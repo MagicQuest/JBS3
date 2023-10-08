@@ -1,3 +1,6 @@
+//ignore like most of the comments lol
+//an example from https://learn.microsoft.com/en-us/windows/win32/inputdev/using-mouse-input
+
 let window;
 const icon = LoadIcon(NULL, IDI_QUESTION);
 //let mouse;
