@@ -1,13 +1,13 @@
 # JBS3  
 ![JBS "LOGO"](https://github.com/MagicQuest/JBS3/blob/main/jbs3.png?raw=true)
 
-a program to use C++ without compiling C++
+a program to made use C++ without compiling C++
 
 Heavily geared towards drawing to the screen for some reason!
 
 ### What this really is
-A JavaScript engine to run C++/Windows.h functions because sometimes I am at school and I want to make something in c++
-It would take YEARS to download and install Visual Studio (obviously) so I need a solution -> JBS3
+A JavaScript engine made to run C++/Windows.h functions because sometimes I want to make something in c++  
+but I don't have Visual Studio so the solution -> **JBS3**
 
 ### Backstory
 I wanted to recreate Visual Basic Script but with JavaScript and thats where JBS came from
