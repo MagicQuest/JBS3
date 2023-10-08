@@ -1,0 +1,23 @@
+const add = (x, y) => x + y; //oops almost left return like a regular function but this anonymous nigga
+//like c++ []() {}
+
+class fuck {
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+    }
+}
+
+const f = new fuck(9, 10);
+print(console, console.log);
+print("21");
+print(add(f.x, f.y));
+print(version());
+
+const fs = require("fs");
+//print(nigg);
+//print(fs, fs.v, nigg);
+//print(fs.read("tux.js"));
+let curFile = fs.read(file.name);
+fs.write(file.name + "1", curFile);
+//print(fs, file, file.name);

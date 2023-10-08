@@ -1,0 +1,1 @@
+inputbox "nigga", 32, "fuc"
