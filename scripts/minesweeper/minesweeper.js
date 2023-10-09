@@ -4,14 +4,16 @@ let window;
 let windowDC;
 const screen = GetDC(null);
 
-const bounds = 500;
-const res = 25;
+const bounds = 600;
+const res = 25; // how many tiles across
 const BB = bounds/res;
 
 const tiles = [];
 
+const trolIcon = LoadImage(NULL, `${__dirname}/troll.ico`, IMAGE_ICON, 0, 0, LR_SHARED | LR_LOADFROMFILE);
+
 let d2d;
-let tileBmp, bombBmp, flagBmp, revealedBmp;//, tileBmpBrush;
+let tileBmp, bombBmp, flagBmp, revealedBmp;//, tiledRevealedBmp, revealedBmpBrush;//, tileBmpBrush;
 let font, colorBrush;
 
             //number colors i.e
@@ -21,6 +23,7 @@ const colors = [[0.0,0.0,1.0],[0.0,.5,0.0],[1.0,0.0,0.0],[0.0,0.0,.5],[.5,0.0,0.
 let mousePos = {x: 0, y: 0};
 
 let lost = false;
+
 
 class Tile {
     constructor() {
@@ -37,12 +40,12 @@ class Tile {
                     //bmp = revealedBmp;
                     //d2d.DrawBitmap(revealedBmp, x*BB, y*BB, x*BB+BB, y*BB+BB, 1.0);
                     //print("revealBmp");
-                    d2d.DrawBitmap(revealedBmp, x*BB, y*BB, x*BB+BB, y*BB+BB, 1.0);
-                //}else {
+                    //}else {
+                d2d.DrawBitmap(revealedBmp, x*BB, y*BB, x*BB+BB, y*BB+BB, 1.0);
                 if(this.neighbors) {
                     colorBrush.SetColor(...colors[this.neighbors-1]);
                     d2d.DrawText(this.neighbors, font, x*BB, y*BB-5, x*BB+BB, y*BB+BB, colorBrush);
-                    return;
+                    //return;
                 }
             }else {
                 d2d.DrawBitmap(bombBmp, x*BB, y*BB, x*BB+BB, y*BB+BB, 1.0);
@@ -83,8 +86,11 @@ function revealTile(x, y) {
             }
         }
     }
-    if(tile.bomb) {
+    if(tile.bomb && !tile.flagged) {
         SetWindowText(window, `Minesweeper - JBS (YOU LOST!!!)`);
+        //print(GetClassLongPtr(window, GCLP_HICONSM));
+        SetClassLongPtr(window, GCLP_HICONSM, trolIcon);
+        SetClassLongPtr(window, GCLP_HICON, trolIcon);
         lost = true;
     }
 }
@@ -107,6 +113,8 @@ for(let i = 0; i < res; i++) {
 
 //print(tiles);
 
+const gdiFonts = [];
+
 function init(hwnd) {   
     d2d = createCanvas("d2d", ID2D1DCRenderTarget, hwnd); //with ID2D1DCRenderTarget you are allowed to draw to the desktop by setting hwnd to null!
                         //just created __dirname for this example
@@ -114,6 +122,14 @@ function init(hwnd) {
     bombBmp = d2d.CreateBitmapFromFilename(`${__dirname}/tile_bomb.png`);
     flagBmp = d2d.CreateBitmapFromFilename(`${__dirname}/tile_flag.png`);
     revealedBmp = d2d.CreateBitmapFromFilename(`${__dirname}/tile_revealed.png`);
+    //just found out that d2d.CreateBitmap() created it slightly wrong
+    //tiledRevealedBmp = d2d.CreateBitmap(BB, BB);//d2d.CreateBitmapFromFilename(`${__dirname}/tile_revealed.png`);
+    //print(revealedBmp.GetPixelFormat(), tiledRevealedBmp.GetPixelFormat());
+    //print(_com_error(tiledRevealedBmp.CopyFromBitmap(0, 0, revealedBmp, 0, 0, BB,BB)), GetLastError());
+    //revealedBmpBrush = d2d.CreateBitmapBrush(tiledRevealedBmp);
+    //revealedBmpBrush.SetExtendMode(D2D1_EXTEND_MODE_WRAP);
+    //revealedBmpBrush.SetOpacity(.01);
+
     colorBrush = d2d.CreateSolidColorBrush(1.0,0.0,0.0,1.0);
     font = d2d.CreateFont("Comic Sans ms", BB);
     font.SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
@@ -121,11 +137,27 @@ function init(hwnd) {
     print(font.GetFontFamilyName());
     print(d2d.GetSize(), BB);
     windowDC = GetDC(window);
+    
+    EnumFontFamilies(windowDC, (font, textMetric, FontType) => {
+        //print(font);
+        font.lfHeight = 50;
+        font.lfWidth = 25;
+        gdiFonts.push(CreateFontIndirect(font));
+    });
+
+    newFont = gdiFonts[0];//CreateFontSimple("Troika", 20, 40);
+
+    //print(EnumFontFamilies(windowDC, (font, textMetric, FontType) => {
+    //    print(font, textMetric, FontType);
+    //}));
+    
     //tileBmpBrush = d2d.CreateBitmapBrush(tileBmp);
 }
 
 const pointer = LoadCursor(null, IDC_HAND);
 const defaultCursor = LoadCursor(null, IDC_ARROW);
+//const gdiFont = CreateFont(48,0,0,0,FW_DONTCARE,false,true,false,DEFAULT_CHARSET,OUT_OUTLINE_PRECIS,
+//    CLIP_DEFAULT_PRECIS,CLEARTYPE_QUALITY, VARIABLE_PITCH,"Impact");
 
 function windowProc(hwnd, msg, wp, lp) {
     window = hwnd;
@@ -173,7 +205,11 @@ const windowMovement = {x: 250, y: 0, vx: 1, vy: 0};
 let date = Date.now()/1000;
 let i = 0;
 
+let newFont;
+
 //const mouseMovement = {x: 0, y: 0, vx: 1, vy: 0};
+
+const bmpTest = LoadImage(null, __dirname+"/ifoundamongus.bmp", IMAGE_BITMAP, 200, 200, LR_SHARED | LR_LOADFROMFILE);
 
 function loop() {
     if(GetKey(VK_ESCAPE)) {
@@ -184,6 +220,11 @@ function loop() {
         let dt = Date.now()/1000-date;
 
         d2d.BeginDraw();
+
+        //d2d.DrawBitmap(tiledRevealedBmp, 0, 0, bounds, bounds);
+        //d2d.FillRectangle(0,0,bounds,bounds,revealedBmpBrush);
+
+        //d2d.Clear(1.0,1.0,1.0,.1);
 
         for(let x = 0; x < res; x++) {
             for(let y = 0; y < res; y++) {
@@ -201,9 +242,21 @@ function loop() {
         
         //on my machine constantly bltting to the screen will actually slow down ALT+TABBING which is really weird (but not weird enough to stop doing it)
         //let oldFont = SelectObject(screen, GetDefaultFont()); //font too small bruh i wanna change size https://stackoverflow.com/questions/72324284/how-do-i-change-the-font-size-of-textout-win32-api-in-c
+        //print(gdiFonts.length, Math.floor(Math.random()*gdiFonts.length), gdiFonts[Math.floor(Math.random()*gdiFonts.length)]);
+        if(i % 250 == 0) {
+            newFont = gdiFonts[Math.floor(Math.random()*gdiFonts.length)];//CreateFontIndirect(gdiFonts[Math.floor(Math.random()*gdiFonts.length)]);
+        }
+        //print("umbrage",newFont);
+        let oldFont = SelectObject(screen, newFont);
         StretchBlt(screen, windowMovement.vx,(1080-bounds/2)+windowMovement.vy,bounds/2,bounds/2,windowDC,0,0,bounds,bounds,SRCCOPY);
-        TextOut(screen, bounds/4-25, 1080-bounds/2-17, "Minimap!");
-        //SelectObject(screen, oldFont);
+        TextOut(screen, /*bounds/4-25*/0, (1080-bounds/2-50)+windowMovement.vy, "Minimap!");
+        SelectObject(screen, oldFont);
+
+        const memDC = CreateCompatibleDC(screen);
+        SelectObject(memDC, bmpTest);
+        BitBlt(screen, 100, 100, 200, 200, memDC, 0, 0, SRCCOPY); //https://learn.microsoft.com/en-us/windows/win32/gdi/scaling-an-image
+        DeleteDC(memDC);
+        //DeleteObject(newFont);
 
         if(bombs == 0) {
             windowMovement.vy += .1;
@@ -263,7 +316,21 @@ function loop() {
 
 const WINCLASSEXA = CreateWindowClass("WinClass", init, windowProc, loop);
 WINCLASSEXA.hCursor = defaultCursor;
+//WINCLASSEXA.hIcon = trolIcon;
+//WINCLASSEXA.hIconSm = trolIcon;
 
 window = CreateWindow(WINCLASSEXA/*A*/, `Minesweeper - JBS (${bombs} bombs left)`, WS_OVERLAPPEDWINDOW | WS_VISIBLE, 250, 0, bounds+16, bounds+39);
 
 console.log(window);
+
+//clean up
+for(const font of gdiFonts) {
+    DeleteObject(font);
+}
+font.Release();
+colorBrush.Release();
+tileBmp.Release();
+bombBmp.Release();
+flagBmp.Release();
+revealedBmp.Release();
+d2d.Release();

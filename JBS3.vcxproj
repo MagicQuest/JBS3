@@ -146,6 +146,7 @@
     <ClInclude Include="console2.h" />
     <ClInclude Include="Direct2D.h" />
     <ClInclude Include="guicon.h" />
+    <ClInclude Include="JBS3.h" />
     <ClInclude Include="resource.h" />
   </ItemGroup>
   <ItemGroup>

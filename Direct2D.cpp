@@ -36,7 +36,12 @@ bool Direct2D::Init(HWND window, int type) {
 		D2D1_RENDER_TARGET_PROPERTIES props = D2D1::RenderTargetProperties(D2D1_RENDER_TARGET_TYPE_DEFAULT,
 			D2D1::PixelFormat(
 				DXGI_FORMAT_B8G8R8A8_UNORM,
-				D2D1_ALPHA_MODE_IGNORE),
+				D2D1_ALPHA_MODE_PREMULTIPLIED), //having this set to ignore seriously made using CreateBitmap->CopyFromBitmap(WICBitmap) stop working (lemme explain)
+			//i used fnBmp = CreateBitmapFromFilename("...")
+			//then made another bitmap with cBitmap = CreateBitmap(...)
+			//i wanted to copy the fnBmp to the cBitmap so
+			//i used cBitmap.CopyFromBitmap(..., fnBmp, ...)
+			//and it failed because cBitmap had a different pixel format and here was the source of that difference
 			0,
 			0,
 			D2D1_RENDER_TARGET_USAGE_NONE,

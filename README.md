@@ -16,7 +16,7 @@ I wanted to recreate Visual Basic Script but with JavaScript and thats where JBS
 
 JBS3 is actually only the second version of JBS and I don't remember why the first was called JBS2 but...  
 
-JBS1 actually could have been made with lua (of course it would be called JBS if I did) but i didn't go through with it because I heard about [Luvit](https://luvit.io/) which is basically lua node.js  
+JBS1 actually could have been made with lua (of course it wouldn't be called JBS if I did) but i didn't go through with it because I heard about [Luvit](https://luvit.io/) which is basically lua node.js  
 
 JBS2 used Duktape which is a simple JS engine and I had to switch to V8 because it didn't even support ES6!  
 
@@ -25,4 +25,4 @@ JBS3 uses google's V8 engine which was HARD to setup but now im 1 step closer to
 speaking of node.js maybe i should just make a node.js library instead
 
 ### Examples
-In the scripts folder there are a few examples like minesweeper and msnexample while the rest of the scripts folder are completely random tests or funny things I wanted to do
+In the scripts folder there are a few examples like minesweeper and msnexample while the rest of the scripts folder are completely random tests or funny things I wanted to do that may or may not work

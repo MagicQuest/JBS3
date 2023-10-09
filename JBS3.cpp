@@ -16,6 +16,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <iostream>
+#include <comdef.h>
 
 #include "include/libplatform/libplatform.h"
 #include "include/v8-context.h"
@@ -769,6 +770,20 @@ V8FUNC(DeleteObjectWrapper) {
     info.GetReturnValue().Set(DeleteObject((HGDIOBJ)IntegerFI(info[0])));
 }
 
+V8FUNC(DestroyCursorWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(DestroyCursor((HCURSOR)IntegerFI(info[0])));
+}
+
+V8FUNC(DestroyIconWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(DestroyIcon((HICON)IntegerFI(info[0])));
+}
+
 V8FUNC(SetDCPenColorWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
@@ -840,15 +855,153 @@ V8FUNC(SetTextColorWrapper) {
     SetTextColor((HDC)IntegerFI(info[0]), IntegerFI(info[1]));//RGB(IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3])));
 }
 
+V8FUNC(CreateFontWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)CreateFontA(IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]), IntegerFI(info[4]), IntegerFI(info[5]), IntegerFI(info[6]), IntegerFI(info[7]), IntegerFI(info[8]), IntegerFI(info[9]), IntegerFI(info[10]), IntegerFI(info[11]), IntegerFI(info[12]), CStringFI(info[13]))));
+}
+
+V8FUNC(CreateFontSimpleWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)CreateFontA(IntegerFI(info[2]), IntegerFI(info[1]), 0, 0, FW_DONTCARE, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH | FF_DONTCARE, CStringFI(info[0]))));
+}
+
+V8FUNC(CreateFontIndirectWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    LOGFONTA lplf{0};
+
+    //print("logofnta");
+    
+    Local<Object> jsLOGFONT = info[0].As<Object>();
+#define GetIntProperty(name) IntegerFI(jsLOGFONT->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL(name)).ToLocalChecked())
+#define GetProperty(name) jsLOGFONT->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL(name)).ToLocalChecked()
+    lplf.lfHeight = GetIntProperty("lfHeight");
+    lplf.lfWidth = GetIntProperty("lfWidth");
+    lplf.lfEscapement = GetIntProperty("lfEscapement");
+    lplf.lfOrientation = GetIntProperty("lfOrientation");
+    lplf.lfWeight = GetIntProperty("lfWeight");
+    lplf.lfItalic = GetIntProperty("lfItalic");
+    lplf.lfUnderline = GetIntProperty("lfUnderline");
+    lplf.lfStrikeOut = GetIntProperty("lfStrikeOut");
+    lplf.lfCharSet = GetIntProperty("lfCharSet");
+    lplf.lfOutPrecision = GetIntProperty("lfOutPrecision");
+    lplf.lfClipPrecision = GetIntProperty("lfClipPrecision");
+    lplf.lfQuality = GetIntProperty("lfQuality");
+    lplf.lfPitchAndFamily = GetIntProperty("lfPitchAndFamily");
+    //print("lfFaceName");
+    strcpy(lplf.lfFaceName, CStringFI(GetProperty("lfFaceName")));
+    //lplf.lfFaceName = CStringFI(GetProperty("lfFaceName"));
+
+    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)CreateFontIndirectA(&lplf)));
+}
+
+int CALLBACK EnumFontFamExProc(const LOGFONTA* lpelfe, const TEXTMETRICA* lpntme, DWORD FontType, LPARAM lParam) {
+    //print(*lpelfe->lfFaceName << " default char " << lpntme->tmDefaultChar);
+    //print(lpelfe->lfFaceName  << " wa " << lpelfe->lfFaceName[0] << " " << *lpelfe->lfFaceName << " " << FontType);
+    using namespace v8;
+    v8::FunctionCallbackInfo<v8::Value> info = *(v8::FunctionCallbackInfo<v8::Value>*)lParam;
+    Isolate* isolate = info.GetIsolate();
+
+    Local<Object> jsLOGFONT = Object::New(isolate);
+#define SetProperty(obj, name, value) obj->Set(isolate->GetCurrentContext(), LITERAL(name), Number::New(isolate, value))
+#define SetPropertyRaw(obj, name, value) obj->Set(isolate->GetCurrentContext(), LITERAL(name), value)
+
+    SetProperty(jsLOGFONT, "lfCharSet", lpelfe->lfCharSet);
+    SetProperty(jsLOGFONT, "lfClipPrecision", lpelfe->lfClipPrecision);
+    SetProperty(jsLOGFONT, "lfEscapement", lpelfe->lfEscapement);
+    SetPropertyRaw(jsLOGFONT, "lfFaceName", String::NewFromUtf8(isolate, lpelfe->lfFaceName).ToLocalChecked());
+    SetProperty(jsLOGFONT, "lfHeight", lpelfe->lfHeight);
+    SetProperty(jsLOGFONT, "lfItalic", lpelfe->lfItalic);
+    SetProperty(jsLOGFONT, "lfOrientation", lpelfe->lfOrientation);
+    SetProperty(jsLOGFONT, "lfOutPrecision", lpelfe->lfOutPrecision);
+    SetProperty(jsLOGFONT, "lfPitchAndFamily", lpelfe->lfPitchAndFamily);
+    SetProperty(jsLOGFONT, "lfQuality", lpelfe->lfQuality);
+    SetProperty(jsLOGFONT, "lfStrikeOut", lpelfe->lfStrikeOut);
+    SetProperty(jsLOGFONT, "lfUnderline", lpelfe->lfUnderline);
+    SetProperty(jsLOGFONT, "lfWeight", lpelfe->lfWeight);
+    SetProperty(jsLOGFONT, "lfWidth", lpelfe->lfWidth);
+
+    Local<Object> jsTEXTMETRIC = Object::New(isolate);
+
+    SetProperty(jsTEXTMETRIC, "tmHeight", lpntme->tmHeight);
+    SetProperty(jsTEXTMETRIC, "tmAscent", lpntme->tmAscent);
+    SetProperty(jsTEXTMETRIC, "tmDescent", lpntme->tmDescent);
+    SetProperty(jsTEXTMETRIC, "tmInternalLeading", lpntme->tmInternalLeading);
+    SetProperty(jsTEXTMETRIC, "tmExternalLeading", lpntme->tmExternalLeading);
+    SetProperty(jsTEXTMETRIC, "tmAveCharWidth", lpntme->tmAveCharWidth);
+    SetProperty(jsTEXTMETRIC, "tmMaxCharWidth", lpntme->tmMaxCharWidth);
+    SetProperty(jsTEXTMETRIC, "tmWeight", lpntme->tmWeight);
+    SetProperty(jsTEXTMETRIC, "tmOverhang", lpntme->tmOverhang);
+    SetProperty(jsTEXTMETRIC, "tmDigitizedAspectX", lpntme->tmDigitizedAspectX);
+    SetProperty(jsTEXTMETRIC, "tmDigitizedAspectY", lpntme->tmDigitizedAspectY);
+    SetProperty(jsTEXTMETRIC, "tmFirstChar", lpntme->tmFirstChar);
+    SetProperty(jsTEXTMETRIC, "tmLastChar", lpntme->tmLastChar);
+    SetProperty(jsTEXTMETRIC, "tmDefaultChar", lpntme->tmDefaultChar);
+    SetProperty(jsTEXTMETRIC, "tmBreakChar", lpntme->tmBreakChar);
+    SetProperty(jsTEXTMETRIC, "tmItalic", lpntme->tmItalic);
+    SetProperty(jsTEXTMETRIC, "tmUnderlined", lpntme->tmUnderlined);
+    SetProperty(jsTEXTMETRIC, "tmStruckOut", lpntme->tmStruckOut);
+    SetProperty(jsTEXTMETRIC, "tmPitchAndFamily", lpntme->tmPitchAndFamily);
+    SetProperty(jsTEXTMETRIC, "tmCharSet", lpntme->tmCharSet);
+
+    Local<Value> args[] = { jsLOGFONT, jsTEXTMETRIC, Number::New(isolate, FontType) };
+    info[1].As<Function>()->Call(isolate->GetCurrentContext(), isolate->GetCurrentContext()->Global(), 3, args);
+
+    return TRUE;
+}
+
+V8FUNC(EnumFontFamiliesWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    LOGFONTA digga{ 0 };
+    digga.lfCharSet = DEFAULT_CHARSET;
+    
+    //digga.lfFaceName[0] = '\0';
+    //digga.lfPitchAndFamily; //https://learn.microsoft.com/en-us/windows/win32/api/wingdi/nf-wingdi-enumfontfamiliesexa
+
+    EnumFontFamiliesExA((HDC)IntegerFI(info[0]), &digga, EnumFontFamExProc, (LPARAM)&info, NULL);
+}
+
+V8FUNC(_com_errorWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    HRESULT hr = IntegerFI(info[0]);
+
+    _com_error err(hr);
+
+    //Local<Object> jsErr = Object::New(isolate);
+    wchar_t* errMsg = (wchar_t*)err.ErrorMessage();
+    const char* errMsgCStr = _bstr_t(errMsg);
+
+    //jsErr->Set(isolate->GetCurrentContext(), LITERAL("ErrorMessage"), String::NewFromUtf8(isolate, errMsgCStr).ToLocalChecked());
+    //jsErr->Set(isolate->GetCurrentContext(), LITERAL("Description"), String::NewFromUtf8(isolate, err.Description()).ToLocalChecked());
+
+    info.GetReturnValue().Set(String::NewFromUtf8(isolate, errMsgCStr).ToLocalChecked());//jsErr);
+}
+
+V8FUNC(BeepWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Beep(IntegerFI(info[0]), IntegerFI(info[1])));
+}
+
 #include "Direct2D.h"
 
 #pragma comment(lib, "d2d1.lib")
 #pragma comment(lib, "dwrite.lib")
 
-float lerp(float a, float b, float f)
-{
-    return a * (1.0 - f) + (b * f);
-}
+//float lerp(float a, float b, float f)
+//{
+//    return a * (1.0 - f) + (b * f);
+//}
 
 namespace DIRECT2D {
     using namespace v8;
@@ -915,7 +1068,8 @@ namespace DIRECT2D {
             ID2D1Bitmap* bmp = (ID2D1Bitmap*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
 
             D2D1_PIXEL_FORMAT pf = bmp->GetPixelFormat();
-
+            
+            
             Local<Object> jsPixelFormat = Object::New(isolate);
             jsPixelFormat->Set(isolate->GetCurrentContext(), LITERAL("format"), Number::New(isolate, pf.format));
             jsPixelFormat->Set(isolate->GetCurrentContext(), LITERAL("alphaMode"), Number::New(isolate, pf.alphaMode));
@@ -954,7 +1108,19 @@ namespace DIRECT2D {
             D2D1_POINT_2U point = D2D1::Point2U(IntegerFI(info[0]), IntegerFI(info[1]));
             D2D1_RECT_U rect = D2D1::RectU(IntegerFI(info[3]), IntegerFI(info[4]), IntegerFI(info[5]), IntegerFI(info[6]));
             
-            bmp->CopyFromBitmap(&point, (ID2D1Bitmap*)IntegerFI(info[2]), &rect);
+            ID2D1Bitmap* copyFrom = (ID2D1Bitmap*)(IntegerFI(info[2].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()));
+
+            //print(bmp << " " << point.x << "<-x  y->" << point.y << " left->" << rect.left << " top->" << rect.top << " right->" << rect.right << " bottom->" << rect.bottom << " " << copyFrom);
+
+            //https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-erref/705fb797-2175-4a90-b5a3-3918024b10b8?redirectedfrom=MSDN
+            //getting -2147024809
+            //FFFF FFFF 8007 0057
+            //0x80070057 -> E_INVALIDARG
+            //it did NOT need all that effort to get the code
+            //ok i just found the solution
+            https://stackoverflow.com/questions/7008047/is-there-a-way-to-get-the-string-representation-of-hresult-value-using-win-api
+            //IT THINKS MY UNCOMMENTED LINKS ARE LABELS FOR GOTO!
+            info.GetReturnValue().Set(Number::New(isolate, bmp->CopyFromBitmap(&point, /*(ID2D1Bitmap*)IntegerFI(info[2])*/copyFrom, &rect)));
         }));
         jsBitmap->Set(isolate, "CopyFromRenderTarget", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
             Isolate* isolate = info.GetIsolate();
@@ -1072,12 +1238,12 @@ namespace DIRECT2D {
         }
         else if (strcmp(brushType, "linear") == 0) {
             //angle = (float)((int)angle % 360);
-                        //damn it i lose precision
+                        //damn it i lose precision (lol it donesn't reall y mater)
             angle = fmod(angle, 360.f);
             ID2D1LinearGradientBrush* brush = (ID2D1LinearGradientBrush*)bruh;
             D2D1_POINT_2F zeroRotP0 = D2D1::Point2F(point0.x+(point1.x-point0.x)*f3(angle/360), point1.y - (point1.y - point0.y) * f(angle / 360));
             D2D1_POINT_2F zeroRotP1 = D2D1::Point2F(point1.x + (point0.x - point1.x) * f3(angle / 360), point0.y - (point0.y - point1.y) * f(angle / 360));
-            //https://www.desmos.com/calculator/erqmojpc7j
+            //https://www.desmos.com/calculator/erqmojpc7j   //absolutely insane math
             //desmos just saved my life
             //print(angle);
             //if (angle < 45) {
@@ -1641,6 +1807,8 @@ V8FUNC(createCanvas) {
 
             d2d->renderTarget->CreateBitmapFromWicBitmap(wicConverter, NULL, &bmp);
 
+            
+
             //wicFactory->Release();
             wicDecoder->Release();
             wicConverter->Release();
@@ -1654,8 +1822,8 @@ V8FUNC(createCanvas) {
             Isolate* isolate = info.GetIsolate();
             Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
             ID2D1Bitmap* bmp = (ID2D1Bitmap*)info[0].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()->IntegerValue(isolate->GetCurrentContext()).FromJust();//IntegerFI(info[0]);
-            
-            d2d->renderTarget->DrawBitmap(bmp, D2D1::RectF(FloatFI(info[1]), FloatFI(info[2]), FloatFI(info[3]), FloatFI(info[4])), FloatFI(info[5]), (D2D1_BITMAP_INTERPOLATION_MODE)IntegerFI(info[6]), D2D1::RectF(info[7]->IsNumber() ? FloatFI(info[7]) : 0.0F, info[8]->IsNumber() ? FloatFI(info[8]) : 0.0F, info[9]->IsNumber() ? FloatFI(info[9]) : bmp->GetSize().width, info[10]->IsNumber() ? FloatFI(info[10]) : bmp->GetSize().height));
+                                                                                                                //had the unfortunate realization that the alpha is not automatically set to 1
+            d2d->renderTarget->DrawBitmap(bmp, D2D1::RectF(FloatFI(info[1]), FloatFI(info[2]), FloatFI(info[3]), FloatFI(info[4])), info[5]->IsNumber() ? FloatFI(info[5]) : 1.0, (D2D1_BITMAP_INTERPOLATION_MODE)IntegerFI(info[6]), D2D1::RectF(info[7]->IsNumber() ? FloatFI(info[7]) : 0.0F, info[8]->IsNumber() ? FloatFI(info[8]) : 0.0F, info[9]->IsNumber() ? FloatFI(info[9]) : bmp->GetSize().width, info[10]->IsNumber() ? FloatFI(info[10]) : bmp->GetSize().height));
         }));
         context->Set(isolate, "CreateBitmapBrush", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
             Isolate* isolate = info.GetIsolate();
@@ -1714,7 +1882,7 @@ V8FUNC(createCanvas) {
                 ID2D1BitmapBrush* bmpBrush = (ID2D1BitmapBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
                 
                 bmpBrush->SetExtendModeX((D2D1_EXTEND_MODE)IntegerFI(info[0]));
-                bmpBrush->SetExtendModeY((D2D1_EXTEND_MODE)IntegerFI(info[1]));
+                bmpBrush->SetExtendModeY((D2D1_EXTEND_MODE)IntegerFI(info[0]));
             }));
             jsBrush->Set(isolate, "SetInterpolationMode", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
                 Isolate* isolate = info.GetIsolate();
@@ -2328,7 +2496,7 @@ V8FUNC(EnumWindowsWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
 
-    EnumWindows(enumWindowCallback, (LONG_PTR)&info);
+    EnumWindows(enumWindowCallback, (LONG_PTR)&info); //v8 would actually assert and crash at this line to "prevent inadvertent misuse" so i commented that part out and it works fine LO
     //EnumWindows((WNDENUMPROC)[&,isolate](HWND hwnd, LPARAM lParam) {
     //
     //    return TRUE;
@@ -2451,6 +2619,13 @@ V8FUNC(LoadCursorWrapper) {
     Isolate* isolate = info.GetIsolate();
 
     info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)LoadCursorA((HINSTANCE)IntegerFI(info[0]), (LPCSTR)IntegerFI(info[1]))));
+}
+
+V8FUNC(LoadCursorFromFileWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)LoadCursorFromFileA((LPCSTR)IntegerFI(info[0]))));
 }
 
 V8FUNC(LoadImageWrapper) {
@@ -2759,7 +2934,7 @@ V8FUNC(CreateWindowWrapper) {
     if (!RegisterClassExA(&wc)) {
         info.GetReturnValue().Set(false);
         print("FAILED RegisteClassExA "<<hInstance<< " " << GetModuleHandle(NULL));
-        MessageBoxA(NULL, "failed to register window class", (std::string("err: [") + std::to_string(GetLastError()) + "]").c_str(), MB_OK | MB_ICONERROR);
+        MessageBoxA(NULL, "failed to register window class (keep trying idk why CreateWindow is a little sketchy)", (std::string("err: [") + std::to_string(GetLastError()) + "]").c_str(), MB_OK | MB_ICONERROR);
         return;
     }
 
@@ -2773,7 +2948,9 @@ V8FUNC(CreateWindowWrapper) {
     HWND newWindow = CreateWindowA(CStringFI(GetProperty("lpszClassName")), CStringFI(info[1]), IntegerFI(info[2]), x, y, width, height, NULL, NULL, hInstance, NULL);
 
     if (GetLastError() != 0) {
-        MessageBoxA(NULL, "rerun JBS because there's a 50% chance of your NOT window being created", "CreateWindow Error Checking", MB_OK | MB_ICONWARNING);
+        if (MessageBoxA(NULL, "RESTART JBS because there's a 99% chance that the window was NOT created", "CreateWindow Error Checking", MB_OKCANCEL | MB_ICONWARNING) == IDCANCEL) {
+            return;
+        }
     }
     MessageBoxA(NULL, (std::string("shit")+std::to_string(GetLastError())).c_str(), "titlke", MB_OKCANCEL); //https://www.youtube.com/watch?v=58OhXFmTUo0
     SetWindowLongPtrW(newWindow, GWLP_USERDATA, (LONG_PTR)isolate);//(size_t) & wndclass->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("windowProc")).ToLocalChecked().As<Function>());
@@ -2823,6 +3000,7 @@ V8FUNC(CreateWindowWrapper) {
             }
             else
             {
+                v8::HandleScope handle_scope(isolate); //apparently i needed this so good to know
                 looper->Call(isolate->GetCurrentContext(), isolate->GetCurrentContext()->Global(), 0, nullptr);
                 //print("LOPER CALLED!");
 
@@ -2883,6 +3061,13 @@ V8FUNC(EnableWindowWrapper) {
     info.GetReturnValue().Set(Number::New(isolate, EnableWindow((HWND)IntegerFI(info[0]), IntegerFI(info[1]))));
 }
 
+V8FUNC(SendMessageWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, SendMessageA((HWND)IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]))));
+}
+
 V8FUNC(ClientToScreenWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
@@ -2930,6 +3115,70 @@ V8FUNC(GetSystemMetricsWrapper) {
     Isolate* isolate = info.GetIsolate();
 
     info.GetReturnValue().Set(Number::New(isolate, GetSystemMetrics(IntegerFI(info[0]))));
+}
+
+V8FUNC(CreateCompatibleBitmapWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)CreateCompatibleBitmap((HDC)IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2])))); //i need a return int macro
+}
+
+V8FUNC(CreateCompatibleDCWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)CreateCompatibleDC((HDC)IntegerFI(info[0])))); //i need a return int macro
+}
+
+V8FUNC(DeleteDCWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)DeleteDC((HDC)IntegerFI(info[0]))));
+}
+
+//V8FUNC(CreateDCWrapper) {
+//    using namespace v8;
+//    Isolate* isolate = info.GetIsolate();
+//
+//    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)CreateDC((HDC)IntegerFI(info[0]))));
+//}
+
+//https://stackoverflow.com/questions/14050919/hbitmap-to-bitmap-converting
+//https://forums.codeguru.com/showthread.php?441251-CBitmap-to-HICON-or-HICON-from-HBITMAP
+HICON HICONFromHBITMAP(HBITMAP bitmap)
+{
+    BITMAP bmp{0}; GetObject(bitmap, sizeof(BITMAP), &bmp);
+    //bitmap.GetBitmap(&bmp);
+
+
+    HBITMAP hbmMask = CreateCompatibleBitmap(GetDC(NULL),
+        bmp.bmWidth, bmp.bmHeight);
+
+    ICONINFO ii = { 0 };
+    ii.fIcon = TRUE;
+    ii.hbmColor = bitmap;
+    ii.hbmMask = hbmMask;
+
+    HICON hIcon = CreateIconIndirect(&ii);
+    DeleteObject(hbmMask);
+
+    return hIcon;
+}
+
+V8FUNC(HICONFromHBITMAPWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)HICONFromHBITMAP((HBITMAP)IntegerFI(info[0]))));
+}
+
+V8FUNC(CreateBitmapWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)CreateBitmap(IntegerFI(info[0]), IntegerFI(info[1]), 1, 32, nullptr)));
 }
 
 v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
@@ -3079,23 +3328,165 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     setGlobalConst(PS_NULL);
     setGlobalConst(PS_INSIDEFRAME);
 
-#define D2D1_EXTEND_MODE_CLAMP D2D1_EXTEND_MODE_CLAMP
-#define D2D1_EXTEND_MODE_WRAP D2D1_EXTEND_MODE_WRAP
-#define D2D1_EXTEND_MODE_MIRROR D2D1_EXTEND_MODE_MIRROR
-#define D2D1_EXTEND_MODE_FORCE_DWORD D2D1_EXTEND_MODE_FORCE_DWORD
+//#define D2D1_EXTEND_MODE_CLAMP D2D1_EXTEND_MODE_CLAMP
+//#define D2D1_EXTEND_MODE_WRAP D2D1_EXTEND_MODE_WRAP
+//#define D2D1_EXTEND_MODE_MIRROR D2D1_EXTEND_MODE_MIRROR
+//#define D2D1_EXTEND_MODE_FORCE_DWORD D2D1_EXTEND_MODE_FORCE_DWORD
 
     setGlobalConst(D2D1_EXTEND_MODE_CLAMP);
     setGlobalConst(D2D1_EXTEND_MODE_WRAP);
     setGlobalConst(D2D1_EXTEND_MODE_MIRROR);
     setGlobalConst(D2D1_EXTEND_MODE_FORCE_DWORD);
 
-#define D2D1_BITMAP_INTERPOLATION_MODE_NEAREST_NEIGHBOR D2D1_BITMAP_INTERPOLATION_MODE_NEAREST_NEIGHBOR
-#define D2D1_BITMAP_INTERPOLATION_MODE_LINEAR D2D1_BITMAP_INTERPOLATION_MODE_LINEAR
-#define D2D1_BITMAP_INTERPOLATION_MODE_FORCE_DWORD D2D1_BITMAP_INTERPOLATION_MODE_FORCE_DWORD
+//#define D2D1_BITMAP_INTERPOLATION_MODE_NEAREST_NEIGHBOR D2D1_BITMAP_INTERPOLATION_MODE_NEAREST_NEIGHBOR
+//#define D2D1_BITMAP_INTERPOLATION_MODE_LINEAR D2D1_BITMAP_INTERPOLATION_MODE_LINEAR
+//#define D2D1_BITMAP_INTERPOLATION_MODE_FORCE_DWORD D2D1_BITMAP_INTERPOLATION_MODE_FORCE_DWORD
 
     setGlobalConst(D2D1_BITMAP_INTERPOLATION_MODE_NEAREST_NEIGHBOR);
     setGlobalConst(D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);
     setGlobalConst(D2D1_BITMAP_INTERPOLATION_MODE_FORCE_DWORD);
+
+
+//string.replaceAll(" ", "").replaceAll("\t", "").split("\n").map(s = > "#define " + s + " " + s).map(s = > console.log(s));
+//OK I DID ALL THIS THEN REALIZED I DIN'T HAVE TO
+//IDK EVEN KNOW WHY I THOUGHT I HAD TO
+
+//#define DXGI_FORMAT_UNKNOWN DXGI_FORMAT_UNKNOWN
+//#define DXGI_FORMAT_R32G32B32A32_TYPELESS DXGI_FORMAT_R32G32B32A32_TYPELESS
+//#define DXGI_FORMAT_R32G32B32A32_FLOAT DXGI_FORMAT_R32G32B32A32_FLOAT
+//#define DXGI_FORMAT_R32G32B32A32_UINT DXGI_FORMAT_R32G32B32A32_UINT
+//#define DXGI_FORMAT_R32G32B32A32_SINT DXGI_FORMAT_R32G32B32A32_SINT
+//#define DXGI_FORMAT_R32G32B32_TYPELESS DXGI_FORMAT_R32G32B32_TYPELESS
+//#define DXGI_FORMAT_R32G32B32_FLOAT DXGI_FORMAT_R32G32B32_FLOAT
+//#define DXGI_FORMAT_R32G32B32_UINT DXGI_FORMAT_R32G32B32_UINT
+//#define DXGI_FORMAT_R32G32B32_SINT DXGI_FORMAT_R32G32B32_SINT
+//#define DXGI_FORMAT_R16G16B16A16_TYPELESS DXGI_FORMAT_R16G16B16A16_TYPELESS
+//#define DXGI_FORMAT_R16G16B16A16_FLOAT DXGI_FORMAT_R16G16B16A16_FLOAT
+//#define DXGI_FORMAT_R16G16B16A16_UNORM DXGI_FORMAT_R16G16B16A16_UNORM
+//#define DXGI_FORMAT_R16G16B16A16_UINT DXGI_FORMAT_R16G16B16A16_UINT
+//#define DXGI_FORMAT_R16G16B16A16_SNORM DXGI_FORMAT_R16G16B16A16_SNORM
+//#define DXGI_FORMAT_R16G16B16A16_SINT DXGI_FORMAT_R16G16B16A16_SINT
+//#define DXGI_FORMAT_R32G32_TYPELESS DXGI_FORMAT_R32G32_TYPELESS
+//#define DXGI_FORMAT_R32G32_FLOAT DXGI_FORMAT_R32G32_FLOAT
+//#define DXGI_FORMAT_R32G32_UINT DXGI_FORMAT_R32G32_UINT
+//#define DXGI_FORMAT_R32G32_SINT DXGI_FORMAT_R32G32_SINT
+//#define DXGI_FORMAT_R32G8X24_TYPELESS DXGI_FORMAT_R32G8X24_TYPELESS
+//#define DXGI_FORMAT_D32_FLOAT_S8X24_UINT DXGI_FORMAT_D32_FLOAT_S8X24_UINT
+//#define DXGI_FORMAT_R32_FLOAT_X8X24_TYPELESS DXGI_FORMAT_R32_FLOAT_X8X24_TYPELESS
+//#define DXGI_FORMAT_X32_TYPELESS_G8X24_UINT DXGI_FORMAT_X32_TYPELESS_G8X24_UINT
+//#define DXGI_FORMAT_R10G10B10A2_TYPELESS DXGI_FORMAT_R10G10B10A2_TYPELESS
+//#define DXGI_FORMAT_R10G10B10A2_UNORM DXGI_FORMAT_R10G10B10A2_UNORM
+//#define DXGI_FORMAT_R10G10B10A2_UINT DXGI_FORMAT_R10G10B10A2_UINT
+//#define DXGI_FORMAT_R11G11B10_FLOAT DXGI_FORMAT_R11G11B10_FLOAT
+//#define DXGI_FORMAT_R8G8B8A8_TYPELESS DXGI_FORMAT_R8G8B8A8_TYPELESS
+//#define DXGI_FORMAT_R8G8B8A8_UNORM DXGI_FORMAT_R8G8B8A8_UNORM
+//#define DXGI_FORMAT_R8G8B8A8_UNORM_SRGB DXGI_FORMAT_R8G8B8A8_UNORM_SRGB
+//#define DXGI_FORMAT_R8G8B8A8_UINT DXGI_FORMAT_R8G8B8A8_UINT
+//#define DXGI_FORMAT_R8G8B8A8_SNORM DXGI_FORMAT_R8G8B8A8_SNORM
+//#define DXGI_FORMAT_R8G8B8A8_SINT DXGI_FORMAT_R8G8B8A8_SINT
+//#define DXGI_FORMAT_R16G16_TYPELESS DXGI_FORMAT_R16G16_TYPELESS
+//#define DXGI_FORMAT_R16G16_FLOAT DXGI_FORMAT_R16G16_FLOAT
+//#define DXGI_FORMAT_R16G16_UNORM DXGI_FORMAT_R16G16_UNORM
+//#define DXGI_FORMAT_R16G16_UINT DXGI_FORMAT_R16G16_UINT
+//#define DXGI_FORMAT_R16G16_SNORM DXGI_FORMAT_R16G16_SNORM
+//#define DXGI_FORMAT_R16G16_SINT DXGI_FORMAT_R16G16_SINT
+//#define DXGI_FORMAT_R32_TYPELESS DXGI_FORMAT_R32_TYPELESS
+//#define DXGI_FORMAT_D32_FLOAT DXGI_FORMAT_D32_FLOAT
+//#define DXGI_FORMAT_R32_FLOAT DXGI_FORMAT_R32_FLOAT
+//#define DXGI_FORMAT_R32_UINT DXGI_FORMAT_R32_UINT
+//#define DXGI_FORMAT_R32_SINT DXGI_FORMAT_R32_SINT
+//#define DXGI_FORMAT_R24G8_TYPELESS DXGI_FORMAT_R24G8_TYPELESS
+//#define DXGI_FORMAT_D24_UNORM_S8_UINT DXGI_FORMAT_D24_UNORM_S8_UINT
+//#define DXGI_FORMAT_R24_UNORM_X8_TYPELESS DXGI_FORMAT_R24_UNORM_X8_TYPELESS
+//#define DXGI_FORMAT_X24_TYPELESS_G8_UINT DXGI_FORMAT_X24_TYPELESS_G8_UINT
+//#define DXGI_FORMAT_R8G8_TYPELESS DXGI_FORMAT_R8G8_TYPELESS
+//#define DXGI_FORMAT_R8G8_UNORM DXGI_FORMAT_R8G8_UNORM
+//#define DXGI_FORMAT_R8G8_UINT DXGI_FORMAT_R8G8_UINT
+//#define DXGI_FORMAT_R8G8_SNORM DXGI_FORMAT_R8G8_SNORM
+//#define DXGI_FORMAT_R8G8_SINT DXGI_FORMAT_R8G8_SINT
+//#define DXGI_FORMAT_R16_TYPELESS DXGI_FORMAT_R16_TYPELESS
+//#define DXGI_FORMAT_R16_FLOAT DXGI_FORMAT_R16_FLOAT
+//#define DXGI_FORMAT_D16_UNORM DXGI_FORMAT_D16_UNORM
+//#define DXGI_FORMAT_R16_UNORM DXGI_FORMAT_R16_UNORM
+//#define DXGI_FORMAT_R16_UINT DXGI_FORMAT_R16_UINT
+//#define DXGI_FORMAT_R16_SNORM DXGI_FORMAT_R16_SNORM
+//#define DXGI_FORMAT_R16_SINT DXGI_FORMAT_R16_SINT
+//#define DXGI_FORMAT_R8_TYPELESS DXGI_FORMAT_R8_TYPELESS
+//#define DXGI_FORMAT_R8_UNORM DXGI_FORMAT_R8_UNORM
+//#define DXGI_FORMAT_R8_UINT DXGI_FORMAT_R8_UINT
+//#define DXGI_FORMAT_R8_SNORM DXGI_FORMAT_R8_SNORM
+//#define DXGI_FORMAT_R8_SINT DXGI_FORMAT_R8_SINT
+//#define DXGI_FORMAT_A8_UNORM DXGI_FORMAT_A8_UNORM
+//#define DXGI_FORMAT_R1_UNORM DXGI_FORMAT_R1_UNORM
+//#define DXGI_FORMAT_R9G9B9E5_SHAREDEXP DXGI_FORMAT_R9G9B9E5_SHAREDEXP
+//#define DXGI_FORMAT_R8G8_B8G8_UNORM DXGI_FORMAT_R8G8_B8G8_UNORM
+//#define DXGI_FORMAT_G8R8_G8B8_UNORM DXGI_FORMAT_G8R8_G8B8_UNORM
+//#define DXGI_FORMAT_BC1_TYPELESS DXGI_FORMAT_BC1_TYPELESS
+//#define DXGI_FORMAT_BC1_UNORM DXGI_FORMAT_BC1_UNORM
+//#define DXGI_FORMAT_BC1_UNORM_SRGB DXGI_FORMAT_BC1_UNORM_SRGB
+//#define DXGI_FORMAT_BC2_TYPELESS DXGI_FORMAT_BC2_TYPELESS
+//#define DXGI_FORMAT_BC2_UNORM DXGI_FORMAT_BC2_UNORM
+//#define DXGI_FORMAT_BC2_UNORM_SRGB DXGI_FORMAT_BC2_UNORM_SRGB
+//#define DXGI_FORMAT_BC3_TYPELESS DXGI_FORMAT_BC3_TYPELESS
+//#define DXGI_FORMAT_BC3_UNORM DXGI_FORMAT_BC3_UNORM
+//#define DXGI_FORMAT_BC3_UNORM_SRGB DXGI_FORMAT_BC3_UNORM_SRGB
+//#define DXGI_FORMAT_BC4_TYPELESS DXGI_FORMAT_BC4_TYPELESS
+//#define DXGI_FORMAT_BC4_UNORM DXGI_FORMAT_BC4_UNORM
+//#define DXGI_FORMAT_BC4_SNORM DXGI_FORMAT_BC4_SNORM
+//#define DXGI_FORMAT_BC5_TYPELESS DXGI_FORMAT_BC5_TYPELESS
+//#define DXGI_FORMAT_BC5_UNORM DXGI_FORMAT_BC5_UNORM
+//#define DXGI_FORMAT_BC5_SNORM DXGI_FORMAT_BC5_SNORM
+//#define DXGI_FORMAT_B5G6R5_UNORM DXGI_FORMAT_B5G6R5_UNORM
+//#define DXGI_FORMAT_B5G5R5A1_UNORM DXGI_FORMAT_B5G5R5A1_UNORM
+//#define DXGI_FORMAT_B8G8R8A8_UNORM DXGI_FORMAT_B8G8R8A8_UNORM
+//#define DXGI_FORMAT_B8G8R8X8_UNORM DXGI_FORMAT_B8G8R8X8_UNORM
+//#define DXGI_FORMAT_R10G10B10_XR_BIAS_A2_UNORM DXGI_FORMAT_R10G10B10_XR_BIAS_A2_UNORM
+//#define DXGI_FORMAT_B8G8R8A8_TYPELESS DXGI_FORMAT_B8G8R8A8_TYPELESS
+//#define DXGI_FORMAT_B8G8R8A8_UNORM_SRGB DXGI_FORMAT_B8G8R8A8_UNORM_SRGB
+//#define DXGI_FORMAT_B8G8R8X8_TYPELESS DXGI_FORMAT_B8G8R8X8_TYPELESS
+//#define DXGI_FORMAT_B8G8R8X8_UNORM_SRGB DXGI_FORMAT_B8G8R8X8_UNORM_SRGB
+//#define DXGI_FORMAT_BC6H_TYPELESS DXGI_FORMAT_BC6H_TYPELESS
+//#define DXGI_FORMAT_BC6H_UF16 DXGI_FORMAT_BC6H_UF16
+//#define DXGI_FORMAT_BC6H_SF16 DXGI_FORMAT_BC6H_SF16
+//#define DXGI_FORMAT_BC7_TYPELESS DXGI_FORMAT_BC7_TYPELESS
+//#define DXGI_FORMAT_BC7_UNORM DXGI_FORMAT_BC7_UNORM
+//#define DXGI_FORMAT_BC7_UNORM_SRGB DXGI_FORMAT_BC7_UNORM_SRGB
+//#define DXGI_FORMAT_AYUV DXGI_FORMAT_AYUV
+//#define DXGI_FORMAT_Y410 DXGI_FORMAT_Y410
+//#define DXGI_FORMAT_Y416 DXGI_FORMAT_Y416
+//#define DXGI_FORMAT_NV12 DXGI_FORMAT_NV12
+//#define DXGI_FORMAT_P010 DXGI_FORMAT_P010
+//#define DXGI_FORMAT_P016 DXGI_FORMAT_P016
+//#define DXGI_FORMAT_420_OPAQUE DXGI_FORMAT_420_OPAQUE
+//#define DXGI_FORMAT_YUY2 DXGI_FORMAT_YUY2
+//#define DXGI_FORMAT_Y210 DXGI_FORMAT_Y210
+//#define DXGI_FORMAT_Y216 DXGI_FORMAT_Y216
+//#define DXGI_FORMAT_NV11 DXGI_FORMAT_NV11
+//#define DXGI_FORMAT_AI44 DXGI_FORMAT_AI44
+//#define DXGI_FORMAT_IA44 DXGI_FORMAT_IA44
+//#define DXGI_FORMAT_P8 DXGI_FORMAT_P8
+//#define DXGI_FORMAT_A8P8 DXGI_FORMAT_A8P8
+//#define DXGI_FORMAT_B4G4R4A4_UNORM DXGI_FORMAT_B4G4R4A4_UNORM
+//#define DXGI_FORMAT_P208 DXGI_FORMAT_P208
+//#define DXGI_FORMAT_V208 DXGI_FORMAT_V208
+//#define DXGI_FORMAT_V408 DXGI_FORMAT_V408
+//#define DXGI_FORMAT_SAMPLER_FEEDBACK_MIN_MIP_OPAQUE DXGI_FORMAT_SAMPLER_FEEDBACK_MIN_MIP_OPAQUE
+//#define DXGI_FORMAT_SAMPLER_FEEDBACK_MIP_REGION_USED_OPAQUE DXGI_FORMAT_SAMPLER_FEEDBACK_MIP_REGION_USED_OPAQUE
+//#define DXGI_FORMAT_FORCE_UINT DXGI_FORMAT_FORCE_UINT
+
+setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYPELESS); setGlobalConst(DXGI_FORMAT_R32G32B32A32_FLOAT); setGlobalConst(DXGI_FORMAT_R32G32B32A32_UINT); setGlobalConst(DXGI_FORMAT_R32G32B32A32_SINT); setGlobalConst(DXGI_FORMAT_R32G32B32_TYPELESS); setGlobalConst(DXGI_FORMAT_R32G32B32_FLOAT); setGlobalConst(DXGI_FORMAT_R32G32B32_UINT); setGlobalConst(DXGI_FORMAT_R32G32B32_SINT); setGlobalConst(DXGI_FORMAT_R16G16B16A16_TYPELESS); setGlobalConst(DXGI_FORMAT_R16G16B16A16_FLOAT); setGlobalConst(DXGI_FORMAT_R16G16B16A16_UNORM); setGlobalConst(DXGI_FORMAT_R16G16B16A16_UINT); setGlobalConst(DXGI_FORMAT_R16G16B16A16_SNORM); setGlobalConst(DXGI_FORMAT_R16G16B16A16_SINT); setGlobalConst(DXGI_FORMAT_R32G32_TYPELESS); setGlobalConst(DXGI_FORMAT_R32G32_FLOAT); setGlobalConst(DXGI_FORMAT_R32G32_UINT); setGlobalConst(DXGI_FORMAT_R32G32_SINT); setGlobalConst(DXGI_FORMAT_R32G8X24_TYPELESS); setGlobalConst(DXGI_FORMAT_D32_FLOAT_S8X24_UINT); setGlobalConst(DXGI_FORMAT_R32_FLOAT_X8X24_TYPELESS); setGlobalConst(DXGI_FORMAT_X32_TYPELESS_G8X24_UINT); setGlobalConst(DXGI_FORMAT_R10G10B10A2_TYPELESS); setGlobalConst(DXGI_FORMAT_R10G10B10A2_UNORM); setGlobalConst(DXGI_FORMAT_R10G10B10A2_UINT); setGlobalConst(DXGI_FORMAT_R11G11B10_FLOAT); setGlobalConst(DXGI_FORMAT_R8G8B8A8_TYPELESS); setGlobalConst(DXGI_FORMAT_R8G8B8A8_UNORM); setGlobalConst(DXGI_FORMAT_R8G8B8A8_UNORM_SRGB); setGlobalConst(DXGI_FORMAT_R8G8B8A8_UINT); setGlobalConst(DXGI_FORMAT_R8G8B8A8_SNORM); setGlobalConst(DXGI_FORMAT_R8G8B8A8_SINT); setGlobalConst(DXGI_FORMAT_R16G16_TYPELESS); setGlobalConst(DXGI_FORMAT_R16G16_FLOAT); setGlobalConst(DXGI_FORMAT_R16G16_UNORM); setGlobalConst(DXGI_FORMAT_R16G16_UINT); setGlobalConst(DXGI_FORMAT_R16G16_SNORM); setGlobalConst(DXGI_FORMAT_R16G16_SINT); setGlobalConst(DXGI_FORMAT_R32_TYPELESS); setGlobalConst(DXGI_FORMAT_D32_FLOAT); setGlobalConst(DXGI_FORMAT_R32_FLOAT); setGlobalConst(DXGI_FORMAT_R32_UINT); setGlobalConst(DXGI_FORMAT_R32_SINT); setGlobalConst(DXGI_FORMAT_R24G8_TYPELESS); setGlobalConst(DXGI_FORMAT_D24_UNORM_S8_UINT); setGlobalConst(DXGI_FORMAT_R24_UNORM_X8_TYPELESS); setGlobalConst(DXGI_FORMAT_X24_TYPELESS_G8_UINT); setGlobalConst(DXGI_FORMAT_R8G8_TYPELESS); setGlobalConst(DXGI_FORMAT_R8G8_UNORM); setGlobalConst(DXGI_FORMAT_R8G8_UINT); setGlobalConst(DXGI_FORMAT_R8G8_SNORM); setGlobalConst(DXGI_FORMAT_R8G8_SINT); setGlobalConst(DXGI_FORMAT_R16_TYPELESS); setGlobalConst(DXGI_FORMAT_R16_FLOAT); setGlobalConst(DXGI_FORMAT_D16_UNORM); setGlobalConst(DXGI_FORMAT_R16_UNORM); setGlobalConst(DXGI_FORMAT_R16_UINT); setGlobalConst(DXGI_FORMAT_R16_SNORM); setGlobalConst(DXGI_FORMAT_R16_SINT); setGlobalConst(DXGI_FORMAT_R8_TYPELESS); setGlobalConst(DXGI_FORMAT_R8_UNORM); setGlobalConst(DXGI_FORMAT_R8_UINT); setGlobalConst(DXGI_FORMAT_R8_SNORM); setGlobalConst(DXGI_FORMAT_R8_SINT); setGlobalConst(DXGI_FORMAT_A8_UNORM); setGlobalConst(DXGI_FORMAT_R1_UNORM); setGlobalConst(DXGI_FORMAT_R9G9B9E5_SHAREDEXP); setGlobalConst(DXGI_FORMAT_R8G8_B8G8_UNORM); setGlobalConst(DXGI_FORMAT_G8R8_G8B8_UNORM); setGlobalConst(DXGI_FORMAT_BC1_TYPELESS); setGlobalConst(DXGI_FORMAT_BC1_UNORM); setGlobalConst(DXGI_FORMAT_BC1_UNORM_SRGB); setGlobalConst(DXGI_FORMAT_BC2_TYPELESS); setGlobalConst(DXGI_FORMAT_BC2_UNORM); setGlobalConst(DXGI_FORMAT_BC2_UNORM_SRGB); setGlobalConst(DXGI_FORMAT_BC3_TYPELESS); setGlobalConst(DXGI_FORMAT_BC3_UNORM); setGlobalConst(DXGI_FORMAT_BC3_UNORM_SRGB); setGlobalConst(DXGI_FORMAT_BC4_TYPELESS); setGlobalConst(DXGI_FORMAT_BC4_UNORM); setGlobalConst(DXGI_FORMAT_BC4_SNORM); setGlobalConst(DXGI_FORMAT_BC5_TYPELESS); setGlobalConst(DXGI_FORMAT_BC5_UNORM); setGlobalConst(DXGI_FORMAT_BC5_SNORM); setGlobalConst(DXGI_FORMAT_B5G6R5_UNORM); setGlobalConst(DXGI_FORMAT_B5G5R5A1_UNORM); setGlobalConst(DXGI_FORMAT_B8G8R8A8_UNORM); setGlobalConst(DXGI_FORMAT_B8G8R8X8_UNORM); setGlobalConst(DXGI_FORMAT_R10G10B10_XR_BIAS_A2_UNORM); setGlobalConst(DXGI_FORMAT_B8G8R8A8_TYPELESS); setGlobalConst(DXGI_FORMAT_B8G8R8A8_UNORM_SRGB); setGlobalConst(DXGI_FORMAT_B8G8R8X8_TYPELESS); setGlobalConst(DXGI_FORMAT_B8G8R8X8_UNORM_SRGB); setGlobalConst(DXGI_FORMAT_BC6H_TYPELESS); setGlobalConst(DXGI_FORMAT_BC6H_UF16); setGlobalConst(DXGI_FORMAT_BC6H_SF16); setGlobalConst(DXGI_FORMAT_BC7_TYPELESS); setGlobalConst(DXGI_FORMAT_BC7_UNORM); setGlobalConst(DXGI_FORMAT_BC7_UNORM_SRGB); setGlobalConst(DXGI_FORMAT_AYUV); setGlobalConst(DXGI_FORMAT_Y410); setGlobalConst(DXGI_FORMAT_Y416); setGlobalConst(DXGI_FORMAT_NV12); setGlobalConst(DXGI_FORMAT_P010); setGlobalConst(DXGI_FORMAT_P016); setGlobalConst(DXGI_FORMAT_420_OPAQUE); setGlobalConst(DXGI_FORMAT_YUY2); setGlobalConst(DXGI_FORMAT_Y210); setGlobalConst(DXGI_FORMAT_Y216); setGlobalConst(DXGI_FORMAT_NV11); setGlobalConst(DXGI_FORMAT_AI44); setGlobalConst(DXGI_FORMAT_IA44); setGlobalConst(DXGI_FORMAT_P8); setGlobalConst(DXGI_FORMAT_A8P8); setGlobalConst(DXGI_FORMAT_B4G4R4A4_UNORM); setGlobalConst(DXGI_FORMAT_P208); setGlobalConst(DXGI_FORMAT_V208); setGlobalConst(DXGI_FORMAT_V408); setGlobalConst(DXGI_FORMAT_SAMPLER_FEEDBACK_MIN_MIP_OPAQUE); setGlobalConst(DXGI_FORMAT_SAMPLER_FEEDBACK_MIP_REGION_USED_OPAQUE); setGlobalConst(DXGI_FORMAT_FORCE_UINT);
+
+    //#define D2D1_ALPHA_MODE_FORCE_DWORD D2D1_ALPHA_MODE_FORCE_DWORD
+    //#define D2D1_ALPHA_MODE_IGNORE D2D1_ALPHA_MODE_IGNORE
+    //#define D2D1_ALPHA_MODE_PREMULTIPLIED D2D1_ALPHA_MODE_PREMULTIPLIED
+    //#define D2D1_ALPHA_MODE_STRAIGHT D2D1_ALPHA_MODE_STRAIGHT
+    //#define D2D1_ALPHA_MODE_UNKNOWN D2D1_ALPHA_MODE_UNKNOWN
+
+    setGlobalConst(D2D1_ALPHA_MODE_FORCE_DWORD);
+    setGlobalConst(D2D1_ALPHA_MODE_IGNORE);
+    setGlobalConst(D2D1_ALPHA_MODE_PREMULTIPLIED);
+    setGlobalConst(D2D1_ALPHA_MODE_STRAIGHT);
+    setGlobalConst(D2D1_ALPHA_MODE_UNKNOWN);
 
     /*
     let codes = [];
@@ -3126,6 +3517,7 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     global->Set(isolate, "SetCursorPos", FunctionTemplate::New(isolate, SetMousePos));
 
     setGlobalWrapper(LoadCursor);
+    setGlobalWrapper(LoadCursorFromFile);
     setGlobalWrapper(LoadImage);
     setGlobalWrapper(MAKEINTRESOURCE);
     setGlobalWrapper(SetCursor);
@@ -3133,6 +3525,7 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     setGlobalWrapper(DrawIconEx);
     setGlobalWrapper(DrawIcon);
     setGlobalWrapper(LoadIcon);
+    setGlobalWrapper(HICONFromHBITMAP);
     setGlobalWrapper(GetIconDimensions);
 
     setGlobalConst(IMAGE_BITMAP);
@@ -3158,8 +3551,23 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     setGlobalWrapper(SetBkColor);
     setGlobalWrapper(SetBkMode);
     
+    setGlobalWrapper(EnumFontFamilies);
+    setGlobalWrapper(CreateFont);
+    setGlobalWrapper(CreateFontSimple);
+    setGlobalWrapper(CreateFontIndirect); //bruh i forgot this line and V8 didn't say SHIT   it just started gaining a ton memory and stopped running
+    setGlobalConst(FW_DONTCARE); setGlobalConst(FW_THIN); setGlobalConst(FW_EXTRALIGHT); setGlobalConst(FW_ULTRALIGHT); setGlobalConst(FW_LIGHT); setGlobalConst(FW_NORMAL); setGlobalConst(FW_REGULAR); setGlobalConst(FW_MEDIUM); setGlobalConst(FW_SEMIBOLD); setGlobalConst(FW_DEMIBOLD); setGlobalConst(FW_BOLD); setGlobalConst(FW_EXTRABOLD); setGlobalConst(FW_ULTRABOLD); setGlobalConst(FW_HEAVY); setGlobalConst(FW_BLACK);
+    setGlobalConst(ANSI_CHARSET); setGlobalConst(BALTIC_CHARSET); setGlobalConst(CHINESEBIG5_CHARSET); setGlobalConst(DEFAULT_CHARSET); setGlobalConst(EASTEUROPE_CHARSET); setGlobalConst(GB2312_CHARSET); setGlobalConst(GREEK_CHARSET); setGlobalConst(HANGUL_CHARSET); setGlobalConst(MAC_CHARSET); setGlobalConst(OEM_CHARSET); setGlobalConst(RUSSIAN_CHARSET); setGlobalConst(SHIFTJIS_CHARSET); setGlobalConst(SYMBOL_CHARSET); setGlobalConst(TURKISH_CHARSET); setGlobalConst(VIETNAMESE_CHARSET);
+    setGlobalConst(JOHAB_CHARSET); setGlobalConst(ARABIC_CHARSET); setGlobalConst(HEBREW_CHARSET); setGlobalConst(THAI_CHARSET);
+    setGlobalConst(OUT_CHARACTER_PRECIS); setGlobalConst(OUT_DEFAULT_PRECIS); setGlobalConst(OUT_DEVICE_PRECIS); setGlobalConst(OUT_OUTLINE_PRECIS); setGlobalConst(OUT_PS_ONLY_PRECIS); setGlobalConst(OUT_RASTER_PRECIS); setGlobalConst(OUT_STRING_PRECIS); setGlobalConst(OUT_STROKE_PRECIS); setGlobalConst(OUT_TT_ONLY_PRECIS); setGlobalConst(OUT_TT_PRECIS);
+    setGlobalConst(CLIP_CHARACTER_PRECIS); setGlobalConst(CLIP_DEFAULT_PRECIS); setGlobalConst(CLIP_DFA_DISABLE); setGlobalConst(CLIP_EMBEDDED); setGlobalConst(CLIP_LH_ANGLES); setGlobalConst(CLIP_MASK); /*setGlobalConst(CLIP_DFA_OVERRIDE);*/ setGlobalConst(CLIP_STROKE_PRECIS); setGlobalConst(CLIP_TT_ALWAYS);
+    setGlobalConst(ANTIALIASED_QUALITY); setGlobalConst(CLEARTYPE_QUALITY); setGlobalConst(DEFAULT_QUALITY); setGlobalConst(DRAFT_QUALITY); setGlobalConst(NONANTIALIASED_QUALITY); setGlobalConst(PROOF_QUALITY);
+    setGlobalConst(DEFAULT_PITCH); setGlobalConst(FIXED_PITCH); setGlobalConst(VARIABLE_PITCH);
+    setGlobalConst(FF_DECORATIVE); setGlobalConst(FF_DONTCARE); setGlobalConst(FF_MODERN); setGlobalConst(FF_ROMAN); setGlobalConst(FF_SCRIPT); setGlobalConst(FF_SWISS);
+
     setGlobalWrapper(SelectObject);
     setGlobalWrapper(DeleteObject);
+    setGlobalWrapper(DestroyCursor);
+    setGlobalWrapper(DestroyIcon);
     setGlobalWrapper(SetDCPenColor);
     setGlobalWrapper(SetDCBrushColor);
     setGlobalWrapper(CreateSolidBrush);
@@ -3171,6 +3579,10 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     setGlobalWrapper(GetWindowDC);
     setGlobalWrapper(SaveDC);
     setGlobalWrapper(RestoreDC);
+    setGlobalWrapper(DeleteDC);
+    setGlobalWrapper(CreateCompatibleBitmap);
+    setGlobalWrapper(CreateCompatibleDC);
+    setGlobalWrapper(CreateBitmap);
     
     setGlobalWrapper(Rectangle);
 
@@ -3356,6 +3768,13 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     setGlobalWrapper(SetPixelV);
     setGlobalWrapper(GetStretchBltMode);
     setGlobalWrapper(SetStretchBltMode);
+    setGlobalWrapper(SendMessage);
+
+    setGlobalConst(ICON_BIG);
+    setGlobalConst(ICON_SMALL);
+
+    setGlobalConst(BLACKONWHITE); setGlobalConst(COLORONCOLOR); setGlobalConst(HALFTONE); setGlobalConst(STRETCH_ANDSCANS); setGlobalConst(STRETCH_DELETESCANS); setGlobalConst(STRETCH_HALFTONE); setGlobalConst(STRETCH_ORSCANS); setGlobalConst(WHITEONBLACK);
+    
     setGlobalWrapper(PrintWindow);
 
     setGlobalConst(PW_CLIENTONLY);
@@ -3416,9 +3835,10 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     setGlobalWrapper(SetWindowLongPtr);
     setGlobalWrapper(GetClassLongPtr);
     setGlobalWrapper(GetWindowLongPtr);
-
+    
     setGlobalWrapper(GetLastError);
-
+    setGlobalWrapper(_com_error);
+    setGlobalWrapper(Beep);
 
     setGlobalConst(DWLP_DLGPROC);
     setGlobalConst(DWLP_MSGRESULT);
@@ -3487,9 +3907,9 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInstance, char* nCmdList, int
     print("UNFORTUNATELY i need to use create text layout some where for font boldness and the like");
     //print("replace all using of RGB() with a js function");
     print("figure out win timers");
-    print("maybe do send input but if i can't i can't");
-    print("investigate 3/11 -> why does SetClassLongPtr AND GetWindowLongPtr not work?");
-    print("GDI CreateFont and CreateWindowExA!");
+    //print("maybe do send input but if i can't i can't");
+    //print("investigate 3/11 -> why does SetClassLongPtr AND GetWindowLongPtr not work?"); //haha i can change the icons now!
+    print("GDI CreateFont and CreateWindowExA AND use ID2D1BitmapBrush1!");
 
     SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), 7);
 
@@ -3507,6 +3927,8 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInstance, char* nCmdList, int
     //print(GetLastError());
     //https://learn.microsoft.com/en-us/windows/win32/menurc/using-icons
     //print(GetWindowLongPtrA(GetConsoleWindow(), GWLP_HINSTANCE) << " " << hInstance << " " << GetLastError());
+    // 
+    //NIGGA WHAT THIS ISN"T A COMMENT???????????
 https://forums.codeguru.com/showthread.php?69236-How-to-obtain-HINSTANCE-using-HWND
     //NONCLIENTMETRICS ncm;
     //ncm.cbSize = sizeof(NONCLIENTMETRICS);
