@@ -26,3 +26,9 @@ speaking of node.js maybe i should just make a node.js library instead
 
 ### Examples
 In the scripts folder there are a few examples like minesweeper and msnexample while the rest of the scripts folder are completely random tests or funny things I wanted to do that may or may not work
+
+### Yapping
+Can you believe that I started making JBS3 because I was learning about Direct2D then remembered about JBS2, fiddled with V8 for a day, and then made JBS3 with Direct2D and MANY drawing type functions  
+
+The pipeline is crazy  
+**How to make overlay C++/C#** -> **[cool article](http://kylehalladay.com/blog/2021/07/14/Dll-Search-Order-Hijacking-For-PostProcess-Injection.html) talks about DLL Injecting** -> **read his [other articles](http://kylehalladay.com/blog/2020/05/20/Hooking-Input-Snake-In-Notepad.html) about DLL Injecting** -> **~~try to hack Roblox for decent while~~ (roblox has new anticheat so nope)** -> **go back to article to learn DirectX** -> **Direct2D** -> **remember JBS2** -> **JBS3xDirect2D**
