@@ -90,7 +90,7 @@
 
 //#pragma comment(lib, "v8_base_without_compiler")
 
-#pragma comment(lib, "v8_monolith")
+#pragma comment(lib, "v8_monolith") //>ninja -C out/x64.release v8_monolith
 #pragma comment(lib, "Msimg32.lib")
 
 //https://medium.com/compilers/v8-javascript-engine-compiling-with-gn-and-ninja-8673e7c5e14a
@@ -270,14 +270,62 @@ namespace fs {
 
         std::string shit;
 
-        std::ifstream file(*String::Utf8Value(info.GetIsolate(), info[0]));
+        std::ifstream file(*String::Utf8Value(info.GetIsolate(), info[0]));//, std::ios::binary);
 
         if (file.is_open()) {
             
             //i hate reading files in c++
             buffer << file.rdbuf();
             shit = buffer.str();
-            info.GetReturnValue().Set(String::NewFromUtf8(info.GetIsolate(), shit.c_str()).ToLocalChecked());
+            //std::string tempstring(shit.size(), '#');
+            //v8::Local<String> str = String::NewFromUtf8(info.GetIsolate(), tempstring.c_str()).ToLocalChecked();
+            //str->WriteOneByte(info.GetIsolate(), (uint8_t*)(shit.c_str()), 0, shit.length(), v8::String::NO_NULL_TERMINATION);
+            //str->WriteUtf8(info.GetIsolate(), (char*)shit.c_str(), shit.length(),nullptr, v8::String::NO_NULL_TERMINATION);
+
+                info.GetReturnValue().Set(String::NewFromUtf8(info.GetIsolate(), shit.c_str()).ToLocalChecked());
+                //info.GetReturnValue().Set(str);
+            //print(shit << " youcanstandundermyinbrelela" << shit.size());
+        }
+        else {
+            info.GetReturnValue().SetUndefined();
+        }
+
+        file.close();
+    }
+
+    void readBinary(const v8::FunctionCallbackInfo<v8::Value>& info) {
+        using namespace v8;
+        Isolate* isolate = info.GetIsolate();
+
+        std::stringstream buffer;
+
+        std::string shit;
+
+        std::ifstream file(*String::Utf8Value(info.GetIsolate(), info[0]), std::ios::binary);
+
+        if (file.is_open()) {
+
+            buffer << file.rdbuf();
+            shit = buffer.str();
+
+            Local<Array> jsArray = Array::New(isolate, shit.size());
+            for (int i = 0; i < shit.size(); i++) {
+                jsArray->Set(isolate->GetCurrentContext(), i, Number::New(isolate, shit[i]));
+            }
+
+            //std::string* fuck = new std::string(shit); //it's giving undefined behavior
+
+            //ok i works but i could just pass an array of chars (ints) //probably use arraybuffer because i think thats what browsers do for files maybe idk
+
+            //char* stringPtr = new char[shit.size()]; //uh oh
+            //strcpy(stringPtr, shit.c_str());
+            //strncpy(stringPtr, shit.c_str(), shit.size());
+            //memcpy(stringPtr, shit.c_str(), shit.size()); //shit.c_str() gets cut off!
+            //print(stringPtr << " shit->" << shit.c_str() << " " << shit);
+
+            //info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)fuck/*stringPtr*/));//String::NewFromUtf8(info.GetIsolate(), shit.c_str()).ToLocalChecked());
+            info.GetReturnValue().Set(jsArray);
+            //print(shit << " youcanstandundermyinbrelela" << shit.size());
         }
         else {
             info.GetReturnValue().SetUndefined();
@@ -313,6 +361,7 @@ void Require(const v8::FunctionCallbackInfo<v8::Value>& info) {
         
         Local<ObjectTemplate> filesys = ObjectTemplate::New(isolate);
         filesys->Set(isolate, "read", FunctionTemplate::New(isolate, fs::read));
+        filesys->Set(isolate, "readBinary", FunctionTemplate::New(isolate, fs::readBinary));
         filesys->Set(isolate, "write", FunctionTemplate::New(isolate, fs::write));
         //filesys->Set(isolate->GetCurrentContext(), String::NewFromUtf8(isolate, "open").ToLocalChecked(), v8::FunctionTemplate::New(isolate, fs::open));
         //filesys->Set(isolate, "v", String::NewFromUtf8(isolate, "KYS").ToLocalChecked());
@@ -1118,6 +1167,7 @@ namespace DIRECT2D {
             //0x80070057 -> E_INVALIDARG
             //it did NOT need all that effort to get the code
             //ok i just found the solution
+		//https://stackoverflow.com/questions/22493524/decode-hresult-2147467259
             https://stackoverflow.com/questions/7008047/is-there-a-way-to-get-the-string-representation-of-hresult-value-using-win-api
             //IT THINKS MY UNCOMMENTED LINKS ARE LABELS FOR GOTO!
             info.GetReturnValue().Set(Number::New(isolate, bmp->CopyFromBitmap(&point, /*(ID2D1Bitmap*)IntegerFI(info[2])*/copyFrom, &rect)));
@@ -3181,6 +3231,52 @@ V8FUNC(CreateBitmapWrapper) {
     info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)CreateBitmap(IntegerFI(info[0]), IntegerFI(info[1]), 1, 32, nullptr)));
 }
 
+V8FUNC(StretchDIBitsWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    std::string bits;
+    Local<Array> jsBits = info[9].As<Array>();
+    for (int i = 0; i < jsBits->Length(); i++) {
+        bits.push_back((char)jsBits->Get(isolate->GetCurrentContext(), i).ToLocalChecked()->IntegerValue(isolate->GetCurrentContext()).FromJust());
+    }
+    HDC dc = (HDC)IntegerFI(info[0]);
+
+    int ul = CHECKJPEGFORMAT;
+    print(jsBits->Length() << " " << bits.length());
+    if (
+        // Check if CHECKJPEGFORMAT exists: 
+
+        (ExtEscape(dc, QUERYESCSUPPORT,
+            sizeof(ul), (LPCSTR) & ul, 0, 0) > 0) &&
+
+        // Check if CHECKJPEGFORMAT executed without error: 
+
+        (ExtEscape(dc, CHECKJPEGFORMAT,
+            bits.length(), &bits[0], sizeof(ul), (LPSTR)&ul) > 0) &&
+
+        // Check status code returned by CHECKJPEGFORMAT: 
+
+        (ul == 1)
+        )
+    {
+        print("WORKING CHECK JPEG");
+    }
+    //print(bits);
+
+    BITMAPINFO bmi;//{0};
+    memset(&bmi, 0, sizeof(bmi));
+    bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+    bmi.bmiHeader.biWidth = IntegerFI(info[10]);
+    bmi.bmiHeader.biHeight = -IntegerFI(info[11]); // top-down image 
+    bmi.bmiHeader.biPlanes = 1;
+    bmi.bmiHeader.biBitCount = 0;
+    bmi.bmiHeader.biCompression = IntegerFI(info[12]);
+    bmi.bmiHeader.biSizeImage = bits.length();//IntegerFI(info[10])*IntegerFI(info[11]);
+    
+    info.GetReturnValue().Set(Number::New(isolate, StretchDIBits(dc, IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]), IntegerFI(info[4]), IntegerFI(info[5]), IntegerFI(info[6]), IntegerFI(info[7]), IntegerFI(info[8]), &bits[0], &bmi, DIB_RGB_COLORS, IntegerFI(info[13]))));
+}
+
 v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     using namespace v8;
 
@@ -3241,9 +3337,17 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
 
     global->Set(isolate, "BitBlt", FunctionTemplate::New(isolate, BitBltWrapper));
     global->Set(isolate, "StretchBlt", FunctionTemplate::New(isolate, StretchBltWrapper));
+    setGlobalWrapper(StretchDIBits);
 
     //https://stackoverflow.com/questions/6707148/foreach-macro-on-macros-arguments
 #define setGlobalConst(g) global->Set(isolate, #g, Number::New(isolate, g))
+
+    setGlobalConst(BI_RGB);
+    setGlobalConst(BI_RLE8);
+    setGlobalConst(BI_RLE4);
+    setGlobalConst(BI_BITFIELDS);
+    setGlobalConst(BI_JPEG);
+    setGlobalConst(BI_PNG);
     
     global->Set(isolate, "CreateWindow", FunctionTemplate::New(isolate, CreateWindowWrapper));
     global->Set(isolate, "CreateWindowClass", FunctionTemplate::New(isolate, CreateWindowClass));
@@ -3593,7 +3697,7 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
             ncm.cbSize = sizeof(NONCLIENTMETRICS);
             SystemParametersInfo(SPI_GETNONCLIENTMETRICS, sizeof(NONCLIENTMETRICS), &ncm, 0);
             defaultfont = CreateFontIndirect(&ncm.lfMessageFont);
-            
+
             print("creating static defaultfont");
         }
         info.GetReturnValue().Set(Number::New(info.GetIsolate(), (long long)defaultfont)); //honestly this is a REALLY weird solution but it works suprisingly
@@ -3852,7 +3956,15 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
     setGlobalConst(ARW_BOTTOMLEFT); setGlobalConst(ARW_BOTTOMRIGHT); setGlobalConst(ARW_TOPLEFT); setGlobalConst(ARW_TOPRIGHT);
     setGlobalConst(ARW_DOWN); setGlobalConst(ARW_HIDE); setGlobalConst(ARW_LEFT); setGlobalConst(ARW_RIGHT); setGlobalConst(ARW_UP);
 
-    
+    global->Set(isolate, "HELP", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+        using namespace v8;
+        Isolate* isolate = info.GetIsolate();
+        HandleScope handle_scope(isolate);
+        //print(CStringFI(info[0]));
+        //const char* shit = (const char*)IntegerFI(info[0]);
+        std::string shit = *(std::string*)IntegerFI(info[0]);
+        print(shit);
+    }));
     
 //#define setGlobal(name) global->Set(isolate, "name", v8::FunctionTemplate::New(isolate, name));
     //wait a funking mineite i was on to ssomething
@@ -3909,7 +4021,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInstance, char* nCmdList, int
     print("figure out win timers");
     //print("maybe do send input but if i can't i can't");
     //print("investigate 3/11 -> why does SetClassLongPtr AND GetWindowLongPtr not work?"); //haha i can change the icons now!
-    print("GDI CreateFont and CreateWindowExA AND use ID2D1BitmapBrush1!");
+    print(/*"GDI CreateFont and */"CreateWindowExA AND use ID2D1BitmapBrush1!");
 
     SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), 7);
 

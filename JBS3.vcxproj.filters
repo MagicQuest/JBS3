@@ -46,9 +46,6 @@
     <ClInclude Include="Direct2D.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="JBS3.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Image Include="jbs3.ico">
