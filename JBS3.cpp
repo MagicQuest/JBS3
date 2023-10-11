@@ -3277,6 +3277,27 @@ V8FUNC(StretchDIBitsWrapper) {
     info.GetReturnValue().Set(Number::New(isolate, StretchDIBits(dc, IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]), IntegerFI(info[4]), IntegerFI(info[5]), IntegerFI(info[6]), IntegerFI(info[7]), IntegerFI(info[8]), &bits[0], &bmi, DIB_RGB_COLORS, IntegerFI(info[13]))));
 }
 
+V8FUNC(PatBltWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, PatBlt((HDC)IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]), IntegerFI(info[4]), IntegerFI(info[5]))));
+}
+
+V8FUNC(CreatePatternBrushWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)CreatePatternBrush((HBITMAP)IntegerFI(info[0]))));
+}
+
+V8FUNC(CreateHatchBrushWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)CreateHatchBrush(IntegerFI(info[0]), IntegerFI(info[1]))));
+}
+
 v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     using namespace v8;
 
@@ -3338,9 +3359,14 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     global->Set(isolate, "BitBlt", FunctionTemplate::New(isolate, BitBltWrapper));
     global->Set(isolate, "StretchBlt", FunctionTemplate::New(isolate, StretchBltWrapper));
     setGlobalWrapper(StretchDIBits);
+    setGlobalWrapper(PatBlt);
+    setGlobalWrapper(CreatePatternBrush);
+    setGlobalWrapper(CreateHatchBrush);
 
     //https://stackoverflow.com/questions/6707148/foreach-macro-on-macros-arguments
 #define setGlobalConst(g) global->Set(isolate, #g, Number::New(isolate, g))
+
+    setGlobalConst(PATCOPY); setGlobalConst(PATINVERT); setGlobalConst(DSTINVERT); setGlobalConst(BLACKNESS); setGlobalConst(WHITENESS);
 
     setGlobalConst(BI_RGB);
     setGlobalConst(BI_RLE8);
@@ -3955,6 +3981,8 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
     setGlobalConst(SM_ARRANGE); setGlobalConst(SM_CLEANBOOT); setGlobalConst(SM_CMONITORS); setGlobalConst(SM_CMOUSEBUTTONS); setGlobalConst(SM_CONVERTIBLESLATEMODE); setGlobalConst(SM_CXBORDER); setGlobalConst(SM_CXCURSOR); setGlobalConst(SM_CXDLGFRAME); setGlobalConst(SM_CXDOUBLECLK); setGlobalConst(SM_CXDRAG); setGlobalConst(SM_CXEDGE); setGlobalConst(SM_CXFIXEDFRAME); setGlobalConst(SM_CXFOCUSBORDER); setGlobalConst(SM_CXFRAME); setGlobalConst(SM_CXFULLSCREEN); setGlobalConst(SM_CXHSCROLL); setGlobalConst(SM_CXHTHUMB); setGlobalConst(SM_CXICON); setGlobalConst(SM_CXICONSPACING); setGlobalConst(SM_CXMAXIMIZED); setGlobalConst(SM_CXMAXTRACK); setGlobalConst(SM_CXMENUCHECK); setGlobalConst(SM_CXMENUSIZE); setGlobalConst(SM_CXMIN); setGlobalConst(SM_CXMINIMIZED); setGlobalConst(SM_CXMINSPACING); setGlobalConst(SM_CXMINTRACK); setGlobalConst(SM_CXPADDEDBORDER); setGlobalConst(SM_CXSCREEN); setGlobalConst(SM_CXSIZE); setGlobalConst(SM_CXSIZEFRAME); setGlobalConst(SM_CXSMICON); setGlobalConst(SM_CXSMSIZE); setGlobalConst(SM_CXVIRTUALSCREEN); setGlobalConst(SM_CXVSCROLL); setGlobalConst(SM_CYBORDER); setGlobalConst(SM_CYCAPTION); setGlobalConst(SM_CYCURSOR); setGlobalConst(SM_CYDLGFRAME); setGlobalConst(SM_CYDOUBLECLK); setGlobalConst(SM_CYDRAG); setGlobalConst(SM_CYEDGE); setGlobalConst(SM_CYFIXEDFRAME); setGlobalConst(SM_CYFOCUSBORDER); setGlobalConst(SM_CYFRAME); setGlobalConst(SM_CYFULLSCREEN); setGlobalConst(SM_CYHSCROLL); setGlobalConst(SM_CYICON); setGlobalConst(SM_CYICONSPACING); setGlobalConst(SM_CYKANJIWINDOW); setGlobalConst(SM_CYMAXIMIZED); setGlobalConst(SM_CYMAXTRACK); setGlobalConst(SM_CYMENU); setGlobalConst(SM_CYMENUCHECK); setGlobalConst(SM_CYMENUSIZE); setGlobalConst(SM_CYMIN); setGlobalConst(SM_CYMINIMIZED); setGlobalConst(SM_CYMINSPACING); setGlobalConst(SM_CYMINTRACK); setGlobalConst(SM_CYSCREEN); setGlobalConst(SM_CYSIZE); setGlobalConst(SM_CYSIZEFRAME); setGlobalConst(SM_CYSMCAPTION); setGlobalConst(SM_CYSMICON); setGlobalConst(SM_CYSMSIZE); setGlobalConst(SM_CYVIRTUALSCREEN); setGlobalConst(SM_CYVSCROLL); setGlobalConst(SM_CYVTHUMB); setGlobalConst(SM_DBCSENABLED); setGlobalConst(SM_DEBUG); setGlobalConst(SM_DIGITIZER); setGlobalConst(SM_IMMENABLED); setGlobalConst(SM_MAXIMUMTOUCHES); setGlobalConst(SM_MEDIACENTER); setGlobalConst(SM_MENUDROPALIGNMENT); setGlobalConst(SM_MIDEASTENABLED); setGlobalConst(SM_MOUSEPRESENT); setGlobalConst(SM_MOUSEHORIZONTALWHEELPRESENT); setGlobalConst(SM_MOUSEWHEELPRESENT); setGlobalConst(SM_NETWORK); setGlobalConst(SM_PENWINDOWS); setGlobalConst(SM_REMOTECONTROL); setGlobalConst(SM_REMOTESESSION); setGlobalConst(SM_SAMEDISPLAYFORMAT); setGlobalConst(SM_SECURE); setGlobalConst(SM_SERVERR2); setGlobalConst(SM_SHOWSOUNDS); setGlobalConst(SM_SHUTTINGDOWN); setGlobalConst(SM_SLOWMACHINE); setGlobalConst(SM_STARTER); setGlobalConst(SM_SWAPBUTTON); setGlobalConst(SM_SYSTEMDOCKED); setGlobalConst(SM_TABLETPC); setGlobalConst(SM_XVIRTUALSCREEN); setGlobalConst(SM_YVIRTUALSCREEN);
     setGlobalConst(ARW_BOTTOMLEFT); setGlobalConst(ARW_BOTTOMRIGHT); setGlobalConst(ARW_TOPLEFT); setGlobalConst(ARW_TOPRIGHT);
     setGlobalConst(ARW_DOWN); setGlobalConst(ARW_HIDE); setGlobalConst(ARW_LEFT); setGlobalConst(ARW_RIGHT); setGlobalConst(ARW_UP);
+
+    setGlobalConst(HS_BDIAGONAL); setGlobalConst(HS_CROSS); setGlobalConst(HS_DIAGCROSS); setGlobalConst(HS_FDIAGONAL); setGlobalConst(HS_HORIZONTAL); setGlobalConst(HS_VERTICAL);
 
     global->Set(isolate, "HELP", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
         using namespace v8;
