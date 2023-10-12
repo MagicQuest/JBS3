@@ -3339,6 +3339,217 @@ V8FUNC(MaskBltWrapper) {
     info.GetReturnValue().Set(Number::New(isolate, MaskBlt((HDC)IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]), IntegerFI(info[4]), (HDC)IntegerFI(info[5]), IntegerFI(info[6]), IntegerFI(info[7]), (HBITMAP)IntegerFI(info[8]), IntegerFI(info[9]), IntegerFI(info[10]), IntegerFI(info[11]))));
 }
 
+V8FUNC(GetObjectHBITMAP) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    BITMAP bmp; GetObject((HANDLE)IntegerFI(info[0]), sizeof(BITMAP), &bmp);
+
+    Local<Object> jsBITMAP = Object::New(isolate);
+
+    jsBITMAP->Set(isolate->GetCurrentContext(), LITERAL("bmType"),       Number::New(isolate, bmp.bmType));
+    jsBITMAP->Set(isolate->GetCurrentContext(), LITERAL("bmWidth"),      Number::New(isolate, bmp.bmWidth));
+    jsBITMAP->Set(isolate->GetCurrentContext(), LITERAL("bmHeight"),     Number::New(isolate, bmp.bmHeight));
+    jsBITMAP->Set(isolate->GetCurrentContext(), LITERAL("bmWidthBytes"), Number::New(isolate, bmp.bmWidthBytes));
+    jsBITMAP->Set(isolate->GetCurrentContext(), LITERAL("bmPlanes"),     Number::New(isolate, bmp.bmPlanes));
+    jsBITMAP->Set(isolate->GetCurrentContext(), LITERAL("bmBitsPixel"),  Number::New(isolate, bmp.bmBitsPixel));
+    jsBITMAP->Set(isolate->GetCurrentContext(), LITERAL("bmBits"),       Number::New(isolate, (LONG_PTR)bmp.bmBits));
+
+    info.GetReturnValue().Set(jsBITMAP);
+}
+
+V8FUNC(GetObjectDIBITMAP) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    DIBSECTION dib; GetObject((HANDLE)IntegerFI(info[0]), sizeof(DIBSECTION), &dib);
+
+    Local<Context> context = isolate->GetCurrentContext();
+
+    Local<Object> jsBITMAP = Object::New(isolate);
+
+    jsBITMAP->Set(context, LITERAL("bmType"), Number::New(isolate, dib.dsBm.bmType));
+    jsBITMAP->Set(context, LITERAL("bmWidth"), Number::New(isolate, dib.dsBm.bmWidth));
+    jsBITMAP->Set(context, LITERAL("bmHeight"), Number::New(isolate, dib.dsBm.bmHeight));
+    jsBITMAP->Set(context, LITERAL("bmWidthBytes"), Number::New(isolate, dib.dsBm.bmWidthBytes));
+    jsBITMAP->Set(context, LITERAL("bmPlanes"), Number::New(isolate, dib.dsBm.bmPlanes));
+    jsBITMAP->Set(context, LITERAL("bmBitsPixel"), Number::New(isolate, dib.dsBm.bmBitsPixel));
+    jsBITMAP->Set(context, LITERAL("bmBits"), Number::New(isolate, (LONG_PTR)dib.dsBm.bmBits));
+
+    Local<Object> jsINFOHEADER = Object::New(isolate);
+
+    jsINFOHEADER->Set(context, LITERAL("biSize"), Number::New(isolate,           dib.dsBmih.biSize));
+    jsINFOHEADER->Set(context, LITERAL("biWidth"), Number::New(isolate,          dib.dsBmih.biWidth));
+    jsINFOHEADER->Set(context, LITERAL("biHeight"), Number::New(isolate,         dib.dsBmih.biHeight));
+    jsINFOHEADER->Set(context, LITERAL("biPlanes"), Number::New(isolate,         dib.dsBmih.biPlanes));
+    jsINFOHEADER->Set(context, LITERAL("biBitCount"), Number::New(isolate,       dib.dsBmih.biBitCount));
+    jsINFOHEADER->Set(context, LITERAL("biCompression"), Number::New(isolate,    dib.dsBmih.biCompression));
+    jsINFOHEADER->Set(context, LITERAL("biSizeImage"), Number::New(isolate,      dib.dsBmih.biSizeImage));
+    jsINFOHEADER->Set(context, LITERAL("biXPelsPerMeter"), Number::New(isolate,  dib.dsBmih.biXPelsPerMeter));
+    jsINFOHEADER->Set(context, LITERAL("biYPelsPerMeter"), Number::New(isolate,  dib.dsBmih.biYPelsPerMeter));
+    jsINFOHEADER->Set(context, LITERAL("biClrUsed"), Number::New(isolate,        dib.dsBmih.biClrUsed));
+    jsINFOHEADER->Set(context, LITERAL("biClrImportant"), Number::New(isolate,   dib.dsBmih.biClrImportant));
+
+    Local<Array> jsSECTIONS = Array::New(isolate);
+
+    jsSECTIONS->Set(context, 0, Number::New(isolate, dib.dsBitfields[0]));
+    jsSECTIONS->Set(context, 1, Number::New(isolate, dib.dsBitfields[1]));
+    jsSECTIONS->Set(context, 2, Number::New(isolate, dib.dsBitfields[2]));
+
+    Local<Object> jsDIBSECTION = Object::New(isolate);
+    
+    jsDIBSECTION->Set(context, LITERAL("dsBm"), jsBITMAP); //yeah idk how im doing intellisense with my extension for this one
+    jsDIBSECTION->Set(context, LITERAL("dsBmih"), jsINFOHEADER);
+    jsDIBSECTION->Set(context, LITERAL("dsBitfields"), jsSECTIONS);
+    jsDIBSECTION->Set(context, LITERAL("dshSection"), Number::New(isolate, (LONG_PTR)dib.dshSection));
+    jsDIBSECTION->Set(context, LITERAL("dsOffset"), Number::New(isolate, dib.dsOffset));
+
+    info.GetReturnValue().Set(jsDIBSECTION);
+}
+
+V8FUNC(GetObjectHPALETTE) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    WORD entries; GetObject((HANDLE)IntegerFI(info[0]), sizeof(WORD), &entries);
+
+    info.GetReturnValue().Set(Number::New(isolate, entries));
+}
+
+V8FUNC(GetObjectExtHPEN) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    EXTLOGPEN pen; GetObject((HANDLE)IntegerFI(info[0]), sizeof(EXTLOGPEN), &pen);
+
+    Local<Object> jsPEN = Object::New(isolate);
+    
+    jsPEN->Set(isolate->GetCurrentContext(), LITERAL("elpPenStyle"), Number::New(isolate,   pen.elpPenStyle));
+    jsPEN->Set(isolate->GetCurrentContext(), LITERAL("elpWidth"), Number::New(isolate,      pen.elpWidth));
+    jsPEN->Set(isolate->GetCurrentContext(), LITERAL("elpBrushStyle"), Number::New(isolate, pen.elpBrushStyle));
+    jsPEN->Set(isolate->GetCurrentContext(), LITERAL("elpColor"), Number::New(isolate,      pen.elpColor));
+    jsPEN->Set(isolate->GetCurrentContext(), LITERAL("elpHatch"), Number::New(isolate,      pen.elpHatch));
+    jsPEN->Set(isolate->GetCurrentContext(), LITERAL("elpNumEntries"), Number::New(isolate, pen.elpNumEntries));
+
+    Local<Array> jsEntriesArray = Array::New(isolate); //still mad that i wanted to use arrays a while ago and i didn't import the v8-array thing so i thought it just wasn't the way to do it
+
+    for (int i = 0; i < ARRAYSIZE(pen.elpStyleEntry); i++) {
+    //for(DWORD entry : pen.elpStyleEntry) { //nvm i need i
+        jsEntriesArray->Set(isolate->GetCurrentContext(), i, Number::New(isolate, pen.elpStyleEntry[i]));
+    }
+
+    jsPEN->Set(isolate->GetCurrentContext(), LITERAL("elpStyleEntry"), jsEntriesArray);//Number::New(isolate, pen.elpStyleEntry));
+
+    info.GetReturnValue().Set(jsPEN);
+}
+
+V8FUNC(GetObjectHPEN) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    LOGPEN pen; GetObject((HANDLE)IntegerFI(info[0]), sizeof(LOGPEN), &pen);
+
+    Local<Object> jsPEN = Object::New(isolate);
+
+    jsPEN->Set(isolate->GetCurrentContext(), LITERAL("lopnStyle"), Number::New(isolate, pen.lopnStyle));
+
+    jsPEN->Set(isolate->GetCurrentContext(), LITERAL("lopnWidth"), jsImpl::createWinPoint(isolate, pen.lopnWidth));
+
+    jsPEN->Set(isolate->GetCurrentContext(), LITERAL("lopnColor"), Number::New(isolate, pen.lopnColor));
+
+    info.GetReturnValue().Set(jsPEN);
+}
+
+V8FUNC(GetObjectHBRUSH) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    LOGBRUSH brush; GetObject((HANDLE)IntegerFI(info[0]), sizeof(LOGBRUSH), &brush);
+
+    Local<Object> jsBRUSH = Object::New(isolate);
+
+    jsBRUSH->Set(isolate->GetCurrentContext(), LITERAL("lbStyle"), Number::New(isolate, brush.lbStyle));
+    jsBRUSH->Set(isolate->GetCurrentContext(), LITERAL("lbColor"), Number::New(isolate, brush.lbColor));
+    jsBRUSH->Set(isolate->GetCurrentContext(), LITERAL("lbHatch"), Number::New(isolate, brush.lbHatch));
+
+    info.GetReturnValue().Set(jsBRUSH);
+}
+
+V8FUNC(GetObjectHFONT) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    LOGFONTA font; GetObjectA((HANDLE)IntegerFI(info[0]), sizeof(LOGFONTA), &font);
+
+    Local<Object> jsFONT = Object::New(isolate);
+
+    jsFONT->Set(isolate->GetCurrentContext(), LITERAL("lfHeight"), Number::New(isolate, font.lfHeight));
+    jsFONT->Set(isolate->GetCurrentContext(), LITERAL("lfWidth"), Number::New(isolate, font.lfWidth));
+    jsFONT->Set(isolate->GetCurrentContext(), LITERAL("lfEscapement"), Number::New(isolate, font.lfEscapement));
+    jsFONT->Set(isolate->GetCurrentContext(), LITERAL("lfOrientation"), Number::New(isolate, font.lfOrientation));
+    jsFONT->Set(isolate->GetCurrentContext(), LITERAL("lfWeight"), Number::New(isolate, font.lfWeight));
+    jsFONT->Set(isolate->GetCurrentContext(), LITERAL("lfItalic"), Number::New(isolate, font.lfItalic));
+    jsFONT->Set(isolate->GetCurrentContext(), LITERAL("lfUnderline"), Number::New(isolate, font.lfUnderline));
+    jsFONT->Set(isolate->GetCurrentContext(), LITERAL("lfStrikeOut"), Number::New(isolate, font.lfStrikeOut));
+    jsFONT->Set(isolate->GetCurrentContext(), LITERAL("lfCharSet"), Number::New(isolate, font.lfCharSet));
+    jsFONT->Set(isolate->GetCurrentContext(), LITERAL("lfOutPrecision"), Number::New(isolate, font.lfOutPrecision));
+    jsFONT->Set(isolate->GetCurrentContext(), LITERAL("lfClipPrecision"), Number::New(isolate, font.lfClipPrecision));
+    jsFONT->Set(isolate->GetCurrentContext(), LITERAL("lfQuality"), Number::New(isolate, font.lfQuality));
+    jsFONT->Set(isolate->GetCurrentContext(), LITERAL("lfPitchAndFamily"), Number::New(isolate, font.lfPitchAndFamily));
+    jsFONT->Set(isolate->GetCurrentContext(), LITERAL("lfFaceName"), String::NewFromUtf8(isolate, font.lfFaceName).ToLocalChecked());
+
+    info.GetReturnValue().Set(jsFONT);
+}
+
+V8FUNC(PlaySoundWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, PlaySoundA(CStringFI(info[0]), (HINSTANCE)IntegerFI(info[1]), IntegerFI(info[2]))));
+}
+
+V8FUNC(PlaySoundSpecial) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    if (info[1]->IsString()) {
+
+        std::string sound = std::string(CStringFI(info[0]));
+        //std::string type = sound.substr(sound.length() - 3, 3);  //ok idk why i added the type bruh that was CAP
+        sound = "open \"" + sound + "\" type mpegvideo alias " + CStringFI(info[1]);
+        print(sound);
+        mciSendStringA(sound.c_str(), NULL, 0, NULL);
+        bool notify = info[2]->IsNumber() && IntegerFI(info[2]) != 0;
+        //print(info[2]->IsNumber() << " " << IntegerFI(info[2]));
+        print((std::string("play ") + CStringFI(info[1]) + (info[3]->IsBoolean() ? info[3]->BooleanValue(isolate) ? " wait" : "" : "")+ (notify ? " notify" : "")).c_str());
+        info.GetReturnValue().Set(Number::New(isolate, mciSendStringA((std::string("play ") + CStringFI(info[1]) + (info[3]->IsBoolean() ? info[3]->BooleanValue(isolate) ? " wait" : "" : "")+(notify ? " notify" : "")).c_str(), NULL, 0, (HWND)IntegerFI(info[2]))));
+    }
+    else {
+        info.GetReturnValue().Set(Number::New(isolate, mciSendStringA(CStringFI(info[0]), NULL, 0, (HWND)IntegerFI(info[2]))));
+    }
+}
+
+V8FUNC(StopSoundSpecial) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, mciSendStringA((std::string("stop ")+CStringFI(info[0])).c_str(), NULL, 0, NULL)+ mciSendStringA((std::string("close ") + CStringFI(info[0])).c_str(), NULL, 0, NULL)));
+}
+
+V8FUNC(InitiateSystemShutdownWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+                                        //THIS WARNING IS EVEN BETTER "Consider using 'a design alternative' instead of 'InitiateSystemShutdownExA'."
+    info.GetReturnValue().Set(Number::New(isolate, InitiateSystemShutdownExA(CStringFI(info[0]), CStringFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]), IntegerFI(info[4]), IntegerFI(info[5]))));//ExitWindowsEx(IntegerFI(info[0]), IntegerFI(info[1]))); //hell no im not testing this (HAH WHAT IS THIS WARNING)
+}
+
+V8FUNC(AbortSystemShutdownWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, AbortSystemShutdownA(CStringFI(info[0]))));
+}
 
 v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     using namespace v8;
@@ -3407,6 +3618,21 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     setGlobalWrapper(MAKEROP4);
     setGlobalWrapper(CreatePatternBrush);
     setGlobalWrapper(CreateHatchBrush);
+    setGlobal(GetObjectHBITMAP);
+    setGlobal(GetObjectDIBITMAP);
+    setGlobal(GetObjectHPALETTE);
+    setGlobal(GetObjectExtHPEN);
+    setGlobal(GetObjectHPEN);
+    setGlobal(GetObjectHBRUSH);
+    setGlobal(GetObjectHFONT);
+    setGlobalWrapper(CreateFontIndirect); //bruh i forgot this line and V8 didn't say SHIT   it just started gaining a ton memory and stopped running
+    //next update (tomorrow) im adding all indirect funcs
+    
+    setGlobalWrapper(PlaySound);
+    setGlobal(PlaySoundSpecial);
+    setGlobal(StopSoundSpecial);
+    setGlobalWrapper(InitiateSystemShutdown);
+    setGlobalWrapper(AbortSystemShutdown);
 
     //https://stackoverflow.com/questions/6707148/foreach-macro-on-macros-arguments
 #define setGlobalConst(g) global->Set(isolate, #g, Number::New(isolate, g))
@@ -3422,7 +3648,10 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     setGlobalConst(BI_BITFIELDS);
     setGlobalConst(BI_JPEG);
     setGlobalConst(BI_PNG);
-    
+
+    setGlobalConst(SND_APPLICATION); setGlobalConst(SND_ALIAS); setGlobalConst(SND_ALIAS_ID); setGlobalConst(SND_ASYNC); setGlobalConst(SND_FILENAME); setGlobalConst(SND_LOOP); setGlobalConst(SND_MEMORY); setGlobalConst(SND_NODEFAULT); setGlobalConst(SND_NOSTOP); setGlobalConst(SND_NOWAIT); setGlobalConst(SND_PURGE); setGlobalConst(SND_RESOURCE); setGlobalConst(SND_SENTRY); setGlobalConst(SND_SYNC); setGlobalConst(SND_SYSTEM);
+    setGlobalConst(MM_MCINOTIFY);
+
     global->Set(isolate, "CreateWindow", FunctionTemplate::New(isolate, CreateWindowWrapper));
     global->Set(isolate, "CreateWindowClass", FunctionTemplate::New(isolate, CreateWindowClass));
 
@@ -3752,7 +3981,6 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
     setGlobalWrapper(EnumFontFamilies);
     setGlobalWrapper(CreateFont);
     setGlobalWrapper(CreateFontSimple);
-    setGlobalWrapper(CreateFontIndirect); //bruh i forgot this line and V8 didn't say SHIT   it just started gaining a ton memory and stopped running
     setGlobalConst(FW_DONTCARE); setGlobalConst(FW_THIN); setGlobalConst(FW_EXTRALIGHT); setGlobalConst(FW_ULTRALIGHT); setGlobalConst(FW_LIGHT); setGlobalConst(FW_NORMAL); setGlobalConst(FW_REGULAR); setGlobalConst(FW_MEDIUM); setGlobalConst(FW_SEMIBOLD); setGlobalConst(FW_DEMIBOLD); setGlobalConst(FW_BOLD); setGlobalConst(FW_EXTRABOLD); setGlobalConst(FW_ULTRABOLD); setGlobalConst(FW_HEAVY); setGlobalConst(FW_BLACK);
     setGlobalConst(ANSI_CHARSET); setGlobalConst(BALTIC_CHARSET); setGlobalConst(CHINESEBIG5_CHARSET); setGlobalConst(DEFAULT_CHARSET); setGlobalConst(EASTEUROPE_CHARSET); setGlobalConst(GB2312_CHARSET); setGlobalConst(GREEK_CHARSET); setGlobalConst(HANGUL_CHARSET); setGlobalConst(MAC_CHARSET); setGlobalConst(OEM_CHARSET); setGlobalConst(RUSSIAN_CHARSET); setGlobalConst(SHIFTJIS_CHARSET); setGlobalConst(SYMBOL_CHARSET); setGlobalConst(TURKISH_CHARSET); setGlobalConst(VIETNAMESE_CHARSET);
     setGlobalConst(JOHAB_CHARSET); setGlobalConst(ARABIC_CHARSET); setGlobalConst(HEBREW_CHARSET); setGlobalConst(THAI_CHARSET);
@@ -4116,7 +4344,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInstance, char* nCmdList, int
     //print("replace all using of RGB() with a js function");
     print("figure out win timers");
     //print("maybe do send input but if i can't i can't");
-    //print("investigate 3/11 -> why does SetClassLongPtr AND GetWindowLongPtr not work?"); //haha i can change the icons now!
+    //print("investigate 3/11 -> why does SetClassLongPtr AND GetWindowLongPtr not work?"); //haha i can change the icons now! (it wasn't working because i was using WINCLASS instead of the EX versions)
     print(/*"GDI CreateFont and */"CreateWindowExA AND use ID2D1BitmapBrush1!");
 
     SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), 7);

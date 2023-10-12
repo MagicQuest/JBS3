@@ -38,6 +38,7 @@ const textBmpBrush = CreatePatternBrush(textBmp);
     SelectObject(memDC, missingTextureBmp);
     SelectObject(memDC, GetStockObject(DC_BRUSH));
     SetDCBrushColor(memDC, RGB(255,0,255)); //instead of creating new brushes i could just use the DC_BRUSH (i thought about it but i didn't think it would work)
+    
     FillRect(memDC, 0, 0, 50, 50, NULL); //oh i didn't know i could do that
     //SetDCBrushColor(memDC, RGB(255,0,255));
     FillRect(memDC, 50, 50, 100, 100, NULL);

@@ -17,7 +17,7 @@ function init(hwnd) {
     InvalidateRect(hwnd, 0, 0, width, height, true);
     UpdateWindow(hwnd); //draw immediately
     button = CreateWindow("BUTTON", "OK", WS_CHILD | WS_VISIBLE, (width-146)/2, height/2+36, 146, 36, hwnd);
-    
+    PlaySoundSpecial(__dirname+"/peterstartup.mp3", "startup");
     //let dc = GetDC(hwnd);
     //const memDC = CreateCompatibleDC(dc);
     //SelectObject(memDC, mask);
@@ -55,12 +55,21 @@ function windowProc(hwnd, msg, wp, lp) {
     }else if(msg == WM_COMMAND) {
         if(lp == button && wp == BN_CLICKED) { //haven't added the https://learn.microsoft.com/en-us/windows/win32/controls/button-messages#notification-messages-from-buttons event names yet so imagine i put && BN_CLICKED (ok nevermind i added them)
             //print("BUTTON EVENT!");
-            Msgbox("playsound peter griffin", "heehehehe", MB_OK);
+            //Msgbox("playsound peter griffin", "heehehehe", MB_OK);
             SetClassLongPtr(hwnd, GCLP_HBRBACKGROUND, peterTiled); //LO!
             InvalidateRect(hwnd, 0, 0, width, height, true); //gotta redraw
             UpdateWindow(hwnd);
             //PlaySound peter griffin hehe
-            Msgbox("shutdown computer", "heehehehe", MB_OKCANCEL);
+            //PlaySound("E:/Program Files/Image-Line/FL Studio 20/heartbeat shift.wav", NULL, SND_FILENAME);
+            //PlaySoundSpecial("E:/Downloads/update2022-castle-funk.mp3", "funk", hwnd, true);
+            //PlaySoundSpecial("D:/21st century meme pack/clip funnies/aeiou.mp3", "funk", hwnd);
+            PlaySoundSpecial(__dirname+"/peter.mp3", "peteg");
+            if(Msgbox("shutdown computer", "heehehehe", MB_OKCANCEL) == IDOK) {
+                if(Msgbox("ARE YOU SURE?", "heehehehe", MB_OKCANCEL | MB_ICONQUESTION) == IDOK) {
+                    Msgbox("alrighty then", "heehehehe", MB_OK | MB_ICONERROR);
+                    InitiateSystemShutdown(NULL, "Peter Alert hehehehe", 5, false, false, 0x00000003); //https://learn.microsoft.com/en-us/windows/win32/shutdown/system-shutdown-reason-codes
+                }
+            }
             DestroyWindow(hwnd);
             //Beep(500, 200);
             //Sleep(750);
@@ -69,6 +78,8 @@ function windowProc(hwnd, msg, wp, lp) {
             //Beep(500, 200);
         }
         //print(wp, lp, button);
+    }else if(msg == MM_MCINOTIFY) { //yeah idk it ain't getting called
+        print(wp, lp, "done playing sound");
     }
 }
 
@@ -77,4 +88,7 @@ winclass.hIcon = winclass.hIconSm = HICONFromHBITMAP(peter); //LO! (paint.net do
 winclass.hbrBackground = COLOR_BACKGROUND;
 winclass.hCursor = LoadCursor(NULL, IDC_ARROW);
                                                                                                 //math
-CreateWindow(winclass, "Peter Alert", WS_CAPTION | WS_SYSMENU | WS_VISIBLE, screenWidth/2-width/2, screenHeight/2-height/2, width, height);
+CreateWindow(winclass, "Peter Alert", WS_CAPTION | WS_SYSMENU | WS_VISIBLE, screenWidth/2-width/2, screenHeight/2-height/2, width, height); //blocking
+
+StopSoundSpecial("startup"); //just clean up (and if i really cared i'd clean up HICONFromHBITMAP too)
+StopSoundSpecial("peteg");
