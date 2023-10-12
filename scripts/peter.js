@@ -38,7 +38,7 @@ function windowProc(hwnd, msg, wp, lp) {
         const memDC = CreateCompatibleDC(ps.hdc);
         SelectObject(memDC, peter);
         //BitBlt(ps.hdc, (width-146)/2, height/2-146, 146, 146, memDC, 0, 0, SRCCOPY);
-        print(MaskBlt(ps.hdc,(width-146)/2, height/2-146, 146, 146, memDC,0,0,mask, 0, 0, MAKEROP4(SRCCOPY, 0x00AA0029)), _com_error(GetLastError())); //forgot to add MAKEROP4 as a function and v8 didn't say SHIT he just smiled and waved (yo my power just turned off for a SPLIT second and my computer is still on lets go) (haha i forgot to build it)
+        print(MaskBlt(ps.hdc, (width-146)/2, height/2-146, 146, 146, memDC,0,0,mask, 0, 0, MAKEROP4(SRCCOPY, 0x00AA0029)), _com_error(GetLastError())); //forgot to add MAKEROP4 as a function and v8 didn't say SHIT he just smiled and waved (yo my power just turned off for a SPLIT second and my computer is still on lets go) (haha i forgot to build it)
         DeleteDC(memDC);
         EndPaint(hwnd, ps);
     }else if(msg == WM_KEYDOWN) {
