@@ -31,12 +31,16 @@ class IconObj {
         this.vy = velocity.y;
         this.icon = icon;
         let dim = GetIconDimensions(this.icon);
-        if(dim.cx < 100) {
-            dim.cx += 32;
-            dim.cy += 32;
+        //if(dim.cx < 100) {
+        //    dim.cx += 32;
+        //    dim.cy += 32;
+        //}
+        if(dim.width < 100) {
+            dim.width += 32;
+            dim.height += 32;
         }
-        this.cx = dim.cx;
-        this.cy = dim.cy;
+        this.cx = dim.width;
+        this.cy = dim.height;
     }
 
     update(rect, window) {

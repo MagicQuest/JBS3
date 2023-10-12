@@ -1295,6 +1295,7 @@ namespace DIRECT2D {
             D2D1_POINT_2F zeroRotP1 = D2D1::Point2F(point1.x + (point0.x - point1.x) * f3(angle / 360), point0.y - (point0.y - point1.y) * f(angle / 360));
             //https://www.desmos.com/calculator/erqmojpc7j   //absolutely insane math
             //desmos just saved my life
+            //even though i probably didn't have to do any of that with D2D1::Matrix math (however idk what imdoing)
             //print(angle);
             //if (angle < 45) {
             //    zeroRotP0 = D2D1::Point2F(point0.x, lerp(point0.y + (point1.y-point0.y)/2, point0.y, angle / 45));
@@ -1359,7 +1360,7 @@ V8FUNC(createCanvas) {
         Direct2D* d2d = new Direct2D();
         d2d->Init(info[2]->IsNumber() ? (HWND)IntegerFI(info[2]) : (HWND)NULL, IntegerFI(info[1]));
 
-        context->Set(isolate, "internalDXPtr", Number::New(isolate, (LONG_PTR)d2d));
+        context->Set(isolate, "internalDXPtr", Number::New(isolate, (LONG_PTR)d2d)); //lowkey should set these private but it PROBABLY doesn't matter just dont change it lol
         context->Set(isolate, "renderTarget", Number::New(isolate, (LONG_PTR)d2d->renderTarget));
         print("TRENDERTARF< " << d2d->renderTarget);
         context->Set(isolate, "BeginDraw", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
@@ -2809,8 +2810,22 @@ V8FUNC(GetIconDimensionsWrapper) {
     GetIconDimensions(HICON(IntegerFI(info[0])), &size);
 
     Local<Object> jsSize = Object::New(isolate);
-    jsSize->Set(isolate->GetCurrentContext(), LITERAL("cx"), Number::New(isolate, size.cx));
-    jsSize->Set(isolate->GetCurrentContext(), LITERAL("cy"), Number::New(isolate, size.cy));
+    jsSize->Set(isolate->GetCurrentContext(), LITERAL("width"), Number::New(isolate, size.cx)); //jbs is now 1.3.1 because i changed an existing function and had to update mousemover.js
+    jsSize->Set(isolate->GetCurrentContext(), LITERAL("height"), Number::New(isolate, size.cy));
+
+    info.GetReturnValue().Set(jsSize);
+}
+
+V8FUNC(GetBitmapDimensionsWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    BITMAP bmp;
+    GetObjectA((HBITMAP)IntegerFI(info[0]), sizeof(BITMAP), &bmp); //oof getobject wrapper gonna be hard (also i usually don't say oof anymore)
+    
+    Local<Object> jsSize = Object::New(isolate);
+    jsSize->Set(isolate->GetCurrentContext(), LITERAL("width"), Number::New(isolate, bmp.bmWidth));
+    jsSize->Set(isolate->GetCurrentContext(), LITERAL("height"), Number::New(isolate, bmp.bmHeight));
 
     info.GetReturnValue().Set(jsSize);
 }
@@ -2956,38 +2971,6 @@ V8FUNC(CreateWindowWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
 
-    wndclass = info[0].As<Object>();
-
-#define GetProperty(name) wndclass->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL(name)).ToLocalChecked()
-
-    //const char* className = *String::Utf8Value(isolate, wndclass->GetRealNamedProperty(isolate->GetCurrentContext(), String::NewFromUtf8Literal(isolate, "className")).ToLocalChecked());
-    print(*String::Utf8Value(isolate, wndclass->GetRealNamedProperty(isolate->GetCurrentContext(), String::NewFromUtf8Literal(isolate, "lpszClassName")).ToLocalChecked()));
-    //WNDCLASSA wc{ 0 };
-    WNDCLASSEXA wc{ 0 };
-    wc.cbSize = sizeof(WNDCLASSEXA);
-    wc.hbrBackground = (HBRUSH)IntegerFI(GetProperty("hbrBackground"));
-    wc.hCursor = (HCURSOR)IntegerFI(GetProperty("hCursor"));
-    wc.hIcon = (HICON)IntegerFI(GetProperty("hIcon"));
-    wc.hIconSm = (HICON)IntegerFI(GetProperty("hIconSm"));
-    HINSTANCE shit = hInstance;
-    if (!GetProperty("hInstance")->IsUndefined()) {
-        shit = (HINSTANCE)IntegerFI(GetProperty("hInstance"));
-    }
-    wc.hInstance = shit;
-    wc.lpszClassName = CStringFI(GetProperty("lpszClassName"));
-    if (!GetProperty("lpszMenuName")->IsUndefined()) {
-        wc.lpszMenuName = CStringFI(GetProperty("lpszMenuName"));
-    }
-    wc.style = IntegerFI(GetProperty("style"));
-    wc.lpfnWndProc = WinProc;
-
-    if (!RegisterClassExA(&wc)) {
-        info.GetReturnValue().Set(false);
-        print("FAILED RegisteClassExA "<<hInstance<< " " << GetModuleHandle(NULL));
-        MessageBoxA(NULL, "failed to register window class (keep trying idk why CreateWindow is a little sketchy)", (std::string("err: [") + std::to_string(GetLastError()) + "]").c_str(), MB_OK | MB_ICONERROR);
-        return;
-    }
-
     int x = IntegerFI(info[3]);
     int y = IntegerFI(info[4]);
     int width = IntegerFI(info[5]);
@@ -2995,85 +2978,130 @@ V8FUNC(CreateWindowWrapper) {
 
     print(CStringFI(info[1]) << " " << x << " " << y << " " << width << " " << height);
 
-    HWND newWindow = CreateWindowA(CStringFI(GetProperty("lpszClassName")), CStringFI(info[1]), IntegerFI(info[2]), x, y, width, height, NULL, NULL, hInstance, NULL);
+    HWND newWindow;// = CreateWindowA(CStringFI(GetProperty("lpszClassName")), CStringFI(info[1]), IntegerFI(info[2]), x, y, width, height, NULL, NULL, hInstance, NULL);
 
-    if (GetLastError() != 0) {
-        if (MessageBoxA(NULL, "RESTART JBS because there's a 99% chance that the window was NOT created", "CreateWindow Error Checking", MB_OKCANCEL | MB_ICONWARNING) == IDCANCEL) {
+    if (!info[0]->IsString()) {
+
+        wndclass = info[0].As<Object>();
+
+#define GetProperty(name) wndclass->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL(name)).ToLocalChecked()
+
+        //const char* className = *String::Utf8Value(isolate, wndclass->GetRealNamedProperty(isolate->GetCurrentContext(), String::NewFromUtf8Literal(isolate, "className")).ToLocalChecked());
+        print(*String::Utf8Value(isolate, wndclass->GetRealNamedProperty(isolate->GetCurrentContext(), String::NewFromUtf8Literal(isolate, "lpszClassName")).ToLocalChecked()));
+        //WNDCLASSA wc{ 0 };
+        WNDCLASSEXA wc{ 0 };
+        wc.cbSize = sizeof(WNDCLASSEXA);
+        wc.hbrBackground = (HBRUSH)IntegerFI(GetProperty("hbrBackground"));
+        wc.hCursor = (HCURSOR)IntegerFI(GetProperty("hCursor"));
+        wc.hIcon = (HICON)IntegerFI(GetProperty("hIcon"));
+        wc.hIconSm = (HICON)IntegerFI(GetProperty("hIconSm"));
+        HINSTANCE shit = hInstance;
+        if (!GetProperty("hInstance")->IsUndefined()) {
+            shit = (HINSTANCE)IntegerFI(GetProperty("hInstance"));
+        }
+        wc.hInstance = shit;
+        wc.lpszClassName = CStringFI(GetProperty("lpszClassName"));
+        if (!GetProperty("lpszMenuName")->IsUndefined()) {
+            wc.lpszMenuName = CStringFI(GetProperty("lpszMenuName"));
+        }
+        wc.style = IntegerFI(GetProperty("style"));
+        wc.lpfnWndProc = WinProc;
+
+        if (!RegisterClassExA(&wc)) {
+            info.GetReturnValue().Set(false);
+            print("FAILED RegisteClassExA " << hInstance << " " << GetModuleHandle(NULL));
+            MessageBoxA(NULL, "failed to register window class (keep trying idk why CreateWindow is a little sketchy)", (std::string("err: [") + (const char*)_bstr_t(_com_error(GetLastError()).ErrorMessage()) + "]").c_str(), MB_OK | MB_ICONERROR);
             return;
         }
-    }
-    MessageBoxA(NULL, (std::string("shit")+std::to_string(GetLastError())).c_str(), "titlke", MB_OKCANCEL); //https://www.youtube.com/watch?v=58OhXFmTUo0
-    SetWindowLongPtrW(newWindow, GWLP_USERDATA, (LONG_PTR)isolate);//(size_t) & wndclass->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("windowProc")).ToLocalChecked().As<Function>());
 
-    ShowWindow(newWindow, SW_SHOW);
-
-    //types.d.ts
-
-    //HWND newWindow = CreateWindowA();
-    //
-    //Local<ObjectTemplate> window = ObjectTemplate::New(isolate);
-    //window->Set(isolate, "read", FunctionTemplate::New(isolate, fs::read));
-    //window->Set(isolate, "write", FunctionTemplate::New(isolate, fs::write));
-    ////filesys->Set(isolate->GetCurrentContext(), String::NewFromUtf8(isolate, "open").ToLocalChecked(), v8::FunctionTemplate::New(isolate, fs::open));
-    ////filesys->Set(isolate, "v", String::NewFromUtf8(isolate, "KYS").ToLocalChecked());
-    //
-    ////print(filesys->IsValue() << " is value");
-    //
-    //Local<Object> result = window->NewInstance(isolate->GetCurrentContext()).ToLocalChecked(); //why did i have to cap on this dawg
-    //
-    //info.GetReturnValue().Set(result);
-
-    MSG Message;
-    Message.message = ~WM_QUIT;
-
-    //Local<Promise::Resolver> uh = Promise::Resolver::New(isolate->GetCurrentContext()).ToLocalChecked();
-    //info.GetReturnValue().Set(uh->GetPromise());
-    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)newWindow));
-
-    Local<Value> args[] = { Number::New(isolate, (LONG_PTR)newWindow)};
-
-    UpdateWindow(newWindow);
-    GetProperty("init").As<Function>()->Call(isolate->GetCurrentContext(), isolate->GetCurrentContext()->Global(), 1, args)/*.ToLocalChecked()*/;
-
-    Local<Function> looper = GetProperty("loop").As<Function>();
-    print(looper.IsEmpty() << " " << looper->IsUndefined());
-
-    if (!looper->IsUndefined()) {
-        while (Message.message != WM_QUIT)
-        {
-            if (PeekMessage(&Message, NULL, 0, 0, PM_REMOVE))
-            {
-                // If a message was waiting in the message queue, process it
-                //print("wajt");
-                TranslateMessage(&Message);
-                DispatchMessage(&Message);
-            }
-            else
-            {
-                v8::HandleScope handle_scope(isolate); //apparently i needed this so good to know
-                looper->Call(isolate->GetCurrentContext(), isolate->GetCurrentContext()->Global(), 0, nullptr);
-                //print("LOPER CALLED!");
-
-                isolate->PerformMicrotaskCheckpoint();
+        newWindow = CreateWindowA(CStringFI(GetProperty("lpszClassName")), CStringFI(info[1]), IntegerFI(info[2]), x, y, width, height, NULL, NULL, hInstance, NULL);
+    
+        if (GetLastError() != 0) {
+            //std::string shit = std::string("RESTART JBS because there's a 99% chance that the window was NOT created ") + (const char*)_bstr_t(_com_error(GetLastError()).ErrorMessage()) + ")";
+                                //ahhhhhhh
+            if (MessageBoxA(NULL, /*&shit[0]*/"I'm not gonna lie something when wrong when we tried to create that window", (const char*)_bstr_t(_com_error(GetLastError()).ErrorMessage()), MB_OKCANCEL | MB_ICONWARNING | MB_DEFBUTTON2) == IDCANCEL) {
+                return;
             }
         }
+
+        SetWindowLongPtrW(newWindow, GWLP_USERDATA, (LONG_PTR)isolate);//(size_t) & wndclass->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("windowProc")).ToLocalChecked().As<Function>());
+
+        ShowWindow(newWindow, SW_SHOW);
+
+        //types.d.ts
+
+        //HWND newWindow = CreateWindowA();
+        //
+        //Local<ObjectTemplate> window = ObjectTemplate::New(isolate);
+        //window->Set(isolate, "read", FunctionTemplate::New(isolate, fs::read));
+        //window->Set(isolate, "write", FunctionTemplate::New(isolate, fs::write));
+        ////filesys->Set(isolate->GetCurrentContext(), String::NewFromUtf8(isolate, "open").ToLocalChecked(), v8::FunctionTemplate::New(isolate, fs::open));
+        ////filesys->Set(isolate, "v", String::NewFromUtf8(isolate, "KYS").ToLocalChecked());
+        //
+        ////print(filesys->IsValue() << " is value");
+        //
+        //Local<Object> result = window->NewInstance(isolate->GetCurrentContext()).ToLocalChecked(); //why did i have to cap on this dawg
+        //
+        //info.GetReturnValue().Set(result);
+
+        MSG Message;
+        Message.message = ~WM_QUIT;
+
+        //Local<Promise::Resolver> uh = Promise::Resolver::New(isolate->GetCurrentContext()).ToLocalChecked();
+        //info.GetReturnValue().Set(uh->GetPromise());
+        info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)newWindow));
+
+        Local<Value> args[] = { Number::New(isolate, (LONG_PTR)newWindow) };
+
+        InvalidateRect(newWindow, NULL, true);
+        UpdateWindow(newWindow);
+        GetProperty("init").As<Function>()->Call(isolate->GetCurrentContext(), isolate->GetCurrentContext()->Global(), 1, args)/*.ToLocalChecked()*/;
+
+        Local<Function> looper = GetProperty("loop").As<Function>();
+        print(looper.IsEmpty() << " " << looper->IsUndefined());
+
+        if (!looper->IsUndefined()) {
+            while (Message.message != WM_QUIT)
+            {
+                if (PeekMessage(&Message, NULL, 0, 0, PM_REMOVE))
+                {
+                    // If a message was waiting in the message queue, process it
+                    //print("wajt");
+                    TranslateMessage(&Message);
+                    DispatchMessage(&Message);
+                }
+                else
+                {
+                    v8::HandleScope handle_scope(isolate); //apparently i needed this so good to know
+                    looper->Call(isolate->GetCurrentContext(), isolate->GetCurrentContext()->Global(), 0, nullptr);
+                    //print("LOPER CALLED!");
+
+                    isolate->PerformMicrotaskCheckpoint();
+                }
+            }
+        }
+        else {
+            while (Message.message != WM_QUIT)
+            {
+                if (GetMessage(&Message, NULL, 0, 0))
+                {
+                    // If a message was waiting in the message queue, process it
+                    //print("wajt");
+                    TranslateMessage(&Message);
+                    DispatchMessage(&Message);
+                }
+            }
+        }
+
+        print("loop over nigga");
+
+        //uh->Resolve(isolate->GetCurrentContext(), Undefined(isolate)); //https://gist.github.com/jupp0r/5f11c0ee2b046b0ab89660ce85ea480e
     }
     else {
-        while (Message.message != WM_QUIT)
-        {
-            if (GetMessage(&Message, NULL, 0, 0))
-            {
-                // If a message was waiting in the message queue, process it
-                //print("wajt");
-                TranslateMessage(&Message);
-                DispatchMessage(&Message);
-            }
-        }
+        newWindow = CreateWindowA(CStringFI(info[0]), CStringFI(info[1]), IntegerFI(info[2]), x, y, width, height, (HWND)IntegerFI(info[7]), NULL, hInstance, NULL);
+        info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)newWindow));
     }
-
-    print("loop over nigga");
-
-    //uh->Resolve(isolate->GetCurrentContext(), Undefined(isolate)); //https://gist.github.com/jupp0r/5f11c0ee2b046b0ab89660ce85ea480e
+    //MessageBoxA(NULL, (std::string("shit")+std::to_string(GetLastError())).c_str(), "titlke", MB_OKCANCEL); //https://www.youtube.com/watch?v=58OhXFmTUo0
 }
 
 V8FUNC(RedrawWindowWrapper) {
@@ -3228,7 +3256,13 @@ V8FUNC(CreateBitmapWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
 
-    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)CreateBitmap(IntegerFI(info[0]), IntegerFI(info[1]), 1, 32, nullptr)));
+    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)CreateBitmap(IntegerFI(info[0]), IntegerFI(info[1]), 1, info[2]->IsNumber() ? IntegerFI(info[2]) : 32, nullptr)));
+}
+
+V8FUNC(MAKEROP4Wrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    info.GetReturnValue().Set(Number::New(info.GetIsolate(), MAKEROP4(IntegerFI(info[0]), IntegerFI(info[1]))));
 }
 
 V8FUNC(StretchDIBitsWrapper) {
@@ -3298,6 +3332,14 @@ V8FUNC(CreateHatchBrushWrapper) {
     info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)CreateHatchBrush(IntegerFI(info[0]), IntegerFI(info[1]))));
 }
 
+V8FUNC(MaskBltWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    
+    info.GetReturnValue().Set(Number::New(isolate, MaskBlt((HDC)IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]), IntegerFI(info[4]), (HDC)IntegerFI(info[5]), IntegerFI(info[6]), IntegerFI(info[7]), (HBITMAP)IntegerFI(info[8]), IntegerFI(info[9]), IntegerFI(info[10]), IntegerFI(info[11]))));
+}
+
+
 v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     using namespace v8;
 
@@ -3336,6 +3378,7 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
 
         global->Set(isolate, "__dirname", String::NewFromUtf8(isolate, strFileName.c_str()).ToLocalChecked());
     }
+
     global->Set(isolate, "screenWidth", Number::New(isolate, screenWidth));
     global->Set(isolate, "screenHeight", Number::New(isolate, screenHeight));
     
@@ -3360,6 +3403,8 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     global->Set(isolate, "StretchBlt", FunctionTemplate::New(isolate, StretchBltWrapper));
     setGlobalWrapper(StretchDIBits);
     setGlobalWrapper(PatBlt);
+    setGlobalWrapper(MaskBlt);
+    setGlobalWrapper(MAKEROP4);
     setGlobalWrapper(CreatePatternBrush);
     setGlobalWrapper(CreateHatchBrush);
 
@@ -3367,6 +3412,9 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
 #define setGlobalConst(g) global->Set(isolate, #g, Number::New(isolate, g))
 
     setGlobalConst(PATCOPY); setGlobalConst(PATINVERT); setGlobalConst(DSTINVERT); setGlobalConst(BLACKNESS); setGlobalConst(WHITENESS);
+    setGlobalConst(PATPAINT);
+    setGlobalConst(MERGEPAINT);
+    setGlobalConst(MERGECOPY);
 
     setGlobalConst(BI_RGB);
     setGlobalConst(BI_RLE8);
@@ -3381,6 +3429,25 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     setGlobalConst(COLOR_ACTIVEBORDER); setGlobalConst(COLOR_ACTIVECAPTION); setGlobalConst(COLOR_APPWORKSPACE); setGlobalConst(COLOR_BACKGROUND); setGlobalConst(COLOR_BTNFACE); setGlobalConst(COLOR_BTNSHADOW); setGlobalConst(COLOR_BTNTEXT); setGlobalConst(COLOR_CAPTIONTEXT); setGlobalConst(COLOR_GRAYTEXT); setGlobalConst(COLOR_HIGHLIGHT); setGlobalConst(COLOR_HIGHLIGHTTEXT); setGlobalConst(COLOR_INACTIVEBORDER); setGlobalConst(COLOR_INACTIVECAPTION); setGlobalConst(COLOR_MENU); setGlobalConst(COLOR_MENUTEXT); setGlobalConst(COLOR_SCROLLBAR); setGlobalConst(COLOR_WINDOW); setGlobalConst(COLOR_WINDOWFRAME); setGlobalConst(COLOR_WINDOWTEXT);
     setGlobalConst(WS_BORDER); setGlobalConst(WS_CAPTION); setGlobalConst(WS_CHILD); setGlobalConst(WS_CHILDWINDOW); setGlobalConst(WS_CLIPCHILDREN); setGlobalConst(WS_CLIPSIBLINGS); setGlobalConst(WS_DISABLED); setGlobalConst(WS_DLGFRAME); setGlobalConst(WS_GROUP); setGlobalConst(WS_HSCROLL); setGlobalConst(WS_ICONIC); setGlobalConst(WS_MAXIMIZE); setGlobalConst(WS_MAXIMIZEBOX); setGlobalConst(WS_MINIMIZE); setGlobalConst(WS_MINIMIZEBOX); setGlobalConst(WS_OVERLAPPED); setGlobalConst(WS_OVERLAPPEDWINDOW); setGlobalConst(WS_POPUP); setGlobalConst(WS_POPUPWINDOW); setGlobalConst(WS_SIZEBOX); setGlobalConst(WS_SYSMENU); setGlobalConst(WS_TABSTOP); setGlobalConst(WS_THICKFRAME); setGlobalConst(WS_TILED); setGlobalConst(WS_TILEDWINDOW); setGlobalConst(WS_VISIBLE); setGlobalConst(WS_VSCROLL);
     setGlobalConst(CS_BYTEALIGNCLIENT); setGlobalConst(CS_BYTEALIGNWINDOW); setGlobalConst(CS_CLASSDC); setGlobalConst(CS_DBLCLKS); setGlobalConst(CS_DROPSHADOW); setGlobalConst(CS_GLOBALCLASS); setGlobalConst(CS_HREDRAW); setGlobalConst(CS_NOCLOSE); setGlobalConst(CS_OWNDC); setGlobalConst(CS_PARENTDC); setGlobalConst(CS_SAVEBITS); setGlobalConst(CS_VREDRAW);
+    setGlobalConst(BS_3STATE); setGlobalConst(BS_AUTO3STATE); setGlobalConst(BS_AUTOCHECKBOX); setGlobalConst(BS_AUTORADIOBUTTON); setGlobalConst(BS_BITMAP); setGlobalConst(BS_BOTTOM); setGlobalConst(BS_CENTER); setGlobalConst(BS_CHECKBOX); /*setGlobalConst(BS_COMMANDLINK); setGlobalConst(BS_DEFCOMMANDLINK);*/ setGlobalConst(BS_DEFPUSHBUTTON); /*setGlobalConst(BS_DEFSPLITBUTTON);*/ setGlobalConst(BS_GROUPBOX); setGlobalConst(BS_ICON); setGlobalConst(BS_FLAT); setGlobalConst(BS_LEFT); setGlobalConst(BS_LEFTTEXT); setGlobalConst(BS_MULTILINE); setGlobalConst(BS_NOTIFY); setGlobalConst(BS_OWNERDRAW); setGlobalConst(BS_PUSHBUTTON); setGlobalConst(BS_PUSHLIKE); setGlobalConst(BS_RADIOBUTTON); setGlobalConst(BS_RIGHT); setGlobalConst(BS_RIGHTBUTTON); /*setGlobalConst(BS_SPLITBUTTON);*/ setGlobalConst(BS_TEXT); setGlobalConst(BS_TOP); setGlobalConst(BS_TYPEMASK); setGlobalConst(BS_USERBUTTON); setGlobalConst(BS_VCENTER);
+    /*setGlobalConst(BCN_HOTITEMCHANGE);*/ setGlobalConst(BN_CLICKED); setGlobalConst(BN_DBLCLK); setGlobalConst(BN_DOUBLECLICKED); setGlobalConst(BN_DISABLE); setGlobalConst(BN_PUSHED); setGlobalConst(BN_HILITE); setGlobalConst(BN_KILLFOCUS); setGlobalConst(BN_PAINT); setGlobalConst(BN_SETFOCUS); setGlobalConst(BN_UNPUSHED); setGlobalConst(BN_UNHILITE);
+
+    setGlobalConst(ES_LEFT);
+    setGlobalConst(ES_CENTER);
+    setGlobalConst(ES_RIGHT);
+    setGlobalConst(ES_MULTILINE);
+    setGlobalConst(ES_UPPERCASE);
+    setGlobalConst(ES_LOWERCASE);
+    setGlobalConst(ES_PASSWORD);
+    setGlobalConst(ES_AUTOVSCROLL);
+    setGlobalConst(ES_AUTOHSCROLL);
+    setGlobalConst(ES_NOHIDESEL);
+    setGlobalConst(ES_OEMCONVERT);
+    setGlobalConst(ES_READONLY);
+    setGlobalConst(ES_WANTRETURN);
+    setGlobalConst(ES_NUMBER);
+
+    
 
     setGlobalWrapper(RedrawWindow);
     setGlobalWrapper(InvalidateRect);
@@ -3657,6 +3724,7 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
     setGlobalWrapper(LoadIcon);
     setGlobalWrapper(HICONFromHBITMAP);
     setGlobalWrapper(GetIconDimensions);
+    setGlobalWrapper(GetBitmapDimensions);
 
     setGlobalConst(IMAGE_BITMAP);
     setGlobalConst(IMAGE_CURSOR);
@@ -3917,10 +3985,10 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
     //setGlobalConst(HWND_TOP);
     //setGlobalConst(HWND_TOPMOST);
 
-    global->Set(isolate, "HWND_BOTTOM", Number::New(isolate, (int)HWND_BOTTOM));
-    global->Set(isolate, "HWND_NOTOPMOST", Number::New(isolate, (int)HWND_NOTOPMOST));
-    global->Set(isolate, "HWND_TOP", Number::New(isolate, (int)HWND_TOP));
-    global->Set(isolate, "HWND_TOPMOST", Number::New(isolate, (int)HWND_TOPMOST));
+    global->Set(isolate, "HWND_BOTTOM", Number::New(isolate, (LONG_PTR)HWND_BOTTOM));
+    global->Set(isolate, "HWND_NOTOPMOST", Number::New(isolate, (LONG_PTR)HWND_NOTOPMOST));
+    global->Set(isolate, "HWND_TOP", Number::New(isolate, (LONG_PTR)HWND_TOP));
+    global->Set(isolate, "HWND_TOPMOST", Number::New(isolate, (LONG_PTR)HWND_TOPMOST));
 
     setGlobalConst(SWP_ASYNCWINDOWPOS); setGlobalConst(SWP_DEFERERASE); setGlobalConst(SWP_DRAWFRAME); setGlobalConst(SWP_FRAMECHANGED); setGlobalConst(SWP_HIDEWINDOW); setGlobalConst(SWP_NOACTIVATE); setGlobalConst(SWP_NOCOPYBITS); setGlobalConst(SWP_NOMOVE); setGlobalConst(SWP_NOOWNERZORDER); setGlobalConst(SWP_NOREDRAW); setGlobalConst(SWP_NOREPOSITION); setGlobalConst(SWP_NOSENDCHANGING); setGlobalConst(SWP_NOSIZE); setGlobalConst(SWP_NOZORDER); setGlobalConst(SWP_SHOWWINDOW);
 
@@ -4053,7 +4121,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInstance, char* nCmdList, int
 
     SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), 7);
 
-    print("JBS3 -> Version 1.3.0"); //so idk how normal version things work so the first number will probably stay one --- i will increment the second number if i change an existing function like when i remade the CreateWindowClass and CreateWindow functions --- i might random increment the third number if i feel like it
+    print("JBS3 -> Version 1.3.1"); //so idk how normal version things work so the first number will probably stay one --- i will increment the second number if i change an existing function like when i remade the CreateWindowClass and CreateWindow functions --- i might random increment the third number if i feel like it
     print(screenWidth << "x" << screenHeight);
     
 
