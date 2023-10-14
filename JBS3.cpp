@@ -3766,6 +3766,36 @@ V8FUNC(AbortSystemShutdownWrapper) {
     info.GetReturnValue().Set(Number::New(isolate, AbortSystemShutdownA(CStringFI(info[0]))));
 }
 
+V8FUNC(PlgBltWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    POINT p[4];
+
+    Local<Array> jspoints = info[1].As<Array>();
+    for (int i = 0; i < jspoints->Length(); i++) {
+        Local<Object> jspoint = jspoints->Get(isolate->GetCurrentContext(), i).ToLocalChecked().As<Object>();
+        p[i] = POINT{(long)IntegerFI(jspoint->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("x")).ToLocalChecked()),(long)IntegerFI(jspoint->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("y")).ToLocalChecked()) };
+        //print(p[i].x << " " << p[i].y);
+    }
+
+    info.GetReturnValue().Set(Number::New(isolate, PlgBlt((HDC)IntegerFI(info[0]), p, (HDC)IntegerFI(info[2]), IntegerFI(info[3]), IntegerFI(info[4]), IntegerFI(info[5]), IntegerFI(info[6]), (HBITMAP)IntegerFI(info[7]), IntegerFI(info[8]), IntegerFI(info[9]))));
+}
+
+V8FUNC(SetTimerWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    MessageBoxA(NULL, "i should probably implement some SetTimer timerproc thing", "yeah get on that", MB_OK);
+    info.GetReturnValue().Set(Number::New(isolate, SetTimer((HWND)IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), NULL)));
+}
+
+V8FUNC(KillTimerWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, KillTimer((HWND)IntegerFI(info[0]), IntegerFI(info[1]))));
+}
+
 v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     using namespace v8;
 
@@ -3833,6 +3863,10 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     setGlobalWrapper(StretchDIBits);
     setGlobalWrapper(PatBlt);
     setGlobalWrapper(MaskBlt);
+    setGlobalWrapper(PlgBlt);
+    setGlobalWrapper(SetTimer);
+    setGlobalWrapper(KillTimer);
+
     setGlobalWrapper(MAKEROP4);
     setGlobalWrapper(CreatePatternBrush);
     setGlobalWrapper(CreateHatchBrush);
@@ -4583,9 +4617,9 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInstance, char* nCmdList, int
     //print("uhhh i need to define like 100 WM_ global macros kthxbai");
     print(sizeof(int) << " " << sizeof(long) << " " << sizeof(LONG_PTR));
     print("also i MUST consider adding convenience functions like setting the color of objects that don't support it (by creating new ones)");
-    print("UNFORTUNATELY i need to use create text layout some where for font boldness and the like");
+    print("[D2D] UNFORTUNATELY i need to use create text layout some where for font boldness and the like");
     //print("replace all using of RGB() with a js function");
-    print("figure out win timers");
+    //print("figure out win timers"); //i couldn't be bothered to immediately figure it out because the param names seems so weird that i couldn\'t be beothereed
     //print("maybe do send input but if i can't i can't");
     //print("investigate 3/11 -> why does SetClassLongPtr AND GetWindowLongPtr not work?"); //haha i can change the icons now! (it wasn't working because i was using WINCLASS instead of the EX versions)
     print(/*"GDI CreateFont and CreateWindowExA AND */"use ID2D1BitmapBrush1!");
@@ -4798,7 +4832,7 @@ LRESULT CALLBACK WinProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
     if (isolate != nullptr || msg == WM_CREATE) {
         if (msg == WM_CREATE) isolate = (Isolate*)(((CREATESTRUCTW*)lp)->lpCreateParams);  //usually i don't do single line if statements but im feeling quirky
         //print(isolate << " " << lp << " " << (msg == WM_CREATE));// << " random data " << isolate->GetCurrentContext()->IsContext());
-
+        HandleScope handle_scope(isolate); //slapping this bad boy in here
         Local<Function> listener = wndclass->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("windowProc")).ToLocalChecked().As<Function>();
         Local<Value> args[] = { Number::New(isolate, (LONG_PTR)hwnd),  Number::New(isolate, msg), Number::New(isolate, wp), Number::New(isolate, lp)};
         /*Local<Value> result = */listener->Call(isolate->GetCurrentContext(), isolate->GetCurrentContext()->Global(), 4, args)/*.ToLocalChecked()*/;
