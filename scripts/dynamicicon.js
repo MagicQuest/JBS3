@@ -25,7 +25,7 @@ function init(hwnd) {
 function windowProc(hwnd, msg, wp, lp) {
     if(msg == WM_DESTROY) {
         PostQuitMessage();
-    }else if(WM_MOUSEWHEEL) {
+    }else if(msg == WM_MOUSEWHEEL) {//if(WM_MOUSEWHEEL) { //WAIT HAS IT ALWAYS BEEN LKE THAT
         let wheel = HIWORD(wp);
         if(wheel) {
             if(wheel % 120 == 0) {
@@ -35,6 +35,8 @@ function windowProc(hwnd, msg, wp, lp) {
                 size -= 16;
             }
         }
+    }else if(msg == WM_CREATE) {
+        init(hwnd);
     }
 }
 
@@ -98,7 +100,7 @@ function loop() {
     }
 }
 
-const WINCLASSEX = CreateWindowClass("WinClass", init, windowProc, loop);
+const WINCLASSEX = CreateWindowClass("WinClass"/*, init*/, windowProc, loop);
 const icon = LoadIcon(NULL, IDI_ERROR);
 WINCLASSEX.hCursor = LoadCursor(NULL, IDC_HAND);
 WINCLASSEX.hIcon = icon;
@@ -106,4 +108,4 @@ WINCLASSEX.hIconSm = icon;
 
 //print(WINCLASSEX);
 
-CreateWindow(WINCLASSEX, "dynamic icons?", WS_OVERLAPPEDWINDOW | WS_VISIBLE, 200, 200, bounds+16, bounds+39);
+CreateWindow(WS_EX_OVERLAPPEDWINDOW, WINCLASSEX, "dynamic icons?", WS_OVERLAPPEDWINDOW | WS_VISIBLE, 200, 200, bounds+16, bounds+39, NULL, NULL, hInstance);

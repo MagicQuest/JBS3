@@ -1,47 +1,74 @@
 //creative way of loading PNGs into an HBITMAP using d2d
 
-const width = 600;
-const height = 600;
+const width = 900;
+const height = 900;
 
 let button;
 
 let pngBitmap;
+let patbltBitmap;
 
 let mouse = {x: 0, y: 0};
+
+let loadedPng = true;
 
 function init(hwnd) {
     InvalidateRect(hwnd, 0, 0, width, height, true);
     UpdateWindow(hwnd); //draw immediately
-    button = CreateWindow("BUTTON", "OK NIGGA", WS_CHILD | WS_VISIBLE, (width-146)/2, height/2+36, 146, 36, hwnd);
+    button = CreateWindow(NULL,"BUTTON", "OK NIGGA", WS_CHILD | WS_VISIBLE, (width-146)/2, height/2+36, 146, 36, hwnd, NULL, hInstance);
     SendMessage(button, WM_SETFONT, CreateFontSimple("impact", 20, 40), true); //lol
 
+    loadedPng = false;
+    //too early?
+}
+
+function loadPng(hwnd, dc, filename) {
     const d2d = createCanvas("d2d", ID2D1DCRenderTarget, hwnd);
-    const png = d2d.CreateBitmapFromFilename(__dirname+"/msnexample.png");
+    print(filename);
+    const png = d2d.CreateBitmapFromFilename(filename);
+    const size = png.GetPixelSize();
+    print(size, "NISGG");
     d2d.BeginDraw();
-    d2d.DrawBitmap(png, 0, 0, 507, 516);
+    d2d.DrawBitmap(png, 0, 0, size.width, size.height);
     d2d.EndDraw();
     png.Release();
     d2d.Release(); //immediately releases d2d after drawing
 
-    const dc = GetDC(hwnd);
+    //const dc = GetDC(hwnd);
     const memDC = CreateCompatibleDC(dc);
-    pngBitmap = CreateCompatibleBitmap(dc, 507, 516); //oops forgot that
-    SelectObject(memDC, pngBitmap);
-    BitBlt(memDC, 0, 0, 507, 516, dc, 0, 0, SRCCOPY);
+    const bmp = CreateCompatibleBitmap(dc, size.width, size.height); //oops forgot that
+    SelectObject(memDC, bmp);
+    BitBlt(memDC, 0, 0, size.width, size.height, dc, 0, 0, SRCCOPY);
     DeleteDC(memDC);
+    return bmp;
+    //loadedPng = true;
 }
 
 function windowProc(hwnd, msg, wp, lp) {
-    if(msg == WM_MOUSEMOVE) {
+    if(msg == WM_CREATE) {
+        init(hwnd);
+    }else if(msg == WM_MOUSEMOVE) {
         mouse = MAKEPOINTS(lp);
         InvalidateRect(hwnd, 0, 0, width, height, true);
         UpdateWindow(hwnd);
     }else if(msg == WM_PAINT) {
         const ps = BeginPaint(hwnd);
         
-        const memDC = CreateCompatibleDC(ps.hdc);
+        if(!loadedPng) {
+            pngBitmap = loadPng(hwnd, ps.hdc, __dirname+"/msnexample.png");
+            patbltBitmap = loadPng(hwnd, ps.hdc, __dirname+"/patblt.png");
+            loadedPng = true;
+        }
+
+        let memDC = CreateCompatibleDC(ps.hdc);
         SelectObject(memDC, pngBitmap);
-        BitBlt(ps.hdc, mouse.x, mouse.y, 507, 516, memDC, 0, 0, SRCCOPY); //pure gdi
+        BitBlt(ps.hdc, mouse.x+306, mouse.y, 507, 516, memDC, 0, 0, SRCCOPY); //pure gdi
+        DeleteDC(memDC);
+
+        memDC = CreateCompatibleDC(ps.hdc);
+        SelectObject(memDC, patbltBitmap);
+        //                (patblt.png is 306, 936)
+        BitBlt(ps.hdc, mouse.x, mouse.y, 306, 936, memDC, 0, 0, SRCCOPY); //pure gdi
         DeleteDC(memDC);
 
         EndPaint(hwnd, ps);
@@ -57,9 +84,9 @@ function windowProc(hwnd, msg, wp, lp) {
     }
 }
 
-const winclass = CreateWindowClass("WinClass", init, windowProc); //loop is not required y'all
+const winclass = CreateWindowClass("WinClass"/*, init*/, windowProc); //loop is not required y'all
 winclass.hIcon = winclass.hIconSm = LoadIcon(NULL, IDI_APPLICATION);
 winclass.hbrBackground = COLOR_BACKGROUND;
 winclass.hCursor = LoadCursor(NULL, IDC_ARROW);
                                                                                                 //math
-CreateWindow(winclass, "using direct2d to read a png", WS_CAPTION | WS_SYSMENU | WS_VISIBLE, screenWidth/2-width/2, screenHeight/2-height/2, width, height);
+CreateWindow(WS_EX_OVERLAPPEDWINDOW, winclass, "using direct2d to read a png", WS_CAPTION | WS_SYSMENU | WS_VISIBLE, screenWidth/2-width/2, screenHeight/2-height/2, width, height, NULL, NULL, hInstance);

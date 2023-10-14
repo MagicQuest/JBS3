@@ -151,4 +151,4 @@ while(!GetKey(VK_ESCAPE)) {
     i += .01;
     time = Date.now()/1000;
 }
-ReleaseCapture(GetConsoleWindow());
+//ReleaseCapture(GetConsoleWindow());

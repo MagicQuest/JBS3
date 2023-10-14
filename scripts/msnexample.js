@@ -6,11 +6,11 @@ const icon = LoadIcon(NULL, IDI_QUESTION);
 //let mouse;
 //let mouse = {x: 0, y: 0};
 
-function init(hwnd) {
-    //DrawIcon(GetDC(NULL), 500, 500, icon);
-    print(InvalidateRect(hwnd, 0, 0, 500, 500, true));
-    print(GetClassLongPtr(window, GCLP_HBRBACKGROUND));//SetClassLongPtr(window, GCLP_HICON, icon), GetLastError());
-}
+//function init(hwnd) {
+//    //DrawIcon(GetDC(NULL), 500, 500, icon);
+//    print(InvalidateRect(hwnd, 0, 0, 500, 500, true));
+//    print(GetClassLongPtr(window, GCLP_HBRBACKGROUND));//SetClassLongPtr(window, GCLP_HICON, icon), GetLastError());
+//}
 
 let ptsBegin;        // beginning point 
 let ptsEnd;          // new endpoint 
@@ -160,12 +160,12 @@ function windowProc(hwndMain, uMsg, wParam, lParam) {
 //    }
 //}
 
-const WINCLASS = CreateWindowClass("sNIGGER", init, windowProc);//, loop);
+const WINCLASS = CreateWindowClass("sNIGGER"/*, init*/, windowProc);//, loop);
 WINCLASS.hIcon = LoadIcon(NULL, IDI_QUESTION);
 WINCLASS.hbrBackground = COLOR_WINDOW;
 WINCLASS.hCursor = LoadCursor(NULL, IDC_HAND);
 WINCLASS.hIconSm = LoadIcon(NULL, IDI_ERROR);
 
-window = CreateWindow(WINCLASS, "paint example msn", /*WS_POPUPWINDOW*/ WS_OVERLAPPEDWINDOW | WS_VISIBLE, 200, 200, 500, 500);
+window = CreateWindow(WS_EX_OVERLAPPEDWINDOW, WINCLASS, "paint example msn", /*WS_POPUPWINDOW*/ WS_OVERLAPPEDWINDOW | WS_VISIBLE, 200, 200, 500, 500, NULL, NULL, hInstance);
 
 //window = CreateWindow(WINCLASSA, "paint example msn", WS_, 200, 200, 500, 500);

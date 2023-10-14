@@ -161,7 +161,9 @@ const defaultCursor = LoadCursor(null, IDC_ARROW);
 
 function windowProc(hwnd, msg, wp, lp) {
     window = hwnd;
-    if(msg == WM_LBUTTONDOWN) {
+    if(msg == WM_CREATE) {
+        init(hwnd);
+    }else if(msg == WM_LBUTTONDOWN) {
         mousePos = {x: GET_X_LPARAM(lp), y: GET_Y_LPARAM(lp)}; //nowadays you can use mousePos = MAKEPOINTS(lp);
 
         revealTile(Math.floor(mousePos.x/BB),Math.floor(mousePos.y/BB));
@@ -314,14 +316,14 @@ function loop() {
     i++;
 }
 
-const WINCLASSEXA = CreateWindowClass("WinClass", init, windowProc, loop);
-WINCLASSEXA.hCursor = defaultCursor;
+const WINCLASSEXW = CreateWindowClass("WinClass", /*init, */windowProc, loop);
+WINCLASSEXW.hCursor = defaultCursor;
 //WINCLASSEXA.hIcon = trolIcon;
 //WINCLASSEXA.hIconSm = trolIcon;
 
-window = CreateWindow(WINCLASSEXA/*A*/, `Minesweeper - JBS (${bombs} bombs left)`, WS_OVERLAPPEDWINDOW | WS_VISIBLE, 250, 0, bounds+16, bounds+39);
+window = CreateWindow(WS_EX_OVERLAPPEDWINDOW, WINCLASSEXW/*A*/, `Minesweeper - JBS (${bombs} bombs left)`, WS_OVERLAPPEDWINDOW | WS_VISIBLE, 250, 0, bounds+16, bounds+39, NULL, NULL, hInstance);
 
-console.log(window);
+console.log(window, args);
 
 //clean up
 for(const font of gdiFonts) {

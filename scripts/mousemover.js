@@ -129,6 +129,7 @@ while (!GetKey(VK_ESCAPE)) {
     }
     if(GetKeyDown("e")) {
         window = WindowFromPoint(mouse.x, mouse.y);
+        print(GetWindowText(window));
     }
     if(GetKey(VK_LBUTTON)) {
         iconobjs.push(new IconObj(mouse,velocity, icons[Math.floor(Math.random()*icons.length)]));

@@ -17,17 +17,15 @@
 #include <string.h>
 #include <iostream>
 #include <comdef.h>
+//#include <tuple>
 
 #include "include/libplatform/libplatform.h"
 #include "include/v8-context.h"
 #include "include/v8-initialization.h"
-#include "include/v8-isolate.h"
-#include "include/v8-local-handle.h"
 #include "include/v8-primitive.h"
 #include "include/v8-script.h"
-#include "include/v8-template.h"
-#include <include/v8-function.h>
-#include <include/v8-container.h>
+#include "include/v8-function.h"
+#include "include/v8-container.h"
 
 //https://medium.com/angular-in-depth/how-to-build-v8-on-windows-and-not-go-mad-6347c69aacd4
 //https://v8.dev/docs/embed
@@ -100,6 +98,8 @@
 #pragma comment(lib, "shlwapi.lib")
 
 #define print(msg) std::cout << msg << std::endl
+#define wprint(msg) std::wcout << msg << std::endl
+//honestly im suprised this works
 
 #include <sstream>
 #include <windows.h>
@@ -266,11 +266,11 @@ void Version(const v8::FunctionCallbackInfo<v8::Value>& info) {
 namespace fs {
     void read(const v8::FunctionCallbackInfo<v8::Value>& info) {
         using v8::String;
-        std::stringstream buffer;
+        std::wstringstream buffer;
 
-        std::string shit;
+        std::wstring shit;
 
-        std::ifstream file(*String::Utf8Value(info.GetIsolate(), info[0]));//, std::ios::binary);
+        std::ifstream file((wchar_t*)*String::Value(info.GetIsolate(), info[0]));//, std::ios::binary);
 
         if (file.is_open()) {
             
@@ -282,7 +282,7 @@ namespace fs {
             //str->WriteOneByte(info.GetIsolate(), (uint8_t*)(shit.c_str()), 0, shit.length(), v8::String::NO_NULL_TERMINATION);
             //str->WriteUtf8(info.GetIsolate(), (char*)shit.c_str(), shit.length(),nullptr, v8::String::NO_NULL_TERMINATION);
 
-                info.GetReturnValue().Set(String::NewFromUtf8(info.GetIsolate(), shit.c_str()).ToLocalChecked());
+                info.GetReturnValue().Set(String::NewFromTwoByte(info.GetIsolate(), (const uint16_t*)shit.c_str()).ToLocalChecked());
                 //info.GetReturnValue().Set(str);
             //print(shit << " youcanstandundermyinbrelela" << shit.size());
         }
@@ -297,25 +297,27 @@ namespace fs {
         using namespace v8;
         Isolate* isolate = info.GetIsolate();
 
-        std::stringstream buffer;
+        std::wstringstream buffer;
 
-        std::string shit;
+        std::wstring shit;
 
-        std::ifstream file(*String::Utf8Value(info.GetIsolate(), info[0]), std::ios::binary);
+        std::ifstream file((wchar_t*)*String::Value(info.GetIsolate(), info[0]), std::ios::binary);
 
         if (file.is_open()) {
 
             buffer << file.rdbuf();
             shit = buffer.str();
 
-            Local<Array> jsArray = Array::New(isolate, shit.size());
+            Local<ArrayBuffer> jsArrayBuffer = ArrayBuffer::New(isolate, shit.size());
+
+            //Local<Array> jsArray = Array::New(isolate, shit.size());
             for (int i = 0; i < shit.size(); i++) {
-                jsArray->Set(isolate->GetCurrentContext(), i, Number::New(isolate, shit[i]));
+                jsArrayBuffer->Set(isolate->GetCurrentContext(), i, Number::New(isolate, shit[i]));
             }
 
             //std::string* fuck = new std::string(shit); //it's giving undefined behavior
 
-            //ok i works but i could just pass an array of chars (ints) //probably use arraybuffer because i think thats what browsers do for files maybe idk
+            //ok i works but i could just pass an array of chars (ints) //probably use arraybuffer because i think thats what browsers do for files maybe idk (yeah so the documentation for arraybuffer literally says a buffer full of bytes)
 
             //char* stringPtr = new char[shit.size()]; //uh oh
             //strcpy(stringPtr, shit.c_str());
@@ -324,7 +326,7 @@ namespace fs {
             //print(stringPtr << " shit->" << shit.c_str() << " " << shit);
 
             //info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)fuck/*stringPtr*/));//String::NewFromUtf8(info.GetIsolate(), shit.c_str()).ToLocalChecked());
-            info.GetReturnValue().Set(jsArray);
+            info.GetReturnValue().Set(jsArrayBuffer);
             //print(shit << " youcanstandundermyinbrelela" << shit.size());
         }
         else {
@@ -336,11 +338,11 @@ namespace fs {
 
     void write(const v8::FunctionCallbackInfo<v8::Value>& info) {
         using v8::String;
-        std::ofstream file(*String::Utf8Value(info.GetIsolate(), info[0]));
+        std::ofstream file((wchar_t*)*String::Value(info.GetIsolate(), info[0]));
 
         if (file.is_open()) {
             //file.write(*String::Utf8Value(info.GetIsolate(), info[1]), );
-            file << *String::Utf8Value(info.GetIsolate(), info[1]);
+            file << (wchar_t*)*String::Value(info.GetIsolate(), info[1]);
             info.GetReturnValue().Set(true);
         }
         else {
@@ -381,12 +383,12 @@ void SystemWrapper(const v8::FunctionCallbackInfo<v8::Value>& info) {
 
 void setBackground(const v8::FunctionCallbackInfo<v8::Value>& info) {
     //ok so there are 2 versions of JBS and for some reason in the last one this was a function so im adding it again
-    info.GetReturnValue().Set(SystemParametersInfo(SPI_SETDESKWALLPAPER, 0, *v8::String::Utf8Value(info.GetIsolate(), info[0]), SPIF_UPDATEINIFILE));
+    info.GetReturnValue().Set(SystemParametersInfo(SPI_SETDESKWALLPAPER, 0, (wchar_t*)*v8::String::Value(info.GetIsolate(), info[0]), SPIF_UPDATEINIFILE));
 }
 
 void Msgbox(const v8::FunctionCallbackInfo<v8::Value>& info) {
     using namespace v8;
-    info.GetReturnValue().Set(MessageBoxA(NULL, *String::Utf8Value(info.GetIsolate(), info[0]), *String::Utf8Value(info.GetIsolate(), info[1]), info[2].As<Number>()->IntegerValue(info.GetIsolate()->GetCurrentContext()).FromJust()));
+    info.GetReturnValue().Set(MessageBox(NULL, (const wchar_t*)*String::Value(info.GetIsolate(), info[0]), (const wchar_t*)*String::Value(info.GetIsolate(), info[1]), info[2].As<Number>()->IntegerValue(info.GetIsolate()->GetCurrentContext()).FromJust()));
 }
 
 #include "resource.h"
@@ -407,15 +409,15 @@ INT_PTR CALLBACK DialogProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lPara
     case WM_HELP: {
         //print();
         //DialogData dlg = *((DialogData*)lParam);
-        const char** data = (const char**)lParam;
+        const wchar_t** data = (const wchar_t**)lParam;
         print(data[0] << " " << data[1] << " " << data[2]);
         //print(dlg.title);
         //print(dlg.description);
         //print(dlg.input);
-        SetWindowTextA(hwnd, data[1]);//dlg.title);
+        SetWindowText(hwnd, data[1]);//dlg.title);
         //SetDlgItemTextA(hwnd, IDC_BUTTON1, dlg->description);
-        SetDlgItemTextA(hwnd, IDC_STATIC1, data[0]);//dlg.description);
-        SetDlgItemTextA(hwnd, IDC_EDIT1, data[2]);//dlg.input);
+        SetDlgItemText(hwnd, IDC_STATIC1, data[0]);//dlg.description);
+        SetDlgItemText(hwnd, IDC_EDIT1, data[2]);//dlg.input);
 
         return TRUE;
     }
@@ -423,11 +425,11 @@ INT_PTR CALLBACK DialogProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lPara
         switch (LOWORD(wParam))
         {
         case IDOK:
-            char shit[100];
+            //wchar_t shit[100];
             //GetWindowTextA(GetDlgItem, shit, 100);
-            GetDlgItemTextA(hwnd, IDC_EDIT1, shit, 100);
-            print(shit);
-            *(bool*)GetWindowLongPtr(hwnd, GWLP_USERDATA) = true;
+            //GetDlgItemText(hwnd, IDC_EDIT1, shit, 100);
+            //print(shit);
+            *(bool*)GetWindowLongPtr(hwnd, GWLP_USERDATA) = true; //this is crazy to read
             EndDialog(hwnd, IDOK);
             break;
         case IDCANCEL:
@@ -444,6 +446,7 @@ INT_PTR CALLBACK DialogProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lPara
 
 HINSTANCE hInstance;
 #define CStringFI(e) *String::Utf8Value(isolate, e)
+#define WStringFI(e) (const wchar_t*)*String::Value(isolate, e)
 #define IntegerFI(e) e/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust()
 #define FloatFI(e) e.As<Number>()->Value()
 
@@ -461,9 +464,9 @@ void Inputbox(const v8::FunctionCallbackInfo<v8::Value>& info) {
     HWND dialog = CreateDialog(hInstance, MAKEINTRESOURCE(IDD_DIALOG1), GetConsoleWindow(), DialogProc);
     bool done = false; //haha bool pointer is crazy (waiot nevermidn)
     //}
-    const char* data[3]{ CStringFI(info[0]), CStringFI(info[1]), CStringFI(info[2]) };
+    const wchar_t* data[3]{ WStringFI(info[0]), WStringFI(info[1]), WStringFI(info[2]) };
     print(data[0] << " " << data[1] << " " << data[2]);
-    SendMessageA(dialog, WM_HELP, NULL, (LPARAM) & data);
+    SendMessage(dialog, WM_HELP, NULL, (LPARAM) & data);
     //print(data.description << " " << data.title << " " << data.input);
     SetWindowLongPtr(dialog, GWLP_USERDATA, (LONG_PTR) &done);
     ShowWindow(dialog, SW_SHOW);
@@ -477,11 +480,11 @@ void Inputbox(const v8::FunctionCallbackInfo<v8::Value>& info) {
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
-    char shit[100];
+    wchar_t shit[100];
     //GetWindowTextA(GetDlgItem, shit, 100);
-    GetDlgItemTextA(dialog, IDC_EDIT1, shit, 100);
+    GetDlgItemText(dialog, IDC_EDIT1, shit, 100);
 
-    info.GetReturnValue().Set(String::NewFromUtf8(isolate, shit).ToLocalChecked());
+    info.GetReturnValue().Set(String::NewFromTwoByte(isolate, (uint16_t*)shit).ToLocalChecked());
     //char shit[100];
     ////GetWindowTextA(GetDlgItem, shit, 100);
     //GetDlgItemTextA(dialog, IDC_EDIT1, shit, 100);
@@ -683,7 +686,7 @@ V8FUNC(EndPaintWrapper) {
 
     EndPaint(window, lps);
 
-    print("deleting lps");
+    //print("deleting lps");
 
     delete lps; //phew
 }
@@ -713,9 +716,9 @@ V8FUNC(TextOutWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
     HDC dc = (HDC)IntegerFI(info[0]);
-    const char* words = CStringFI(info[3]);
+    const wchar_t* words = WStringFI(info[3]);
     //print(words << " words");
-    info.GetReturnValue().Set(TextOutA(dc, IntegerFI(info[1]), IntegerFI(info[2]), words, strlen(words)));
+    info.GetReturnValue().Set(TextOut(dc, IntegerFI(info[1]), IntegerFI(info[2]), words, wcslen(words)));
 }
 
 V8FUNC(BitBltWrapper) {
@@ -793,7 +796,7 @@ V8FUNC(DrawTextWrapper) {
     Isolate* isolate = info.GetIsolate();
     //const char* text = CStringFI(info[1]);
     RECT r = RECT{ (long)IntegerFI(info[2]) ,(long)IntegerFI(info[3]) ,(long)IntegerFI(info[4]) ,(long)IntegerFI(info[5]) };
-    info.GetReturnValue().Set(Number::New(isolate, DrawTextA((HDC)IntegerFI(info[0]), CStringFI(info[1]), -1, &r, IntegerFI(info[6]))));
+    info.GetReturnValue().Set(Number::New(isolate, DrawText((HDC)IntegerFI(info[0]), WStringFI(info[1]), -1, &r, IntegerFI(info[6]))));
 }
 
 //HFONT defaultfont = NULL;
@@ -810,6 +813,24 @@ V8FUNC(CreatePenWrapper) {
     Isolate* isolate = info.GetIsolate();
 
     info.GetReturnValue().Set(Number::New(isolate, (long long)CreatePen(IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]))));//RGB(IntegerFI(info[2]), IntegerFI(info[3]), IntegerFI(info[4])))));
+}
+
+V8FUNC(ExtCreatePenWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    Local<Object> jsLOGBRUSH = info[2].As<Object>();
+
+    LOGBRUSH lpbrush{0};
+    lpbrush.lbStyle = jsLOGBRUSH->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("lbStyle")).ToLocalChecked()->IntegerValue(isolate->GetCurrentContext()).FromJust();
+    lpbrush.lbColor = jsLOGBRUSH->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("lbColor")).ToLocalChecked()->IntegerValue(isolate->GetCurrentContext()).FromJust();
+    lpbrush.lbHatch = jsLOGBRUSH->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("lbHatch")).ToLocalChecked()->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+    if (IntegerFI(info[0]) & PS_USERSTYLE) {
+        MessageBoxA(NULL, "my fault og but PS_USERSTYLE don't work rn because theres some data you gotta use and idk if i can bebotherd", "ExtCreatePenWrapper", MB_OK | MB_ICONERROR);
+    }
+
+    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)ExtCreatePen(IntegerFI(info[0]), IntegerFI(info[1]), &lpbrush, NULL, nullptr)));
 }
 
 V8FUNC(DeleteObjectWrapper) {
@@ -882,19 +903,19 @@ V8FUNC(GetStockObjectWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
 
-    info.GetReturnValue().Set(Number::New(isolate, (long long)GetStockObject(IntegerFI(info[0]))));
+    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)GetStockObject(IntegerFI(info[0]))));
 }
 
 V8FUNC(FindWindowWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
 
-    const char* className = NULL;
+    const wchar_t* className = NULL;
     if (!info[0]->IsNullOrUndefined() && info[0]->IsString()) {
-        className = CStringFI(info[0]);
+        className = WStringFI(info[0]);
     }
 
-    info.GetReturnValue().Set(Number::New(isolate, (long long)FindWindowA(className, CStringFI(info[1]))));
+    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)FindWindow(className, WStringFI(info[1]))));
 }
 
 V8FUNC(SetTextColorWrapper) {
@@ -908,21 +929,21 @@ V8FUNC(CreateFontWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
 
-    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)CreateFontA(IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]), IntegerFI(info[4]), IntegerFI(info[5]), IntegerFI(info[6]), IntegerFI(info[7]), IntegerFI(info[8]), IntegerFI(info[9]), IntegerFI(info[10]), IntegerFI(info[11]), IntegerFI(info[12]), CStringFI(info[13]))));
+    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)CreateFontW(IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]), IntegerFI(info[4]), IntegerFI(info[5]), IntegerFI(info[6]), IntegerFI(info[7]), IntegerFI(info[8]), IntegerFI(info[9]), IntegerFI(info[10]), IntegerFI(info[11]), IntegerFI(info[12]), WStringFI(info[13]))));
 }
 
 V8FUNC(CreateFontSimpleWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
 
-    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)CreateFontA(IntegerFI(info[2]), IntegerFI(info[1]), 0, 0, FW_DONTCARE, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH | FF_DONTCARE, CStringFI(info[0]))));
+    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)CreateFontW(IntegerFI(info[2]), IntegerFI(info[1]), 0, 0, FW_DONTCARE, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH | FF_DONTCARE, WStringFI(info[0]))));
 }
 
 V8FUNC(CreateFontIndirectWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
 
-    LOGFONTA lplf{0};
+    LOGFONTW lplf{0};
 
     //print("logofnta");
     
@@ -943,13 +964,13 @@ V8FUNC(CreateFontIndirectWrapper) {
     lplf.lfQuality = GetIntProperty("lfQuality");
     lplf.lfPitchAndFamily = GetIntProperty("lfPitchAndFamily");
     //print("lfFaceName");
-    strcpy(lplf.lfFaceName, CStringFI(GetProperty("lfFaceName")));
+    wcscpy(lplf.lfFaceName, WStringFI(GetProperty("lfFaceName")));
     //lplf.lfFaceName = CStringFI(GetProperty("lfFaceName"));
 
-    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)CreateFontIndirectA(&lplf)));
+    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)CreateFontIndirect(&lplf)));
 }
 
-int CALLBACK EnumFontFamExProc(const LOGFONTA* lpelfe, const TEXTMETRICA* lpntme, DWORD FontType, LPARAM lParam) {
+int CALLBACK EnumFontFamExProc(const LOGFONTW* lpelfe, const TEXTMETRICW* lpntme, DWORD FontType, LPARAM lParam) {
     //print(*lpelfe->lfFaceName << " default char " << lpntme->tmDefaultChar);
     //print(lpelfe->lfFaceName  << " wa " << lpelfe->lfFaceName[0] << " " << *lpelfe->lfFaceName << " " << FontType);
     using namespace v8;
@@ -963,7 +984,7 @@ int CALLBACK EnumFontFamExProc(const LOGFONTA* lpelfe, const TEXTMETRICA* lpntme
     SetProperty(jsLOGFONT, "lfCharSet", lpelfe->lfCharSet);
     SetProperty(jsLOGFONT, "lfClipPrecision", lpelfe->lfClipPrecision);
     SetProperty(jsLOGFONT, "lfEscapement", lpelfe->lfEscapement);
-    SetPropertyRaw(jsLOGFONT, "lfFaceName", String::NewFromUtf8(isolate, lpelfe->lfFaceName).ToLocalChecked());
+    SetPropertyRaw(jsLOGFONT, "lfFaceName", String::NewFromTwoByte(isolate, (uint16_t*)lpelfe->lfFaceName).ToLocalChecked());
     SetProperty(jsLOGFONT, "lfHeight", lpelfe->lfHeight);
     SetProperty(jsLOGFONT, "lfItalic", lpelfe->lfItalic);
     SetProperty(jsLOGFONT, "lfOrientation", lpelfe->lfOrientation);
@@ -1008,13 +1029,13 @@ V8FUNC(EnumFontFamiliesWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
 
-    LOGFONTA digga{ 0 };
+    LOGFONTW digga{ 0 };
     digga.lfCharSet = DEFAULT_CHARSET;
     
     //digga.lfFaceName[0] = '\0';
     //digga.lfPitchAndFamily; //https://learn.microsoft.com/en-us/windows/win32/api/wingdi/nf-wingdi-enumfontfamiliesexa
 
-    EnumFontFamiliesExA((HDC)IntegerFI(info[0]), &digga, EnumFontFamExProc, (LPARAM)&info, NULL);
+    EnumFontFamiliesExW((HDC)IntegerFI(info[0]), &digga, EnumFontFamExProc, (LPARAM)&info, NULL);
 }
 
 V8FUNC(_com_errorWrapper) {
@@ -2030,8 +2051,8 @@ V8FUNC(createCanvas) {
             //print("gSC -> " << (LONG_PTR)gSC);
             //D2D1_GRADIENT_STOP stops[2]; gSC->GetGradientStops(stops, 2);
             //print("stops -> " << stops << " " << stops[0].color.r << " " << stops[0].color.g);
-
-            d2d->renderTarget->CreateLinearGradientBrush(D2D1::LinearGradientBrushProperties(D2D1::Point2F(FloatFI(info[0]), FloatFI(info[1])), D2D1::Point2F(FloatFI(info[2], FloatFI(info[3])))), gSC, &newBrush);//D2D1::ColorF(FloatFI(info[0]), FloatFI(info[1]), FloatFI(info[2]), info[3]->IsNumber() ? FloatFI(info[3]) : 1.0F), & newBrush);//FloatFI(info[3])), &newBrush);
+                                                                                                                                                                //HOW LONG HAS THAT BEEN LIKE THAT????
+            d2d->renderTarget->CreateLinearGradientBrush(D2D1::LinearGradientBrushProperties(D2D1::Point2F(FloatFI(info[0]), FloatFI(info[1])), D2D1::Point2F(FloatFI(info[2]), FloatFI(info[3]))), gSC, &newBrush);//D2D1::ColorF(FloatFI(info[0]), FloatFI(info[1]), FloatFI(info[2]), info[3]->IsNumber() ? FloatFI(info[3]) : 1.0F), & newBrush);//FloatFI(info[3])), &newBrush);
         
             Local<ObjectTemplate> jsBrush = DIRECT2D::getDefaultBrushImpl(isolate, newBrush, "linear");//ObjectTemplate::New(isolate);
             //jsBrush->Set(isolate, "internalPtr", Number::New(isolate, (LONG_PTR)newBrush));
@@ -2413,16 +2434,16 @@ V8FUNC(LOWORDWRAPPER) {
 V8FUNC(GetWindowTextWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
-    char shit[255];
-    GetWindowTextA((HWND)IntegerFI(info[0]), shit, 255);
-    info.GetReturnValue().Set(String::NewFromUtf8(isolate, shit).ToLocalChecked());
+    wchar_t shit[255];
+    GetWindowText((HWND)IntegerFI(info[0]), shit, 255);
+    info.GetReturnValue().Set(String::NewFromTwoByte(isolate, (uint16_t*)shit).ToLocalChecked());
 }
 
 V8FUNC(SetWindowTextWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
     
-    info.GetReturnValue().Set(SetWindowTextA((HWND)IntegerFI(info[0]), CStringFI(info[1])));
+    info.GetReturnValue().Set(SetWindowText((HWND)IntegerFI(info[0]), WStringFI(info[1])));
 }
 
 V8FUNC(TransparentBltWrapper) {
@@ -2955,9 +2976,9 @@ V8FUNC(CreateWindowClass) {
     wndclass->Set(isolate->GetCurrentContext(), LITERAL("lpszClassName"), info[0]);//Number::New(isolate, 0));
     wndclass->Set(isolate->GetCurrentContext(), LITERAL("lpszMenuName"), Number::New(isolate, 0));
     wndclass->Set(isolate->GetCurrentContext(), LITERAL("style"), Number::New(isolate, 0));
-    wndclass->Set(isolate->GetCurrentContext(), LITERAL("init"), info[1]);
-    wndclass->Set(isolate->GetCurrentContext(), LITERAL("windowProc"), info[2]);
-    wndclass->Set(isolate->GetCurrentContext(), LITERAL("loop"), info[3]);
+    //wndclass->Set(isolate->GetCurrentContext(), LITERAL("init"), info[1]);
+    wndclass->Set(isolate->GetCurrentContext(), LITERAL("windowProc"), info[1]);
+    wndclass->Set(isolate->GetCurrentContext(), LITERAL("loop"), info[2]);
     
     info.GetReturnValue().Set(wndclass);//result);
 }
@@ -2966,56 +2987,108 @@ LRESULT CALLBACK WinProc(HWND hWnd, UINT msg, WPARAM wp, LPARAM lp);
 
 v8::Local<v8::Object> wndclass;
 
+//struct IsolateAndClazz { //maybe use a tuple? (if i have it imported already im using it)
+//    v8::Isolate* isolate;
+//    v8::Local<v8::Object> wndclass;
+//};
+
 V8FUNC(CreateWindowWrapper) {
     //MessageBoxA(NULL, "aw shit another unfiinished hting", "ok so like no cap the only message you can resieve as of now is WM_PAINT", MB_OK | MB_ICONEXCLAMATION);
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
+    HandleScope handle_scope(isolate); //throwing this bad boy in there sure oughta fix up these strange errors (i barely know what this does but it for sure does something)
 
-    int x = IntegerFI(info[3]);
-    int y = IntegerFI(info[4]);
-    int width = IntegerFI(info[5]);
-    int height = IntegerFI(info[6]);
+    int x = IntegerFI(info[4]);
+    int y = IntegerFI(info[5]);
+    int width = IntegerFI(info[6]);
+    int height = IntegerFI(info[7]);
+    wprint(WStringFI(info[2]) << " " << x << " " << y << " " << width << " " << height);
 
-    print(CStringFI(info[1]) << " " << x << " " << y << " " << width << " " << height);
 
     HWND newWindow;// = CreateWindowA(CStringFI(GetProperty("lpszClassName")), CStringFI(info[1]), IntegerFI(info[2]), x, y, width, height, NULL, NULL, hInstance, NULL);
 
-    if (!info[0]->IsString()) {
+    if (!info[1]->IsString()) {
 
-        wndclass = info[0].As<Object>();
+        wndclass = info[1].As<Object>(); //aw damn i was pretty confused then i remembered the info[0] is the extended flags
 
 #define GetProperty(name) wndclass->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL(name)).ToLocalChecked()
 
         //const char* className = *String::Utf8Value(isolate, wndclass->GetRealNamedProperty(isolate->GetCurrentContext(), String::NewFromUtf8Literal(isolate, "className")).ToLocalChecked());
-        print(*String::Utf8Value(isolate, wndclass->GetRealNamedProperty(isolate->GetCurrentContext(), String::NewFromUtf8Literal(isolate, "lpszClassName")).ToLocalChecked()));
+        //wprint(WStringFI(GetProperty("lpszClassName")));
         //WNDCLASSA wc{ 0 };
-        WNDCLASSEXA wc{ 0 };
-        wc.cbSize = sizeof(WNDCLASSEXA);
+        WNDCLASSEXW wc{ 0 };
+        wc.cbSize = sizeof(WNDCLASSEXW);
         wc.hbrBackground = (HBRUSH)IntegerFI(GetProperty("hbrBackground"));
         wc.hCursor = (HCURSOR)IntegerFI(GetProperty("hCursor"));
         wc.hIcon = (HICON)IntegerFI(GetProperty("hIcon"));
         wc.hIconSm = (HICON)IntegerFI(GetProperty("hIconSm"));
+        print(wc.cbSize << " " << wc.hbrBackground << " " << wc.hCursor << " " << wc.hIcon << " " << wc.hIconSm);
         HINSTANCE shit = hInstance;
-        if (!GetProperty("hInstance")->IsUndefined()) {
+        if (GetProperty("hInstance")->IntegerValue(isolate->GetCurrentContext()).FromJust() != 0) {
             shit = (HINSTANCE)IntegerFI(GetProperty("hInstance"));
+            print(hInstance << " " << shit << " hInstance vs shit");
         }
         wc.hInstance = shit;
-        wc.lpszClassName = CStringFI(GetProperty("lpszClassName"));
-        if (!GetProperty("lpszMenuName")->IsUndefined()) {
-            wc.lpszMenuName = CStringFI(GetProperty("lpszMenuName"));
+        //wc.lpszClassName = WStringFI(GetProperty("lpszClassName"));
+        //print(WStringFI(GetProperty("lpszClassName")));
+        //wprint(WStringFI(GetProperty("lpszClassName")));
+        //memset((void*)wc.lpszClassName, 0, wcslen(WStringFI(GetProperty("lpszClassName"))));
+        //wcscpy((wchar_t*)wc.lpszClassName, WStringFI(GetProperty("lpszClassName"))); //yeah i think it wasn't working because i was copying the pointer instead of the shit it was pointing to
+        //OK FUCK
+        wchar_t CLAZZ[256]; //https://learn.microsoft.com/en-us/windows/win32/api/winuser/ns-winuser-wndclassa#:~:text=The%20class%20name%20can%20be,the%20RegisterClass%20function%20will%20fail.
+        
+        wcscpy(CLAZZ, WStringFI(GetProperty("lpszClassName")));
+        print(CLAZZ);
+        wprint(CLAZZ);
+        //print(CLAZZ << " " << WStringFI(GetProperty("lpszClassName")));
+        wc.lpszClassName = CLAZZ;//WStringFI(GetProperty("lpszClassName"));//CLAZZ;
+        //i think using CLAZZ actually makes CreateWindow and RegisterClass work 100% of the time because Local<Object>s just be getting filled with garbage sometimes
+        if (GetProperty("lpszMenuName")->NumberValue(isolate->GetCurrentContext()).FromJust() != 0) {
+            wc.lpszMenuName = WStringFI(GetProperty("lpszMenuName"));
+            //wcscpy((wchar_t*)wc.lpszMenuName, WStringFI(GetProperty("lpszMenuName"))); //yeah i think it wasn't working because i was copying the pointer instead of the shit it was pointing to
         }
         wc.style = IntegerFI(GetProperty("style"));
         wc.lpfnWndProc = WinProc;
 
-        if (!RegisterClassExA(&wc)) {
+        //wc.lpfnWndProc = WinProc;
+        //wc.hInstance = hInstance;
+        //wc.cbSize = sizeof(WNDCLASSEXW);
+        //wc.lpszClassName = L"WinClass";
+
+        if (!RegisterClassExW(&wc)) {
             info.GetReturnValue().Set(false);
-            print("FAILED RegisteClassExA " << hInstance << " " << GetModuleHandle(NULL));
+            print("FAILED RegisteClassExW " << hInstance << " " << GetModuleHandle(NULL));
             MessageBoxA(NULL, "failed to register window class (keep trying idk why CreateWindow is a little sketchy)", (std::string("err: [") + (const char*)_bstr_t(_com_error(GetLastError()).ErrorMessage()) + "]").c_str(), MB_OK | MB_ICONERROR);
             return;
         }
+        //newWindow = CreateWindowA(CStringFI(GetProperty("lpszClassName")), CStringFI(info[1]), IntegerFI(info[2]), x, y, width, height, NULL, NULL, hInstance, NULL);
+        //wprint(IntegerFI(info[0]) << " " << WStringFI(GetProperty("lpszClassName")) << " " << WStringFI(info[2]));
+        //print(wc.lpszClassName);
+        //wprint(wc.lpszClassName);
+        //CREATESTRUCTW pukeData{ 0 };
+        //pukeData.lpCreateParams = (LPVOID)isolate;
+        //newWindow = CreateWindowExW(WS_EX_OVERLAPPEDWINDOW, wc.lpszClassName, L"TITLE NIGGA FUCK", WS_OVERLAPPEDWINDOW | WS_VISIBLE, 0, 0, 500, 500, NULL, NULL, hInstance, (LPVOID)isolate);
+        //wprint(WStringFI(info[2]) << L" NIGGER");
+        //print("what is happeneing here?");
+        //wchar_t shits[100];
+        //wcscpy(shits, WStringFI(info[2]));
+        //std::tuple<Isolate*, Local<Object>> iac = std::make_pair(isolate, wndclass);
+        newWindow = CreateWindowExW(IntegerFI(info[0]), //HOLY SHIT THIS LINE WAS FAILING EVERYTIME I EVEN USED BREAKPOINTS TO FIND THE ISSUE AND GUESS WHAT
+            //THE ERROR WAS ACTUALLY IN THE WINPROC AND I WAS GETTING THE ISOLATE LPARAM WRONG (literally spent at minimum 30 minutes to figure this out (this is why JBS3 has me talking about banning it))
+            wc.lpszClassName, //buddy idk what but something around here is KILLING M(Y/E) PROGRAM
+            WStringFI(info[2]), //title was truncated because i was using DefWindowProcW https://stackoverflow.com/questions/11884021/c-why-this-window-title-gets-truncated
+            IntegerFI(info[3]),
+            x,
+            y,
+            width,
+            height,
+            (HWND)IntegerFI(info[8]),
+            (HMENU)IntegerFI(info[9]),
+            (HINSTANCE)IntegerFI(info[10]),
+            (LPVOID)isolate);//(LPVOID)IntegerFI(info[10]));
 
-        newWindow = CreateWindowA(CStringFI(GetProperty("lpszClassName")), CStringFI(info[1]), IntegerFI(info[2]), x, y, width, height, NULL, NULL, hInstance, NULL);
-    
+        //https://rave.dj/xXjJ5rcPG5qLcQ (i made this like 4 years ago)
+
         if (GetLastError() != 0) {
             //std::string shit = std::string("RESTART JBS because there's a 99% chance that the window was NOT created ") + (const char*)_bstr_t(_com_error(GetLastError()).ErrorMessage()) + ")";
                                 //ahhhhhhh
@@ -3023,6 +3096,7 @@ V8FUNC(CreateWindowWrapper) {
                 return;
             }
         }
+
 
         SetWindowLongPtrW(newWindow, GWLP_USERDATA, (LONG_PTR)isolate);//(size_t) & wndclass->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("windowProc")).ToLocalChecked().As<Function>());
 
@@ -3051,11 +3125,11 @@ V8FUNC(CreateWindowWrapper) {
         //info.GetReturnValue().Set(uh->GetPromise());
         info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)newWindow));
 
-        Local<Value> args[] = { Number::New(isolate, (LONG_PTR)newWindow) };
+        //Local<Value> args[] = { Number::New(isolate, (LONG_PTR)newWindow) };
 
         InvalidateRect(newWindow, NULL, true);
         UpdateWindow(newWindow);
-        GetProperty("init").As<Function>()->Call(isolate->GetCurrentContext(), isolate->GetCurrentContext()->Global(), 1, args)/*.ToLocalChecked()*/;
+        //GetProperty("init").As<Function>()->Call(isolate->GetCurrentContext(), isolate->GetCurrentContext()->Global(), 1, args)/*.ToLocalChecked()*/;
 
         Local<Function> looper = GetProperty("loop").As<Function>();
         print(looper.IsEmpty() << " " << looper->IsUndefined());
@@ -3098,7 +3172,8 @@ V8FUNC(CreateWindowWrapper) {
         //uh->Resolve(isolate->GetCurrentContext(), Undefined(isolate)); //https://gist.github.com/jupp0r/5f11c0ee2b046b0ab89660ce85ea480e
     }
     else {
-        newWindow = CreateWindowA(CStringFI(info[0]), CStringFI(info[1]), IntegerFI(info[2]), x, y, width, height, (HWND)IntegerFI(info[7]), NULL, hInstance, NULL);
+        //newWindow = CreateWindowA(CStringFI(info[0]), CStringFI(info[1]), IntegerFI(info[2]), x, y, width, height, (HWND)IntegerFI(info[7]), NULL, hInstance, NULL);
+        newWindow = CreateWindowExW(IntegerFI(info[0]), WStringFI(info[1]), WStringFI(info[2]), IntegerFI(info[3]), x, y, width, height, (HWND)IntegerFI(info[8]), (HMENU)IntegerFI(info[9]), (HINSTANCE)IntegerFI(info[10]), NULL);
         info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)newWindow));
     }
     //MessageBoxA(NULL, (std::string("shit")+std::to_string(GetLastError())).c_str(), "titlke", MB_OKCANCEL); //https://www.youtube.com/watch?v=58OhXFmTUo0
@@ -3143,7 +3218,7 @@ V8FUNC(SendMessageWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
 
-    info.GetReturnValue().Set(Number::New(isolate, SendMessageA((HWND)IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]))));
+    info.GetReturnValue().Set(Number::New(isolate, SendMessage((HWND)IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]))));
 }
 
 V8FUNC(ClientToScreenWrapper) {
@@ -3338,6 +3413,10 @@ V8FUNC(MaskBltWrapper) {
     
     info.GetReturnValue().Set(Number::New(isolate, MaskBlt((HDC)IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]), IntegerFI(info[4]), (HDC)IntegerFI(info[5]), IntegerFI(info[6]), IntegerFI(info[7]), (HBITMAP)IntegerFI(info[8]), IntegerFI(info[9]), IntegerFI(info[10]), IntegerFI(info[11]))));
 }
+//#define COUNT_OF(x) ((sizeof(x)/sizeof(0[x])) / ((size_t)(!(sizeof(x) % sizeof(0[x])))))
+
+//https://learn.microsoft.com/en-us/windows/win32/api/wingdi/nf-wingdi-createbitmap
+#define msnformula(nWidth, nHeight, nPlanes, nBitCount) ((((nWidth * nPlanes * nBitCount + 15) >> 4) << 1) * nHeight)
 
 V8FUNC(GetObjectHBITMAP) {
     using namespace v8;
@@ -3353,9 +3432,53 @@ V8FUNC(GetObjectHBITMAP) {
     jsBITMAP->Set(isolate->GetCurrentContext(), LITERAL("bmWidthBytes"), Number::New(isolate, bmp.bmWidthBytes));
     jsBITMAP->Set(isolate->GetCurrentContext(), LITERAL("bmPlanes"),     Number::New(isolate, bmp.bmPlanes));
     jsBITMAP->Set(isolate->GetCurrentContext(), LITERAL("bmBitsPixel"),  Number::New(isolate, bmp.bmBitsPixel));
-    jsBITMAP->Set(isolate->GetCurrentContext(), LITERAL("bmBits"),       Number::New(isolate, (LONG_PTR)bmp.bmBits));
+    if (bmp.bmBits != NULL) {
+        LONG_PTR count = msnformula(bmp.bmWidth, bmp.bmHeight, bmp.bmPlanes, bmp.bmBitsPixel);
+        Local<ArrayBuffer> jsBits = ArrayBuffer::New(isolate, count);
+        for (LONG_PTR i = 0; i < count; i++) {
+            jsBits->Set(isolate->GetCurrentContext(), i, Number::New(isolate, ((BYTE*)bmp.bmBits)[i]));
+        }
+        jsBITMAP->Set(isolate->GetCurrentContext(), LITERAL("bmBits"), jsBits);
+    }
+    else {
+        jsBITMAP->Set(isolate->GetCurrentContext(), LITERAL("bmBits"),       Number::New(isolate, (LONG_PTR)bmp.bmBits));
+    }
+
+    //print(bmp.bmBits);
 
     info.GetReturnValue().Set(jsBITMAP);
+}
+
+V8FUNC(CreateBitmapIndirectWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    Local<Object> jsBITMAP = info[0].As<Object>(); //aw damn i didn't even have to cast (NO THIS WAS WRONG AND I HAD TO EDIT LIKE 7 DIFFERENT LINES BECAUSE I DIDN'T CAST)
+
+    BITMAP bmp{ 0 };
+
+#define GetIntProperty(name) IntegerFI(jsBITMAP->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL(name)).ToLocalChecked())
+#define GetProperty(name) jsBITMAP->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL(name)).ToLocalChecked()
+    
+    bmp.bmType = GetIntProperty("bmType");
+    bmp.bmWidth = GetIntProperty("bmWidth");
+    bmp.bmHeight = GetIntProperty("bmHeight");
+    bmp.bmWidthBytes = GetIntProperty("bmWidthBytes");
+    bmp.bmPlanes = GetIntProperty("bmPlanes");
+    bmp.bmBitsPixel = GetIntProperty("bmBitsPixel");
+
+    if (GetProperty("bmBits")->IsNumber()) {
+        bmp.bmBits = (LPVOID)GetIntProperty("bmBits");
+    }
+    else {
+        Local<ArrayBuffer> jsBits = GetProperty("bmBits").As<ArrayBuffer>();
+        memset(bmp.bmBits, 0, jsBits->ByteLength()); //sure?
+        for (size_t i = 0; i < jsBits->ByteLength(); i++) {
+            ((BYTE*)bmp.bmBits)[i] = jsBits->Get(isolate->GetCurrentContext(), i).ToLocalChecked()->IntegerValue(isolate->GetCurrentContext()).FromJust();
+        }
+    }
+
+    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)CreateBitmapIndirect(&bmp)));
 }
 
 V8FUNC(GetObjectDIBITMAP) {
@@ -3374,7 +3497,20 @@ V8FUNC(GetObjectDIBITMAP) {
     jsBITMAP->Set(context, LITERAL("bmWidthBytes"), Number::New(isolate, dib.dsBm.bmWidthBytes));
     jsBITMAP->Set(context, LITERAL("bmPlanes"), Number::New(isolate, dib.dsBm.bmPlanes));
     jsBITMAP->Set(context, LITERAL("bmBitsPixel"), Number::New(isolate, dib.dsBm.bmBitsPixel));
-    jsBITMAP->Set(context, LITERAL("bmBits"), Number::New(isolate, (LONG_PTR)dib.dsBm.bmBits));
+    //jsBITMAP->Set(context, LITERAL("bmBits"), Number::New(isolate, (LONG_PTR)dib.dsBm.bmBits));
+
+    if (dib.dsBm.bmBits != NULL) {
+        LONG_PTR count = msnformula(dib.dsBm.bmWidth, dib.dsBm.bmHeight, dib.dsBm.bmPlanes, dib.dsBm.bmBitsPixel);
+        //print(count << " " << dib.dsBmih.biSizeImage << " " << dib.dsBmih.biSize << " " << dib.dsBm.bmWidth << " " << dib.dsBm.bmHeight << " " << dib.dsBm.bmPlanes << " " << dib.dsBm.bmBitsPixel);
+        Local<ArrayBuffer> jsBits = ArrayBuffer::New(isolate, count);//dib.dsBmih.biSizeImage);
+        for (LONG_PTR i = 0; i < count; i++) {
+            jsBits->Set(isolate->GetCurrentContext(), i, Number::New(isolate, ((BYTE*)dib.dsBm.bmBits)[i]));
+        }
+        jsBITMAP->Set(isolate->GetCurrentContext(), LITERAL("bmBits"), jsBits);
+    }
+    else {
+        jsBITMAP->Set(isolate->GetCurrentContext(), LITERAL("bmBits"), Number::New(isolate, (LONG_PTR)dib.dsBm.bmBits));
+    }
 
     Local<Object> jsINFOHEADER = Object::New(isolate);
 
@@ -3407,6 +3543,43 @@ V8FUNC(GetObjectDIBITMAP) {
     info.GetReturnValue().Set(jsDIBSECTION);
 }
 
+V8FUNC(CreateDIBSectionWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    Local<Object> jsBITMAP = info[1].As<Object>();
+    
+    //imma assume this all works and im closing VS
+
+    BITMAPINFO bmi{0};
+    if(jsBITMAP->HasRealNamedProperty(isolate->GetCurrentContext(), LITERAL("dsBmih")).FromJust()) {
+        Local<Object> jsBMIH = jsBITMAP->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("dsBmih")).ToLocalChecked().As<Object>();
+        bmi.bmiHeader.biSize = IntegerFI(jsBMIH->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("biSize")).ToLocalChecked());
+        bmi.bmiHeader.biWidth = IntegerFI(jsBMIH->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("biWidth")).ToLocalChecked());
+        bmi.bmiHeader.biHeight = IntegerFI(jsBMIH->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("biHeight")).ToLocalChecked());
+        bmi.bmiHeader.biPlanes = IntegerFI(jsBMIH->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("biPlanes")).ToLocalChecked());
+        bmi.bmiHeader.biBitCount = IntegerFI(jsBMIH->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("biBitCount")).ToLocalChecked());
+        bmi.bmiHeader.biCompression = IntegerFI(jsBMIH->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("biCompression")).ToLocalChecked());
+        bmi.bmiHeader.biSizeImage = IntegerFI(jsBMIH->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("biSizeImage")).ToLocalChecked());
+        bmi.bmiHeader.biXPelsPerMeter = IntegerFI(jsBMIH->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("biXPelsPerMeter")).ToLocalChecked());
+        bmi.bmiHeader.biYPelsPerMeter = IntegerFI(jsBMIH->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("biYPelsPerMeter")).ToLocalChecked());
+        bmi.bmiHeader.biClrUsed = IntegerFI(jsBMIH->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("biClrUsed")).ToLocalChecked());
+        bmi.bmiHeader.biClrImportant = IntegerFI(jsBMIH->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("biClrImportant")).ToLocalChecked());
+
+        //Local<ArrayBuffer> jsArrayBuffer = jsBITMAP->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("dsBm")).ToLocalChecked().As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("bmBits")).ToLocalChecked();
+    
+        //BYTE* bytes;
+        //memset(bytes, 0, jsArrayBuffer->ByteLength());
+        //
+        //for (size_t i = 0; i < jsArrayBuffer->ByteLength(); i++) {
+        //
+        //}
+        BYTE* bytes;
+
+        info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)CreateDIBSection((HDC)IntegerFI(info[0]), &bmi, IntegerFI(info[2]), (void**) &bytes, NULL, IntegerFI(jsBITMAP->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("dsOffset")).ToLocalChecked()))));
+    }
+}
+
 V8FUNC(GetObjectHPALETTE) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
@@ -3416,8 +3589,16 @@ V8FUNC(GetObjectHPALETTE) {
     info.GetReturnValue().Set(Number::New(isolate, entries));
 }
 
+//V8FUNC(CreatePaletteWrapper) {
+//    using namespace v8;
+//    Isolate* isolate = info.GetIsolate();
+//
+//    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)CreatePalette()))
+//}
+
 V8FUNC(GetObjectExtHPEN) {
     using namespace v8;
+
     Isolate* isolate = info.GetIsolate();
 
     EXTLOGPEN pen; GetObject((HANDLE)IntegerFI(info[0]), sizeof(EXTLOGPEN), &pen);
@@ -3460,6 +3641,26 @@ V8FUNC(GetObjectHPEN) {
     info.GetReturnValue().Set(jsPEN);
 }
 
+V8FUNC(CreatePenIndirectWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    Local<Object> jsPEN = info[0].As<Object>();
+
+    LOGPEN pen{0};
+
+    pen.lopnStyle = IntegerFI(jsPEN->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("lopnStyle")).ToLocalChecked());
+    
+    Local<Object> jsPOINT = jsPEN->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("lopnStyle")).ToLocalChecked().As<Object>();
+
+    POINT p{ IntegerFI(jsPOINT->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("x")).ToLocalChecked()), IntegerFI(jsPOINT->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("y")).ToLocalChecked())};
+
+    pen.lopnWidth = p;
+    pen.lopnColor = IntegerFI(jsPEN->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("lopnColor")).ToLocalChecked());
+
+    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)CreatePenIndirect(&pen)));
+}
+
 V8FUNC(GetObjectHBRUSH) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
@@ -3473,6 +3674,20 @@ V8FUNC(GetObjectHBRUSH) {
     jsBRUSH->Set(isolate->GetCurrentContext(), LITERAL("lbHatch"), Number::New(isolate, brush.lbHatch));
 
     info.GetReturnValue().Set(jsBRUSH);
+}
+
+V8FUNC(CreateBrushIndirectWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    Local<Object> jsBrush = info[0].As<Object>();
+
+    LOGBRUSH brush{0};
+    brush.lbStyle = IntegerFI(jsBrush->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("lbStyle")).ToLocalChecked());
+    brush.lbColor = IntegerFI(jsBrush->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("lbColor")).ToLocalChecked());
+    brush.lbHatch = IntegerFI(jsBrush->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("lbHatch")).ToLocalChecked());
+
+    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)CreateBrushIndirect(&brush)));
 }
 
 V8FUNC(GetObjectHFONT) {
@@ -3571,7 +3786,7 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
 
     global->Set(isolate, "nigg", String::NewFromUtf8(isolate, "er").ToLocalChecked());
 
-    global->Set(isolate, "child_process", FunctionTemplate::New(isolate, SystemWrapper));
+    global->Set(isolate, "system", FunctionTemplate::New(isolate, SystemWrapper)); //yeah idk why i wanted that to be something different even in JBS2 it was cmd instead of JUST system
 
     global->Set(isolate, "setBackground", FunctionTemplate::New(isolate, setBackground));
 
@@ -3588,6 +3803,9 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
         print(tempStr << " " << strFileName);
 
         global->Set(isolate, "__dirname", String::NewFromUtf8(isolate, strFileName.c_str()).ToLocalChecked());
+        
+        global->Set(isolate, "args", String::NewFromUtf8(isolate, filename).ToLocalChecked());
+        //tempStr
     }
 
     global->Set(isolate, "screenWidth", Number::New(isolate, screenWidth));
@@ -3625,6 +3843,10 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     setGlobal(GetObjectHPEN);
     setGlobal(GetObjectHBRUSH);
     setGlobal(GetObjectHFONT);
+    setGlobalWrapper(CreateBitmapIndirect); //accidently had this written twice and v8 spit out some complete GARBAGE of an error (VERY LUCKILY i caught it after just a minute of thinking)
+    setGlobalWrapper(CreatePenIndirect);
+    setGlobalWrapper(CreateBrushIndirect);
+    setGlobalWrapper(CreateDIBSection);
     setGlobalWrapper(CreateFontIndirect); //bruh i forgot this line and V8 didn't say SHIT   it just started gaining a ton memory and stopped running
     //next update (tomorrow) im adding all indirect funcs
     
@@ -3642,6 +3864,9 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     setGlobalConst(MERGEPAINT);
     setGlobalConst(MERGECOPY);
 
+    setGlobalConst(DIB_RGB_COLORS);
+    setGlobalConst(DIB_PAL_COLORS);
+
     setGlobalConst(BI_RGB);
     setGlobalConst(BI_RLE8);
     setGlobalConst(BI_RLE4);
@@ -3651,10 +3876,10 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
 
     setGlobalConst(SND_APPLICATION); setGlobalConst(SND_ALIAS); setGlobalConst(SND_ALIAS_ID); setGlobalConst(SND_ASYNC); setGlobalConst(SND_FILENAME); setGlobalConst(SND_LOOP); setGlobalConst(SND_MEMORY); setGlobalConst(SND_NODEFAULT); setGlobalConst(SND_NOSTOP); setGlobalConst(SND_NOWAIT); setGlobalConst(SND_PURGE); setGlobalConst(SND_RESOURCE); setGlobalConst(SND_SENTRY); setGlobalConst(SND_SYNC); setGlobalConst(SND_SYSTEM);
     setGlobalConst(MM_MCINOTIFY);
-
+    
     global->Set(isolate, "CreateWindow", FunctionTemplate::New(isolate, CreateWindowWrapper));
     global->Set(isolate, "CreateWindowClass", FunctionTemplate::New(isolate, CreateWindowClass));
-
+    setGlobalConst(WS_EX_ACCEPTFILES); setGlobalConst(WS_EX_APPWINDOW); setGlobalConst(WS_EX_CLIENTEDGE); setGlobalConst(WS_EX_COMPOSITED); setGlobalConst(WS_EX_CONTEXTHELP); setGlobalConst(WS_EX_CONTROLPARENT); setGlobalConst(WS_EX_DLGMODALFRAME); setGlobalConst(WS_EX_LAYERED); setGlobalConst(WS_EX_LAYOUTRTL); setGlobalConst(WS_EX_LEFT); setGlobalConst(WS_EX_LEFTSCROLLBAR); setGlobalConst(WS_EX_LTRREADING); setGlobalConst(WS_EX_MDICHILD); setGlobalConst(WS_EX_NOACTIVATE); setGlobalConst(WS_EX_NOINHERITLAYOUT); setGlobalConst(WS_EX_NOPARENTNOTIFY); setGlobalConst(WS_EX_NOREDIRECTIONBITMAP); setGlobalConst(WS_EX_OVERLAPPEDWINDOW); setGlobalConst(WS_EX_PALETTEWINDOW); setGlobalConst(WS_EX_RIGHT); setGlobalConst(WS_EX_RIGHTSCROLLBAR); setGlobalConst(WS_EX_RTLREADING); setGlobalConst(WS_EX_STATICEDGE); setGlobalConst(WS_EX_TOOLWINDOW); setGlobalConst(WS_EX_TOPMOST); setGlobalConst(WS_EX_TRANSPARENT); setGlobalConst(WS_EX_WINDOWEDGE);
     setGlobalConst(COLOR_ACTIVEBORDER); setGlobalConst(COLOR_ACTIVECAPTION); setGlobalConst(COLOR_APPWORKSPACE); setGlobalConst(COLOR_BACKGROUND); setGlobalConst(COLOR_BTNFACE); setGlobalConst(COLOR_BTNSHADOW); setGlobalConst(COLOR_BTNTEXT); setGlobalConst(COLOR_CAPTIONTEXT); setGlobalConst(COLOR_GRAYTEXT); setGlobalConst(COLOR_HIGHLIGHT); setGlobalConst(COLOR_HIGHLIGHTTEXT); setGlobalConst(COLOR_INACTIVEBORDER); setGlobalConst(COLOR_INACTIVECAPTION); setGlobalConst(COLOR_MENU); setGlobalConst(COLOR_MENUTEXT); setGlobalConst(COLOR_SCROLLBAR); setGlobalConst(COLOR_WINDOW); setGlobalConst(COLOR_WINDOWFRAME); setGlobalConst(COLOR_WINDOWTEXT);
     setGlobalConst(WS_BORDER); setGlobalConst(WS_CAPTION); setGlobalConst(WS_CHILD); setGlobalConst(WS_CHILDWINDOW); setGlobalConst(WS_CLIPCHILDREN); setGlobalConst(WS_CLIPSIBLINGS); setGlobalConst(WS_DISABLED); setGlobalConst(WS_DLGFRAME); setGlobalConst(WS_GROUP); setGlobalConst(WS_HSCROLL); setGlobalConst(WS_ICONIC); setGlobalConst(WS_MAXIMIZE); setGlobalConst(WS_MAXIMIZEBOX); setGlobalConst(WS_MINIMIZE); setGlobalConst(WS_MINIMIZEBOX); setGlobalConst(WS_OVERLAPPED); setGlobalConst(WS_OVERLAPPEDWINDOW); setGlobalConst(WS_POPUP); setGlobalConst(WS_POPUPWINDOW); setGlobalConst(WS_SIZEBOX); setGlobalConst(WS_SYSMENU); setGlobalConst(WS_TABSTOP); setGlobalConst(WS_THICKFRAME); setGlobalConst(WS_TILED); setGlobalConst(WS_TILEDWINDOW); setGlobalConst(WS_VISIBLE); setGlobalConst(WS_VSCROLL);
     setGlobalConst(CS_BYTEALIGNCLIENT); setGlobalConst(CS_BYTEALIGNWINDOW); setGlobalConst(CS_CLASSDC); setGlobalConst(CS_DBLCLKS); setGlobalConst(CS_DROPSHADOW); setGlobalConst(CS_GLOBALCLASS); setGlobalConst(CS_HREDRAW); setGlobalConst(CS_NOCLOSE); setGlobalConst(CS_OWNDC); setGlobalConst(CS_PARENTDC); setGlobalConst(CS_SAVEBITS); setGlobalConst(CS_VREDRAW);
@@ -4013,7 +4238,7 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
     setGlobalWrapper(Rectangle);
 
     global->Set(isolate, "GetDefaultFont", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-        static HFONT defaultfont = NULL;
+        static HFONT defaultfont = NULL; //lowkey still genius
         if (defaultfont == NULL) {
             NONCLIENTMETRICS ncm;
             ncm.cbSize = sizeof(NONCLIENTMETRICS);
@@ -4027,6 +4252,11 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
     //https://cpp.sh/?source=%2F%2F+Example+program%0A%23include+%3Ciostream%3E%0A%23include+%3Cstring%3E%0A%0Aint+main()%0A%7B%0A++std%3A%3Astring+name%3B%0A++std%3A%3Acout+%3C%3C+%22What+is+your+name%3F+%22%3B%0A++getline+(std%3A%3Acin%2C+name)%3B%0A++std%3A%3Acout+%3C%3C+%22Hello%2C+%22+%3C%3C+name+%3C%3C+%22!%5Cn%22%3B%0A%7D
     
     setGlobalWrapper(CreatePen);
+    setGlobalConst(PS_GEOMETRIC);
+    setGlobalConst(PS_COSMETIC);
+    //setGlobalConst(PS_ALTERNATIVE);
+    setGlobalConst(PS_USERSTYLE);
+    setGlobalConst(PS_ENDCAP_ROUND); setGlobalConst(PS_ENDCAP_SQUARE); setGlobalConst(PS_ENDCAP_FLAT); setGlobalConst(PS_JOIN_BEVEL); setGlobalConst(PS_JOIN_MITER); setGlobalConst(PS_JOIN_ROUND);
     setGlobalWrapper(GetStockObject);
 
     setGlobalConst(BLACK_BRUSH); setGlobalConst(DKGRAY_BRUSH); setGlobalConst(DC_BRUSH); setGlobalConst(GRAY_BRUSH); setGlobalConst(HOLLOW_BRUSH); setGlobalConst(LTGRAY_BRUSH); setGlobalConst(NULL_BRUSH); setGlobalConst(WHITE_BRUSH); setGlobalConst(BLACK_PEN); setGlobalConst(DC_PEN); setGlobalConst(NULL_PEN); setGlobalConst(WHITE_PEN); setGlobalConst(ANSI_FIXED_FONT); setGlobalConst(ANSI_VAR_FONT); setGlobalConst(DEVICE_DEFAULT_FONT); setGlobalConst(DEFAULT_GUI_FONT); setGlobalConst(OEM_FIXED_FONT); setGlobalConst(SYSTEM_FONT); setGlobalConst(SYSTEM_FIXED_FONT); setGlobalConst(DEFAULT_PALETTE);
@@ -4289,13 +4519,26 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
         std::string shit = *(std::string*)IntegerFI(info[0]);
         print(shit);
     }));
+
+    global->Set(isolate, "wprint", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+        using namespace v8;
+        Isolate* isolate = info.GetIsolate();
+        HandleScope handle_scope(isolate);
+        //when you forgot your headphones at home and you gotta listen to DELTARUNE music (chillin on thuh weekend like USUAL,  watching spongebob and scobydobydo)
+        //Local<String> shit = info[0].As<String>();
+        // 
+        //std::wstring shit = std::wstring((const wchar_t*)(*String::Value(isolate, info[0])));
+
+        wprint(WStringFI(info[0]));
+        MessageBox(NULL, WStringFI(info[0]), L"wprint using Utf16 (wchar_t)", MB_OK);
+    }));
     
 //#define setGlobal(name) global->Set(isolate, "name", v8::FunctionTemplate::New(isolate, name));
     //wait a funking mineite i was on to ssomething
     //setGlobalWrapper(BitBlt);
     //setGlobal(Msgbox);
 
-    //https://stackoverflow.com/questions/37385102/failed-to-draw-on-desktopwindow GRRRRR
+    //https://stackoverflow.com/questions/37385102/failed-to-draw-on-desktopwindow GRRRRR (why are people so against drawing to the screen JUST EXPLAIN IT)
 
     return Context::New(isolate, NULL, global);
 
@@ -4345,11 +4588,14 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInstance, char* nCmdList, int
     print("figure out win timers");
     //print("maybe do send input but if i can't i can't");
     //print("investigate 3/11 -> why does SetClassLongPtr AND GetWindowLongPtr not work?"); //haha i can change the icons now! (it wasn't working because i was using WINCLASS instead of the EX versions)
-    print(/*"GDI CreateFont and */"CreateWindowExA AND use ID2D1BitmapBrush1!");
+    print(/*"GDI CreateFont and CreateWindowExA AND */"use ID2D1BitmapBrush1!");
 
     SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), 7);
 
-    print("JBS3 -> Version 1.3.1"); //so idk how normal version things work so the first number will probably stay one --- i will increment the second number if i change an existing function like when i remade the CreateWindowClass and CreateWindow functions --- i might random increment the third number if i feel like it
+    //ok 1.3.2 because i changed child_process to system
+    //1.3.3 because i finally figured out how to get Utf16 strings as wchars
+    //1.4.3 because i finally figured out how to get Utf16 strings as wchars (and completely changed how CreateWindow works)
+    print("JBS3 -> Version 1.4.3"); //so idk how normal version things work so the first number will probably stay one --- i will increment the second number if i change an existing function like when i remade the CreateWindowClass and CreateWindow functions --- i might random increment the third number if i feel like it
     print(screenWidth << "x" << screenHeight);
     
 
@@ -4402,16 +4648,18 @@ https://forums.codeguru.com/showthread.php?69236-How-to-obtain-HINSTANCE-using-H
 
     //std::cout.rdbuf(sb);
     //return 0;
-    
+    print(nCmdList);
 
 
     // Initialize V8.
     if (strlen(nCmdList) == 0) {
         std::cout << "PATH, NIGGA! (bellunicode\x07)" << std::endl;
+        system("pause");
         return -1;
     }
     else if (strcmp(nCmdList,"--help")==0) {
         print("yo we got functions like require and and child_process and and uhhh setBackground idk man just do for in globalThis :sob:");
+        system("pause");
         return -1;
     }
     v8::V8::InitializeICUDefaultLocation(nCmdList);//argv[0]);
@@ -4449,7 +4697,12 @@ https://forums.codeguru.com/showthread.php?69236-How-to-obtain-HINSTANCE-using-H
     
             std::string shit;
     
-            std::ifstream file(nCmdList);//argv[1]);
+            std::string args(nCmdList);
+            if (args[0] == '"') {
+                args = args.substr(1, args.find('"', 1)); //sounds right
+            }
+
+            std::ifstream file(args);//argv[1]);
     
             if (file.is_open()) {
                 print("working file ok good " << nCmdList << " ;");
@@ -4542,9 +4795,12 @@ LRESULT CALLBACK WinProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
     //Local<Value> args[] = { Number::New(isolate, (size_t)hwnd), Number::New(isolate, msg) };
     //Local<Value> result = listener->Call(isolate->GetCurrentContext(), isolate->GetCurrentContext()->Global(), 1, args).ToLocalChecked();
     //print(CStringFI(result));
-    if (isolate != nullptr) {
+    if (isolate != nullptr || msg == WM_CREATE) {
+        if (msg == WM_CREATE) isolate = (Isolate*)(((CREATESTRUCTW*)lp)->lpCreateParams);  //usually i don't do single line if statements but im feeling quirky
+        //print(isolate << " " << lp << " " << (msg == WM_CREATE));// << " random data " << isolate->GetCurrentContext()->IsContext());
+
         Local<Function> listener = wndclass->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("windowProc")).ToLocalChecked().As<Function>();
-        Local<Value> args[] = { Number::New(isolate, (long long)hwnd),  Number::New(isolate, msg), Number::New(isolate, wp), Number::New(isolate, lp)};
+        Local<Value> args[] = { Number::New(isolate, (LONG_PTR)hwnd),  Number::New(isolate, msg), Number::New(isolate, wp), Number::New(isolate, lp)};
         /*Local<Value> result = */listener->Call(isolate->GetCurrentContext(), isolate->GetCurrentContext()->Global(), 4, args)/*.ToLocalChecked()*/;
         //print(CStringFI(result));
     }
@@ -4564,5 +4820,5 @@ LRESULT CALLBACK WinProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
     //    PostQuitMessage(0);
     //}
 
-    return DefWindowProcA(hwnd, msg, wp, lp);
+    return DefWindowProcW(hwnd, msg, wp, lp);
 }

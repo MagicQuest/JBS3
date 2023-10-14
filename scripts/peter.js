@@ -1,6 +1,6 @@
 //https://twitter.com/cuzsie/status/1708226732950749316
 //Msgbox("yo watch out this is finna shutdown your computer LOL", "Peter Alert", MB_OKCANCEL);
-const peter = LoadImage(NULL, __dirname+"/peter.bmp", IMAGE_BITMAP, 0, 0, LR_SHARED | LR_LOADFROMFILE);
+const peter = LoadImage(NULL, __dirname+"/peter.bmp", IMAGE_BITMAP, 0, 0, LR_SHARED | LR_LOADFROMFILE | LR_CREATEDIBSECTION);
 
 //aw DAMN i was trying to figure out why MaskBlt wasn't working and the bitmap has to be monochromic and i thought it was because i exported it as such from paint.net but there is actually a FLAG for that and i just checked
 const mask = LoadImage(NULL, __dirname+"/petermask.bmp", IMAGE_BITMAP, 0, 0, LR_SHARED | LR_LOADFROMFILE | LR_MONOCHROME); //had to export from paint.net as bmp with a bit-depth of 1 (also i used the curves effect to make peter white just incase i need to remember that)
@@ -14,10 +14,13 @@ const height = 360;
 let button;
 
 function init(hwnd) {
+    button = CreateWindow(NULL, "BUTTON", "OK", WS_CHILD | WS_VISIBLE, (width-146)/2, height/2+36, 146, 36, hwnd, NULL, hInstance); //bruh at school i realized i was updating the screen before making the button causing it to show up late
     InvalidateRect(hwnd, 0, 0, width, height, true);
     UpdateWindow(hwnd); //draw immediately
-    button = CreateWindow("BUTTON", "OK", WS_CHILD | WS_VISIBLE, (width-146)/2, height/2+36, 146, 36, hwnd);
     PlaySoundSpecial(__dirname+"/peterstartup.mp3", "startup");
+    //print(GetObjectHBITMAP(peter));
+    //const bits = GetObjectDIBITMAP(peter).dsBm.bmBits;
+    //print(bits);
     //let dc = GetDC(hwnd);
     //const memDC = CreateCompatibleDC(dc);
     //SelectObject(memDC, mask);
@@ -29,7 +32,9 @@ function init(hwnd) {
 }
 
 function windowProc(hwnd, msg, wp, lp) {
-    if(msg == WM_PAINT) {
+    if(msg == WM_CREATE) {
+        init(hwnd);
+    }else if(msg == WM_PAINT) {
         const ps = BeginPaint(hwnd);
         //const lastFont = SelectObject(ps.hdc, lolFont);
         //TextOut(ps.hdc, 0, 0, "digga");
@@ -63,7 +68,7 @@ function windowProc(hwnd, msg, wp, lp) {
             //PlaySound("E:/Program Files/Image-Line/FL Studio 20/heartbeat shift.wav", NULL, SND_FILENAME);
             //PlaySoundSpecial("E:/Downloads/update2022-castle-funk.mp3", "funk", hwnd, true);
             //PlaySoundSpecial("D:/21st century meme pack/clip funnies/aeiou.mp3", "funk", hwnd);
-            PlaySoundSpecial(__dirname+"/peter.mp3", "peteg");
+            PlaySoundSpecial(__dirname+"/peter.mp3", "peteg", hwnd);
             if(Msgbox("shutdown computer", "heehehehe", MB_OKCANCEL) == IDOK) {
                 if(Msgbox("ARE YOU SURE?", "heehehehe", MB_OKCANCEL | MB_ICONQUESTION) == IDOK) {
                     Msgbox("alrighty then", "heehehehe", MB_OK | MB_ICONERROR);
@@ -78,17 +83,17 @@ function windowProc(hwnd, msg, wp, lp) {
             //Beep(500, 200);
         }
         //print(wp, lp, button);
-    }else if(msg == MM_MCINOTIFY) { //yeah idk it ain't getting called
-        print(wp, lp, "done playing sound");
+    }else if(msg == MM_MCINOTIFY) { //yeah idk it ain't getting called (wait nevermind it worked)
+        print(wp, lp, "done playing sound lol");
     }
 }
 
-const winclass = CreateWindowClass("WinClass", init, windowProc); //loop is not required y'all
+const winclass = CreateWindowClass("WinClass"/*, init*/, windowProc); //loop is not required y'all
 winclass.hIcon = winclass.hIconSm = HICONFromHBITMAP(peter); //LO! (paint.net does not export .ico BUT i can do .bmp so (i think you are supposed to DeleteObject() because HICONFromHBITMAP uses IconFromIndirect so...))
 winclass.hbrBackground = COLOR_BACKGROUND;
 winclass.hCursor = LoadCursor(NULL, IDC_ARROW);
                                                                                                 //math
-CreateWindow(winclass, "Peter Alert", WS_CAPTION | WS_SYSMENU | WS_VISIBLE, screenWidth/2-width/2, screenHeight/2-height/2, width, height); //blocking
+CreateWindow(WS_EX_OVERLAPPEDWINDOW, winclass, "Peter Alert", WS_CAPTION | WS_SYSMENU | WS_VISIBLE, screenWidth/2-width/2, screenHeight/2-height/2, width, height, NULL, NULL, hInstance); //blocking
 
 StopSoundSpecial("startup"); //just clean up (and if i really cared i'd clean up HICONFromHBITMAP too)
 StopSoundSpecial("peteg");

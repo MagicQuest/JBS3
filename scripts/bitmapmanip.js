@@ -24,7 +24,9 @@ function init(hwnd) {
 }
 
 function windowProc(hwnd, msg, wp, lp) {
-    if(msg == WM_MOUSEMOVE) {
+    if(msg == WM_CREATE) {
+        init(hwnd);
+    }else if(msg == WM_MOUSEMOVE) {
         mouse = MAKEPOINTS(lp);
     }else if(msg == WM_DESTROY) {
         PostQuitMessage();
@@ -96,7 +98,7 @@ function loop() {
     }
 }
 
-const WINCLASSEX = CreateWindowClass("WinClass", init, windowProc, loop);
+const WINCLASSEX = CreateWindowClass("WinClass"/*, init*/, windowProc, loop);
 const icon = LoadIcon(NULL, IDI_ERROR);
 WINCLASSEX.hCursor = LoadCursor(NULL, IDC_HAND);
 WINCLASSEX.hIcon = icon;
@@ -104,4 +106,4 @@ WINCLASSEX.hIconSm = icon;
 
 //print(WINCLASSEX);
 
-CreateWindow(WINCLASSEX, "random bitmap gdi testins", WS_OVERLAPPEDWINDOW | WS_VISIBLE, 200, 200, bounds+16, bounds+39);
+CreateWindow(WS_EX_OVERLAPPEDWINDOW, WINCLASSEX, "random bitmap gdi testins", WS_OVERLAPPEDWINDOW | WS_VISIBLE, 200, 200, bounds+16, bounds+39, NULL, NULL, hInstance);
