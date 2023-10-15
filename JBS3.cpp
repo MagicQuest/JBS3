@@ -99,7 +99,7 @@
 
 #define print(msg) std::cout << msg << std::endl
 #define wprint(msg) std::wcout << msg << std::endl
-//honestly im suprised this works
+//honestly im suprised this works (because i use a "custom" console i didn't think wcout would work)
 
 #include <sstream>
 #include <windows.h>
@@ -221,7 +221,7 @@ void Print(const v8::FunctionCallbackInfo<v8::Value>& info) {
         }
         v8::String::Utf8Value str(info.GetIsolate(), info[i]);
         const char* cstr = *str ? *str: "<string conversion failed>";//ToCString(str);
-        printf("%s", Highlight(info.GetIsolate(), console, info[i]));
+        printf("%s", Highlight(info.GetIsolate(), console, info[i])); //print syntax colors for the console
         //const char* color = "";
         //if (!info[i]->IsString()) {
         //    if (info[i]->IsNumber()) {//atoi(cstr)) {
@@ -2676,7 +2676,7 @@ V8FUNC(SendInputWrapper) {
         print("SendInput failed: 0x%x\n" << HRESULT_FROM_WIN32(GetLastError()));
     }
 
-    delete[] inputs;
+    delete[] inputs; //honestly it's kinda of suprising that this SendInput actually works because i feel like it is hard to use just normally (idk why but i just feel it ok)
 }
 
 V8FUNC(MAKEINTRESOURCEWrapper) {
@@ -2837,7 +2837,7 @@ V8FUNC(GetIconDimensionsWrapper) {
     info.GetReturnValue().Set(jsSize);
 }
 
-V8FUNC(GetBitmapDimensionsWrapper) {
+V8FUNC(GetBitmapDimensions) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
 
@@ -3796,6 +3796,154 @@ V8FUNC(KillTimerWrapper) {
     info.GetReturnValue().Set(Number::New(isolate, KillTimer((HWND)IntegerFI(info[0]), IntegerFI(info[1]))));
 }
 
+//V8FUNC(UpdateLayeredWindowWrapper) {
+//    using namespace v8;
+//    Isolate* isolate = info.GetIsolate();
+//
+//    info.GetReturnValue().Set(Number::New(isolate, UpdateLayeredWindow((HWND)IntegerFI(info[0]), (HDC)IntegerFI(info[1]), &pptdst, &psize, IntegerFI(info[4]), &ppsrc, IntegerFI(info[6]), ));
+//}
+
+V8FUNC(SetLayeredWindowAttributesWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, SetLayeredWindowAttributes((HWND)IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]))));
+}
+
+V8FUNC(GetLayeredWindowAttributesWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    COLORREF c;
+    BYTE b;
+    DWORD d;
+    
+    GetLayeredWindowAttributes((HWND)IntegerFI(info[0]), &c, &b, &d);
+
+    Local<Object> jsAttrib = Object::New(isolate);
+    jsAttrib->Set(isolate->GetCurrentContext(), LITERAL("transparencyColor"), Number::New(isolate, c));
+    jsAttrib->Set(isolate->GetCurrentContext(), LITERAL("alpha"), Number::New(isolate, b));
+    jsAttrib->Set(isolate->GetCurrentContext(), LITERAL("dwFlags"), Number::New(isolate, d));
+
+    info.GetReturnValue().Set(jsAttrib);
+}
+
+//Function RotateImageA(theta As Single) As Long //stolen from this TOTALLY random website https://forum.powerbasic.com/forum/user-to-user-discussions/powerbasic-for-windows/47733-basic-image-rotation-iv-plgblt
+V8FUNC(RotateImage) { //and i just found out that you can do even more shit with gdi https://learn.microsoft.com/en-us/windows/win32/api/wingdi/nf-wingdi-setgraphicsmode
+    //300x300 image is rotated
+    //Dim PlgPts(0 To 2) As PointAPI   //UL, UR, LL corners of source image
+    //long XCenter, YCenter;
+    //Local XCenter, YCenter As Long
+    //XCenter = 149;
+    //YCenter = 149;
+    //   newx = XCenter + (x - XCenter) * Cos(theta) - (y - YCenter) * Sin(theta)
+    //   newy = YCenter + (x - XCenter) * Sin(theta) + (y - YCenter) * Cos(theta)
+    
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    POINT p[3];
+    
+    int x = IntegerFI(info[1]);
+    int y = IntegerFI(info[2]);
+    int width = IntegerFI(info[3]);
+    int height = IntegerFI(info[4]);
+    int theta = IntegerFI(info[5]);
+
+    p[0].x = x + (0 - x) * cos(theta) - (0 - y) * sin(theta);  //upper-left in target
+    p[0].y = y + (0 - x) * sin(theta) + (0 - y) * cos(theta);
+    p[1].x = x + (width - x) * cos(theta) - (0 - y) * sin(theta);  //upper-right in target
+    p[1].y = y + (width - x) * sin(theta) + (0 - y) * cos(theta);
+    p[2].x = x + (0 - x) * cos(theta) - (height - y) * sin(theta);  //lower left in target
+    p[2].y = y + (0 - x) * sin(theta) + (height - y) * cos(theta);
+    info.GetReturnValue().Set(Number::New(isolate, PlgBlt((HDC)IntegerFI(info[0]), p, (HDC)IntegerFI(info[6]), x, y, width, height, (HBITMAP)IntegerFI(info[7]), IntegerFI(info[8]), IntegerFI(info[9]))));  // Draw rotated image
+}
+//End Function
+
+V8FUNC(GetGraphicsModeWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, GetGraphicsMode((HDC)IntegerFI(info[0]))));
+}
+
+V8FUNC(SetGraphicsModeWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, SetGraphicsMode((HDC)IntegerFI(info[0]), IntegerFI(info[1]))));
+}
+
+V8FUNC(GetMapModeWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, GetMapMode((HDC)IntegerFI(info[0]))));
+}
+
+V8FUNC(SetMapModeWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, SetMapMode((HDC)IntegerFI(info[0]), IntegerFI(info[1]))));
+}
+
+V8FUNC(GetWorldTransformWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    Local<Object> jsTRANSFORM = Object::New(isolate);
+    
+    XFORM xForm; GetWorldTransform((HDC)IntegerFI(info[0]), &xForm);
+    
+    jsTRANSFORM->Set(isolate->GetCurrentContext(), LITERAL("eM11"), Number::New(isolate, xForm.eM11));
+    jsTRANSFORM->Set(isolate->GetCurrentContext(), LITERAL("eM12"), Number::New(isolate, xForm.eM12));
+    jsTRANSFORM->Set(isolate->GetCurrentContext(), LITERAL("eM21"), Number::New(isolate, xForm.eM21));
+    jsTRANSFORM->Set(isolate->GetCurrentContext(), LITERAL("eM22"), Number::New(isolate, xForm.eM22));
+    jsTRANSFORM->Set(isolate->GetCurrentContext(), LITERAL("eDx"), Number::New(isolate, xForm.eDx));
+    jsTRANSFORM->Set(isolate->GetCurrentContext(), LITERAL("eDy"), Number::New(isolate, xForm.eDy));
+
+    info.GetReturnValue().Set(jsTRANSFORM);
+}
+
+V8FUNC(SetWorldTransformWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    Local<Object> jsTRANSFORM = info[1].As<Object>();
+    //https://www.vbforums.com/showthread.php?840377-2d-shape-(rectangle)-manipulation&p=5117971&viewfull=1#post5117971
+    //https://www.vbforums.com/showthread.php?888707-API-what-is-the-best-function-for-draw-an-image-using-4-points
+    XFORM xForm{ 0 };
+    xForm.eM11 = FloatFI(jsTRANSFORM->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("eM11")).ToLocalChecked());
+    xForm.eM12 = FloatFI(jsTRANSFORM->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("eM12")).ToLocalChecked());
+    xForm.eM21 = FloatFI(jsTRANSFORM->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("eM21")).ToLocalChecked());
+    xForm.eM22 = FloatFI(jsTRANSFORM->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("eM22")).ToLocalChecked());
+    xForm.eDx = FloatFI(jsTRANSFORM->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("eDx")).ToLocalChecked());
+    xForm.eDy = FloatFI(jsTRANSFORM->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("eDy")).ToLocalChecked());
+
+    info.GetReturnValue().Set(Number::New(isolate, SetWorldTransform((HDC)IntegerFI(info[0]), &xForm)));
+}
+
+V8FUNC(ModifyWorldTransformWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    if (info[1]->IsNumber() || info[1]->IsNullOrUndefined()) {
+        info.GetReturnValue().Set(Number::New(isolate, ModifyWorldTransform((HDC)IntegerFI(info[0]), (const XFORM*)IntegerFI(info[1]), IntegerFI(info[2]))));
+    }
+    else {
+        Local<Object> jsTRANSFORM = info[1].As<Object>();
+        XFORM xForm{ 0 };
+        xForm.eM11 = FloatFI(jsTRANSFORM->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("eM11")).ToLocalChecked());
+        xForm.eM12 = FloatFI(jsTRANSFORM->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("eM12")).ToLocalChecked());
+        xForm.eM21 = FloatFI(jsTRANSFORM->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("eM21")).ToLocalChecked());
+        xForm.eM22 = FloatFI(jsTRANSFORM->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("eM22")).ToLocalChecked());
+        xForm.eDx = FloatFI(jsTRANSFORM->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("eDx")).ToLocalChecked());
+        xForm.eDy = FloatFI(jsTRANSFORM->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("eDy")).ToLocalChecked());
+        info.GetReturnValue().Set(Number::New(isolate, ModifyWorldTransform((HDC)IntegerFI(info[0]), &xForm, IntegerFI(info[2]))));
+    }
+}
+
 v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     using namespace v8;
 
@@ -3830,8 +3978,11 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     {
         std::string tempStr(filename);
         std::string strFileName = tempStr.substr(0, tempStr.find_last_of('\\'));
-        print(tempStr << " " << strFileName);
-
+        //print(tempStr << " " << strFileName);
+        if (strFileName[0] == '"') {
+            strFileName = strFileName.substr(1, strFileName.find('"', 1) - 1); //sounds right
+            print("STRFILENAME::" << strFileName);
+        }
         global->Set(isolate, "__dirname", String::NewFromUtf8(isolate, strFileName.c_str()).ToLocalChecked());
         
         global->Set(isolate, "args", String::NewFromUtf8(isolate, filename).ToLocalChecked());
@@ -3864,8 +4015,13 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     setGlobalWrapper(PatBlt);
     setGlobalWrapper(MaskBlt);
     setGlobalWrapper(PlgBlt);
+    setGlobal(RotateImage);
     setGlobalWrapper(SetTimer);
     setGlobalWrapper(KillTimer);
+
+    setGlobalWrapper(SetLayeredWindowAttributes);
+    setGlobalWrapper(GetLayeredWindowAttributes);
+    //setGlobalWrapper(UpdateLayeredWindow);
 
     setGlobalWrapper(MAKEROP4);
     setGlobalWrapper(CreatePatternBrush);
@@ -3881,7 +4037,7 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     setGlobalWrapper(CreatePenIndirect);
     setGlobalWrapper(CreateBrushIndirect);
     setGlobalWrapper(CreateDIBSection);
-    setGlobalWrapper(CreateFontIndirect); //bruh i forgot this line and V8 didn't say SHIT   it just started gaining a ton memory and stopped running
+    setGlobalWrapper(CreateFontIndirect); //bruh i forgot this line and V8 didn't say SHIT   it just started gaining a ton memory and stopped running (ok wait i don't think i was error checking correctly)
     //next update (tomorrow) im adding all indirect funcs
     
     setGlobalWrapper(PlaySound);
@@ -3892,7 +4048,16 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
 
     //https://stackoverflow.com/questions/6707148/foreach-macro-on-macros-arguments
 #define setGlobalConst(g) global->Set(isolate, #g, Number::New(isolate, g))
-
+    setGlobalConst(LWA_ALPHA); setGlobalConst(LWA_COLORKEY);
+    setGlobalWrapper(SetGraphicsMode);
+    setGlobalWrapper(GetGraphicsMode);
+    setGlobalWrapper(GetMapMode);
+    setGlobalWrapper(SetMapMode);
+    setGlobalWrapper(SetWorldTransform);
+    setGlobalWrapper(ModifyWorldTransform); setGlobalConst(MWT_IDENTITY); setGlobalConst(MWT_LEFTMULTIPLY); setGlobalConst(MWT_RIGHTMULTIPLY);
+    setGlobalWrapper(GetWorldTransform);
+    setGlobalConst(MM_ANISOTROPIC); setGlobalConst(MM_HIENGLISH); setGlobalConst(MM_HIMETRIC); setGlobalConst(MM_ISOTROPIC); setGlobalConst(MM_LOENGLISH); setGlobalConst(MM_LOMETRIC); setGlobalConst(MM_TEXT); setGlobalConst(MM_TWIPS);
+    setGlobalConst(GM_COMPATIBLE); setGlobalConst(GM_ADVANCED); setGlobalConst(GM_LAST);
     setGlobalConst(PATCOPY); setGlobalConst(PATINVERT); setGlobalConst(DSTINVERT); setGlobalConst(BLACKNESS); setGlobalConst(WHITENESS);
     setGlobalConst(PATPAINT);
     setGlobalConst(MERGEPAINT);
@@ -4212,7 +4377,7 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
     setGlobalWrapper(LoadIcon);
     setGlobalWrapper(HICONFromHBITMAP);
     setGlobalWrapper(GetIconDimensions);
-    setGlobalWrapper(GetBitmapDimensions);
+    setGlobal(GetBitmapDimensions);
 
     setGlobalConst(IMAGE_BITMAP);
     setGlobalConst(IMAGE_CURSOR);
@@ -4333,25 +4498,25 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
     global->Set(isolate, "HIWORD", FunctionTemplate::New(isolate, HIWORDWRAPPER));
     global->Set(isolate, "LOWORD", FunctionTemplate::New(isolate, LOWORDWRAPPER));
 
-    #define DWRITE_FLOW_DIRECTION_TOP_TO_BOTTOM DWRITE_FLOW_DIRECTION_TOP_TO_BOTTOM
-    #define DWRITE_FLOW_DIRECTION_BOTTOM_TO_TOP DWRITE_FLOW_DIRECTION_BOTTOM_TO_TOP
-    #define DWRITE_FLOW_DIRECTION_LEFT_TO_RIGHT DWRITE_FLOW_DIRECTION_LEFT_TO_RIGHT
-    #define DWRITE_FLOW_DIRECTION_RIGHT_TO_LEFT DWRITE_FLOW_DIRECTION_RIGHT_TO_LEFT
+    //#define DWRITE_FLOW_DIRECTION_TOP_TO_BOTTOM DWRITE_FLOW_DIRECTION_TOP_TO_BOTTOM
+    //#define DWRITE_FLOW_DIRECTION_BOTTOM_TO_TOP DWRITE_FLOW_DIRECTION_BOTTOM_TO_TOP
+    //#define DWRITE_FLOW_DIRECTION_LEFT_TO_RIGHT DWRITE_FLOW_DIRECTION_LEFT_TO_RIGHT
+    //#define DWRITE_FLOW_DIRECTION_RIGHT_TO_LEFT DWRITE_FLOW_DIRECTION_RIGHT_TO_LEFT
     setGlobalConst(DWRITE_FLOW_DIRECTION_TOP_TO_BOTTOM);
     setGlobalConst(DWRITE_FLOW_DIRECTION_BOTTOM_TO_TOP);
     setGlobalConst(DWRITE_FLOW_DIRECTION_LEFT_TO_RIGHT);
     setGlobalConst(DWRITE_FLOW_DIRECTION_RIGHT_TO_LEFT);
-    #define DWRITE_FONT_STRETCH_UNDEFINED       DWRITE_FONT_STRETCH_UNDEFINED
-    #define DWRITE_FONT_STRETCH_ULTRA_CONDENSED DWRITE_FONT_STRETCH_ULTRA_CONDENSED
-    #define DWRITE_FONT_STRETCH_EXTRA_CONDENSED DWRITE_FONT_STRETCH_EXTRA_CONDENSED
-    #define DWRITE_FONT_STRETCH_CONDENSED       DWRITE_FONT_STRETCH_CONDENSED
-    #define DWRITE_FONT_STRETCH_SEMI_CONDENSED  DWRITE_FONT_STRETCH_SEMI_CONDENSED
-    #define DWRITE_FONT_STRETCH_NORMAL          DWRITE_FONT_STRETCH_NORMAL
-    #define DWRITE_FONT_STRETCH_MEDIUM          DWRITE_FONT_STRETCH_MEDIUM
-    #define DWRITE_FONT_STRETCH_SEMI_EXPANDED   DWRITE_FONT_STRETCH_SEMI_EXPANDED
-    #define DWRITE_FONT_STRETCH_EXPANDED        DWRITE_FONT_STRETCH_EXPANDED
-    #define DWRITE_FONT_STRETCH_EXTRA_EXPANDED  DWRITE_FONT_STRETCH_EXTRA_EXPANDED
-    #define DWRITE_FONT_STRETCH_ULTRA_EXPANDED  DWRITE_FONT_STRETCH_ULTRA_EXPANDED
+    //#define DWRITE_FONT_STRETCH_UNDEFINED       DWRITE_FONT_STRETCH_UNDEFINED
+    //#define DWRITE_FONT_STRETCH_ULTRA_CONDENSED DWRITE_FONT_STRETCH_ULTRA_CONDENSED
+    //#define DWRITE_FONT_STRETCH_EXTRA_CONDENSED DWRITE_FONT_STRETCH_EXTRA_CONDENSED
+    //#define DWRITE_FONT_STRETCH_CONDENSED       DWRITE_FONT_STRETCH_CONDENSED
+    //#define DWRITE_FONT_STRETCH_SEMI_CONDENSED  DWRITE_FONT_STRETCH_SEMI_CONDENSED
+    //#define DWRITE_FONT_STRETCH_NORMAL          DWRITE_FONT_STRETCH_NORMAL
+    //#define DWRITE_FONT_STRETCH_MEDIUM          DWRITE_FONT_STRETCH_MEDIUM
+    //#define DWRITE_FONT_STRETCH_SEMI_EXPANDED   DWRITE_FONT_STRETCH_SEMI_EXPANDED
+    //#define DWRITE_FONT_STRETCH_EXPANDED        DWRITE_FONT_STRETCH_EXPANDED
+    //#define DWRITE_FONT_STRETCH_EXTRA_EXPANDED  DWRITE_FONT_STRETCH_EXTRA_EXPANDED
+    //#define DWRITE_FONT_STRETCH_ULTRA_EXPANDED  DWRITE_FONT_STRETCH_ULTRA_EXPANDED
     setGlobalConst(DWRITE_FONT_STRETCH_UNDEFINED);
     setGlobalConst(DWRITE_FONT_STRETCH_ULTRA_CONDENSED);
     setGlobalConst(DWRITE_FONT_STRETCH_EXTRA_CONDENSED);
@@ -4363,30 +4528,30 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
     setGlobalConst(DWRITE_FONT_STRETCH_EXPANDED);
     setGlobalConst(DWRITE_FONT_STRETCH_EXTRA_EXPANDED);
     setGlobalConst(DWRITE_FONT_STRETCH_ULTRA_EXPANDED);
-    #define DWRITE_FONT_STYLE_NORMAL  DWRITE_FONT_STYLE_NORMAL
-    #define DWRITE_FONT_STYLE_OBLIQUE DWRITE_FONT_STYLE_OBLIQUE
-    #define DWRITE_FONT_STYLE_ITALIC  DWRITE_FONT_STYLE_ITALIC
+    //#define DWRITE_FONT_STYLE_NORMAL  DWRITE_FONT_STYLE_NORMAL
+    //#define DWRITE_FONT_STYLE_OBLIQUE DWRITE_FONT_STYLE_OBLIQUE
+    //#define DWRITE_FONT_STYLE_ITALIC  DWRITE_FONT_STYLE_ITALIC
     setGlobalConst(DWRITE_FONT_STYLE_NORMAL);
     setGlobalConst(DWRITE_FONT_STYLE_OBLIQUE);
     setGlobalConst(DWRITE_FONT_STYLE_ITALIC);
     
-        #define DWRITE_FONT_WEIGHT_THIN          DWRITE_FONT_WEIGHT_THIN
-        #define DWRITE_FONT_WEIGHT_EXTRA_LIGHT   DWRITE_FONT_WEIGHT_EXTRA_LIGHT
-        #define DWRITE_FONT_WEIGHT_ULTRA_LIGHT   DWRITE_FONT_WEIGHT_ULTRA_LIGHT
-        #define DWRITE_FONT_WEIGHT_LIGHT         DWRITE_FONT_WEIGHT_LIGHT
-        #define DWRITE_FONT_WEIGHT_SEMI_LIGHT    DWRITE_FONT_WEIGHT_SEMI_LIGHT
-        #define DWRITE_FONT_WEIGHT_NORMAL        DWRITE_FONT_WEIGHT_NORMAL
-        #define DWRITE_FONT_WEIGHT_REGULAR       DWRITE_FONT_WEIGHT_REGULAR
-        #define DWRITE_FONT_WEIGHT_MEDIUM        DWRITE_FONT_WEIGHT_MEDIUM
-        #define DWRITE_FONT_WEIGHT_DEMI_BOLD     DWRITE_FONT_WEIGHT_DEMI_BOLD
-        #define DWRITE_FONT_WEIGHT_SEMI_BOLD     DWRITE_FONT_WEIGHT_SEMI_BOLD
-        #define DWRITE_FONT_WEIGHT_BOLD          DWRITE_FONT_WEIGHT_BOLD
-        #define DWRITE_FONT_WEIGHT_EXTRA_BOLD    DWRITE_FONT_WEIGHT_EXTRA_BOLD
-        #define DWRITE_FONT_WEIGHT_ULTRA_BOLD    DWRITE_FONT_WEIGHT_ULTRA_BOLD
-        #define DWRITE_FONT_WEIGHT_BLACK         DWRITE_FONT_WEIGHT_BLACK
-        #define DWRITE_FONT_WEIGHT_HEAVY         DWRITE_FONT_WEIGHT_HEAVY
-        #define DWRITE_FONT_WEIGHT_EXTRA_BLACK   DWRITE_FONT_WEIGHT_EXTRA_BLACK
-        #define DWRITE_FONT_WEIGHT_ULTRA_BLACK   DWRITE_FONT_WEIGHT_ULTRA_BLACK
+        //#define DWRITE_FONT_WEIGHT_THIN          DWRITE_FONT_WEIGHT_THIN
+        //#define DWRITE_FONT_WEIGHT_EXTRA_LIGHT   DWRITE_FONT_WEIGHT_EXTRA_LIGHT
+        //#define DWRITE_FONT_WEIGHT_ULTRA_LIGHT   DWRITE_FONT_WEIGHT_ULTRA_LIGHT
+        //#define DWRITE_FONT_WEIGHT_LIGHT         DWRITE_FONT_WEIGHT_LIGHT
+        //#define DWRITE_FONT_WEIGHT_SEMI_LIGHT    DWRITE_FONT_WEIGHT_SEMI_LIGHT
+        //#define DWRITE_FONT_WEIGHT_NORMAL        DWRITE_FONT_WEIGHT_NORMAL
+        //#define DWRITE_FONT_WEIGHT_REGULAR       DWRITE_FONT_WEIGHT_REGULAR
+        //#define DWRITE_FONT_WEIGHT_MEDIUM        DWRITE_FONT_WEIGHT_MEDIUM
+        //#define DWRITE_FONT_WEIGHT_DEMI_BOLD     DWRITE_FONT_WEIGHT_DEMI_BOLD
+        //#define DWRITE_FONT_WEIGHT_SEMI_BOLD     DWRITE_FONT_WEIGHT_SEMI_BOLD
+        //#define DWRITE_FONT_WEIGHT_BOLD          DWRITE_FONT_WEIGHT_BOLD
+        //#define DWRITE_FONT_WEIGHT_EXTRA_BOLD    DWRITE_FONT_WEIGHT_EXTRA_BOLD
+        //#define DWRITE_FONT_WEIGHT_ULTRA_BOLD    DWRITE_FONT_WEIGHT_ULTRA_BOLD
+        //#define DWRITE_FONT_WEIGHT_BLACK         DWRITE_FONT_WEIGHT_BLACK
+        //#define DWRITE_FONT_WEIGHT_HEAVY         DWRITE_FONT_WEIGHT_HEAVY
+        //#define DWRITE_FONT_WEIGHT_EXTRA_BLACK   DWRITE_FONT_WEIGHT_EXTRA_BLACK
+        //#define DWRITE_FONT_WEIGHT_ULTRA_BLACK   DWRITE_FONT_WEIGHT_ULTRA_BLACK
     setGlobalConst(DWRITE_FONT_WEIGHT_THIN);
     setGlobalConst(DWRITE_FONT_WEIGHT_EXTRA_LIGHT);
     setGlobalConst(DWRITE_FONT_WEIGHT_ULTRA_LIGHT);
@@ -4405,46 +4570,46 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
     setGlobalConst(DWRITE_FONT_WEIGHT_EXTRA_BLACK);
     setGlobalConst(DWRITE_FONT_WEIGHT_ULTRA_BLACK);
 
-#define DWRITE_PARAGRAPH_ALIGNMENT_NEAR   DWRITE_PARAGRAPH_ALIGNMENT_NEAR
-#define DWRITE_PARAGRAPH_ALIGNMENT_FAR    DWRITE_PARAGRAPH_ALIGNMENT_FAR
-#define DWRITE_PARAGRAPH_ALIGNMENT_CENTER DWRITE_PARAGRAPH_ALIGNMENT_CENTER
+//#define DWRITE_PARAGRAPH_ALIGNMENT_NEAR   DWRITE_PARAGRAPH_ALIGNMENT_NEAR
+//#define DWRITE_PARAGRAPH_ALIGNMENT_FAR    DWRITE_PARAGRAPH_ALIGNMENT_FAR
+//#define DWRITE_PARAGRAPH_ALIGNMENT_CENTER DWRITE_PARAGRAPH_ALIGNMENT_CENTER
 
     setGlobalConst(DWRITE_PARAGRAPH_ALIGNMENT_NEAR);
     setGlobalConst(DWRITE_PARAGRAPH_ALIGNMENT_FAR);
     setGlobalConst(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
 
-#define DWRITE_READING_DIRECTION_TOP_TO_BOTTOM DWRITE_READING_DIRECTION_TOP_TO_BOTTOM
-#define DWRITE_READING_DIRECTION_BOTTOM_TO_TOP DWRITE_READING_DIRECTION_BOTTOM_TO_TOP
-#define DWRITE_READING_DIRECTION_LEFT_TO_RIGHT DWRITE_READING_DIRECTION_LEFT_TO_RIGHT
-#define DWRITE_READING_DIRECTION_RIGHT_TO_LEFT DWRITE_READING_DIRECTION_RIGHT_TO_LEFT
+//#define DWRITE_READING_DIRECTION_TOP_TO_BOTTOM DWRITE_READING_DIRECTION_TOP_TO_BOTTOM
+//#define DWRITE_READING_DIRECTION_BOTTOM_TO_TOP DWRITE_READING_DIRECTION_BOTTOM_TO_TOP
+//#define DWRITE_READING_DIRECTION_LEFT_TO_RIGHT DWRITE_READING_DIRECTION_LEFT_TO_RIGHT
+//#define DWRITE_READING_DIRECTION_RIGHT_TO_LEFT DWRITE_READING_DIRECTION_RIGHT_TO_LEFT
     setGlobalConst(DWRITE_READING_DIRECTION_TOP_TO_BOTTOM);
     setGlobalConst(DWRITE_READING_DIRECTION_BOTTOM_TO_TOP);
     setGlobalConst(DWRITE_READING_DIRECTION_LEFT_TO_RIGHT);
     setGlobalConst(DWRITE_READING_DIRECTION_RIGHT_TO_LEFT);
 
-    #define DWRITE_TEXT_ALIGNMENT_LEADING   DWRITE_TEXT_ALIGNMENT_LEADING
-    #define DWRITE_TEXT_ALIGNMENT_TRAILING  DWRITE_TEXT_ALIGNMENT_TRAILING
-    #define DWRITE_TEXT_ALIGNMENT_CENTER    DWRITE_TEXT_ALIGNMENT_CENTER
-    #define DWRITE_TEXT_ALIGNMENT_JUSTIFIED DWRITE_TEXT_ALIGNMENT_JUSTIFIED
+    //#define DWRITE_TEXT_ALIGNMENT_LEADING   DWRITE_TEXT_ALIGNMENT_LEADING
+    //#define DWRITE_TEXT_ALIGNMENT_TRAILING  DWRITE_TEXT_ALIGNMENT_TRAILING
+    //#define DWRITE_TEXT_ALIGNMENT_CENTER    DWRITE_TEXT_ALIGNMENT_CENTER
+    //#define DWRITE_TEXT_ALIGNMENT_JUSTIFIED DWRITE_TEXT_ALIGNMENT_JUSTIFIED
     setGlobalConst(DWRITE_TEXT_ALIGNMENT_LEADING);
     setGlobalConst(DWRITE_TEXT_ALIGNMENT_TRAILING);
     setGlobalConst(DWRITE_TEXT_ALIGNMENT_CENTER);
     setGlobalConst(DWRITE_TEXT_ALIGNMENT_JUSTIFIED);
 
-    #define DWRITE_WORD_WRAPPING_WRAP            DWRITE_WORD_WRAPPING_WRAP
-    #define DWRITE_WORD_WRAPPING_NO_WRAP         DWRITE_WORD_WRAPPING_NO_WRAP
-    #define DWRITE_WORD_WRAPPING_EMERGENCY_BREAK DWRITE_WORD_WRAPPING_EMERGENCY_BREAK
-    #define DWRITE_WORD_WRAPPING_WHOLE_WORD      DWRITE_WORD_WRAPPING_WHOLE_WORD
-    #define DWRITE_WORD_WRAPPING_CHARACTER       DWRITE_WORD_WRAPPING_CHARACTER
+    //#define DWRITE_WORD_WRAPPING_WRAP            DWRITE_WORD_WRAPPING_WRAP
+    //#define DWRITE_WORD_WRAPPING_NO_WRAP         DWRITE_WORD_WRAPPING_NO_WRAP
+    //#define DWRITE_WORD_WRAPPING_EMERGENCY_BREAK DWRITE_WORD_WRAPPING_EMERGENCY_BREAK
+    //#define DWRITE_WORD_WRAPPING_WHOLE_WORD      DWRITE_WORD_WRAPPING_WHOLE_WORD
+    //#define DWRITE_WORD_WRAPPING_CHARACTER       DWRITE_WORD_WRAPPING_CHARACTER
     setGlobalConst(DWRITE_WORD_WRAPPING_WRAP);
     setGlobalConst(DWRITE_WORD_WRAPPING_NO_WRAP);
     setGlobalConst(DWRITE_WORD_WRAPPING_EMERGENCY_BREAK);
     setGlobalConst(DWRITE_WORD_WRAPPING_WHOLE_WORD);
     setGlobalConst(DWRITE_WORD_WRAPPING_CHARACTER);
 
-    #define DWRITE_TRIMMING_GRANULARITY_NONE      DWRITE_TRIMMING_GRANULARITY_NONE
-    #define DWRITE_TRIMMING_GRANULARITY_CHARACTER DWRITE_TRIMMING_GRANULARITY_CHARACTER
-    #define DWRITE_TRIMMING_GRANULARITY_WORD      DWRITE_TRIMMING_GRANULARITY_WORD
+    //#define DWRITE_TRIMMING_GRANULARITY_NONE      DWRITE_TRIMMING_GRANULARITY_NONE
+    //#define DWRITE_TRIMMING_GRANULARITY_CHARACTER DWRITE_TRIMMING_GRANULARITY_CHARACTER
+    //#define DWRITE_TRIMMING_GRANULARITY_WORD      DWRITE_TRIMMING_GRANULARITY_WORD
     setGlobalConst(DWRITE_TRIMMING_GRANULARITY_NONE);
     setGlobalConst(DWRITE_TRIMMING_GRANULARITY_CHARACTER);
     setGlobalConst(DWRITE_TRIMMING_GRANULARITY_WORD);
@@ -4572,7 +4737,7 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
     //setGlobalWrapper(BitBlt);
     //setGlobal(Msgbox);
 
-    //https://stackoverflow.com/questions/37385102/failed-to-draw-on-desktopwindow GRRRRR (why are people so against drawing to the screen JUST EXPLAIN IT)
+    //https://stackoverflow.com/questions/37385102/failed-to-draw-on-desktopwindow GRRRRR (why are people so against drawing to the screen JUST EXPLAIN IT (i might have to make a youtube video talking abaout drawing to the desktop))
 
     return Context::New(isolate, NULL, global);
 
@@ -4682,22 +4847,27 @@ https://forums.codeguru.com/showthread.php?69236-How-to-obtain-HINSTANCE-using-H
 
     //std::cout.rdbuf(sb);
     //return 0;
-    print(nCmdList);
+    print("CMDS-> [" << nCmdList);
 
 
     // Initialize V8.
     if (strlen(nCmdList) == 0) {
         std::cout << "PATH, NIGGA! (bellunicode\x07)" << std::endl;
-        system("pause");
-        return -1;
+        print("but wait a minute, lemme pull out that node.js");
+        //system("pause");
+        //return -1;
     }
     else if (strcmp(nCmdList,"--help")==0) {
         print("yo we got functions like require and and child_process and and uhhh setBackground idk man just do for in globalThis :sob:");
         system("pause");
         return -1;
     }
-    v8::V8::InitializeICUDefaultLocation(nCmdList);//argv[0]);
-    v8::V8::InitializeExternalStartupData(nCmdList);//argv[0]);
+
+    char exe[MAX_PATH]; GetModuleFileNameA(NULL, exe, MAX_PATH);
+    print(exe);
+
+    v8::V8::InitializeICUDefaultLocation(exe);//argv[0]); //is this even doing anything ???
+    v8::V8::InitializeExternalStartupData(exe);//argv[0]);
     std::unique_ptr<v8::Platform> platform = v8::platform::NewDefaultPlatform();
     v8::V8::InitializePlatform(platform.get());
     v8::V8::Initialize();
@@ -4733,13 +4903,15 @@ https://forums.codeguru.com/showthread.php?69236-How-to-obtain-HINSTANCE-using-H
     
             std::string args(nCmdList);
             if (args[0] == '"') {
-                args = args.substr(1, args.find('"', 1)); //sounds right
+                args = args.substr(1, args.find('"', 1)-1); //sounds right
+                print("ARGS::" << args);
             }
+
 
             std::ifstream file(args);//argv[1]);
     
             if (file.is_open()) {
-                print("working file ok good " << nCmdList << " ;");
+                print("working file ok good " << args << " ;");
                 //i hate reading files in c++
                 buffer << file.rdbuf();
                 shit = buffer.str();
@@ -4752,23 +4924,86 @@ https://forums.codeguru.com/showthread.php?69236-How-to-obtain-HINSTANCE-using-H
             }
             else {
                 print("ok buddy what is this file dumb nass nigasg " << nCmdList);
+                print("lemme hear you out tho for a second");
+                shit = nCmdList; //i did not know that equals sign was overloaded
             }
     
             file.close();
-    
-            v8::Local<v8::String> source = v8::String::NewFromUtf8(isolate, shit.c_str(), v8::NewStringType::kNormal, shit.length()).ToLocalChecked();//v8::String::NewFromUtf8(isolate, (const char*)shit, v8::NewStringType::kNormal, strlen(shit)).ToLocalChecked();
+
+            //allow me to pull a node.js
+            if (strlen(nCmdList) != 0) {
+
+                v8::Local<v8::String> source = v8::String::NewFromUtf8(isolate, shit.c_str(), v8::NewStringType::kNormal, shit.length()).ToLocalChecked();//v8::String::NewFromUtf8(isolate, (const char*)shit, v8::NewStringType::kNormal, strlen(shit)).ToLocalChecked();
                 //v8::String::NewFromUtf8Literal(isolate, shit);//"'Hello' + ', World!'");
-    
+
             // Compile the source code.
-            v8::Local<v8::Script> script =
-                v8::Script::Compile(context, source).ToLocalChecked();
-    
-            // Run the script to get the result.
-            v8::Local<v8::Value> result = script->Run(context).ToLocalChecked();
-    
-            // Convert the result to an UTF8 string and print it.
-            v8::String::Utf8Value utf8(isolate, result);
-            printf("%s\n", *utf8);
+                //v8::Local<v8::Script> script =
+                //    v8::Script::Compile(context, source).ToLocalChecked();
+                //
+                //// Run the script to get the result.
+                //v8::Local<v8::Value> result = script->Run(context).ToLocalChecked();
+                //
+                //// Convert the result to an UTF8 string and print it.
+                //v8::String::Utf8Value utf8(isolate, result);
+                //printf("%s\n", *utf8);
+
+                v8::Local<v8::Script> script;
+                if (v8::Script::Compile(context, source).ToLocal(&script)) {
+                    // Run the script to get the result.
+                    v8::Local<v8::Value> result;
+                    if (script->Run(context).ToLocal(&result)) {
+                        // Convert the result to an UTF8 string and print it.
+                        //v8::String::Utf8Value utf8(isolate, result);
+                        //printf("%s\n", *utf8);
+                        using namespace v8;
+                        if (!result->IsNullOrUndefined()) {
+                            printf("%s", Highlight(isolate, GetStdHandle(STD_OUTPUT_HANDLE), result));
+                            printf("%s", CStringFI(result));
+
+                            printf("\n");
+                            fflush(stdout);
+                            SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), 7);
+                        }
+                    }
+                }
+            }
+            else {
+                while (true) {
+                    char scriptcstr[256];
+                    std::cout << ">>> ";
+                    std::cin.getline(scriptcstr, 256);
+
+                    if (strcmp(scriptcstr, "exit") == 0 || strcmp(scriptcstr, "quit") == 0) {
+                        break;
+                    }
+
+                    //std::string scriptstring = "try {\n"+std::string(scriptcstr)+"\n}catch(e) {\nprint(e);\n}";
+
+                    v8::Local<v8::String> source = v8::String::NewFromUtf8(isolate, scriptcstr, v8::NewStringType::kNormal, strlen(scriptcstr)).ToLocalChecked();//v8::String::NewFromUtf8(isolate, (const char*)shit, v8::NewStringType::kNormal, strlen(shit)).ToLocalChecked();
+                    //v8::String::NewFromUtf8Literal(isolate, shit);//"'Hello' + ', World!'");
+
+                // Compile the source code.
+                    v8::Local<v8::Script> script;
+                    if (v8::Script::Compile(context, source).ToLocal(&script)) {
+                        // Run the script to get the result.
+                        v8::Local<v8::Value> result;
+                        if (script->Run(context).ToLocal(&result)) {
+                            // Convert the result to an UTF8 string and print it.
+                            //v8::String::Utf8Value utf8(isolate, result);
+                            //printf("%s\n", *utf8);
+                            using namespace v8;
+                            if (!result->IsNullOrUndefined()) {
+                                printf("%s", Highlight(isolate, GetStdHandle(STD_OUTPUT_HANDLE), result));
+                                printf("%s", CStringFI(result));
+
+                                printf("\n");
+                                fflush(stdout);
+                                SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), 7);
+                            }
+                        }
+                    }
+                }
+            }
         }
     
 //        {
@@ -4835,8 +5070,12 @@ LRESULT CALLBACK WinProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         HandleScope handle_scope(isolate); //slapping this bad boy in here
         Local<Function> listener = wndclass->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("windowProc")).ToLocalChecked().As<Function>();
         Local<Value> args[] = { Number::New(isolate, (LONG_PTR)hwnd),  Number::New(isolate, msg), Number::New(isolate, wp), Number::New(isolate, lp)};
-        /*Local<Value> result = */listener->Call(isolate->GetCurrentContext(), isolate->GetCurrentContext()->Global(), 4, args)/*.ToLocalChecked()*/;
-        //print(CStringFI(result));
+        Local<Value> result;
+        /*Local<Value> result = */
+        if (listener->Call(isolate->GetCurrentContext(), isolate->GetCurrentContext()->Global(), 4, args).ToLocal(&result)) { //   ;/*.ToLocalChecked()*/;
+            //print(CStringFI(result));
+            //print("valid")
+        }
     }
     //if (msg == WM_PAINT) {
     //    //PAINTSTRUCT ps;

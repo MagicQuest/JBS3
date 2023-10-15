@@ -12,6 +12,8 @@ let text = "HELLO FROM THIS NON-SUSPICIOUS TOOLBAR!";
 
 let tween = true;
 
+//let stats = {mouse: {left: 0, right: 0, middle: 0}, kbd: GetAsyncKeyboardState(), windows: {}};
+
 function windowProc(hwnd, msg, wp, lp) {
     if(msg == WM_CREATE) {
         SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
@@ -46,7 +48,7 @@ function windowProc(hwnd, msg, wp, lp) {
         TextOut(ps.hdc, x, 10, text);
         SelectObject(ps.hdc, oldFont);
 
-        //interesting i might have to do some fake 3d stuff with this but i need to find out the formulas
+        //interesting i might have to do some fake 3d stuff with this but i need to find out the formulas (exactly what im talking about https://www.desmos.com/calculator/vahnkqibew)
         //PlgBlt(screen, [{x: 0, y: 0}, {x:1920, y: 0}, {x:10,y:64}], ps.hdc, 0, 0, 1920, 64, NULL, 0, 0);
 
         print("DRAW", x);

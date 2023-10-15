@@ -1,4 +1,4 @@
-//based off a similar c++ program i made in SFML
+//based off a similar c++ program i made in SFML (minus the minimap and ifoundamongus)
 
 let window;
 let windowDC;
@@ -24,6 +24,7 @@ let mousePos = {x: 0, y: 0};
 
 let lost = false;
 
+//print(Inputbox("description", "titpole", "placeholderr!"));
 
 class Tile {
     constructor() {
@@ -257,6 +258,7 @@ function loop() {
         const memDC = CreateCompatibleDC(screen);
         SelectObject(memDC, bmpTest);
         BitBlt(screen, 100, 100, 200, 200, memDC, 0, 0, SRCCOPY); //https://learn.microsoft.com/en-us/windows/win32/gdi/scaling-an-image
+        //RotateImage(screen, mousePos.x, mousePos.y, 200, 200, i, memDC, NULL, 0, 0); //im not gonna lie WTF is this doing
         DeleteDC(memDC);
         //DeleteObject(newFont);
 
@@ -321,7 +323,7 @@ WINCLASSEXW.hCursor = defaultCursor;
 //WINCLASSEXA.hIcon = trolIcon;
 //WINCLASSEXA.hIconSm = trolIcon;
 
-window = CreateWindow(WS_EX_OVERLAPPEDWINDOW, WINCLASSEXW/*A*/, `Minesweeper - JBS (${bombs} bombs left)`, WS_OVERLAPPEDWINDOW | WS_VISIBLE, 250, 0, bounds+16, bounds+39, NULL, NULL, hInstance);
+window = CreateWindow(WS_EX_OVERLAPPEDWINDOW, WINCLASSEXW/*A*/, `😂Minesweeper - JBS (${bombs} bombs left)`, WS_OVERLAPPEDWINDOW | WS_VISIBLE, 250, 0, bounds+16, bounds+39, NULL, NULL, hInstance);
 
 console.log(window, args);
 
