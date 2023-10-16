@@ -2777,6 +2777,27 @@ V8FUNC(IsIconicWrapper) {
     info.GetReturnValue().Set(Number::New(isolate, IsIconic((HWND)IntegerFI(info[0]))));
 }
 
+V8FUNC(IsChildWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, IsChild((HWND)IntegerFI(info[0]), HWND(IntegerFI(info[1]))))); //im still kind of suprised you can cast like that but i guess i shouldn't be
+}
+
+V8FUNC(GetParentWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)GetParent((HWND)IntegerFI(info[0])))); //im still kind of suprised you can cast like that but i guess i shouldn't be
+}
+
+V8FUNC(SetParentWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)SetParent((HWND)IntegerFI(info[0]), HWND(IntegerFI(info[1]))))); //im still kind of suprised you can cast like that but i guess i shouldn't be
+}
+
 V8FUNC(SetClassLongPtrWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
@@ -3716,6 +3737,39 @@ V8FUNC(GetObjectHFONT) {
     info.GetReturnValue().Set(jsFONT);
 }
 
+V8FUNC(GetIconInfoWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    ICONINFO ii;
+    BOOL fResult = GetIconInfo((HICON)IntegerFI(info[0]), &ii);
+
+    Local<Object> jsICONINFO = Object::New(isolate);
+    jsICONINFO->Set(isolate->GetCurrentContext(), LITERAL("fIcon"), Number::New(isolate, ii.fIcon));
+    jsICONINFO->Set(isolate->GetCurrentContext(), LITERAL("xHotspot"), Number::New(isolate, ii.xHotspot));
+    jsICONINFO->Set(isolate->GetCurrentContext(), LITERAL("yHotspot"), Number::New(isolate, ii.yHotspot));
+    jsICONINFO->Set(isolate->GetCurrentContext(), LITERAL("hbmMask"), Number::New(isolate, (LONG_PTR)ii.hbmMask));
+    jsICONINFO->Set(isolate->GetCurrentContext(), LITERAL("hbmColor"), Number::New(isolate, (LONG_PTR)ii.hbmColor));
+
+    info.GetReturnValue().Set(jsICONINFO);
+}
+
+V8FUNC(CreateIconIndirectWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    ICONINFO ii{0};
+
+    Local<Object> jsICONINFO = info[0].As<Object>();
+    ii.fIcon = IntegerFI(jsICONINFO->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("fIcon")).ToLocalChecked());
+    ii.xHotspot = IntegerFI(jsICONINFO->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("xHotspot")).ToLocalChecked());
+    ii.yHotspot = IntegerFI(jsICONINFO->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("yHotspot")).ToLocalChecked());
+    ii.hbmMask = (HBITMAP)IntegerFI(jsICONINFO->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("hbmMask")).ToLocalChecked());
+    ii.hbmColor = (HBITMAP)IntegerFI(jsICONINFO->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("hbmColor")).ToLocalChecked());
+
+    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)CreateIconIndirect(&ii)));
+}
+
 V8FUNC(PlaySoundWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
@@ -3785,7 +3839,7 @@ V8FUNC(PlgBltWrapper) {
 V8FUNC(SetTimerWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
-    MessageBoxA(NULL, "i should probably implement some SetTimer timerproc thing", "yeah get on that", MB_OK);
+    //MessageBoxA(NULL, "i should probably implement some SetTimer timerproc thing", "yeah get on that", MB_OK); //yeah nevermind i can't make that work because i can't pass info from here to timerproc without global variables (and i already didn't like doing it for CreateWindow (wndclass is global))
     info.GetReturnValue().Set(Number::New(isolate, SetTimer((HWND)IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), NULL)));
 }
 
@@ -3796,6 +3850,15 @@ V8FUNC(KillTimerWrapper) {
     info.GetReturnValue().Set(Number::New(isolate, KillTimer((HWND)IntegerFI(info[0]), IntegerFI(info[1]))));
 }
 
+V8FUNC(AnimateWindowWrapper) { //https://www.youtube.com/watch?v=meIci7gOTLk
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, AnimateWindow((HWND)IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]))));
+}
+
+//#error update layered window
+//https://stackoverflow.com/questions/18383681/setlayeredwindowattributes-to-make-a-window-transparent-is-only-working-part-of
 //V8FUNC(UpdateLayeredWindowWrapper) {
 //    using namespace v8;
 //    Isolate* isolate = info.GetIsolate();
@@ -3944,6 +4007,22 @@ V8FUNC(ModifyWorldTransformWrapper) {
     }
 }
 
+#include <dwmapi.h>
+#pragma comment(lib, "Dwmapi.lib");
+
+V8FUNC(DwmExtendFrameIntoClientAreaWrapper) { //https://learn.microsoft.com/en-us/windows/win32/api/dwmapi/nf-dwmapi-dwmextendframeintoclientarea?redirectedfrom=MSDN
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    MARGINS inset{0};
+    inset.cxLeftWidth = IntegerFI(info[1]);
+    inset.cyTopHeight = IntegerFI(info[2]);
+    inset.cxRightWidth = IntegerFI(info[3]);
+    inset.cyBottomHeight = IntegerFI(info[4]);
+
+    info.GetReturnValue().Set(Number::New(isolate, DwmExtendFrameIntoClientArea((HWND)IntegerFI(info[0]), &inset)));
+}
+
 v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     using namespace v8;
 
@@ -4023,6 +4102,8 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     setGlobalWrapper(GetLayeredWindowAttributes);
     //setGlobalWrapper(UpdateLayeredWindow);
 
+    setGlobalWrapper(DwmExtendFrameIntoClientArea); 
+
     setGlobalWrapper(MAKEROP4);
     setGlobalWrapper(CreatePatternBrush);
     setGlobalWrapper(CreateHatchBrush);
@@ -4033,6 +4114,7 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     setGlobal(GetObjectHPEN);
     setGlobal(GetObjectHBRUSH);
     setGlobal(GetObjectHFONT);
+    global->Set(isolate, "GetObjectHICON", FunctionTemplate::New(isolate, GetIconInfoWrapper)); setGlobalWrapper(GetIconInfo); setGlobalWrapper(CreateIconIndirect);
     setGlobalWrapper(CreateBitmapIndirect); //accidently had this written twice and v8 spit out some complete GARBAGE of an error (VERY LUCKILY i caught it after just a minute of thinking)
     setGlobalWrapper(CreatePenIndirect);
     setGlobalWrapper(CreateBrushIndirect);
@@ -4066,6 +4148,7 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     setGlobalConst(DIB_RGB_COLORS);
     setGlobalConst(DIB_PAL_COLORS);
 
+    setGlobalWrapper(AnimateWindow); setGlobalConst(AW_ACTIVATE); setGlobalConst(AW_BLEND); setGlobalConst(AW_CENTER); setGlobalConst(AW_HIDE); setGlobalConst(AW_HOR_POSITIVE); setGlobalConst(AW_HOR_NEGATIVE); setGlobalConst(AW_SLIDE); setGlobalConst(AW_VER_POSITIVE); setGlobalConst(AW_VER_NEGATIVE);
     setGlobalConst(BI_RGB);
     setGlobalConst(BI_RLE8);
     setGlobalConst(BI_RLE4);
@@ -4686,6 +4769,9 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
     setGlobalWrapper(MAKEPOINTS);
 
     setGlobalWrapper(IsIconic);
+    setGlobalWrapper(IsChild);
+    setGlobalWrapper(SetParent);
+    setGlobalWrapper(GetParent);
     setGlobalWrapper(SetClassLongPtr);
     setGlobalWrapper(SetWindowLongPtr);
     setGlobalWrapper(GetClassLongPtr);
