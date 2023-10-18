@@ -1383,6 +1383,7 @@ V8FUNC(createCanvas) {
 
         context->Set(isolate, "internalDXPtr", Number::New(isolate, (LONG_PTR)d2d)); //lowkey should set these private but it PROBABLY doesn't matter just dont change it lol
         context->Set(isolate, "renderTarget", Number::New(isolate, (LONG_PTR)d2d->renderTarget));
+        //context->Set(isolate, "type", info[1]);
         print("TRENDERTARF< " << d2d->renderTarget);
         context->Set(isolate, "BeginDraw", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
             Isolate* isolate = info.GetIsolate();
@@ -1396,6 +1397,27 @@ V8FUNC(createCanvas) {
             //print((LONG_PTR)d2d);
             d2d->renderTarget->EndDraw();
         }));
+        context->Set(isolate, "Resize", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            
+            if (d2d->type == 0) {
+                ID2D1HwndRenderTarget* renderTarget = (ID2D1HwndRenderTarget*)d2d->renderTarget;
+                info.GetReturnValue().Set(Number::New(isolate, renderTarget->Resize(D2D1::SizeU(IntegerFI(info[0]), IntegerFI(info[1])))));
+            }
+            else if(d2d->type == 1) {
+                ID2D1DCRenderTarget* renderTarget = (ID2D1DCRenderTarget*)d2d->renderTarget;
+                //i almost recreated the entire d2d object
+                HDC dc = GetDC(d2d->window);
+                RECT r{ 0, 0, IntegerFI(info[0]), IntegerFI(info[1])};
+                info.GetReturnValue().Set(Number::New(isolate, renderTarget->BindDC(dc, &r)));
+                ReleaseDC(d2d->window, dc);
+            }
+            else if (d2d->type == 2) {
+
+            }
+        }));
+	//#error BindDC!
         context->Set(isolate, "CreateSolidColorBrush", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
             Isolate* isolate = info.GetIsolate();
             Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
@@ -2459,7 +2481,7 @@ V8FUNC(AlphaBlendWrapper) {
     BLENDFUNCTION ftn{0};
     ftn.BlendOp = AC_SRC_OVER;
     ftn.SourceConstantAlpha = IntegerFI(info[10]);
-    ftn.AlphaFormat = AC_SRC_ALPHA;
+    ftn.AlphaFormat = IntegerFI(info[11]);
 
     info.GetReturnValue().Set(AlphaBlend((HDC)IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]), IntegerFI(info[4]), (HDC)IntegerFI(info[5]), IntegerFI(info[6]), IntegerFI(info[7]), IntegerFI(info[8]), IntegerFI(info[9]), ftn));
 }
@@ -3447,6 +3469,8 @@ V8FUNC(GetObjectHBITMAP) {
 
     Local<Object> jsBITMAP = Object::New(isolate);
 
+    print(bmp.bmWidth << " " << bmp.bmHeight);
+
     jsBITMAP->Set(isolate->GetCurrentContext(), LITERAL("bmType"),       Number::New(isolate, bmp.bmType));
     jsBITMAP->Set(isolate->GetCurrentContext(), LITERAL("bmWidth"),      Number::New(isolate, bmp.bmWidth));
     jsBITMAP->Set(isolate->GetCurrentContext(), LITERAL("bmHeight"),     Number::New(isolate, bmp.bmHeight));
@@ -3455,6 +3479,7 @@ V8FUNC(GetObjectHBITMAP) {
     jsBITMAP->Set(isolate->GetCurrentContext(), LITERAL("bmBitsPixel"),  Number::New(isolate, bmp.bmBitsPixel));
     if (bmp.bmBits != NULL) {
         LONG_PTR count = msnformula(bmp.bmWidth, bmp.bmHeight, bmp.bmPlanes, bmp.bmBitsPixel);
+        print(count);
         Local<ArrayBuffer> jsBits = ArrayBuffer::New(isolate, count);
         for (LONG_PTR i = 0; i < count; i++) {
             jsBits->Set(isolate->GetCurrentContext(), i, Number::New(isolate, ((BYTE*)bmp.bmBits)[i]));
@@ -3481,21 +3506,25 @@ V8FUNC(CreateBitmapIndirectWrapper) {
 #define GetIntProperty(name) IntegerFI(jsBITMAP->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL(name)).ToLocalChecked())
 #define GetProperty(name) jsBITMAP->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL(name)).ToLocalChecked()
     
-    bmp.bmType = GetIntProperty("bmType");
+    bmp.bmType = 0;//GetIntProperty("bmType");
     bmp.bmWidth = GetIntProperty("bmWidth");
     bmp.bmHeight = GetIntProperty("bmHeight");
     bmp.bmWidthBytes = GetIntProperty("bmWidthBytes");
     bmp.bmPlanes = GetIntProperty("bmPlanes");
     bmp.bmBitsPixel = GetIntProperty("bmBitsPixel");
 
+    print(bmp.bmWidth << " CreateBitmap " << bmp.bmHeight);
+
     if (GetProperty("bmBits")->IsNumber()) {
         bmp.bmBits = (LPVOID)GetIntProperty("bmBits");
     }
     else {
         Local<ArrayBuffer> jsBits = GetProperty("bmBits").As<ArrayBuffer>();
-        memset(bmp.bmBits, 0, jsBits->ByteLength()); //sure?
+        bmp.bmBits = new BYTE[jsBits->ByteLength()];
+        //memset(bmp.bmBits, 0, jsBits->ByteLength()); //sure? (this memset was FOR SURE causing access violations and i realized it before i ran it)
+        print(bmp.bmBits << " e " << jsBits->ByteLength());
         for (size_t i = 0; i < jsBits->ByteLength(); i++) {
-            ((BYTE*)bmp.bmBits)[i] = jsBits->Get(isolate->GetCurrentContext(), i).ToLocalChecked()->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            ((BYTE*)bmp.bmBits)[i] = IntegerFI(jsBits->Get(isolate->GetCurrentContext(), i).ToLocalChecked());
         }
     }
 
@@ -3571,11 +3600,11 @@ V8FUNC(CreateDIBSectionWrapper) {
     Local<Object> jsBITMAP = info[1].As<Object>();
     
     //imma assume this all works and im closing VS
-
+	//https://stackoverflow.com/questions/25713117/what-is-the-difference-between-bisizeimage-bisize-and-bfsize
     BITMAPINFO bmi{0};
     if(jsBITMAP->HasRealNamedProperty(isolate->GetCurrentContext(), LITERAL("dsBmih")).FromJust()) {
         Local<Object> jsBMIH = jsBITMAP->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("dsBmih")).ToLocalChecked().As<Object>();
-        bmi.bmiHeader.biSize = IntegerFI(jsBMIH->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("biSize")).ToLocalChecked());
+        bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);//IntegerFI(jsBMIH->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("biSize")).ToLocalChecked());
         bmi.bmiHeader.biWidth = IntegerFI(jsBMIH->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("biWidth")).ToLocalChecked());
         bmi.bmiHeader.biHeight = IntegerFI(jsBMIH->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("biHeight")).ToLocalChecked());
         bmi.bmiHeader.biPlanes = IntegerFI(jsBMIH->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("biPlanes")).ToLocalChecked());
@@ -3596,8 +3625,8 @@ V8FUNC(CreateDIBSectionWrapper) {
         //
         //}
         BYTE* bytes;
-
-        info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)CreateDIBSection((HDC)IntegerFI(info[0]), &bmi, IntegerFI(info[2]), (void**) &bytes, NULL, IntegerFI(jsBITMAP->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("dsOffset")).ToLocalChecked()))));
+        
+        info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)CreateDIBSection((HDC)IntegerFI(info[0]), &bmi, IntegerFI(info[2]), (void**) &bytes, NULL, NULL)));
     }
 }
 
@@ -3859,12 +3888,43 @@ V8FUNC(AnimateWindowWrapper) { //https://www.youtube.com/watch?v=meIci7gOTLk
 
 //#error update layered window
 //https://stackoverflow.com/questions/18383681/setlayeredwindowattributes-to-make-a-window-transparent-is-only-working-part-of
-//V8FUNC(UpdateLayeredWindowWrapper) {
-//    using namespace v8;
-//    Isolate* isolate = info.GetIsolate();
-//
-//    info.GetReturnValue().Set(Number::New(isolate, UpdateLayeredWindow((HWND)IntegerFI(info[0]), (HDC)IntegerFI(info[1]), &pptdst, &psize, IntegerFI(info[4]), &ppsrc, IntegerFI(info[6]), ));
-//}
+V8FUNC(UpdateLayeredWindowWrapper) { //https://cplusplus.com/forum/windows/107905/
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    LPPOINT pptdst = NULL;
+    //memset(pptdst, 0, sizeof(POINT));
+    if (!info[2]->IsNumber()) {
+        Local<Object> jsPOINT = info[2].As<Object>();
+        pptdst = new POINT{(long)IntegerFI(jsPOINT->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("x")).ToLocalChecked()), (long)IntegerFI(jsPOINT->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("y")).ToLocalChecked())};
+    }
+    LPSIZE psize = NULL;
+    if (!info[3]->IsNumber()) {
+        Local<Object> jsSIZE = info[2].As<Object>();
+        psize = new SIZE{ (long)IntegerFI(jsSIZE->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("width")).ToLocalChecked()), (long)IntegerFI(jsSIZE->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("height")).ToLocalChecked()) };
+    }
+    LPPOINT ppsrc = NULL;
+    if (!info[5]->IsNumber()) {
+        Local<Object> jsPOINT = info[2].As<Object>();
+        ppsrc = new POINT{ (long)IntegerFI(jsPOINT->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("x")).ToLocalChecked()), (long)IntegerFI(jsPOINT->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("y")).ToLocalChecked()) };
+    }
+
+    BLENDFUNCTION bfunc{ 0 };
+    bfunc.BlendOp = AC_SRC_OVER;
+    bfunc.SourceConstantAlpha = IntegerFI(info[7]);
+    bfunc.AlphaFormat = IntegerFI(info[8]);
+
+    info.GetReturnValue().Set(Number::New(isolate, UpdateLayeredWindow((HWND)IntegerFI(info[0]), (HDC)IntegerFI(info[1]), pptdst, psize, (HDC)IntegerFI(info[4]), ppsrc, IntegerFI(info[6]), &bfunc, IntegerFI(info[9]))));
+    if (pptdst != NULL) {
+        delete pptdst;
+    }
+    if (psize != NULL) {
+        delete psize;
+    }
+    if (ppsrc != NULL) {
+        delete ppsrc;
+    }
+}
 
 V8FUNC(SetLayeredWindowAttributesWrapper) {
     using namespace v8;
@@ -4029,10 +4089,10 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     Local<ObjectTemplate> global = ObjectTemplate::New(isolate);
     // Bind the global 'print' function to the C++ Print callback.
     
-    Local<ObjectTemplate> console = ObjectTemplate::New(isolate);
-    console->Set(isolate, "log", FunctionTemplate::New(isolate, Print));
+    //Local<ObjectTemplate> console = ObjectTemplate::New(isolate);
+    //console->Set(isolate, "log", FunctionTemplate::New(isolate, Print));
 
-    global->Set(isolate, "console", console);
+    //global->Set(isolate, "console", console);
 
     global->Set(isolate, "print", FunctionTemplate::New(isolate, Print));
     // Bind the global 'read' function to the C++ Read callback.
@@ -4100,7 +4160,7 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
 
     setGlobalWrapper(SetLayeredWindowAttributes);
     setGlobalWrapper(GetLayeredWindowAttributes);
-    //setGlobalWrapper(UpdateLayeredWindow);
+    setGlobalWrapper(UpdateLayeredWindow);
 
     setGlobalWrapper(DwmExtendFrameIntoClientArea); 
 
@@ -4130,7 +4190,8 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
 
     //https://stackoverflow.com/questions/6707148/foreach-macro-on-macros-arguments
 #define setGlobalConst(g) global->Set(isolate, #g, Number::New(isolate, g))
-    setGlobalConst(LWA_ALPHA); setGlobalConst(LWA_COLORKEY);
+    setGlobalConst(LWA_ALPHA); setGlobalConst(LWA_COLORKEY); //SetLayeredWindowAttributes
+    setGlobalConst(ULW_ALPHA); setGlobalConst(ULW_COLORKEY); setGlobalConst(ULW_OPAQUE); setGlobalConst(ULW_EX_NORESIZE); //UpdateLayeredWindow
     setGlobalWrapper(SetGraphicsMode);
     setGlobalWrapper(GetGraphicsMode);
     setGlobalWrapper(GetMapMode);

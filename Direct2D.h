@@ -23,6 +23,8 @@ public:
 	ID2D1SolidColorBrush* clearBrush;
 	IWICImagingFactory2* wicFactory;
 	ID2D1DrawingStateBlock* drawingStateBlock;
+	int type;
+	HWND window;
 	//IDWriteTextFormat* textFormat;
 	
 	Direct2D() {

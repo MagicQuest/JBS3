@@ -55,7 +55,11 @@ bool Direct2D::Init(HWND window, int type) {
 			return false;
 		}
 
-		shit = ((ID2D1DCRenderTarget*)renderTarget)->BindDC(GetDC(window), &rect);
+		HDC dc = GetDC(window);
+
+		shit = ((ID2D1DCRenderTarget*)renderTarget)->BindDC(dc, &rect); //yo i forgot to release it
+
+		ReleaseDC(window, dc);
 
 		if (shit != S_OK) {
 			err(shit, "Graphics Bind DC");
@@ -87,6 +91,9 @@ bool Direct2D::Init(HWND window, int type) {
 		MessageBoxA(NULL, "HELP create drawing state block did NOT work (cannot Save/Restore DrawingState)", "uhhhh we need some HELP!", MB_OK | MB_ICONERROR);
 		//return false;
 	}
+
+	this->type = type;
+	this->window = window;
 
 	return true;
 	//err(21, typeid(T).name());
