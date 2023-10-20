@@ -1413,11 +1413,25 @@ V8FUNC(createCanvas) {
                 info.GetReturnValue().Set(Number::New(isolate, renderTarget->BindDC(dc, &r)));
                 ReleaseDC(d2d->window, dc);
             }
-            else if (d2d->type == 2) {
+            else if (d2d->type == 2) {  //possibly dxgi if i can be bothered!
 
             }
         }));
 	//#error BindDC!
+        context->Set(isolate, "BindDC", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+            if (d2d->type == 1) {
+                d2d->window = (HWND)IntegerFI(info[0]);
+                ID2D1DCRenderTarget* renderTarget = (ID2D1DCRenderTarget*)d2d->renderTarget;
+                RECT r{ 0 }; GetClientRect(d2d->window, &r);
+                info.GetReturnValue().Set(Number::New(isolate, renderTarget->BindDC((HDC)IntegerFI(info[1]), &r)));
+            }
+            else {
+                print("[D2D] -> BindDC() only works with Direct2D objects created with ID2D1DCRenderTarget ( createCanvas('d2d', ID2D1DCRenderTarget, hwnd) )");
+            }
+        }));
         context->Set(isolate, "CreateSolidColorBrush", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
             Isolate* isolate = info.GetIsolate();
             Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
@@ -1880,6 +1894,7 @@ V8FUNC(createCanvas) {
 
             if (shit != S_OK) {
                 MessageBoxA(NULL, "GetFirstFrameWiC", "yeah we failed the hoe (wicDecoder->GetFrame(0, &wicFrame))", MB_OK | MB_ICONERROR);
+                wicDecoder->Release();
                 return;
             }
 
@@ -1888,19 +1903,30 @@ V8FUNC(createCanvas) {
 
             if (shit != S_OK) {
                 MessageBoxA(NULL, "Wic converter", "failed wicFactory->CreateFormatConverter(&wicConverter)", MB_OK | MB_ICONERROR);
+                wicDecoder->Release();
+                wicFrame->Release();
                 return;
             }
 
             shit = wicConverter->Initialize(wicFrame, GUID_WICPixelFormat32bppPBGRA, WICBitmapDitherTypeNone, NULL, 0.0, WICBitmapPaletteTypeCustom);
             if (shit != S_OK) {
                 MessageBoxA(NULL, "WIC CONVERTER2", "failed wicConverter->Initialize", MB_OK | MB_ICONERROR);
+                wicDecoder->Release();
+                wicFrame->Release();
+                wicConverter->Release();
                 return;
             }
 
             ID2D1Bitmap* bmp;
 
-            d2d->renderTarget->CreateBitmapFromWicBitmap(wicConverter, NULL, &bmp);
-
+            shit = d2d->renderTarget->CreateBitmapFromWicBitmap(wicConverter, NULL, &bmp);
+            if (shit != S_OK) {
+                MessageBoxA(NULL, "failed d2d->renderTarget->CreateBitmapFromWicBitmap (probably use _com_error(GetLastError()) to learn more)", "load bitmap wicConverter", MB_OK | MB_ICONERROR);
+                wicDecoder->Release();
+                wicConverter->Release();
+                wicFrame->Release();
+                return;
+            }
             
 
             //wicFactory->Release();
@@ -2199,7 +2225,7 @@ V8FUNC(createCanvas) {
                 ID2D1RadialGradientBrush* newBrush = (ID2D1RadialGradientBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
 
                 newBrush->SetRadiusX(FloatFI(info[0]));
-                newBrush->SetRadiusY(FloatFI(info[1]));
+                newBrush->SetRadiusY(FloatFI(info[0]));
             }));
 
             info.GetReturnValue().Set(jsBrush->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
@@ -2722,11 +2748,11 @@ V8FUNC(LoadCursorFromFileWrapper) {
     info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)LoadCursorFromFileA((LPCSTR)IntegerFI(info[0]))));
 }
 
-V8FUNC(LoadImageWrapper) {
+V8FUNC(LoadImageWrapper) { //https://www.youtube.com/watch?v=hNi_MEZ8X10
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
 
-    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)LoadImageA((HINSTANCE)IntegerFI(info[0]), CStringFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]), IntegerFI(info[4]), IntegerFI(info[5]))));
+    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)LoadImageW((HINSTANCE)IntegerFI(info[0]), WStringFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]), IntegerFI(info[4]), IntegerFI(info[5]))));
 }
 
 V8FUNC(SetCursorWrapper) {
@@ -3900,12 +3926,14 @@ V8FUNC(UpdateLayeredWindowWrapper) { //https://cplusplus.com/forum/windows/10790
     }
     LPSIZE psize = NULL;
     if (!info[3]->IsNumber()) {
-        Local<Object> jsSIZE = info[2].As<Object>();
+        Local<Object> jsSIZE = info[3].As<Object>(); //info[2].As<Object>(); //OOPS
+        print(IntegerFI(jsSIZE->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("width")).ToLocalChecked()));
+        print(IntegerFI(jsSIZE->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("height")).ToLocalChecked()));
         psize = new SIZE{ (long)IntegerFI(jsSIZE->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("width")).ToLocalChecked()), (long)IntegerFI(jsSIZE->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("height")).ToLocalChecked()) };
     }
     LPPOINT ppsrc = NULL;
     if (!info[5]->IsNumber()) {
-        Local<Object> jsPOINT = info[2].As<Object>();
+        Local<Object> jsPOINT = info[5].As<Object>();//info[2].As<Object>();
         ppsrc = new POINT{ (long)IntegerFI(jsPOINT->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("x")).ToLocalChecked()), (long)IntegerFI(jsPOINT->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("y")).ToLocalChecked()) };
     }
 
@@ -4191,7 +4219,7 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     //https://stackoverflow.com/questions/6707148/foreach-macro-on-macros-arguments
 #define setGlobalConst(g) global->Set(isolate, #g, Number::New(isolate, g))
     setGlobalConst(LWA_ALPHA); setGlobalConst(LWA_COLORKEY); //SetLayeredWindowAttributes
-    setGlobalConst(ULW_ALPHA); setGlobalConst(ULW_COLORKEY); setGlobalConst(ULW_OPAQUE); setGlobalConst(ULW_EX_NORESIZE); //UpdateLayeredWindow
+    setGlobalConst(ULW_ALPHA); setGlobalConst(ULW_COLORKEY); setGlobalConst(ULW_OPAQUE); setGlobalConst(ULW_EX_NORESIZE); setGlobalConst(AC_SRC_ALPHA); setGlobalConst(AC_SRC_OVER);//UpdateLayeredWindow
     setGlobalWrapper(SetGraphicsMode);
     setGlobalWrapper(GetGraphicsMode);
     setGlobalWrapper(GetMapMode);
@@ -5202,6 +5230,7 @@ https://forums.codeguru.com/showthread.php?69236-How-to-obtain-HINSTANCE-using-H
 
     return 0;
 }
+//#include "include/v8-exception.h"
 //#include <windowsx.h>
 LRESULT CALLBACK WinProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
     using namespace v8;
@@ -5219,6 +5248,7 @@ LRESULT CALLBACK WinProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         Local<Value> args[] = { Number::New(isolate, (LONG_PTR)hwnd),  Number::New(isolate, msg), Number::New(isolate, wp), Number::New(isolate, lp)};
         Local<Value> result;
         /*Local<Value> result = */
+        //Local<TryCatch> shit(isolate);
         if (listener->Call(isolate->GetCurrentContext(), isolate->GetCurrentContext()->Global(), 4, args).ToLocal(&result)) { //   ;/*.ToLocalChecked()*/;
             //print(CStringFI(result));
             //print("valid")

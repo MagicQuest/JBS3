@@ -13,7 +13,7 @@ function windowProc(hwnd, msg, wp, lp) {
         UpdateWindow(hwnd); //draw immediately
     }else if(msg == WM_PAINT) {
         const ps = BeginPaint(hwnd);
-        SetGraphicsMode(ps.hdc, GM_ADVANCED);
+        SetGraphicsMode(ps.hdc, GM_ADVANCED); //yeah i did NOT know you could do this and idk even know how to use matrixes like i need some easy functions to use
         const transform = GetWorldTransform(ps.hdc);
         print(transform); //im im sky hugh
         transform.eM11 = 1.0;

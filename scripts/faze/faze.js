@@ -105,7 +105,7 @@ function windowProc(hwnd, msg, wp, lp) {
         DestroyIcon(lastCursor);
         DeleteObject(maskBmp);
         DeleteObject(bmp);
-        ReleaseDC(dc);
+        ReleaseDC(hwnd, dc);
     }
 }
 

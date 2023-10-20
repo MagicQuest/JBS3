@@ -62,7 +62,7 @@ function windowProc(hwnd, msg, wp, lp) {
         SetStretchBltMode(dc, HALFTONE);
         StretchBlt(memDC, 0, 0, (width-16)/5, (height-39)/5, dc, 0, 0, width-16, height-39, SRCCOPY);
         DeleteDC(memDC);
-        ReleaseDC(dc);
+        ReleaseDC(hwnd, dc);
     }else if(msg == WM_ERASEBKGND) {
         //const ps = BeginPaint(hwnd);
         //let s = SelectObject(ps.hdc, GetStockObject(DC_BRUSH));

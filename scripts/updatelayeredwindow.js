@@ -38,7 +38,7 @@ function windowProc(hwnd, msg, wp, lp) {
         //BitBlt(screen, 0, 0, 500, 500, memDC, 0, 0, SRCCOPY);
         //DeleteDC(memDC);
         //print(GetObjectDIBITMAP(windowBmp));
-        ReleaseDC(dc);
+        ReleaseDC(hwnd, dc);
     }else if(msg == WS_DESTROY) {
         PostQuitMessage();
     }
