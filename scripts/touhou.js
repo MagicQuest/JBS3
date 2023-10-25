@@ -15,8 +15,10 @@ const cpip = [10,20,30,40,50,60,70,80,90,100,
 const powerlevels = [8,16,32,48,64,80,96,128];
 
 let window;
-const width = 640+16; //16 because IDK OK GOOGLE IT LO!
-const height = 480+39; //+39 because titlebar takes up 39 pixels or something
+const width = 640; //+16; //16 because IDK OK GOOGLE IT LO!
+const height = 480; //+39; //+39 because titlebar takes up 39 pixels or something
+
+const gameWidth = 430;
 
 function clamp(x, min, max) {
     return Math.max(min, Math.min(x, max));
@@ -162,7 +164,7 @@ function addPower(newpower) {
         if(power == pl) {
             entities.push(new TextEnt(plr.x+20, plr.y+20, pl == 128 ? "full power achieved!!" : "power up!!", 1));
             powerLevel = i;
-            print("yo pwoer up NIGGER YRAHH");
+            //print("yo pwoer up NIGGER YRAHH");
         }
     });
     power = clamp(power, 0, 128);
@@ -185,10 +187,11 @@ class Bullet extends Entity {
         //my d2d wrapper doesn't do transforms YET :sob:
         //i gotta implement it like a regular browser canvas context
 
-        if(contains(plr, this)) { //touhou hitbox is pretty small so im just gonna use this
+        //if(contains(plr, this)) { //touhou hitbox is pretty small so im just gonna use this
+        if(contains(this, {x: plr.x+(plr.width/2), y: plr.y+(2*plr.height/3), width: 2,height: 2})) {
             print("lose life or kill player");
             entities.push(new CircleEffect(this.x,this.y,10 , 50, .25, 0, .5));
-            plr.x = width/2;
+            plr.x = gameWidth/2;
             plr.y = height/2;
             powerstreak = 0;
             if(lifes == 0) {
@@ -197,7 +200,7 @@ class Bullet extends Entity {
                 lifes--;
             }
             bombs = 3; //so i only learned this after googling but when you die your bombs get reset
-            addPower(-16);
+            addPower(-16); //uhh spawn power up items randomly after
         }
     }
 }
@@ -275,7 +278,8 @@ class Item extends Entity { //powerup/scoreitem
                     scorenumber = 100000;
                 }else {
                     //scorenumber = 50000-(height-plr.y)*100; //kinda random lemme check
-                    scorenumber = Math.floor(lerp(50000, 10000, (plr.y-100)/height)); //goated
+                    //scorenumber = Math.floor(lerp(50000, 10000, (plr.y-100)/height)); //goated
+                    scorenumber = Math.floor(lerp(60000, 10000, (plr.y-100)/height)); //just played the game and realized
                 }
             }else if(this.type == 2) {
                 bombs++;
@@ -313,7 +317,9 @@ class PlrShot extends Entity {
             del.push(this);
         }
 
-        brush.SetColor(101/255, 67/255, 33/255); //had to google brown rgb and can't be bothered to convert myself
+        //unfortunately i need to loop through the enemies to check if i hit one or not (which means i need a new list and it's gonna get HAIRY)
+
+        brush.SetColor(0.396078431, 0.262745098, 0.129411765); //101,67,33
         d2d.FillRectangle(this.x, this.y, this.x+this.width, this.y+this.height, brush);
     }
 }
@@ -346,8 +352,8 @@ class Player extends Entity {
             //SHOOT
             entities.push(new PlrShot(this.x, this.y, 0)); //oh shoot i haven't even made this yet
         }
-        this.x = clamp(this.x, 0, width);
-        this.y = clamp(this.y, 0, height);
+        this.x = clamp(this.x, 0, gameWidth-this.width);
+        this.y = clamp(this.y, 0, height-this.height);
         //super.update(); //ahh thats how thaht works (updates the position shit) (ahh nevermind)
         brush.SetColor(1.0,0.0,0.0);
         d2d.FillRectangle(this.x, this.y, this.x+this.width, this.y+this.height, brush);
@@ -368,10 +374,11 @@ function windowProc(hwnd, msg, wp, lp) {
         font = d2d.CreateFont("impact", 40);
         scoreFont = d2d.CreateFont("Comic sans ms", 20);
         brush = d2d.CreateSolidColorBrush(1.0,1.0,1.0);
-        SetTimer(hwnd, 1, 16); //16.66666 -> 60fps (decimals aren't allowed for SetTimer though) 1000/16.6666666 
+        SetTimer(hwnd, 1, 16); //16.66666 -> 60fps (decimals aren't allowed for SetTimer though) 1000/16.6666666
+            //also if i wanted consistant fps i might have to use a loop and i might do it
     }else if(msg == WM_TIMER) {
         d2d.BeginDraw();
-        d2d.Clear(0,0,0,.6);
+        d2d.Clear(0,0,0,.6); //in touhou 6 the weird trails effect was caused by the background changing or something lol
         
         //do waves kinda yk yky k
         if(Date.now()/1000-startTime < 30) { //(nevermind i actually divided LO!) miliseconds because i don't divide Date.now()/1000 and startTime/1000
@@ -382,7 +389,7 @@ function windowProc(hwnd, msg, wp, lp) {
                 //print(i, plr.x-width*i);
                 //entities.push(new Bullet(width*(i/2), 0, 2, 0));
                 //entities.push(new Bullet(width*(i/2+.5), 0, -2, 0));
-                entities.push(new Bullet(width*i, 0, (plr.x-width*i)/100, plr.y/100));
+                entities.push(new Bullet(gameWidth*i, 0, (plr.x-gameWidth*i)/100, plr.y/100));
                 brush.SetColor(0.0,i,0.0);
             }else {
                 brush.SetColor(1.0,0.0,0.0);
@@ -397,18 +404,26 @@ function windowProc(hwnd, msg, wp, lp) {
                                 //truncate the fps by 2 decimal places
         d2d.DrawText(`${Math.floor(100000/(Date.now()-lastTime))/100} fps`, font, width-200, height-100, width, height, brush); //switch to using text format/text layout idk internal d2d stuff i gotta figure it out
         plr.update(d2d);
-        entities.forEach(ent => {
+        
+        if(GetKey(VK_LSHIFT)) { //oops double getkey check (i check the shift key in plr.update) (i will probably return it from plr.update LO!)
+            brush.SetColor(0.0,0.0,1.0);
+            d2d.FillRectangle(plr.x+(plr.width/2), plr.y+(2*plr.height/3), plr.x+(plr.width/2)+2,plr.y+(2*plr.height/3)+2,brush); //also this is NOT in touhou 6 but apparently in the other games so im adding it >:3
+        }
+        //entities.forEach(ent => {
+        for(let ent of entities) {
             ent.update(d2d);
-        });
-        d2d.DrawText("Score: "+score, scoreFont, 450, 0, width, height, brush);
-        brush.SetColor(1.0,0.8,0.8);
-        d2d.FillRectangle(515, 120, 515+(power*1.1015625), 150, brush); //1.1015625 came from the math 515+141 == width (656) so i did 141/128 and got 1.1015625
+        }//);
+        brush.SetColor(0.670588235,0.788235294,0.894117647); //light blue 171,201,228
+        d2d.FillRectangle(430, 0, width, height, brush);
+        brush.SetColor(1.0,0.5,0.5);        
+        d2d.FillRectangle(505, 120, 505+(power*1.1015625), 150, brush); //1.1015625 came from the math 515+141 == width (656) so i did 141/128 and got 1.1015625
         brush.SetColor(1.0,0.0,0.0);
-        d2d.DrawText("Power: "+(power >= 128 ? "MAX" : power), scoreFont, 450, 120, width, height, brush); //oops power silently goes above 128 sometimes (ok nevermind i changed how that part works)
-        d2d.DrawText("Lives: ", scoreFont, 450, 160, width, height, brush); //use stars
-        d2d.DrawText("Bombs: ", scoreFont, 450, 200, width, height, brush); //use stars
-        d2d.DrawText("Point items: "+pointCount, scoreFont, 450, 240, width, height, brush);
-        d2d.DrawText(entities.length+" Entities/Effects", scoreFont, 450, 340, width, height, brush);
+        d2d.DrawText("Score: "+score, scoreFont, 440, 0, width, height, brush);
+        d2d.DrawText("Power: "+(power >= 128 ? "MAX" : power), scoreFont, 440, 120, width, height, brush); //oops power silently goes above 128 sometimes (ok nevermind i changed how that part works)
+        d2d.DrawText("Lives: ", scoreFont, 440, 160, width, height, brush); //use stars
+        d2d.DrawText("Bombs: ", scoreFont, 440, 200, width, height, brush); //use stars
+        d2d.DrawText("Point items: "+pointCount, scoreFont, 440, 240, width, height, brush);
+        d2d.DrawText(entities.length+" Entities/Effects", scoreFont, 440, 340, width, height, brush);
         //print(1000/(Date.now()-lastTime));
         //let scorenumber;
         //if(plr.y < 100) {
@@ -418,10 +433,11 @@ function windowProc(hwnd, msg, wp, lp) {
         //}
         //d2d.DrawText(scorenumber, scoreFont, plr.x+100, plr.y, width, height, brush);
         d2d.EndDraw();
-        del.forEach(ent => {
+        //del.forEach(ent => { //usually i don't use forEach anyways but i googled today if a standard for loop was quicker and it was (https://blog.bitsrc.io/finding-the-fastest-loop-type-in-javascript-38af16fe7b4f?gi=ce4403a5508c https://stackoverflow.com/questions/43031988/javascript-efficiency-for-vs-foreach)
+        for(let ent of del) { //using for of because it's literally the same as for each (BASICALLY) no index count tho
             //print(entities.findIndex(element => element.x == ent.x && element.y == ent.y));
             entities.splice(entities.findIndex(element => element.x == ent.x && element.y == ent.y && element.constructor.name == ent.constructor.name), 1); //simply ahh check because it prolly doesn't need to be that specific ykykyk also you cannot use indexOf on an array of objects (shit = [{...}, {...}]) because all objects are unique so {x: 21} != {x: 21}
-        });
+        }//);
         //print(del.length);
         del = []; //haha this goofy ahh line FROZE jbs3 and i wish it just flat out told me no const assignment but for some reason it doesn't like to tell me stuff like that (maybe i should try catch the whole thing)
         lastTime = Date.now();
@@ -438,4 +454,4 @@ const wc = CreateWindowClass("ZUN", windowProc);
 //wc.hIcon = wc.hIconSm = icon; //assigns both to the same value just in case you didn't know (my comments are kinda sparse LO!)
 wc.hCursor = LoadCursor(NULL, IDC_ARROW);
 
-window = CreateWindow(WS_EX_OVERLAPPEDWINDOW, wc, "Touhou 6", WS_SYSMENU | WS_MINIMIZEBOX | WS_VISIBLE, screenWidth/2-width/2, screenHeight/2-height/2, width, height, NULL, NULL, hInstance);
+window = CreateWindow(WS_EX_OVERLAPPEDWINDOW, wc, "Touhou 6", WS_SYSMENU | WS_MINIMIZEBOX | WS_VISIBLE, screenWidth/2-(width+16)/2, screenHeight/2-(height+39)/2, width+16, height+39, NULL, NULL, hInstance);
