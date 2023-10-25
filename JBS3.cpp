@@ -751,11 +751,13 @@ V8FUNC(GetKeyDown) {
     if (info[0]->IsString()) {
         key = toupper((CStringFI(info[0]))[0]);
     }
-    info.GetReturnValue().Set(GetAsyncKeyState(key) & 0x1); //0x01 and 0x1 AND 0x001 work the same?
+    info.GetReturnValue().Set(GetAsyncKeyState(key) & 0x1); //0x01 and 0x1 AND 0x001 work the same? (they all just mean 1)
 }
 
 V8FUNC(PostQuitMessageWrapper) {
-    PostQuitMessage(0);
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    PostQuitMessage(IntegerFI(info[0]));
 }
 
 V8FUNC(GetMousePos) {
@@ -1585,7 +1587,9 @@ V8FUNC(createCanvas) {
             d2d->renderTarget->FillEllipse(D2D1::Ellipse(ogPoints, radius.x, radius.y), brush);
         }));
         context->Set(isolate, "CreateFont", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            MessageBoxA(NULL, "SetFontSize does NOT work yet", "CreateFont", MB_OK | MB_ICONWARNING);
+            static bool msg = false;
+            if(!msg) MessageBoxA(NULL, "SetFontSize does NOT work yet", "CreateFont", MB_OK | MB_ICONWARNING);
+            msg = true;
             Isolate* isolate = info.GetIsolate();
             Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
 

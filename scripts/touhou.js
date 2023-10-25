@@ -3,7 +3,7 @@
 
 //const icon = LoadImage(NULL,);
 
-let d2d, font, scoreFont, brush;
+let d2d, font, scoreFont, brush, starPng;
 
 var score = 0, power = 0, pointCount = 0, lifes = 4, bombs = 3, continues = 3, powerstreak = 0, powerLevel; //lives/lifes
 
@@ -136,7 +136,7 @@ class FadeOutEffect extends Entity {
 class TextEnt extends FadeOutEffect {
     constructor(x,y,text,time,color = [1.0,1.0,1.0]) {
         super(x,y,time,1,0);
-        
+        this.vy = -1;        
         //this.scorenumber = scorenumber;
         this.text = text;
         this.color = color;
@@ -144,6 +144,7 @@ class TextEnt extends FadeOutEffect {
     }
 
     update(d2d) {
+        this.y+=this.vy;
         let opacity = super.update(); //now it's getting good
         brush.SetColor(...this.color,opacity);
         d2d.DrawText(this.text, scoreFont, this.x, this.y, width, height, brush);
@@ -155,6 +156,10 @@ class ScoreEnt extends TextEnt {
         super(x,y,scorenumber,.5,[1.0,1.0, (scorenumber == 100000 || scorenumber == 51200) ? 0.0 : 1.0]);
         //real score
         score += scorenumber;
+    }
+
+    update(d2d) {
+        super.update(d2d);
     }
 }
 
@@ -168,6 +173,20 @@ function addPower(newpower) {
         }
     });
     power = clamp(power, 0, 128);
+}
+
+function useBomb() {
+    if(bombs) {
+        bombs--;
+        entities.push(new CircleEffect(plr.x, plr.y, 10, 200, .5, 0, 2));
+    }
+    try {
+        setTimeout(() => {
+            print("HELP");
+        }, 1000);
+    }catch(e) {
+        print(e);
+    }
 }
 
 class Bullet extends Entity {
@@ -311,7 +330,7 @@ class PlrShot extends Entity {
     }
 
     update(d2d) {
-        //some how rotate LO!
+        //somehow rotate LO!
         super.update();
         if(this.y < 0) {
             del.push(this);
@@ -319,7 +338,7 @@ class PlrShot extends Entity {
 
         //unfortunately i need to loop through the enemies to check if i hit one or not (which means i need a new list and it's gonna get HAIRY)
 
-        brush.SetColor(0.396078431, 0.262745098, 0.129411765); //101,67,33
+        brush.SetColor(0.396078431, 0.262745098, 0.129411765, .8); //101,67,33
         d2d.FillRectangle(this.x, this.y, this.x+this.width, this.y+this.height, brush);
     }
 }
@@ -351,6 +370,11 @@ class Player extends Entity {
         if(GetKey("Z")) {
             //SHOOT
             entities.push(new PlrShot(this.x, this.y, 0)); //oh shoot i haven't even made this yet
+            entities.push(new PlrShot(this.x, this.y, 10)); //oh shoot i haven't even made this yet
+            entities.push(new PlrShot(this.x, this.y, -10)); //oh shoot i haven't even made this yet
+        }
+        if(GetKeyDown("X")) {
+            useBomb();
         }
         this.x = clamp(this.x, 0, gameWidth-this.width);
         this.y = clamp(this.y, 0, height-this.height);
@@ -374,6 +398,7 @@ function windowProc(hwnd, msg, wp, lp) {
         font = d2d.CreateFont("impact", 40);
         scoreFont = d2d.CreateFont("Comic sans ms", 20);
         brush = d2d.CreateSolidColorBrush(1.0,1.0,1.0);
+        starPng = d2d.CreateBitmapFromFilename(__dirname+"/boxside.png");
         SetTimer(hwnd, 1, 16); //16.66666 -> 60fps (decimals aren't allowed for SetTimer though) 1000/16.6666666
             //also if i wanted consistant fps i might have to use a loop and i might do it
     }else if(msg == WM_TIMER) {
@@ -416,12 +441,20 @@ function windowProc(hwnd, msg, wp, lp) {
         brush.SetColor(0.670588235,0.788235294,0.894117647); //light blue 171,201,228
         d2d.FillRectangle(430, 0, width, height, brush);
         brush.SetColor(1.0,0.5,0.5);        
-        d2d.FillRectangle(505, 120, 505+(power*1.1015625), 150, brush); //1.1015625 came from the math 515+141 == width (656) so i did 141/128 and got 1.1015625
+        d2d.FillRectangle(505, 120, 505+(power*1.0546875), 150, brush); //1.0546875 came from the math 505+135 == width (640) so i did 135/128 and got 1.0546875
         brush.SetColor(1.0,0.0,0.0);
         d2d.DrawText("Score: "+score, scoreFont, 440, 0, width, height, brush);
         d2d.DrawText("Power: "+(power >= 128 ? "MAX" : power), scoreFont, 440, 120, width, height, brush); //oops power silently goes above 128 sometimes (ok nevermind i changed how that part works)
         d2d.DrawText("Lives: ", scoreFont, 440, 160, width, height, brush); //use stars
+        for(let i = 0; i < lifes; i++) {
+            let x = 500+(i*16);
+            d2d.DrawBitmap(starPng, x, 170, x+14, 184);
+        }
         d2d.DrawText("Bombs: ", scoreFont, 440, 200, width, height, brush); //use stars
+        for(let i = 0; i < bombs; i++) {
+            let x = 510+(i*16);
+            d2d.DrawBitmap(starPng, x, 210, x+14, 224);
+        }
         d2d.DrawText("Point items: "+pointCount, scoreFont, 440, 240, width, height, brush);
         d2d.DrawText(entities.length+" Entities/Effects", scoreFont, 440, 340, width, height, brush);
         //print(1000/(Date.now()-lastTime));
