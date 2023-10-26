@@ -156,6 +156,8 @@ class ScoreEnt extends TextEnt {
         super(x,y,scorenumber,.5,[1.0,1.0, (scorenumber == 100000 || scorenumber == 51200) ? 0.0 : 1.0]);
         //real score
         score += scorenumber;
+        //bruh brayden messing this shi- up
+        //setTimeout(()=>{print("NIGGER t")}, 1000);
     }
 
     update(d2d) {
@@ -352,7 +354,7 @@ class Player extends Entity {
     //    super(x,y,width,height);
     //}
     update(d2d) {
-        if(GetKey(VK_SHIFT)) { //apparently i should actually use WM_KEYDOWN however i already wrote all this LO!
+        if(GetKey(VK_SHIFT)) { //apparently i should actually use WM_KEYDOWN however i already wrote all this LO! (oh yeah another thing about getkey is that it works even if you aren't focused on the window)
             this.speed = 3;
         }else {
             this.speed = 7;
@@ -404,7 +406,6 @@ function windowProc(hwnd, msg, wp, lp) {
     }else if(msg == WM_TIMER) {
         d2d.BeginDraw();
         d2d.Clear(0,0,0,.6); //in touhou 6 the weird trails effect was caused by the background changing or something lol
-        
         //do waves kinda yk yky k
         if(Date.now()/1000-startTime < 30) { //(nevermind i actually divided LO!) miliseconds because i don't divide Date.now()/1000 and startTime/1000
             let time = Date.now()/1000-startTime; //as time goes on this variable will range from 0-30 seconds
@@ -425,9 +426,6 @@ function windowProc(hwnd, msg, wp, lp) {
             //print(time, "wave2");
         }
 
-        brush.SetColor(1.0,1.0,1.0);
-                                //truncate the fps by 2 decimal places
-        d2d.DrawText(`${Math.floor(100000/(Date.now()-lastTime))/100} fps`, font, width-200, height-100, width, height, brush); //switch to using text format/text layout idk internal d2d stuff i gotta figure it out
         plr.update(d2d);
         
         if(GetKey(VK_LSHIFT)) { //oops double getkey check (i check the shift key in plr.update) (i will probably return it from plr.update LO!)
@@ -457,6 +455,9 @@ function windowProc(hwnd, msg, wp, lp) {
         }
         d2d.DrawText("Point items: "+pointCount, scoreFont, 440, 240, width, height, brush);
         d2d.DrawText(entities.length+" Entities/Effects", scoreFont, 440, 340, width, height, brush);
+        brush.SetColor(1.0,1.0,1.0);
+                                //truncate the fps by 2 decimal places
+        d2d.DrawText(`${Math.floor(100000/(Date.now()-lastTime))/100} fps`, font, width-200, height-50, width, height, brush); //switch to using text format/text layout idk internal d2d stuff i gotta figure it out
         //print(1000/(Date.now()-lastTime));
         //let scorenumber;
         //if(plr.y < 100) {

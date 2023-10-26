@@ -26,6 +26,7 @@
 #include "include/v8-script.h"
 #include "include/v8-function.h"
 #include "include/v8-container.h"
+#include "include/v8-exception.h"
 
 //https://medium.com/angular-in-depth/how-to-build-v8-on-windows-and-not-go-mad-6347c69aacd4
 //https://v8.dev/docs/embed
@@ -495,12 +496,19 @@ void Inputbox(const v8::FunctionCallbackInfo<v8::Value>& info) {
 
 #define V8FUNC(name) void name(const v8::FunctionCallbackInfo<v8::Value>& info)
 
+//#include "JSTimer.h"
+//
+//V8FUNC(setTimeout) { //yeah im sorry i can't do setTimeout i gotta read the nodejs repo (i might need libuv >:( )
+//    using namespace v8;
+//    setTimeoutTimer* t = new setTimeoutTimer(info.GetIsolate(), info);
+//}
+
 //V8FUNC(nigga) {
 //    
 //}
 
 //namespace Window {
-//    V8FUNC(addEventListener) {
+//    V8FUNC(addEventListener) { //haha
 //
 //    }
 //}
@@ -4100,7 +4108,7 @@ V8FUNC(ModifyWorldTransformWrapper) {
 }
 
 #include <dwmapi.h>
-#pragma comment(lib, "Dwmapi.lib");
+#pragma comment(lib, "Dwmapi.lib") //oops i left a semicolon but it didn't stop it from compiling
 
 V8FUNC(DwmExtendFrameIntoClientAreaWrapper) { //https://learn.microsoft.com/en-us/windows/win32/api/dwmapi/nf-dwmapi-dwmextendframeintoclientarea?redirectedfrom=MSDN
     using namespace v8;
@@ -4114,6 +4122,55 @@ V8FUNC(DwmExtendFrameIntoClientAreaWrapper) { //https://learn.microsoft.com/en-u
 
     info.GetReturnValue().Set(Number::New(isolate, DwmExtendFrameIntoClientArea((HWND)IntegerFI(info[0]), &inset)));
 }
+
+//void TimeoutProc(HWND hwnd, UINT msg, UINT_PTR id, DWORD time) {
+//    //this looks questionable lets hope it works (oh god)
+//    print("TIMOEUT");
+//    v8::FunctionCallbackInfo<v8::Value> info = *(v8::FunctionCallbackInfo<v8::Value>*)id;
+//    using namespace v8;
+//    Isolate* isolate = info.GetIsolate();
+//    Local<Function> callback = info[0].As<Function>();
+//    Local<Value> result;
+//    /*Local<Value> result = */
+//    //Local<TryCatch> shit(isolate);
+//    if (callback->Call(isolate->GetCurrentContext(), isolate->GetCurrentContext()->Global(), 0, nullptr).ToLocal(&result)) { //   ;/*.ToLocalChecked()*/;
+//
+//    }
+//    KillTimer(GetConsoleWindow(), id);
+//}
+//
+//V8FUNC(setTimeout) {
+//    using namespace v8;
+//    Isolate* isolate = info.GetIsolate();
+//    print("info->" << (LONG_PTR) & info << " " << IntegerFI(info[1]) << " " << GetConsoleWindow());
+//    print(SetTimer(GetConsoleWindow(), (LONG_PTR)&info, IntegerFI(info[1]), TimeoutProc) << " setTimeout");
+//}
+
+//#include <thread>
+
+//yo this is  a little harder than i thought lemme go back to JSTimer.h
+
+//V8FUNC(setTimeout) {
+//    using namespace v8;
+//    //Isolate* isolate = info.GetIsolate();
+//    std::thread t([&, info]() {
+//        Isolate* isolate = info.GetIsolate();
+//        Sleep(IntegerFI(info[1]));
+//        Local<Function> callback = info[0].As<Function>();
+//        callback->Call(isolate->GetCurrentContext(), isolate->GetCurrentContext()->Global(), 0, nullptr);
+//    });
+//    //std::thread t([](v8::FunctionCallbackInfo<v8::Value>* i) {
+//    //    auto info = *i; //first time using auto
+//    //    Isolate* isolate = info.GetIsolate();
+//    //    Sleep(IntegerFI(info[1]));
+//    //    Local<Function> callback = info[0].As<Function>();
+//    //    callback->Call(isolate->GetCurrentContext(), isolate->GetCurrentContext()->Global(), 0, nullptr);
+//    //}, &info);
+//}
+//
+//V8FUNC(setInterval) {
+//
+//}
 
 v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     using namespace v8;
@@ -4532,7 +4589,8 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
     //setGlobalWrapper(GetKeyboardState);
     setGlobal(GetAsyncKeyboardState);
 
-
+    //setGlobal(setTimeout);
+    //setGlobal(setInterval);
 
     setGlobalWrapper(PostQuitMessage);
 
@@ -5062,6 +5120,7 @@ https://forums.codeguru.com/showthread.php?69236-How-to-obtain-HINSTANCE-using-H
         // Create a stack-allocated handle scope.
         v8::HandleScope handle_scope(isolate);
     
+       // v8::TryCatch trycatch(isolate);
         // Create a new context.
         v8::Local<v8::Context> context = InitGlobals(isolate, nCmdList);//argv[1]);//v8::Context::New(isolate, NULL, global);
     
@@ -5145,6 +5204,8 @@ https://forums.codeguru.com/showthread.php?69236-How-to-obtain-HINSTANCE-using-H
                         }
                     }
                 }
+                //using namespace v8;
+                //print(CStringFI(trycatch.Message()->Get()));
             }
             else {
                 while (true) {
@@ -5248,14 +5309,21 @@ LRESULT CALLBACK WinProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         if (msg == WM_CREATE) isolate = (Isolate*)(((CREATESTRUCTW*)lp)->lpCreateParams);  //usually i don't do single line if statements but im feeling quirky
         //print(isolate << " " << lp << " " << (msg == WM_CREATE));// << " random data " << isolate->GetCurrentContext()->IsContext());
         HandleScope handle_scope(isolate); //slapping this bad boy in here
+                 //oof im still mad about this global i gotta fix that at some point (you cannot create 2 main windows (idk when you would want to but))
         Local<Function> listener = wndclass->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("windowProc")).ToLocalChecked().As<Function>();
         Local<Value> args[] = { Number::New(isolate, (LONG_PTR)hwnd),  Number::New(isolate, msg), Number::New(isolate, wp), Number::New(isolate, lp)};
-        Local<Value> result;
+       // Local<Value> result;
+        v8::TryCatch shit(isolate);
         /*Local<Value> result = */
         //Local<TryCatch> shit(isolate);
-        if (listener->Call(isolate->GetCurrentContext(), isolate->GetCurrentContext()->Global(), 4, args).ToLocal(&result)) { //   ;/*.ToLocalChecked()*/;
+        listener->Call(isolate->GetCurrentContext(), isolate->GetCurrentContext()->Global(), 4, args);
+        //                                   the point of the ToLocal &result thing was because i thought it would do error checking and tell me
+        //if (listener->Call(isolate->GetCurrentContext(), isolate->GetCurrentContext()->Global(), 4, args).ToLocal(&result)) { //   ;/*.ToLocalChecked()*/;
             //print(CStringFI(result));
             //print("valid")
+        //}
+        if (shit.HasCaught()) {
+            print(CStringFI(shit.Message()->Get())); //would i rather have it tell me errors at the cost of some performance or have it freeze and do NOTHING (well i guess i know which one im choosing)
         }
     }
     //if (msg == WM_PAINT) {
