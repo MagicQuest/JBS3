@@ -468,12 +468,13 @@ function windowProc(hwnd, msg, wp, lp) {
         //d2d.DrawText(scorenumber, scoreFont, plr.x+100, plr.y, width, height, brush);
         d2d.EndDraw();
         //del.forEach(ent => { //usually i don't use forEach anyways but i googled today if a standard for loop was quicker and it was (https://blog.bitsrc.io/finding-the-fastest-loop-type-in-javascript-38af16fe7b4f?gi=ce4403a5508c https://stackoverflow.com/questions/43031988/javascript-efficiency-for-vs-foreach)
+        //ACTUALLY i have no idea what to believe because i used https://web.archive.org/web/20180621043849/https://jsperf.com/fast-array-foreach and somehow forEach was faster? idk
         for(let ent of del) { //using for of because it's literally the same as for each (BASICALLY) no index count tho
             //print(entities.findIndex(element => element.x == ent.x && element.y == ent.y));
             entities.splice(entities.findIndex(element => element.x == ent.x && element.y == ent.y && element.constructor.name == ent.constructor.name), 1); //simply ahh check because it prolly doesn't need to be that specific ykykyk also you cannot use indexOf on an array of objects (shit = [{...}, {...}]) because all objects are unique so {x: 21} != {x: 21}
         }//);
         //print(del.length);
-        del = []; //haha this goofy ahh line FROZE jbs3 and i wish it just flat out told me no const assignment but for some reason it doesn't like to tell me stuff like that (maybe i should try catch the whole thing)
+        del = []; //haha this goofy ahh line FROZE jbs3 and i wish it just flat out told me no const assignment but for some reason it doesn't like to tell me stuff like that (maybe i should try catch the whole thing (ok i tried to try catch the whole thing but nothing happened (probably because of the window loop) so im only `try`ing the windowProc func))
         lastTime = Date.now();
     }else if(msg == WM_LBUTTONDOWN) {
         entities.push(new Item(LOWORD(lp), HIWORD(lp), 0));

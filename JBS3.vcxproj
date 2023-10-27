@@ -71,7 +71,7 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <LibraryPath>$(ProjectDir)v8\out\x64.release\obj;$(ProjectDir)v8\out\x64.release\obj\src\inspector;$(ProjectDir)v8\out\x64.release\obj\third_party\icu;$(LibraryPath)</LibraryPath>
+    <LibraryPath>$(ProjectDir)v8\out\x64.release\obj;$(ProjectDir)v8\out\x64.release\obj\src\inspector;$(ProjectDir)v8\out\x64.release\obj\third_party\icu;$(ProjectDir)libuv\build;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -122,7 +122,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;V8_COMPRESS_POINTERS;V8_31BIT_SMIS_ON_64BIT_ARCH;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(ProjectDir)v8\include;$(ProjectDir)v8\</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)v8\include;$(ProjectDir)v8\;$(ProjectDir)libuv\include</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
     <Link>

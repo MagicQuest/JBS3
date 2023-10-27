@@ -19,6 +19,9 @@
 #include <comdef.h>
 //#include <tuple>
 
+#include "uv.h"
+
+
 #include "include/libplatform/libplatform.h"
 #include "include/v8-context.h"
 #include "include/v8-initialization.h"
@@ -27,6 +30,8 @@
 #include "include/v8-function.h"
 #include "include/v8-container.h"
 #include "include/v8-exception.h"
+
+//#pragma comment(lib, "libuv.lib")
 
 //https://medium.com/angular-in-depth/how-to-build-v8-on-windows-and-not-go-mad-6347c69aacd4
 //https://v8.dev/docs/embed
@@ -184,6 +189,9 @@ const char* Highlight(v8::Isolate* isolate, HANDLE console, v8::Local<v8::Value>
         }
         else if (value->IsFunction()) {
             SetConsoleTextAttribute(console, 7);
+        }
+        else if (value->IsNullOrUndefined()) {
+            SetConsoleTextAttribute(console, 8);
         }
         else if (value->IsObject()) {
             SetConsoleTextAttribute(console, 8);
@@ -498,7 +506,7 @@ void Inputbox(const v8::FunctionCallbackInfo<v8::Value>& info) {
 
 //#include "JSTimer.h"
 //
-//V8FUNC(setTimeout) { //yeah im sorry i can't do setTimeout i gotta read the nodejs repo (i might need libuv >:( )
+//V8FUNC(setTimeout) { //yeah im sorry i can't do setTimeout i gotta read the nodejs repo (i might need libuv >:( ) yeah not only was libuv made for node.js BUT it even has a setTimeout example ON THE GITHUB! https://github.com/kiddkai/libuv-examples/blob/master/src/timer/README.md#simulate-the-settimeout-in-javascript
 //    using namespace v8;
 //    setTimeoutTimer* t = new setTimeoutTimer(info.GetIsolate(), info);
 //}
@@ -3228,9 +3236,12 @@ V8FUNC(CreateWindowWrapper) {
                 else
                 {
                     v8::HandleScope handle_scope(isolate); //apparently i needed this so good to know
+                    v8::TryCatch shit(isolate);
                     looper->Call(isolate->GetCurrentContext(), isolate->GetCurrentContext()->Global(), 0, nullptr);
                     //print("LOPER CALLED!");
-
+                    if (shit.HasCaught()) {
+                        print(CStringFI(shit.Message()->Get()));
+                    }
                     isolate->PerformMicrotaskCheckpoint();
                 }
             }
@@ -4172,6 +4183,32 @@ V8FUNC(DwmExtendFrameIntoClientAreaWrapper) { //https://learn.microsoft.com/en-u
 //
 //}
 
+#pragma comment(lib, "libuv.lib")
+#pragma comment(lib, "uv.lib")
+
+uv_loop_t* uv_loop;
+
+V8FUNC(setTimeout) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    uv_timer_t timer;
+    timer.data = (void*) & info; //sure i hope this works
+    uv_timer_init(uv_loop, &timer);
+    uv_timer_start(&timer, [](uv_timer_t* handle) { //and i might have to end it BRUH I MIGHT HAVE TO MAKE A SPECIAL CLASS AGAIN (WAIT JUST WAIT A MINUTE void* data is a public member of uv_timer_t)
+        print("timer end ykykyk");
+        FunctionCallbackInfo<Value> info = *(FunctionCallbackInfo<Value>*)handle->data; //i am trusting that this info pointer does not get garbaged by the time this lambda is called
+        Isolate* isolate = info.GetIsolate();
+        Local<Function> callback = info[0].As<Function>();
+        TryCatch shit(isolate);
+        callback->Call(isolate->GetCurrentContext(), isolate->GetCurrentContext()->Global(), 0, nullptr);
+        if (shit.HasCaught()) {
+            print(CStringFI(shit.Message()->Get()));
+        }
+    }, IntegerFI(info[1]), 0);
+    uv_run(uv_loop, UV_RUN_DEFAULT);
+    print("uv_ran");
+}
+
 v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     using namespace v8;
 
@@ -4589,8 +4626,8 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
     //setGlobalWrapper(GetKeyboardState);
     setGlobal(GetAsyncKeyboardState);
 
-    //setGlobal(setTimeout);
-    //setGlobal(setInterval);
+    setGlobal(setTimeout);
+    setGlobal(setInterval);
 
     setGlobalWrapper(PostQuitMessage);
 
@@ -4997,6 +5034,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInstance, char* nCmdList, int
     hInstance = hInst;
     screenWidth = GetSystemMetrics(SM_CXSCREEN); //only used for SendInput
     screenHeight = GetSystemMetrics(SM_CYSCREEN); //only used for SendInput
+    uv_loop = uv_default_loop(); //LO!
     //RedirectIOToConsole();
     
     //if (AllocConsole()) {
@@ -5323,7 +5361,8 @@ LRESULT CALLBACK WinProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             //print("valid")
         //}
         if (shit.HasCaught()) {
-            print(CStringFI(shit.Message()->Get())); //would i rather have it tell me errors at the cost of some performance or have it freeze and do NOTHING (well i guess i know which one im choosing)
+            print(CStringFI(shit.Message()->Get())); //ok WAIT in the last push i talked about "performance loss" from using trycatch but apparently since v8 version 6 (im using 11.9.0) try catch doesn't affect performance UNTIL there is an exception https://stackoverflow.com/questions/19727905/in-javascript-is-it-expensive-to-use-try-catch-blocks-even-if-an-exception-is-n
+            //last time i googled "v8 try catch performance" i saw the first link and it said "there will always be some sort of performance hit" but that was probably written years ago (yeah the <meta> tags say it was published in 2013)
         }
     }
     //if (msg == WM_PAINT) {
