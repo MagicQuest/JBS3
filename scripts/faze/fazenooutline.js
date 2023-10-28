@@ -45,7 +45,7 @@ function windowProc(hwnd, msg, wp, lp) {
             DestroyWindow(hwnd);
         }
     }else if(msg == WM_DESTROY) {
-        PostQuitMessage();
+        PostQuitMessage(0);
     }else if(msg == WM_PAINT) {
         d2d.BeginDraw();
         d2d.Clear(0,1,0); //clear to green because full green == transparent

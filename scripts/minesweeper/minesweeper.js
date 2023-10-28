@@ -199,7 +199,7 @@ function windowProc(hwnd, msg, wp, lp) {
         TextOut(bp.hdc, 100, 100, "niger"); //lol this is hidden behind the tiles
         EndPaint(hwnd, bp);
     }else if(msg == WM_DESTROY) {
-        PostQuitMessage();
+        PostQuitMessage(0);
     }
 }
 

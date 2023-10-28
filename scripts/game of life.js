@@ -38,7 +38,7 @@ function windowProc(hwnd, msg, wp, lp) {
     }else if(msg == WM_MOUSEMOVE) {
         mouse = MAKEPOINTS(lp);
     }else if(msg == WM_DESTROY) {
-        PostQuitMessage();
+        PostQuitMessage(0);
     }
 }
 

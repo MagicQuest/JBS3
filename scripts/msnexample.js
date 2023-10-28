@@ -126,7 +126,7 @@ function windowProc(hwndMain, uMsg, wParam, lParam) {
             return 0; 
  
         case WM_DESTROY: 
-            PostQuitMessage(); 
+            PostQuitMessage(0); 
             break; 
     }
     //if(msg == WM_LBUTTONDOWN) {

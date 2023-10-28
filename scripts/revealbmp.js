@@ -79,7 +79,7 @@ function windowProc(hwnd, msg, wp, lp) {
             DestroyWindow(hwnd);
         }
     }else if(msg == WM_DESTROY) {
-        PostQuitMessage();
+        PostQuitMessage(0);
     }else if(msg == WM_LBUTTONUP) {
         SendMessage(hwnd, WM_SETICON, ICON_SMALL, trollIco); //ok i didn't have to do all that
         ReleaseCapture();

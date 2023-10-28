@@ -191,7 +191,7 @@ function windowProc(hwnd, msg, wp, lp) {
         }
         RedrawWindow(hwnd, 0, 0, width, height, NULL, RDW_ERASE | RDW_INVALIDATE | RDW_UPDATENOW);
     }else if(msg == WM_DESTROY) {
-        PostQuitMessage();
+        PostQuitMessage(0);
     }else if(msg == WM_HELP) {
         print("HELLP HELLP ME");
         //Msgbox("arrow keys->change angle\nidk how to decide which faces to draw first so the sides are messed up but the top and bottom are drawn correctly", "fake3d", MB_OK);

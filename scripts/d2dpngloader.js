@@ -80,7 +80,7 @@ function windowProc(hwnd, msg, wp, lp) {
             Msgbox("implement open file dialog", "openfiledialog", MB_OK | MB_SYSTEMMODAL | MB_ICONERROR); //uhh non blocking in windowProc?
         }
     }else if(msg == WM_DESTROY) {
-        PostQuitMessage();
+        PostQuitMessage(0);
     }
 }
 

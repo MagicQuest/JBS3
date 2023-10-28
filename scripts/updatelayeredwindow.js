@@ -40,7 +40,7 @@ function windowProc(hwnd, msg, wp, lp) {
         //print(GetObjectDIBITMAP(windowBmp));
         ReleaseDC(hwnd, dc);
     }else if(msg == WS_DESTROY) {
-        PostQuitMessage();
+        PostQuitMessage(0);
     }
 }
 

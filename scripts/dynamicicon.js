@@ -24,7 +24,7 @@ function init(hwnd) {
 
 function windowProc(hwnd, msg, wp, lp) {
     if(msg == WM_DESTROY) {
-        PostQuitMessage();
+        PostQuitMessage(0);
     }else if(msg == WM_MOUSEWHEEL) {//if(WM_MOUSEWHEEL) { //WAIT HAS IT ALWAYS BEEN LKE THAT
         let wheel = HIWORD(wp);
         if(wheel) {

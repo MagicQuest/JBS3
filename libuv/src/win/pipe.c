@@ -185,7 +185,6 @@ static HANDLE open_named_pipe(const WCHAR* name, DWORD* duplex_flags) {
   return INVALID_HANDLE_VALUE;
 }
 
-
 static void close_pipe(uv_pipe_t* pipe) {
   assert(pipe->u.fd == -1 || pipe->u.fd > 2);
   if (pipe->u.fd == -1)

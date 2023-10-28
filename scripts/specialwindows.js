@@ -94,7 +94,7 @@ function windowProc(hwnd, msg, wp, lp) {
             lastInteraction = Date.now();
         }
     }else if(msg == WM_DESTROY) {
-        PostQuitMessage();
+        PostQuitMessage(0);
     }
     //i gotta disable automatic DefWindowProcW
 }

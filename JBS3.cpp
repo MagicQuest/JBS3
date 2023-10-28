@@ -16,10 +16,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <iostream>
-#include <comdef.h>
 //#include <tuple>
 
-#include "uv.h"
 
 
 #include "include/libplatform/libplatform.h"
@@ -31,13 +29,25 @@
 #include "include/v8-container.h"
 #include "include/v8-exception.h"
 
-//#pragma comment(lib, "libuv.lib")
+#ifdef LIBUV
+#include "libuv/src/uv-common.h"
+
+
+#pragma comment(lib, "Ws2_32.lib")
+#pragma comment(lib, "Iphlpapi.lib")
+#pragma comment(lib, "Userenv.lib")
+#endif
+
+#include <comdef.h>
+
+//user32.lib; advapi32.lib; iphlpapi.lib; userenv.lib; ws2_32.lib; dbghelp.lib; ole32.lib; uuid.lib; kernel32.lib; user32.lib; gdi32.lib; winspool.lib; shell32.lib; ole32.lib; oleaut32.lib; uuid.lib; comdlg32.lib; advapi32.lib
+//#pragma comment(lib, "psapi.lib")
 
 //https://medium.com/angular-in-depth/how-to-build-v8-on-windows-and-not-go-mad-6347c69aacd4
 //https://v8.dev/docs/embed
 //https://chromium.googlesource.com/v8/v8/+/branch-heads/6.8/samples/hello-world.cc
 
-// the v8_base_without_compiler.lib was corrupt everytime i built it and i KEPT TRYING and eventually found out i had to build v8_monolith.lib
+// the v8_base_without_compiler.lib was corrupt everytime i built it and i KEPT TRYING and eventually found out i had to build v8_monolith.lib (ninja -C out/x64.release v8_monolith)
 //hopefully you can use my precompiled libs or figure out to build v8 for yourself because this was basically as hard as opencv
 //speaking of opencv i had this strange error when i ran my opencv projects outside of CLion/mingw that said -> [The procedure entry point _ZNSt18condition_variable10notify_allEv could not be located in the dynamic link library libopencv_core452.dll]
 //anyways i googled for a while and somebody said to use dependancy walker to see what it is missing and sure enough -> https://stackoverflow.com/questions/42438790/visual-studio-c-based-exe-doesnt-do-nothing
@@ -111,11 +121,28 @@
 #include <windows.h>
 //#include "guicon.h"
 #include "console2.h"
-#include <wincodec.h>
+//#include <wincodec.h> //wait why did i include this? (it was for Direct2D)
 
 #pragma comment(lib, "windowscodecs.lib")
 
 #define LITERAL(cstr) String::NewFromUtf8Literal(isolate, cstr)
+#define CStringFI(e) *String::Utf8Value(isolate, e)
+#define WStringFI(e) (const wchar_t*)*String::Value(isolate, e)
+#define IntegerFI(e) e/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust()
+#define FloatFI(e) e.As<Number>()->Value()
+
+#define CHECKEXCEPTIONS(shit) if (shit.HasCaught()) {                                                                                                    \
+                                  HANDLE console = GetStdHandle(STD_OUTPUT_HANDLE);                                                                      \
+                                  SetConsoleTextAttribute(console, 4);                                                                                   \
+                                  print("[LINE " << shit.Message()->GetLineNumber(isolate->GetCurrentContext()).FromJust() << "] " << CStringFI(shit.Message()->Get()) << "\007");    \
+                                  SetConsoleTextAttribute(console, 7);                                                                                   \
+                              }
+
+
+
+//#include <map>
+//#include "JSWindow.h"
+//std::map<int, JSWindow*> JSWindow::jsWindows = {}; //bruh what is this line
 
 int screenWidth, screenHeight;
 
@@ -454,10 +481,6 @@ INT_PTR CALLBACK DialogProc(HWND hwnd, UINT Message, WPARAM wParam, LPARAM lPara
 }
 
 HINSTANCE hInstance;
-#define CStringFI(e) *String::Utf8Value(isolate, e)
-#define WStringFI(e) (const wchar_t*)*String::Value(isolate, e)
-#define IntegerFI(e) e/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust()
-#define FloatFI(e) e.As<Number>()->Value()
 
 //custom dialog input box bruh
 void Inputbox(const v8::FunctionCallbackInfo<v8::Value>& info) {
@@ -504,12 +527,77 @@ void Inputbox(const v8::FunctionCallbackInfo<v8::Value>& info) {
 
 #define V8FUNC(name) void name(const v8::FunctionCallbackInfo<v8::Value>& info)
 
-//#include "JSTimer.h"
+#include "JSTimer.h" //You cannot give up just yet... MAGICQUEST3! Stay DETERMINED.
+
+std::map<UINT_PTR, setTimeoutTimer*> setTimeoutTimer::timers = {};
+std::map<UINT_PTR, setIntervalTimer*> setIntervalTimer::timers = {};
+
+V8FUNC(setTimeout) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    //HandleScope handle_scope(info.GetIsolate());
+    UINT time = IntegerFI(info[1]);
+    //Local<Function> func = info[0].As<Function>();
+    Persistent<Function> func = Persistent<Function>(isolate, info[0].As<Function>());
+    setTimeoutTimer* t = new setTimeoutTimer(isolate, func); //THIS IS WHAT IT MEANS TO GO EVEN FURTHER BEYOND
+
+    info.GetReturnValue().Set(Number::New(isolate, t->init(time)));
+}
+
+V8FUNC(setInterval) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    UINT time = IntegerFI(info[1]);
+
+    Persistent<Function> func = Persistent<Function>(isolate, info[0].As<Function>());
+    setIntervalTimer* t = new setIntervalTimer(isolate, func); //THIS IS WHAT IT MEANS TO GO EVEN FURTHER BEYOND
+
+    info.GetReturnValue().Set(Number::New(isolate, t->init(time)));
+}
+
+//V8FUNC(clearTimerYKYKYK) { //clearTimeout clearInterval (aw sorry i can't do the same func for both of em)
+//    using namespace v8;
+//    Isolate* isolate = info.GetIsolate();
 //
+//    info.GetReturnValue().Set(Number::New(isolate, KillTimer(NULL, IntegerFI(info[0]))));
+//}
+
 //V8FUNC(setTimeout) { //yeah im sorry i can't do setTimeout i gotta read the nodejs repo (i might need libuv >:( ) yeah not only was libuv made for node.js BUT it even has a setTimeout example ON THE GITHUB! https://github.com/kiddkai/libuv-examples/blob/master/src/timer/README.md#simulate-the-settimeout-in-javascript
 //    using namespace v8;
 //    setTimeoutTimer* t = new setTimeoutTimer(info.GetIsolate(), info);
 //}
+
+V8FUNC(clearTimeout) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    UINT_PTR id = IntegerFI(info[0]);
+    info.GetReturnValue().Set(Number::New(isolate, KillTimer(NULL, id)));
+    if (setTimeoutTimer::timers.find(id) == setTimeoutTimer::timers.end()) {
+        HANDLE console = GetStdHandle(STD_OUTPUT_HANDLE);
+        SetConsoleTextAttribute(console, 4);
+        print("you must use the timer's coresponding clear function (you are getting this error because you may have used clearTimeout on a setInterval timer which (in my version) will cause a small memory leak)" << "\007");
+        SetConsoleTextAttribute(console, 7);
+    }
+    delete setTimeoutTimer::timers[id];
+    setTimeoutTimer::timers.erase(id); //almost forgot that part
+}
+
+V8FUNC(clearInterval) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    UINT_PTR id = IntegerFI(info[0]);
+    info.GetReturnValue().Set(Number::New(isolate, KillTimer(NULL, id)));
+    if (setIntervalTimer::timers.find(id) == setIntervalTimer::timers.end()) {
+        HANDLE console = GetStdHandle(STD_OUTPUT_HANDLE);
+        SetConsoleTextAttribute(console, 4);
+        print("you must use the timer's coresponding clear function (you are getting this error because you may have used clearInterval on a setTimeout timer which (in my version) will cause a small memory leak)" << "\007");
+        SetConsoleTextAttribute(console, 7);
+    }
+    delete setIntervalTimer::timers[id];
+    setIntervalTimer::timers.erase(id);
+}
 
 //V8FUNC(nigga) {
 //    
@@ -2478,7 +2566,7 @@ V8FUNC(DestroyWindowWrapper) {
 V8FUNC(GET_X_LPARAMWRAPPER) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
-    info.GetReturnValue().Set(((int)(short)LOWORD(IntegerFI(info[0]))));
+    info.GetReturnValue().Set(((int)(short)LOWORD(IntegerFI(info[0])))); //the reason i didn't use the actual GET_X_LPARAM macro was because i didn't know i had to include <windowsx.h> and so i just used LOWORD!
 }
 
 V8FUNC(GET_Y_LPARAMWRAPPER) {
@@ -3055,7 +3143,7 @@ V8FUNC(CreateWindowClass) {
     //wc.lpszClassName;
     //wc.lpszMenuName;
     //wc.style;
-    
+
     Local<Object> wndclass = Object::New(isolate);
     wndclass->Set(isolate->GetCurrentContext(), LITERAL("hbrBackground"), Number::New(isolate, 0));
     wndclass->Set(isolate->GetCurrentContext(), LITERAL("hCursor"), Number::New(isolate, 0));
@@ -3068,6 +3156,7 @@ V8FUNC(CreateWindowClass) {
     //wndclass->Set(isolate->GetCurrentContext(), LITERAL("init"), info[1]);
     wndclass->Set(isolate->GetCurrentContext(), LITERAL("windowProc"), info[1]);
     wndclass->Set(isolate->GetCurrentContext(), LITERAL("loop"), info[2]);
+    wndclass->Set(isolate->GetCurrentContext(), LITERAL("DefWindowProc"), Number::New(isolate, 1));
     
     info.GetReturnValue().Set(wndclass);//result);
 }
@@ -3100,6 +3189,8 @@ V8FUNC(CreateWindowWrapper) {
 
         wndclass = info[1].As<Object>(); //aw damn i was pretty confused then i remembered the info[0] is the extended flags
 
+        //JSWindow* window = new JSWindow(isolate, wndclass); //TRUST ME
+        //window->Create(x, y, width, height, info, hInstance);
 #define GetProperty(name) wndclass->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL(name)).ToLocalChecked()
 
         //const char* className = *String::Utf8Value(isolate, wndclass->GetRealNamedProperty(isolate->GetCurrentContext(), String::NewFromUtf8Literal(isolate, "className")).ToLocalChecked());
@@ -3165,7 +3256,7 @@ V8FUNC(CreateWindowWrapper) {
         newWindow = CreateWindowExW(IntegerFI(info[0]), //HOLY SHIT THIS LINE WAS FAILING EVERYTIME I EVEN USED BREAKPOINTS TO FIND THE ISSUE AND GUESS WHAT
             //THE ERROR WAS ACTUALLY IN THE WINPROC AND I WAS GETTING THE ISOLATE LPARAM WRONG (literally spent at minimum 30 minutes to figure this out (this is why JBS3 has me talking about banning it))
             wc.lpszClassName, //buddy idk what but something around here is KILLING M(Y/E) PROGRAM
-            WStringFI(info[2]), //title was truncated because i was using DefWindowProcW https://stackoverflow.com/questions/11884021/c-why-this-window-title-gets-truncated
+            WStringFI(info[2]), //title was truncated because i was using DefWindowProcA https://stackoverflow.com/questions/11884021/c-why-this-window-title-gets-truncated
             IntegerFI(info[3]),
             x,
             y,
@@ -3239,9 +3330,7 @@ V8FUNC(CreateWindowWrapper) {
                     v8::TryCatch shit(isolate);
                     looper->Call(isolate->GetCurrentContext(), isolate->GetCurrentContext()->Global(), 0, nullptr);
                     //print("LOPER CALLED!");
-                    if (shit.HasCaught()) {
-                        print(CStringFI(shit.Message()->Get()));
-                    }
+                    CHECKEXCEPTIONS(shit);
                     isolate->PerformMicrotaskCheckpoint();
                 }
             }
@@ -4125,7 +4214,7 @@ V8FUNC(DwmExtendFrameIntoClientAreaWrapper) { //https://learn.microsoft.com/en-u
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
 
-    MARGINS inset{0};
+    MARGINS inset;
     inset.cxLeftWidth = IntegerFI(info[1]);
     inset.cyTopHeight = IntegerFI(info[2]);
     inset.cxRightWidth = IntegerFI(info[3]);
@@ -4183,30 +4272,83 @@ V8FUNC(DwmExtendFrameIntoClientAreaWrapper) { //https://learn.microsoft.com/en-u
 //
 //}
 
-#pragma comment(lib, "libuv.lib")
-#pragma comment(lib, "uv.lib")
+//uv_loop_t* uv_loop;
+//
+//V8FUNC(setTimeout) {
+//    using namespace v8;
+//    Isolate* isolate = info.GetIsolate();
+//    uv_timer_t timer;
+//    timer.data = (void*) & info; //sure i hope this works
+//    uv_timer_init(uv_loop, &timer);
+//    uv_timer_start(&timer, [](uv_timer_t* handle) { //and i might have to end it BRUH I MIGHT HAVE TO MAKE A SPECIAL CLASS AGAIN (WAIT JUST WAIT A MINUTE void* data is a public member of uv_timer_t)
+//        print("timer end ykykyk");
+//        FunctionCallbackInfo<Value> info = *(FunctionCallbackInfo<Value>*)handle->data; //i am trusting that this info pointer does not get garbaged by the time this lambda is called
+//        Isolate* isolate = info.GetIsolate();
+//        Local<Function> callback = info[0].As<Function>();
+//        TryCatch shit(isolate);
+//        callback->Call(isolate->GetCurrentContext(), isolate->GetCurrentContext()->Global(), 0, nullptr);
+//        if (shit.HasCaught()) {
+//            HANDLE console = GetStdHandle(STD_OUTPUT_HANDLE);
+//            SetConsoleTextAttribute(console, 4);
+//            print(CStringFI(shit.Message()->Get()) << "\007");
+//            SetConsoleTextAttribute(console, 7);
+//        }
+//    }, IntegerFI(info[1]), 0);
+//    uv_run(uv_loop, UV_RUN_DEFAULT);
+//    print("uv_ran");
+//}
 
-uv_loop_t* uv_loop;
-
-V8FUNC(setTimeout) {
+V8FUNC(DwmDefWindowProcWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
-    uv_timer_t timer;
-    timer.data = (void*) & info; //sure i hope this works
-    uv_timer_init(uv_loop, &timer);
-    uv_timer_start(&timer, [](uv_timer_t* handle) { //and i might have to end it BRUH I MIGHT HAVE TO MAKE A SPECIAL CLASS AGAIN (WAIT JUST WAIT A MINUTE void* data is a public member of uv_timer_t)
-        print("timer end ykykyk");
-        FunctionCallbackInfo<Value> info = *(FunctionCallbackInfo<Value>*)handle->data; //i am trusting that this info pointer does not get garbaged by the time this lambda is called
-        Isolate* isolate = info.GetIsolate();
-        Local<Function> callback = info[0].As<Function>();
-        TryCatch shit(isolate);
-        callback->Call(isolate->GetCurrentContext(), isolate->GetCurrentContext()->Global(), 0, nullptr);
-        if (shit.HasCaught()) {
-            print(CStringFI(shit.Message()->Get()));
-        }
-    }, IntegerFI(info[1]), 0);
-    uv_run(uv_loop, UV_RUN_DEFAULT);
-    print("uv_ran");
+    LRESULT lRet; //idk why it is lRet
+    BOOL shit = DwmDefWindowProc((HWND)IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]), &lRet);
+    Local<Array> jsArray = Array::New(isolate, 2);
+    jsArray->Set(isolate->GetCurrentContext(), 0, Number::New(isolate, shit)); //how is Number::New not a macro already?
+    jsArray->Set(isolate->GetCurrentContext(), 1, Number::New(isolate, lRet));
+    info.GetReturnValue().Set(jsArray); //which value should i return? (finally decided on both)
+}
+
+V8FUNC(DwmEnableBlurBehindWindowWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    DWM_BLURBEHIND bb{0};
+    bb.dwFlags = IntegerFI(info[2]);
+    bb.fEnable = IntegerFI(info[1]);
+    if (!info[3].IsEmpty()) {
+        HRGN rgn = CreateRectRgn(IntegerFI(info[3]), IntegerFI(info[4]), IntegerFI(info[5]) , IntegerFI(info[6])); //why do you have to destroy this object like gdi (im not doing that watch out)
+        bb.hRgnBlur = rgn;
+    }
+    else {
+        bb.hRgnBlur = NULL;
+    }
+    info.GetReturnValue().Set(Number::New(isolate, DwmEnableBlurBehindWindow((HWND)IntegerFI(info[0]), &bb)));
+}
+
+//V8FUNC(DwmEnableCompositionWrapper) { //dang it bruh i went to the docs and it DwmEnableComposition doesn't even work anymore
+//    using namespace v8;
+//    Isolate* isolate = info.GetIsolate();
+//
+//    info.GetReturnValue().Set(Number::New(isolate, DwmEnableComposition(IntegerFI(info[0]))));
+//}
+
+V8FUNC(NCCALCSIZE_PARAMSWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    NCCALCSIZE_PARAMS* pncsp = (NCCALCSIZE_PARAMS*)IntegerFI(info[0]);
+    pncsp->rgrc[0].left = pncsp->rgrc[0].left + 0;
+    pncsp->rgrc[0].top = pncsp->rgrc[0].top + 0;
+    pncsp->rgrc[0].right = pncsp->rgrc[0].right - 0;
+    pncsp->rgrc[0].bottom = pncsp->rgrc[0].bottom - 0;
+
+}
+
+V8FUNC(DefWindowProcWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, DefWindowProcW((HWND)IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]))));
 }
 
 v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
@@ -4284,11 +4426,6 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     setGlobalWrapper(SetTimer);
     setGlobalWrapper(KillTimer);
 
-    setGlobalWrapper(SetLayeredWindowAttributes);
-    setGlobalWrapper(GetLayeredWindowAttributes);
-    setGlobalWrapper(UpdateLayeredWindow);
-
-    setGlobalWrapper(DwmExtendFrameIntoClientArea); 
 
     setGlobalWrapper(MAKEROP4);
     setGlobalWrapper(CreatePatternBrush);
@@ -4331,6 +4468,19 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     setGlobalConst(PATPAINT);
     setGlobalConst(MERGEPAINT);
     setGlobalConst(MERGECOPY);
+
+    setGlobalWrapper(SetLayeredWindowAttributes);
+    setGlobalWrapper(GetLayeredWindowAttributes);
+    setGlobalWrapper(UpdateLayeredWindow);
+
+    setGlobalWrapper(DwmExtendFrameIntoClientArea);
+    setGlobalWrapper(DwmDefWindowProc);
+    setGlobalWrapper(DwmEnableBlurBehindWindow);
+    //setGlobalWrapper(DwmEnableComposition);
+    setGlobalWrapper(NCCALCSIZE_PARAMS);
+    setGlobalWrapper(DefWindowProc);
+
+    setGlobalConst(DWM_BB_BLURREGION); setGlobalConst(DWM_BB_ENABLE); setGlobalConst(DWM_BB_TRANSITIONONMAXIMIZED);
 
     setGlobalConst(DIB_RGB_COLORS);
     setGlobalConst(DIB_PAL_COLORS);
@@ -4628,6 +4778,10 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
 
     setGlobal(setTimeout);
     setGlobal(setInterval);
+    setGlobal(clearTimeout);
+    setGlobal(clearInterval);
+    //global->Set(isolate, "clearTimeout", FunctionTemplate::New(isolate, clearTimerYKYKYK));
+    //global->Set(isolate, "clearInterval", FunctionTemplate::New(isolate, clearTimerYKYKYK));
 
     setGlobalWrapper(PostQuitMessage);
 
@@ -5034,7 +5188,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInstance, char* nCmdList, int
     hInstance = hInst;
     screenWidth = GetSystemMetrics(SM_CXSCREEN); //only used for SendInput
     screenHeight = GetSystemMetrics(SM_CYSCREEN); //only used for SendInput
-    uv_loop = uv_default_loop(); //LO!
+    //uv_loop = uv_default_loop(); //LO!
     //RedirectIOToConsole();
     
     //if (AllocConsole()) {
@@ -5354,16 +5508,28 @@ LRESULT CALLBACK WinProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         v8::TryCatch shit(isolate);
         /*Local<Value> result = */
         //Local<TryCatch> shit(isolate);
-        listener->Call(isolate->GetCurrentContext(), isolate->GetCurrentContext()->Global(), 4, args);
+        MaybeLocal<Value> returnedValue = listener->Call(isolate->GetCurrentContext(), isolate->GetCurrentContext()->Global(), 4, args);
         //                                   the point of the ToLocal &result thing was because i thought it would do error checking and tell me
         //if (listener->Call(isolate->GetCurrentContext(), isolate->GetCurrentContext()->Global(), 4, args).ToLocal(&result)) { //   ;/*.ToLocalChecked()*/;
             //print(CStringFI(result));
             //print("valid")
         //}
-        if (shit.HasCaught()) {
-            print(CStringFI(shit.Message()->Get())); //ok WAIT in the last push i talked about "performance loss" from using trycatch but apparently since v8 version 6 (im using 11.9.0) try catch doesn't affect performance UNTIL there is an exception https://stackoverflow.com/questions/19727905/in-javascript-is-it-expensive-to-use-try-catch-blocks-even-if-an-exception-is-n
-            //last time i googled "v8 try catch performance" i saw the first link and it said "there will always be some sort of performance hit" but that was probably written years ago (yeah the <meta> tags say it was published in 2013)
+        //if (shit.HasCaught()) {
+        //    HANDLE console = GetStdHandle(STD_OUTPUT_HANDLE);
+        //    SetConsoleTextAttribute(console, 4);
+        //    print(CStringFI(shit.Message()->Get()) << "\007"); //ok WAIT in the last push i talked about "performance loss" from using trycatch but apparently since v8 version 6 (im using 11.9.0) try catch doesn't affect performance UNTIL there is an exception https://stackoverflow.com/questions/19727905/in-javascript-is-it-expensive-to-use-try-catch-blocks-even-if-an-exception-is-n
+        //    SetConsoleTextAttribute(console, 7);
+        //    //last time i googled "v8 try catch performance" i saw the first link and it said "there will always be some sort of performance hit" but that was probably written years ago (yeah the <meta> tags say it was published in 2013)
+        //}
+        CHECKEXCEPTIONS(shit);
+        bool def = IntegerFI(wndclass->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("DefWindowProc")).ToLocalChecked());
+        if (!def) {
+            return IntegerFI(returnedValue.ToLocalChecked());
         }
+        else {
+            return DefWindowProcW(hwnd, msg, wp, lp);
+        }
+        //return def ? DefWindowProcW(hwnd, msg, wp, lp) : 0;
     }
     //if (msg == WM_PAINT) {
     //    //PAINTSTRUCT ps;
@@ -5380,6 +5546,6 @@ LRESULT CALLBACK WinProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         //DestroyWindow(hwnd);
     //    PostQuitMessage(0);
     //}
-
-    return DefWindowProcW(hwnd, msg, wp, lp);
+    print("NULL?" << msg);
+    return DefWindowProcW(hwnd, msg, wp, lp);; //uh
 }

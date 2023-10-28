@@ -5,14 +5,14 @@
 
 let d2d, font, scoreFont, brush, starPng;
 
-var score = 0, power = 0, pointCount = 0, lifes = 4, bombs = 3, continues = 3, powerstreak = 0, powerLevel; //lives/lifes
+var score = 0, power = 0, pointCount = 0, lifes = 4, bombs = 3, continues = 3, powerstreak = 0, powerLevel = 0; //lives/lifes
 
 const cpip = [10,20,30,40,50,60,70,80,90,100,
     200,300,400,500,600,700,800,900,1000,
     2000,3000,4000,5000,6000,7000,8000,9000,10000,
     11000,12000,51200];//consecutive power item pickups https://en.touhouwiki.net/index.php?title=User:Arknarok/Touhou_Strategy_Guide/TH06/Scoring_Guide&mobileaction=toggle_view_desktop
 
-const powerlevels = [8,16,32,48,64,80,96,128];
+const powerlevels = [0,8,16,32,48,64,80,96,128];
 
 let window;
 const width = 640; //+16; //16 because IDK OK GOOGLE IT LO!
@@ -165,11 +165,36 @@ class ScoreEnt extends TextEnt {
     }
 }
 
+class TitleTextEnt extends TextEnt {
+    constructor(x,y,text,color = [1.0,1.0,1.0]) {
+        super(gameWidth,y,text,1,color);
+        this.endX = x;
+        this.fadeSec *= 2;
+        this.vy = 0;
+    }
+
+    update(d2d) {
+        //print(this.creation);
+        if((Date.now()/1000-this.creation) < .5) {
+            this.x = lerp(gameWidth, this.endX, (Date.now()/1000-this.creation)*2);
+        }
+        super.update(d2d);
+    }
+}
+
 function addPower(newpower) {
     power += newpower; //score var is alreay 
     powerlevels.forEach((pl,i) => {
         if(power == pl) {
-            entities.push(new TextEnt(plr.x+20, plr.y+20, pl == 128 ? "full power achieved!!" : "power up!!", 1));
+            if(pl == 128) {
+                entities.push(new TitleTextEnt(0, height/2, "FULL POWER MODE! !", [.8,.8,1.0]));
+                plr.reachedFullPower = true;
+                setTimeout(() => {
+                    plr.reachedFullPower = false;
+                }, 100);
+            }else {
+                entities.push(new TextEnt(plr.x+20, plr.y+20, "PowerUp", 1, [.8,.8,1.0]));
+            }
             powerLevel = i;
             //print("yo pwoer up NIGGER YRAHH");
         }
@@ -183,12 +208,28 @@ function useBomb() {
         entities.push(new CircleEffect(plr.x, plr.y, 10, 200, .5, 0, 2));
     }
     try {
+        let d = Date.now()/1000;
         setTimeout(() => {
-            print("HELP");
+            print("HELP",Date.now()/1000-d);
         }, 1000);
     }catch(e) {
         print(e);
     }
+}
+
+function killPlayer(x, y) {
+    print("lose life or kill player");
+    entities.push(new CircleEffect(x,y,10 , 50, .25, 0, .5));
+    plr.x = gameWidth/2;
+    plr.y = height/2;
+    powerstreak = 0;
+    if(lifes == 0) {
+        lifes = 4;
+    }else {
+        lifes--;
+    }
+    bombs = 3; //so i only learned this after googling but when you die your bombs get reset
+    addPower(-16); //uhh spawn power up items randomly after
 }
 
 class Bullet extends Entity {
@@ -209,26 +250,19 @@ class Bullet extends Entity {
         //i gotta implement it like a regular browser canvas context
 
         //if(contains(plr, this)) { //touhou hitbox is pretty small so im just gonna use this
-        if(contains(this, {x: plr.x+(plr.width/2), y: plr.y+(2*plr.height/3), width: 2,height: 2})) {
-            print("lose life or kill player");
-            entities.push(new CircleEffect(this.x,this.y,10 , 50, .25, 0, .5));
-            plr.x = gameWidth/2;
-            plr.y = height/2;
-            powerstreak = 0;
-            if(lifes == 0) {
-                lifes = 4;
-            }else {
-                lifes--;
-            }
-            bombs = 3; //so i only learned this after googling but when you die your bombs get reset
-            addPower(-16); //uhh spawn power up items randomly after
+        if(plr.reachedFullPower) {
+            del.push(this);
+            entities.push(new Item(this.x, this.y, 6));
+        }else if(contains(this, {x: plr.x+(plr.width/2), y: plr.y+(2*plr.height/3), width: 2,height: 2})) {
+            killPlayer(this.x,this.y);
         }
     }
 }
 
 class Item extends Entity { //powerup/scoreitem
-    constructor(x, y, type, width = 16, height = 16) {
-        super(x,y, width, height);
+    constructor(x, y, type) {//, width = 16, height = 16) {
+        let size = type == 5 ? 24 : 16; //type 5 is big power up
+        super(x,y, size, size);
         this.type = type;
         this.vy = -2;
     }
@@ -239,6 +273,8 @@ class Item extends Entity { //powerup/scoreitem
         [0.0,1.0,0.0],
         [1.0,0.0,1.0],
         [1.0,1.0,0.0],
+        [1.0,0.0,0.0],
+        [0.0,0.8,0.0],
     ]; //haha this is gemus https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Classes/static
 
     update(d2d) {
@@ -266,6 +302,12 @@ class Item extends Entity { //powerup/scoreitem
         //}
         brush.SetColor(...Item.colors[this.type]);
         d2d.FillRoundedRectangle(this.x, this.y, this.x+this.width, this.y+this.height, 2, 2, brush);
+        if((power == 128 && plr.y < 100) || this.type == 6) {
+            this.x += clamp((plr.x-this.x)/8,-10,10); //huh thats kinda what im going for i guess (it is pretty linear!)
+            this.y += clamp((plr.y-this.y)/8,-10,10);
+            this.vy = 0;
+            this.vx = 0;
+        }
         if(overlaps(plr, this)) { //haha this!
             //delete this; //lol i didn't really think this would do any thing
             //print("overlap?");
@@ -284,13 +326,13 @@ class Item extends Entity { //powerup/scoreitem
             //    //ok yeah thats what i thought it didn't work because i actually didn't use var (i always use let)
             //}
             let scorenumber = 10;
-            if(this.type == 0) {
+            if(this.type == 0 || this.type == 5) {
                 if(power == 128) {
                     //do some math ykykyk
                     powerstreak += powerstreak < cpip.length-1 ? 1 : 0;
                     scorenumber = cpip[powerstreak];
                 }else {
-                    addPower(1);
+                    addPower(this.type == 5 ? 8 : 1);
                 }
             }else if(this.type == 1) {
                 pointCount++;
@@ -313,6 +355,8 @@ class Item extends Entity { //powerup/scoreitem
                 //power = 128;
                 //entities.push(new TextEnt(this.x+20, this.y+20, "full power achieved!!"))
                 scorenumber = 1000; //i think
+            }else if(this.type == 6) {
+                scorenumber;//uhh idk it's dependent on shit
             }
             entities.push(new ScoreEnt(this.x, this.y, scorenumber));
 
@@ -353,6 +397,8 @@ class Player extends Entity {
     //constructor(x,y,width,height) {
     //    super(x,y,width,height);
     //}
+    reachedFullPower = false;
+
     update(d2d) {
         if(GetKey(VK_SHIFT)) { //apparently i should actually use WM_KEYDOWN however i already wrote all this LO! (oh yeah another thing about getkey is that it works even if you aren't focused on the window)
             this.speed = 3;
@@ -371,9 +417,16 @@ class Player extends Entity {
         }
         if(GetKey("Z")) {
             //SHOOT
-            entities.push(new PlrShot(this.x, this.y, 0)); //oh shoot i haven't even made this yet
-            entities.push(new PlrShot(this.x, this.y, 10)); //oh shoot i haven't even made this yet
-            entities.push(new PlrShot(this.x, this.y, -10)); //oh shoot i haven't even made this yet
+            //entities.push(new PlrShot(this.x, this.y, 0)); //oh shoot i haven't even made this yet
+            //entities.push(new PlrShot(this.x, this.y, 10)); //oh shoot i haven't even made this yet
+            //entities.push(new PlrShot(this.x, this.y, -10)); //oh shoot i haven't even made this yet
+            if(powerLevel == 0 || powerLevel == 1) { //powerLevel == 1 because it adds your perk kimda thing like the spikes
+                entities.push(new PlrShot(this.x, this.y, 0));
+            }else if(powerLevel == 2) {
+                entities.push(new PlrShot(this.x-10, this.y, 0));
+                entities.push(new PlrShot(this.x+10, this.y, 0));
+            }
+            //print(powerLevel);
         }
         if(GetKeyDown("X")) {
             useBomb();
@@ -402,13 +455,27 @@ function windowProc(hwnd, msg, wp, lp) {
         brush = d2d.CreateSolidColorBrush(1.0,1.0,1.0);
         starPng = d2d.CreateBitmapFromFilename(__dirname+"/boxside.png");
         SetTimer(hwnd, 1, 16); //16.66666 -> 60fps (decimals aren't allowed for SetTimer though) 1000/16.6666666
+        let iid = 0;
+        let interval = 0;
+        print(iid = setInterval(() => {
+            print("SET INTERVAL WOAH");
+            interval++;
+            if(interval == 100) {
+                clearInterval(iid);
+            }
+        }, 100));
             //also if i wanted consistant fps i might have to use a loop and i might do it
     }else if(msg == WM_TIMER) {
         d2d.BeginDraw();
         d2d.Clear(0,0,0,.6); //in touhou 6 the weird trails effect was caused by the background changing or something lol
         //do waves kinda yk yky k
-        if(Date.now()/1000-startTime < 30) { //(nevermind i actually divided LO!) miliseconds because i don't divide Date.now()/1000 and startTime/1000
-            let time = Date.now()/1000-startTime; //as time goes on this variable will range from 0-30 seconds
+        if(GetKeyDown("J")) {
+            startTime += 5;
+        }else if(GetKeyDown("K")) {
+            startTime -= 5;
+        }
+        if(Date.now()/1000-startTime < 15) { //(nevermind i actually divided LO!) miliseconds because i don't divide Date.now()/1000 and startTime/1000
+            let time = Date.now()/1000-startTime; //as time goes on this variable will range from 0-15 seconds
             //print(Math.floor(time%2)==0, "wave 1");
             if(Math.floor(time%2) == 0) { //returns true every other second for an entire second
                 let i = time%1; //0 -> 1
@@ -421,10 +488,19 @@ function windowProc(hwnd, msg, wp, lp) {
                 brush.SetColor(1.0,0.0,0.0);
             }
             d2d.FillRectangle(0, 0, 20, 20, brush);
-        }else if(Date.now()/1000-startTime < 60) {
-            let time = Date.now()/1000-startTime-30; //must subtract 30 seconds because 30 seconds already passed
+        }else if(Date.now()/1000-startTime < 30) {
+            let time = Date.now()/1000-startTime-15; //must subtract 15 seconds because 15 seconds already passed
             //print(time, "wave2");
+            if(Math.floor(time%4) != 0) {
+                entities.push(new Bullet(gameWidth*Math.random(), 0, 0, 0));
+                brush.SetColor(0.0,1.0,0.0);
+            }else {
+                brush.SetColor(1.0,0.0,0.0);
+            }
+            d2d.FillRectangle(0, 0, 20, 20, brush);
         }
+
+        SetWindowText(hwnd, `Touhou 6 - ${Date.now()/1000-startTime}`)
 
         plr.update(d2d);
         
@@ -477,11 +553,13 @@ function windowProc(hwnd, msg, wp, lp) {
         del = []; //haha this goofy ahh line FROZE jbs3 and i wish it just flat out told me no const assignment but for some reason it doesn't like to tell me stuff like that (maybe i should try catch the whole thing (ok i tried to try catch the whole thing but nothing happened (probably because of the window loop) so im only `try`ing the windowProc func))
         lastTime = Date.now();
     }else if(msg == WM_LBUTTONDOWN) {
-        entities.push(new Item(LOWORD(lp), HIWORD(lp), 0));
-        entities.push(new CircleEffect(LOWORD(lp), HIWORD(lp), 10, 50, .5, 0, .5));
-        entities.push(new TextEnt(LOWORD(lp), HIWORD(lp), "HELP", .1)); //well damn the consequences of deleting objects based on position (this TextEnt was created in the same place as the CircleEffect and since the TextEnt is destroyed in .1 seconds it destroys both the circle and text because it checked only position)
+        let mouse = MAKEPOINTS(lp);
+        entities.push(new Item(mouse.x, mouse.y, 5));
+        entities.push(new CircleEffect(mouse.x, mouse.y, 10, 50, .5, 0, .5));
+        entities.push(new TextEnt(mouse.x, mouse.y, "HELP", .1)); //well damn the consequences of deleting objects based on position (this TextEnt was created in the same place as the CircleEffect and since the TextEnt is destroyed in .1 seconds it destroys both the circle and text because it checked only position)
+        entities.push(new TitleTextEnt(mouse.x, mouse.y, "TITLE! !", [.8,.8,1.0]));
     }else if(msg == WM_DESTROY) {
-        PostQuitMessage();
+        PostQuitMessage(0);
     }
 }
 

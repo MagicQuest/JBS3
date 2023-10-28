@@ -35,7 +35,7 @@ function windowProc(hwnd, msg, wp, lp) {
             DestroyWindow(hwnd);
         }
     }else if(msg == WM_DESTROY) {
-        PostQuitMessage();
+        PostQuitMessage(0);
     }//else if(msg == WM_MOUSEMOVE) {
         //mouse = GetMousePos();
         //print("mouse move");

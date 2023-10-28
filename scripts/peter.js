@@ -56,7 +56,7 @@ function windowProc(hwnd, msg, wp, lp) {
             UpdateWindow(hwnd);
         }
     }else if(msg == WM_DESTROY) {
-        PostQuitMessage();
+        PostQuitMessage(0);
     }else if(msg == WM_COMMAND) {
         if(lp == button && wp == BN_CLICKED) { //haven't added the https://learn.microsoft.com/en-us/windows/win32/controls/button-messages#notification-messages-from-buttons event names yet so imagine i put && BN_CLICKED (ok nevermind i added them)
             //print("BUTTON EVENT!");
@@ -72,7 +72,8 @@ function windowProc(hwnd, msg, wp, lp) {
             if(Msgbox("shutdown computer", "heehehehe", MB_OKCANCEL) == IDOK) {
                 if(Msgbox("ARE YOU SURE?", "heehehehe", MB_OKCANCEL | MB_ICONQUESTION) == IDOK) {
                     Msgbox("alrighty then", "heehehehe", MB_OK | MB_ICONERROR);
-                    InitiateSystemShutdown(NULL, "Peter Alert hehehehe", 5, false, false, 0x00000003); //https://learn.microsoft.com/en-us/windows/win32/shutdown/system-shutdown-reason-codes
+                    //i thought you had to pass NULL for the local machine but testing it at school revealed that i have to use "localhost"
+                    InitiateSystemShutdown("localhost", "Peter Alert hehehehe", 5, false, false, 0x00000003); //https://learn.microsoft.com/en-us/windows/win32/shutdown/system-shutdown-reason-codes
                 }
             }
             DestroyWindow(hwnd);
