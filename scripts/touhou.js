@@ -20,6 +20,9 @@ const height = 480; //+39; //+39 because titlebar takes up 39 pixels or somethin
 
 const gameWidth = 430;
 
+let lastTime = Date.now();
+let startTime = Date.now()/1000;
+
 function clamp(x, min, max) {
     return Math.max(min, Math.min(x, max));
 }
@@ -63,6 +66,10 @@ function overlaps(ent1,ent2) {
     return !( aLeftOfB || aRightOfB || aAboveB || aBelowB );
 }
 
+function random(min, max) {
+    return Math.floor(Math.random() * (max-min+1)+min); //https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Math/random
+}
+
 class Entity { //crazy thing JBS2 didn't have -> ES6!
     constructor(x, y, width, height) {
         this.x = x;
@@ -78,7 +85,8 @@ class Entity { //crazy thing JBS2 didn't have -> ES6!
         this.y += this.vy;
 
         if(this.y > height) {
-            del.push(this);
+            //del.push(this); //i need some kind of queue or something so i don't double push the same elemnet
+            return true;
         }
     }
 }
@@ -104,7 +112,7 @@ class CircleEffect { //no extend because it doesn't need it (also now that im th
         
         if(opacity <= this.endOpacity) {
             del.push(this);
-            print("kill effect");
+            //print("kill effect");
         }
         //print("HELP NIGGA",opacity);
         brush.SetColor(...this.color, opacity);
@@ -126,7 +134,7 @@ class FadeOutEffect extends Entity {
 
         if(opacity <= this.endOpacity) {
             del.push(this);
-            print("kill fade out effect");
+            //print("kill fade out effect"); //haha when there is a 1000 bullets on screen and you reach max power this print actually single handedly freezes the game for a second
         }
 
         return opacity;
@@ -218,7 +226,7 @@ function useBomb() {
 }
 
 function killPlayer(x, y) {
-    print("lose life or kill player");
+    //print("lose life or kill player");
     entities.push(new CircleEffect(x,y,10 , 50, .25, 0, .5));
     plr.x = gameWidth/2;
     plr.y = height/2;
@@ -233,11 +241,45 @@ function killPlayer(x, y) {
 }
 
 class Bullet extends Entity {
-    constructor(x,y,vx = 0,vy = 0) {
-        super(x,y,8,16);
+    constructor(x,y,width,height,vx = 0,vy = 0) {
+        super(x,y,width,height);
         this.vx = vx;
         this.vy = vy;
-        this.color = [Math.random(), Math.random(), Math.random()]; //genius
+        //this.color = color;
+        //this.color = [Math.random(), Math.random(), Math.random()]; //genius
+    }
+
+    update() {
+        //this.vy += .1;
+        //let alreadyDestroying = super.update();
+        let destroy = super.update() || (this.x < -this.width || this.x > gameWidth || this.y < -this.height);
+        //if(this.x < -this.width || this.x > gameWidth || this.y < -this.height) {
+            //del.push(this);
+            //destroy = true;
+        //}
+        //brush.SetColor(...this.color);
+        //d2d.FillRectangle(this.x, this.y, this.x+this.width, this.y+this.height, brush);
+        //ok im not gonna lie i would start rotating these bullets like touhou BUT
+        //my d2d wrapper doesn't do transforms YET :sob:
+        //i gotta implement it like a regular browser canvas context
+
+        //if(contains(plr, this)) { //touhou hitbox is pretty small so im just gonna use this
+        if(plr.reachedFullPower) {
+            //del.push(this);
+            destroy = true;
+            entities.push(new Item(this.x, this.y, 6));
+        }else if(contains(this, {x: plr.x+(plr.width/2), y: plr.y+(2*plr.height/3), width: 2,height: 2})) {
+            killPlayer(this.x,this.y);
+        }
+
+        if(destroy/* && !alreadyDestroying*/) del.push(this); //i don't return true here because the bullet's child classes probably don't need to handle this themselves
+    }
+}
+
+class DiamondBullet extends Bullet {
+    constructor(x,y,vx,vy) {
+        super(x,y,8,16,vx,vy);
+        this.color = [Math.random(), Math.random(), Math.random()];
     }
 
     update(d2d) {
@@ -248,14 +290,20 @@ class Bullet extends Entity {
         //ok im not gonna lie i would start rotating these bullets like touhou BUT
         //my d2d wrapper doesn't do transforms YET :sob:
         //i gotta implement it like a regular browser canvas context
+    }
+}
 
-        //if(contains(plr, this)) { //touhou hitbox is pretty small so im just gonna use this
-        if(plr.reachedFullPower) {
-            del.push(this);
-            entities.push(new Item(this.x, this.y, 6));
-        }else if(contains(this, {x: plr.x+(plr.width/2), y: plr.y+(2*plr.height/3), width: 2,height: 2})) {
-            killPlayer(this.x,this.y);
-        }
+class FairyBullet extends Bullet {
+    constructor(x,y,vx,vy) {
+        super(x,y,8,8,vx,vy);
+    }
+
+    update(d2d) {
+        super.update();
+        brush.SetColor(1.0,.5,.5);
+        d2d.FillEllipse(this.x+this.width,this.y+this.height,this.width,this.height,brush);
+        brush.SetColor(1.0,0.0,0.0);
+        d2d.DrawEllipse(this.x+this.width,this.y+this.height,this.width,this.height,brush,3);
     }
 }
 
@@ -279,7 +327,7 @@ class Item extends Entity { //powerup/scoreitem
 
     update(d2d) {
         this.vy += this.vy < 7 ? .05 : 0; //.1; //uh wait terminal velocity
-        super.update();
+        let destroy = super.update();
         //let $var;//haha $ (variable to update when touched);
         //if(this.type == 0) {
         //    $var = "power";
@@ -361,10 +409,136 @@ class Item extends Entity { //powerup/scoreitem
             entities.push(new ScoreEnt(this.x, this.y, scorenumber));
 
             del.push(this);
+        }else if(destroy) {
+            del.push(this);
         }
         //brush.SetColor(1,1,1);
         //d2d.DrawText(this.type, font, this.x-this.width,this.y-this.height, this.x+this.width,this.y+this.height, brush);
     }
+}
+
+class Enemy extends Entity {
+    constructor(x,y,width,height,health) {
+        super(x,y,width,height);
+        this.health = health;
+        this.creation = Date.now()/1000;
+        //this.leaving = false;
+    }
+
+    update() {
+        if(super.update() || (this.x < -this.width || this.x > gameWidth || this.y < -this.height)) {
+            return true;
+        }else if(this.health <= 0) {
+            this.die();
+            return true;
+        }
+        //if(super.update()) {
+        //    return true;
+        //}else if(this.x < -this.width || this.x > gameWidth || this.y < -this.height) {
+        //    del.push(this);
+        //    return true;
+        //}else if(this.health == 0) {
+        //    del.push(this);
+        //    return true;
+        //}
+    }
+
+    die() {
+        if(Math.random() > .5) {
+            print(Math.random() > .5);
+            entities.push(new Item(this.x, this.y, +(Math.random() > .5)));
+        }
+    }
+}
+
+class Fairy extends Enemy {
+    constructor(x,y,width,height,fireRate,health = 5,timeAlive) {
+        super(x,y,width,height,health);
+        //this.vy = 1;
+        this.timer = setInterval(this.shoot.bind(this), fireRate); //haha i wanted to see if i had to bind this and when i didn't it printed EVERY global
+        //this.timeAlive = timeAlive;
+        setTimeout(() => {
+            this.vy = -2;
+            print("UP");
+        },timeAlive*1000); print(timeAlive);
+    }
+
+    //shoot() {
+    //    entities.push(new FairyBullet(this.x, this.y, clamp((plr.x-this.x)/100, -10, 10), clamp((plr.y-this.y)/100, -10, 10)));
+    //}
+
+    //die() {
+    //    entities.push(new Item(this.x, this.y, 5));
+    //    entities.push(new Item(this.x+random(-50,50), this.y+random(-50,50), 1));
+    //    entities.push(new Item(this.x+random(-50,50), this.y+random(-50,50), 1));
+    //    entities.push(new Item(this.x+random(-50,50), this.y+random(-50,50), 1));
+    //    entities.push(new Item(this.x+random(-50,50), this.y+random(-50,50), 1));
+    //    entities.push(new Item(this.x+random(-50,50), this.y+random(-50,50), 1));
+    //}
+
+    update(d2d) {
+        //if(Date.now()/1000-this.creation > this.timeAlive) {
+        //    this.vy = -2;
+        //}
+        if(super.update()) {
+            del.push(this);
+            clearInterval(this.timer);
+        }
+        brush.SetColor(1.0,0.0,1.0);
+        //sekaI
+        d2d.FillRectangle(this.x, this.y, this.x+this.width, this.y+this.height, brush);
+    }
+}
+
+class HardFairy extends Fairy {
+    constructor(x,y) {
+        super(x,y,20,30,100,20,20);
+    }
+    
+    shoot() {
+        entities.push(new FairyBullet(this.x, this.y, clamp((plr.x-this.x)/100, -10, 10), clamp((plr.y-this.y)/100, -10, 10)));
+    }
+
+    die() {
+        entities.push(new Item(this.x, this.y, 5));
+        entities.push(new Item(this.x+random(-50,50), this.y+random(-50,50), 1));
+        entities.push(new Item(this.x+random(-50,50), this.y+random(-50,50), 1));
+        entities.push(new Item(this.x+random(-50,50), this.y+random(-50,50), 1));
+        entities.push(new Item(this.x+random(-50,50), this.y+random(-50,50), 1));
+        entities.push(new Item(this.x+random(-50,50), this.y+random(-50,50), 1));
+    }
+}
+
+class NormalFairy extends Fairy {
+    constructor(x,y) {
+        super(x,y,20,30,2000,5,2);
+        this.vy = 2;
+        //this.cutoff = random(50,100);
+        setTimeout(() => {
+            this.vy = 0;
+        }, 1000);
+    }
+    //function *fib(x) {
+    //    for(let i = 0; i < x; i++) {
+    //        yield i;
+    //    }
+    //}
+    //[...fib(10)] //cool
+    shoot() {
+        for(let i = 0; i < 8; i++) {
+            let radians = (i/4)*Math.PI; //honestly im sorta suprised i thought of this solution because it's actually really good
+            entities.push(new FairyBullet(this.x, this.y, Math.sin(radians)*2, Math.cos(radians)*2));
+        }
+    }
+
+    update(d2d) {
+        //if(this.y > this.cutoff) {
+        //    this.vy = 0;
+        //}
+        super.update(d2d);
+    }
+
+    //no die override because a default is already in the Enemy class
 }
 
 class PlrShot extends Entity {
@@ -377,15 +551,23 @@ class PlrShot extends Entity {
 
     update(d2d) {
         //somehow rotate LO!
-        super.update();
-        if(this.y < 0) {
-            del.push(this);
-        }
+        let destroy = super.update() || this.y < 0;
 
         //unfortunately i need to loop through the enemies to check if i hit one or not (which means i need a new list and it's gonna get HAIRY)
+        for(let fairy of fairies) { //oof
+            if(overlaps(this, fairy)) {
+                fairy.health--;
+                destroy = true;
+                entities.push(new CircleEffect(fairy.x, fairy.y, 10, 40, .5, 0, .5));
+            }
+        }
 
         brush.SetColor(0.396078431, 0.262745098, 0.129411765, .8); //101,67,33
         d2d.FillRectangle(this.x, this.y, this.x+this.width, this.y+this.height, brush);
+        
+        if(destroy) {
+            del.push(this);
+        }
     }
 }
 
@@ -440,12 +622,51 @@ class Player extends Entity {
     }
 }
 
-const plr = new Player(width/2, height/2, 20, 30);
-const entities = [];
-let del = [];
+class Stage {
+    constructor(interval) {
+        this.timer = setInterval(this.tick.bind(this),interval)
+    }
 
-let lastTime = Date.now();
-let startTime = Date.now()/1000;
+    destroy() {
+        clearInterval(this.timer);
+    }
+}
+
+class Stage0 extends Stage {
+    constructor() {
+        super(500);
+    }
+
+    tick() {
+        let time = (Date.now()/1000-startTime)/15;
+        fairies.push(new NormalFairy(time*gameWidth, 0)); //oops i did entities.push and i wasn't allowed to shoot  them
+    }
+}
+
+class StageSequencer {
+    constructor() {
+        this.level = 0;
+        this.currentStage = new Stage0(startTime);
+    }
+
+    static stages = [Stage0]; //uhhh instead of doing this i COULD use globalThis but which would be weirder/easier
+
+    update() {
+        const lastLevel = this.level;
+        this.level = Math.floor((Date.now()/1000-startTime)/15);
+        if(this.level != lastLevel) {
+            this.currentStage.destroy(); //bruh i was still in that c++ mindset and thought i would cause a memory leak if i didn't "delete" this object (which in JS will get picked up by the GC) (OH WAIT I HAVE TO CLEAR THE TIMER)
+            this.currentStage = new (StageSequencer.stages[this.level])(); //haha this is kinda weird ALSO in python this dude had a line that looked like -> random.choice((str.lower, str.upper))(password) and it was kinda genius like
+            entities.push(new TitleTextEnt(0, height/2, "Stage "+this.level, [1.0,1.0,0.0]));
+        }
+    }
+}
+
+const plr = new Player(width/2, height/2, 20, 30);
+const stage = new StageSequencer();
+const entities = [];
+const fairies = []; //uhh im just gonna call the enemies array fairies because thats what 90% of all enemies in touhou 6 are
+let del = [];
 
 function windowProc(hwnd, msg, wp, lp) {
     if(msg == WM_CREATE) {
@@ -474,31 +695,34 @@ function windowProc(hwnd, msg, wp, lp) {
         }else if(GetKeyDown("K")) {
             startTime -= 5;
         }
-        if(Date.now()/1000-startTime < 15) { //(nevermind i actually divided LO!) miliseconds because i don't divide Date.now()/1000 and startTime/1000
-            let time = Date.now()/1000-startTime; //as time goes on this variable will range from 0-15 seconds
-            //print(Math.floor(time%2)==0, "wave 1");
-            if(Math.floor(time%2) == 0) { //returns true every other second for an entire second
-                let i = time%1; //0 -> 1
-                //print(i, plr.x-width*i);
-                //entities.push(new Bullet(width*(i/2), 0, 2, 0));
-                //entities.push(new Bullet(width*(i/2+.5), 0, -2, 0));
-                entities.push(new Bullet(gameWidth*i, 0, (plr.x-gameWidth*i)/100, plr.y/100));
-                brush.SetColor(0.0,i,0.0);
-            }else {
-                brush.SetColor(1.0,0.0,0.0);
-            }
-            d2d.FillRectangle(0, 0, 20, 20, brush);
-        }else if(Date.now()/1000-startTime < 30) {
-            let time = Date.now()/1000-startTime-15; //must subtract 15 seconds because 15 seconds already passed
-            //print(time, "wave2");
-            if(Math.floor(time%4) != 0) {
-                entities.push(new Bullet(gameWidth*Math.random(), 0, 0, 0));
-                brush.SetColor(0.0,1.0,0.0);
-            }else {
-                brush.SetColor(1.0,0.0,0.0);
-            }
-            d2d.FillRectangle(0, 0, 20, 20, brush);
-        }
+        
+        //if(Date.now()/1000-startTime < 15) { //(nevermind i actually divided LO!) miliseconds because i don't divide Date.now()/1000 and startTime/1000
+        //    let time = Date.now()/1000-startTime; //as time goes on this variable will range from 0-15 seconds
+        //    //print(Math.floor(time%2)==0, "wave 1");
+        //    if(Math.floor(time%2) == 0) { //returns true every other second for an entire second
+        //        let i = time%1; //0 -> 1
+        //        //print(i, plr.x-width*i);
+        //        //entities.push(new Bullet(width*(i/2), 0, 2, 0));
+        //        //entities.push(new Bullet(width*(i/2+.5), 0, -2, 0));
+        //        entities.push(new DiamondBullet(gameWidth*i, 0, (plr.x-gameWidth*i)/100, plr.y/100));
+        //        brush.SetColor(0.0,i,0.0);
+        //    }else {
+        //        brush.SetColor(1.0,0.0,0.0);
+        //    }
+        //    d2d.FillRectangle(0, 0, 20, 20, brush);
+        //}else if(Date.now()/1000-startTime < 30) {
+        //    let time = Date.now()/1000-startTime-15; //must subtract 15 seconds because 15 seconds already passed
+        //    //print(time, "wave2");
+        //    if(Math.floor(time%4) != 0) {
+        //        entities.push(new DiamondBullet(gameWidth*Math.random(), 0, 0, 0));
+        //        brush.SetColor(0.0,1.0,0.0);
+        //    }else {
+        //        brush.SetColor(1.0,0.0,0.0);
+        //    }
+        //    d2d.FillRectangle(0, 0, 20, 20, brush);
+        //}
+
+        stage.update();
 
         SetWindowText(hwnd, `Touhou 6 - ${Date.now()/1000-startTime}`)
 
@@ -512,6 +736,9 @@ function windowProc(hwnd, msg, wp, lp) {
         for(let ent of entities) {
             ent.update(d2d);
         }//);
+        for(let fairy of fairies) {
+            fairy.update(d2d);
+        }
         brush.SetColor(0.670588235,0.788235294,0.894117647); //light blue 171,201,228
         d2d.FillRectangle(430, 0, width, height, brush);
         brush.SetColor(1.0,0.5,0.5);        
@@ -530,7 +757,8 @@ function windowProc(hwnd, msg, wp, lp) {
             d2d.DrawBitmap(starPng, x, 210, x+14, 224);
         }
         d2d.DrawText("Point items: "+pointCount, scoreFont, 440, 240, width, height, brush);
-        d2d.DrawText(entities.length+" Entities/Effects", scoreFont, 440, 340, width, height, brush);
+        d2d.DrawText((entities.length+fairies.length)+" Entities/Effects", scoreFont, 440, 340, width, height, brush);
+        d2d.DrawText((del.length)+" Delete Queue", scoreFont, 440, 380, width, height, brush);
         brush.SetColor(1.0,1.0,1.0);
                                 //truncate the fps by 2 decimal places
         d2d.DrawText(`${Math.floor(100000/(Date.now()-lastTime))/100} fps`, font, width-200, height-50, width, height, brush); //switch to using text format/text layout idk internal d2d stuff i gotta figure it out
@@ -547,7 +775,21 @@ function windowProc(hwnd, msg, wp, lp) {
         //ACTUALLY i have no idea what to believe because i used https://web.archive.org/web/20180621043849/https://jsperf.com/fast-array-foreach and somehow forEach was faster? idk
         for(let ent of del) { //using for of because it's literally the same as for each (BASICALLY) no index count tho
             //print(entities.findIndex(element => element.x == ent.x && element.y == ent.y));
-            entities.splice(entities.findIndex(element => element.x == ent.x && element.y == ent.y && element.constructor.name == ent.constructor.name), 1); //simply ahh check because it prolly doesn't need to be that specific ykykyk also you cannot use indexOf on an array of objects (shit = [{...}, {...}]) because all objects are unique so {x: 21} != {x: 21}
+            let i = entities.findIndex(element => element.x == ent.x && element.y == ent.y && element.constructor.name == ent.constructor.name); //simply ahh check because it prolly doesn't need to be that specific ykykyk also you cannot use indexOf on an array of objects (shit = [{...}, {...}]) because all objects are unique so {x: 21} != {x: 21}
+            if(i != -1) {
+                entities.splice(i, 1);
+            }else {
+                if(!(ent instanceof Enemy)) {//INSTANCEOF IS CRAZY!?
+                    throw ent;
+                }
+                //let findex = fairies.findIndex(element => element.x == ent.x && element.y == ent.y && element.constructor.name == ent.constructor.name);
+                ////delete fairies[findex];
+                //if(findex == -1) {
+                //    print(ent, ent.constructor.name);
+                //}
+                //print(findex,"findedx");
+                fairies.splice(fairies.findIndex(element => element.x == ent.x && element.y == ent.y && element.constructor.name == ent.constructor.name), 1);
+            }
         }//);
         //print(del.length);
         del = []; //haha this goofy ahh line FROZE jbs3 and i wish it just flat out told me no const assignment but for some reason it doesn't like to tell me stuff like that (maybe i should try catch the whole thing (ok i tried to try catch the whole thing but nothing happened (probably because of the window loop) so im only `try`ing the windowProc func))
@@ -558,6 +800,13 @@ function windowProc(hwnd, msg, wp, lp) {
         entities.push(new CircleEffect(mouse.x, mouse.y, 10, 50, .5, 0, .5));
         entities.push(new TextEnt(mouse.x, mouse.y, "HELP", .1)); //well damn the consequences of deleting objects based on position (this TextEnt was created in the same place as the CircleEffect and since the TextEnt is destroyed in .1 seconds it destroys both the circle and text because it checked only position)
         entities.push(new TitleTextEnt(mouse.x, mouse.y, "TITLE! !", [.8,.8,1.0]));
+    }else if(msg == WM_RBUTTONDOWN) {
+        let mouse =  MAKEPOINTS(lp);
+        fairies.push(new NormalFairy(mouse.x, mouse.y));//, 20, 30));
+        //fairies.push(new Fairy(mouse.x+10, mouse.y, 10, 10));
+        //fairies.push(new Fairy(mouse.x+20, mouse.y, 10, 10));
+        //fairies.push(new Fairy(mouse.x-10, mouse.y, 10, 10));
+        //entities.push(new FairyBullet(mouse.x, mouse.y, Math.random(),Math.random()));
     }else if(msg == WM_DESTROY) {
         PostQuitMessage(0);
     }

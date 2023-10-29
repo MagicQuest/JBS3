@@ -39,6 +39,7 @@ public:
 		CHECKEXCEPTIONS(shit);
 		KillTimer(NULL, id);
 		delete timers[id]; //hey this is just like poor man's set timeout!
+		timers.erase(id); //oops forgot that
 	}
 };
 
