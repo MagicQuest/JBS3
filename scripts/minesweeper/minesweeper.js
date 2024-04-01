@@ -13,7 +13,7 @@ const tiles = [];
 const trolIcon = LoadImage(NULL, `${__dirname}/troll.ico`, IMAGE_ICON, 0, 0, LR_SHARED | LR_LOADFROMFILE);
 
 let d2d;
-let tileBmp, bombBmp, flagBmp, revealedBmp;//, tiledRevealedBmp, revealedBmpBrush;//, tileBmpBrush;
+let tileBmp, bombBmp, flagBmp, revealedBmp, backgroundImg;//, tiledRevealedBmp, revealedBmpBrush;//, tileBmpBrush;
 let font, colorBrush;
 
             //number colors i.e
@@ -42,7 +42,9 @@ class Tile {
                     //d2d.DrawBitmap(revealedBmp, x*BB, y*BB, x*BB+BB, y*BB+BB, 1.0);
                     //print("revealBmp");
                     //}else {
-                d2d.DrawBitmap(revealedBmp, x*BB, y*BB, x*BB+BB, y*BB+BB, 1.0);
+                if(!backgroundImg) {
+                    d2d.DrawBitmap(revealedBmp, x*BB, y*BB, x*BB+BB, y*BB+BB, 1.0);
+                }
                 if(this.neighbors) {
                     colorBrush.SetColor(...colors[this.neighbors-1]);
                     d2d.DrawText(this.neighbors, font, x*BB, y*BB-5, x*BB+BB, y*BB+BB, colorBrush);
@@ -116,8 +118,9 @@ for(let i = 0; i < res; i++) {
 
 const gdiFonts = [];
 
-function init(hwnd) {   
-    d2d = createCanvas("d2d", ID2D1DCRenderTarget, hwnd); //with ID2D1DCRenderTarget you are allowed to draw to the desktop by setting hwnd to null!
+function init(hwnd) {
+                    //for some reason using ID2D1DCRenderTarget started glitching out (it wouldn't show minesweeper it would just copy a frame of the desktop?)
+    d2d = createCanvas("d2d", ID2D1RenderTarget, hwnd); //with ID2D1DCRenderTarget you are allowed to draw to the desktop by setting hwnd to null!
                         //just created __dirname for this example
     tileBmp = d2d.CreateBitmapFromFilename(`${__dirname}/tile.png`);//"D:/scripts/jbs/minesweeper/tile.png");
     bombBmp = d2d.CreateBitmapFromFilename(`${__dirname}/tile_bomb.png`);
@@ -191,13 +194,20 @@ function windowProc(hwnd, msg, wp, lp) {
         if(bombs == 0) {
             SetWindowText(window, `Minesweeper - JBS (YOU WON!!!)`);
         }else {
-            SetWindowText(window, `Minesweeper - JBS (${bombs} bombs left)`);
+            SetWindowText(window, `Minesweeper - JBS (${bombs} bombs left)${!backgroundImg ? " - Press 'P' to change the background image!" : ""}`);
         }
     }else if(msg == WM_PAINT) {
         const bp = BeginPaint(hwnd);
         SetTextColor(bp.hdc, RGB(Math.random()*255, Math.random()*255, Math.random()*255));
         TextOut(bp.hdc, 100, 100, "niger"); //lol this is hidden behind the tiles
         EndPaint(hwnd, bp);
+    }else if(msg == WM_KEYDOWN) {
+        if(wp == "P".charCodeAt(0)) {
+            img = showOpenFilePicker({types: [{description: "Images", accept: [".png", ".jp*", ".bmp"]}]});
+            if(img) {
+                backgroundImg = d2d.CreateBitmapFromFilename(img);
+            }
+        }
     }else if(msg == WM_DESTROY) {
         PostQuitMessage(0);
     }
@@ -223,6 +233,10 @@ function loop() {
         let dt = Date.now()/1000-date;
 
         d2d.BeginDraw();
+
+        if(backgroundImg) {
+            d2d.DrawBitmap(backgroundImg, 0, 0, bounds, bounds);
+        }
 
         //d2d.DrawBitmap(tiledRevealedBmp, 0, 0, bounds, bounds);
         //d2d.FillRectangle(0,0,bounds,bounds,revealedBmpBrush);
@@ -323,7 +337,7 @@ WINCLASSEXW.hCursor = defaultCursor;
 //WINCLASSEXA.hIcon = trolIcon;
 //WINCLASSEXA.hIconSm = trolIcon;
 
-window = CreateWindow(WS_EX_OVERLAPPEDWINDOW, WINCLASSEXW/*A*/, `😂Minesweeper - JBS (${bombs} bombs left)`, WS_OVERLAPPEDWINDOW | WS_VISIBLE, 250, 0, bounds+16, bounds+39, NULL, NULL, hInstance);
+window = CreateWindow(WS_EX_OVERLAPPEDWINDOW, WINCLASSEXW/*A*/, `😂Minesweeper - JBS (${bombs} bombs left)${!backgroundImg ? " - Press 'P' to change the background image!" : ""}`, WS_OVERLAPPEDWINDOW | WS_VISIBLE, 250, 0, bounds+16, bounds+39, NULL, NULL, hInstance);
 
 console.log(window, args);
 

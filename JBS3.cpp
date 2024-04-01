@@ -121,6 +121,7 @@
 #include <windows.h>
 //#include "guicon.h"
 #include "console2.h"
+#include <shobjidl_core.h> //for showOpenFilePicker (IFileDialog)
 //#include <wincodec.h> //wait why did i include this? (it was for Direct2D)
 
 #pragma comment(lib, "windowscodecs.lib")
@@ -306,10 +307,9 @@ namespace fs {
 
         std::wstring shit;
 
-        std::ifstream file((wchar_t*)*String::Value(info.GetIsolate(), info[0]));//, std::ios::binary);
+        std::wifstream file((wchar_t*)*String::Value(info.GetIsolate(), info[0]));//, std::ios::binary);
 
         if (file.is_open()) {
-            
             //i hate reading files in c++
             buffer << file.rdbuf();
             shit = buffer.str();
@@ -317,6 +317,9 @@ namespace fs {
             //v8::Local<String> str = String::NewFromUtf8(info.GetIsolate(), tempstring.c_str()).ToLocalChecked();
             //str->WriteOneByte(info.GetIsolate(), (uint8_t*)(shit.c_str()), 0, shit.length(), v8::String::NO_NULL_TERMINATION);
             //str->WriteUtf8(info.GetIsolate(), (char*)shit.c_str(), shit.length(),nullptr, v8::String::NO_NULL_TERMINATION);
+            //std::wcout << shit << std::endl;
+            //wchar_t* memleak = new wchar_t[shit.size()];
+            //memcpy(memleak, shit.c_str(), sizeof(wchar_t)*shit.size());
 
                 info.GetReturnValue().Set(String::NewFromTwoByte(info.GetIsolate(), (const uint16_t*)shit.c_str()).ToLocalChecked());
                 //info.GetReturnValue().Set(str);
@@ -337,7 +340,7 @@ namespace fs {
 
         std::wstring shit;
 
-        std::ifstream file((wchar_t*)*String::Value(info.GetIsolate(), info[0]), std::ios::binary);
+        std::wifstream file((wchar_t*)*String::Value(info.GetIsolate(), info[0]), std::ios::binary);
 
         if (file.is_open()) {
 
@@ -374,7 +377,7 @@ namespace fs {
 
     void write(const v8::FunctionCallbackInfo<v8::Value>& info) {
         using v8::String;
-        std::ofstream file((wchar_t*)*String::Value(info.GetIsolate(), info[0]));
+        std::wofstream file((wchar_t*)*String::Value(info.GetIsolate(), info[0]));
 
         if (file.is_open()) {
             //file.write(*String::Utf8Value(info.GetIsolate(), info[1]), );
@@ -4351,6 +4354,272 @@ V8FUNC(DefWindowProcWrapper) {
     info.GetReturnValue().Set(Number::New(isolate, DefWindowProcW((HWND)IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]))));
 }
 
+V8FUNC(SwitchToThisWindowWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    //#error lol i haven't added this func to the jbs extension so don't compuile this hoe
+    SwitchToThisWindow((HWND)IntegerFI(info[0]), IntegerFI(info[1]));
+}
+
+void showFilePicker(const v8::FunctionCallbackInfo<v8::Value>& info, bool saveDialog) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    //i could use a promise but idk if i can be bothered
+    Local<Object> options = info[0].As<Object>();
+
+    bool multiple = false;
+    //Local<Value> mult;
+    //options->HasRealNamedProperty(isolate->GetCurrentContext(), LITERAL("multiple")).FromJust();
+    if (options->HasRealNamedProperty(isolate->GetCurrentContext(), LITERAL("multiple")).FromJust()) {
+        multiple = options->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("multiple")).ToLocalChecked()->BooleanValue(isolate); //this seems so weird they gotta have a better way but it kept crashing when i tried to do it
+    }
+    bool excludeAcceptAll = false;
+    //Local<Value> exclude;
+    //options->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("excludeAcceptAllOption")).ToLocal(&exclude);
+    if (options->HasRealNamedProperty(isolate->GetCurrentContext(), LITERAL("excludeAcceptAllOption")).FromJust()) {
+        excludeAcceptAll = options->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("excludeAcceptAllOption")).ToLocalChecked()->BooleanValue(isolate); //this seems so weird they gotta have a better way but it kept crashing when i tried to do it
+    }
+
+    bool hasTypes = options->HasRealNamedProperty(isolate->GetCurrentContext(), LITERAL("types")).FromJust();
+
+    IFileDialog* pfd;
+
+    // CoCreate the dialog object.
+    HRESULT hr = CoCreateInstance((saveDialog ? CLSID_FileSaveDialog : CLSID_FileOpenDialog),//CLSID_FileOpenDialog,
+        NULL,
+        CLSCTX_INPROC_SERVER,
+        IID_PPV_ARGS(&pfd));
+
+    if (SUCCEEDED(hr))
+    {
+        DWORD dwOptions;
+        // Specify multiselect.
+        hr = pfd->GetOptions(&dwOptions);
+
+
+        if (SUCCEEDED(hr))
+        {
+            if (multiple) {
+                /*hr = */pfd->SetOptions(dwOptions | FOS_ALLOWMULTISELECT);
+            }
+            int saveTypesCount = excludeAcceptAll ? 0 : 1;
+            Local<Array> types;
+            if (hasTypes) { //ok bruh i learned a lot about this memory shit trying to make this work but honestly i don't think it's worth it (im actually just gonna use COM)
+                types = options->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("types")).ToLocalChecked().As<Array>();
+                saveTypesCount += types->Length();
+            }
+            COMDLG_FILTERSPEC* c_rgSaveTypes = new COMDLG_FILTERSPEC[saveTypesCount];
+            if(hasTypes) { //this is really ugly but not as ugly as i originally had in mind (having 2 checks for hasTypes)
+                for (int i = 0; i < types->Length(); i++) {
+                    Local<Object> typeInfo = types->Get(isolate->GetCurrentContext(), i).ToLocalChecked().As<Object>();
+                    Local<String> desc = typeInfo->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("description")).ToLocalChecked().As<String>();
+                    Local<Array> acceptTypes = typeInfo->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("accept")).ToLocalChecked().As<Array>();
+                    
+                    std::wstring aTWS = std::wstring();
+
+                    for (int j = 0; j < acceptTypes->Length(); j++) {
+                        const wchar_t* aTS = WStringFI(acceptTypes->Get(isolate->GetCurrentContext(), j).ToLocalChecked());
+                        if (aTS[0] == '.') {
+                            aTWS += '*'; //gotta add the * because .png wont work but *.png will
+                        }
+                        aTWS += aTS;
+                        //if (acceptTypes->Length() == 1 || acceptTypes->Length() - 1 == j) {
+                            
+                        //}
+                        //else {
+                        if(acceptTypes->Length() > 1 && acceptTypes->Length() - 1 != j) {
+                            //aTWS += WStringFI(acceptTypes->Get(isolate->GetCurrentContext(), j).ToLocalChecked());
+                            aTWS += L';';
+                        }
+                    }
+
+                    c_rgSaveTypes[i] = { WStringFI(desc), aTWS.c_str()}; //lets hope this c_str() keeps working outside this scope
+                }
+            }
+            if (!excludeAcceptAll) {
+                c_rgSaveTypes[saveTypesCount - 1] = { L"All Files (*.*)", L"*.*" };
+            }
+
+            //pfd->SetFileTypes(ARRAYSIZE(c_rgSaveTypes), c_rgSaveTypes); //when using new for c_rgSaveTypes ARRAYSIZE gives me an error and it suggests _ARRAYSIZE so lets see
+            //alright bruh this is all stupid the only thing arraysize did was literally say how many {}s were inside c_rgSaveTypes (which is saveTypesCount)
+            pfd->SetFileTypes(saveTypesCount, c_rgSaveTypes);
+            // Show the Open dialog.
+            hr = pfd->Show(NULL);
+
+            if (SUCCEEDED(hr))
+            {
+                // Obtain the result of the user interaction.
+                if (!saveDialog) {
+                    IShellItemArray* psiaResults;
+                    IFileOpenDialog* ifod;
+                    hr = pfd->QueryInterface(&ifod); //what the hell this is the only time i've ever used QueryInterface and it lowkey actually worked??? (it crashed when i tried casting pfd as IFileOpenDialog*)
+                    if (SUCCEEDED(hr)) {
+                        hr = ifod->GetResults(&psiaResults);
+
+                        if (SUCCEEDED(hr))
+                        {
+                            DWORD items;
+                            if (SUCCEEDED(psiaResults->GetCount(&items))) {
+                                std::cout << items << std::endl;
+                                Local<Array> jsArr = Array::New(isolate, items);
+                                for (int i = 0; i < items; i++) {
+                                    IShellItem* shellItem; //should i release this object? (for some reason they don't in the docs and maybe they are released when psiaResults are released that sorta thing)
+                                    if (SUCCEEDED(psiaResults->GetItemAt(i, &shellItem))) {
+                                        wchar_t* path = NULL; //it's so weird and kinda annoying how they use special types like PWSTR and half of them mean the exact same thing
+                                        if (SUCCEEDED(shellItem->GetDisplayName(SIGDN_FILESYSPATH, &path))) {
+                                            //info.GetReturnValue().Set(String::NewFromTwoByte(isolate, (const uint16_t*)path).ToLocalChecked());
+                                            jsArr->Set(isolate->GetCurrentContext(), i, String::NewFromTwoByte(isolate, (const uint16_t*)path).ToLocalChecked());
+                                        }
+                                    }
+                                    shellItem->Release();
+                                }
+                                info.GetReturnValue().Set(jsArr);
+                            }
+                            //
+                            // You can add your own code here to handle the results.
+                            //
+                            psiaResults->Release();
+                        }
+                    }
+                }else {
+                    IShellItem* shellItem;
+                    if (SUCCEEDED(pfd->GetResult(&shellItem))) {
+                        wchar_t* path = NULL;
+                        if (SUCCEEDED(shellItem->GetDisplayName(SIGDN_FILESYSPATH, &path))) {
+                            info.GetReturnValue().Set(String::NewFromTwoByte(isolate, (const uint16_t*)path).ToLocalChecked());
+                        }
+                    }
+                    shellItem->Release();
+                }
+            }
+            delete[] c_rgSaveTypes;
+        }
+        pfd->Release();
+    }
+
+    /*OPENFILENAME ofn; //Starting with Windows Vista, the Open and Save As common dialog boxes have been superseded by the Common Item Dialog (im not using all that bruh IFileDialog uses COM and the "basic" example is complicated ASL)
+
+    wchar_t file_name[MAX_PATH]{};
+
+    ZeroMemory(&ofn, sizeof(OPENFILENAME));
+    ofn.lStructSize = sizeof(OPENFILENAME);
+    ofn.lpstrFile = file_name;
+    ofn.lpstrFile[0] = L'\0';
+    ofn.nMaxFile = MAX_PATH;
+    wchar_t filter[MAX_PATH]{};
+    if (!excludeAcceptAll) {
+        //memcpy(filter, L"All Files (*.*)\0*.*\0", 20); //yeah this is sus as fuck lemme breakpoint (honestly wait i can just wcscat)
+        wcscat(filter, L"All Files (*.*)\0*.*\0");
+    }
+    if (options->HasRealNamedProperty(isolate->GetCurrentContext(), LITERAL("types")).FromJust()) { //ok bruh i learned a lot about this memory shit trying to make this work but honestly i don't think it's worth it (im actually just gonna use COM)
+        Local<Array> types = options->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("types")).ToLocalChecked().As<Array>();
+        for (int i = 0; i < types->Length(); i++) {
+            Local<Object> typeInfo = types->Get(isolate->GetCurrentContext(), i).ToLocalChecked().As<Object>();
+            Local<String> desc = typeInfo->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("description")).ToLocalChecked().As<String>();
+            Local<Array> acceptTypes = typeInfo->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("accept")).ToLocalChecked().As<Array>();
+            
+            //sorry buddy i don't think im doing mime types idk bruh we gonna have to see
+
+            //int size = desc->Length() + acceptTypes->Length() + 2; //bruh last night right when i went to bed i realized im not calculating size right and idk how it's been working this whole time
+            int size = desc->Length() + 2; //+2 because null char after description and after the types (desc\0types\0)
+            if (acceptTypes->Length() > 1) {
+                size += acceptTypes->Length() - 1;
+            }
+
+            //OMY GOD I JUST REALIZEDF I COULD'VE USED WSTRING RTHIS WHOLE TIME???? (i've already given up on this approach but THERE'S NO WAY) WHILKE I WAS WEARCHING FOR WCSCAT I SAW SOMEONE USE WSTRING AND IT DIDN'T EVEN PIERCE MY BRAIN
+
+            //wchar_t* combined = nullptr; //bruh i gotta do this the old fashioned way
+            //memset(combined, 0, size); //i was tryna be cheeky and use memset because i wanted a variable sized array but apparently i should've used calloc or not had combined be a pointer (ok this last one is cap)
+            wchar_t* combined = new wchar_t[size];//(wchar_t*)calloc(0, size); //lol i just wanted to see if i could use calloc but honestly im just gonna use new
+                                //what a fun line
+
+            wcscat(combined, WStringFI(desc));
+            //wcscat(combined, L"\0"); (ok it has come to my attention that appending null characters lowkey doesn't work with wcscat)
+            combined[desc->Length()] = L'\0'; //seems right to me
+
+            for (int j = 0; j < acceptTypes->Length(); j++) {
+                if (acceptTypes->Length() == 1 || acceptTypes->Length() - 1 == j) {
+                    wcscat(combined, WStringFI(acceptTypes->Get(isolate->GetCurrentContext(), j).ToLocalChecked()));
+                }
+                else {
+                    wcscat(combined, WStringFI(acceptTypes->Get(isolate->GetCurrentContext(), j).ToLocalChecked()));
+                    wcscat(combined, L";");
+                }
+            }
+
+            combined[size-1]
+            wcscat(filter, combined);
+            //wcscat(filter, L"\0"); //now the last fix was easy but i might be cooked here
+
+            //free(combined);
+            delete[] combined;
+        }
+    }
+    ofn.lpstrFilter = filter;
+    //ofn.lpstrFilter = L"All Files (*.*)\0*.*\0niggers\0*.png;*.gif\0";
+    ofn.nFilterIndex = 1;
+    ofn.Flags = multiple ? OFN_ALLOWMULTISELECT | OFN_EXPLORER : 0;
+
+    GetOpenFileName(&ofn);
+
+    //could do (int) or + (nevermind i couldn't find anybody say it again lets try it tho)
+    if (+file_name[0]) {
+        info.GetReturnValue().Set(String::NewFromTwoByte(isolate, (uint16_t*)file_name, v8::NewStringType::kNormal, MAX_PATH).ToLocalChecked());
+        //changePicture(file_name);
+    }*/
+
+}
+
+void showOpenFilePicker(const v8::FunctionCallbackInfo<v8::Value>& info) {
+    showFilePicker(info, false);
+}
+
+void showSaveFilePicker(const v8::FunctionCallbackInfo<v8::Value>& info) {
+    showFilePicker(info, true);
+}
+
+void showDirectoryPicker(const v8::FunctionCallbackInfo<v8::Value>& info) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    //i could use a promise but idk if i can be bothered
+    IFileDialog* pfd;
+
+    // CoCreate the dialog object.
+    HRESULT hr = CoCreateInstance(CLSID_FileOpenDialog,//CLSID_FileOpenDialog,
+        NULL,
+        CLSCTX_INPROC_SERVER,
+        IID_PPV_ARGS(&pfd));
+
+    if (SUCCEEDED(hr))
+    {
+        DWORD dwOptions;
+        // Specify multiselect.
+        hr = pfd->GetOptions(&dwOptions);
+
+        if (SUCCEEDED(hr))
+        {
+            /*hr = */pfd->SetOptions(dwOptions | FOS_PICKFOLDERS);
+
+            hr = pfd->Show(NULL);
+
+            if (SUCCEEDED(hr))
+            {
+                // Obtain the result of the user interaction.
+
+                IShellItem* shellItem;
+                if (SUCCEEDED(pfd->GetResult(&shellItem))) {
+                    wchar_t* path = NULL;
+                    if (SUCCEEDED(shellItem->GetDisplayName(SIGDN_FILESYSPATH, &path))) {
+                        info.GetReturnValue().Set(String::NewFromTwoByte(isolate, (const uint16_t*)path).ToLocalChecked());
+                    }
+                }
+                shellItem->Release();
+            }
+        }
+        pfd->Release();
+    }
+}
+
 v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     using namespace v8;
 
@@ -4479,6 +4748,12 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     //setGlobalWrapper(DwmEnableComposition);
     setGlobalWrapper(NCCALCSIZE_PARAMS);
     setGlobalWrapper(DefWindowProc);
+
+    setGlobalWrapper(SwitchToThisWindow);
+
+    setGlobal(showOpenFilePicker);
+    setGlobal(showSaveFilePicker);
+    setGlobal(showDirectoryPicker);
 
     setGlobalConst(DWM_BB_BLURREGION); setGlobalConst(DWM_BB_ENABLE); setGlobalConst(DWM_BB_TRANSITIONONMAXIMIZED);
 
@@ -5137,15 +5412,15 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
 
     setGlobalConst(HS_BDIAGONAL); setGlobalConst(HS_CROSS); setGlobalConst(HS_DIAGCROSS); setGlobalConst(HS_FDIAGONAL); setGlobalConst(HS_HORIZONTAL); setGlobalConst(HS_VERTICAL);
 
-    global->Set(isolate, "HELP", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-        using namespace v8;
-        Isolate* isolate = info.GetIsolate();
-        HandleScope handle_scope(isolate);
-        //print(CStringFI(info[0]));
-        //const char* shit = (const char*)IntegerFI(info[0]);
-        std::string shit = *(std::string*)IntegerFI(info[0]);
-        print(shit);
-    }));
+    //global->Set(isolate, "HELP", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+    //    using namespace v8;
+    //    Isolate* isolate = info.GetIsolate();
+    //    HandleScope handle_scope(isolate);
+    //    //print(CStringFI(info[0]));
+    //    //const char* shit = (const char*)IntegerFI(info[0]);
+    //    std::string shit = *(std::string*)IntegerFI(info[0]);
+    //    print(shit);
+    //}));
 
     global->Set(isolate, "wprint", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
         using namespace v8;
@@ -5223,7 +5498,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInstance, char* nCmdList, int
     //ok 1.3.2 because i changed child_process to system
     //1.3.3 because i finally figured out how to get Utf16 strings as wchars
     //1.4.3 because i finally figured out how to get Utf16 strings as wchars (and completely changed how CreateWindow works)
-    print("JBS3 -> Version 1.4.3"); //so idk how normal version things work so the first number will probably stay one --- i will increment the second number if i change an existing function like when i remade the CreateWindowClass and CreateWindow functions --- i might random increment the third number if i feel like it
+    print("JBS3 -> Version 1.4.4"); //so idk how normal version things work so the first number will probably stay one --- i will increment the second number if i change an existing function like when i remade the CreateWindowClass and CreateWindow functions --- i might random increment the third number if i feel like it
     print(screenWidth << "x" << screenHeight);
     
 
@@ -5386,14 +5661,14 @@ https://forums.codeguru.com/showthread.php?69236-How-to-obtain-HINSTANCE-using-H
                         //v8::String::Utf8Value utf8(isolate, result);
                         //printf("%s\n", *utf8);
                         using namespace v8;
-                        if (!result->IsNullOrUndefined()) {
+                        //if (!result->IsNullOrUndefined()) { //huh i wonder why i included this
                             printf("%s", Highlight(isolate, GetStdHandle(STD_OUTPUT_HANDLE), result));
                             printf("%s", CStringFI(result));
 
                             printf("\n");
                             fflush(stdout);
                             SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), 7);
-                        }
+                        //}
                     }
                 }
                 //using namespace v8;
@@ -5424,14 +5699,14 @@ https://forums.codeguru.com/showthread.php?69236-How-to-obtain-HINSTANCE-using-H
                             //v8::String::Utf8Value utf8(isolate, result);
                             //printf("%s\n", *utf8);
                             using namespace v8;
-                            if (!result->IsNullOrUndefined()) {
+                            //if (!result->IsNullOrUndefined()) {
                                 printf("%s", Highlight(isolate, GetStdHandle(STD_OUTPUT_HANDLE), result));
                                 printf("%s", CStringFI(result));
 
                                 printf("\n");
                                 fflush(stdout);
                                 SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), 7);
-                            }
+                            //}
                         }
                     }
                 }

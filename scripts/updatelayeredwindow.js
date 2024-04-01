@@ -39,7 +39,7 @@ function windowProc(hwnd, msg, wp, lp) {
         //DeleteDC(memDC);
         //print(GetObjectDIBITMAP(windowBmp));
         ReleaseDC(hwnd, dc);
-    }else if(msg == WS_DESTROY) {
+    }else if(msg == WM_DESTROY) {
         PostQuitMessage(0);
     }
 }

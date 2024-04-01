@@ -70,6 +70,10 @@ function random(min, max) {
     return Math.floor(Math.random() * (max-min+1)+min); //https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Math/random
 }
 
+function getMagnitude(x,y) {
+    return Math.sqrt(x**2 + y**2);
+}
+
 class Entity { //crazy thing JBS2 didn't have -> ES6!
     constructor(x, y, width, height) {
         this.x = x;
@@ -351,8 +355,9 @@ class Item extends Entity { //powerup/scoreitem
         brush.SetColor(...Item.colors[this.type]);
         d2d.FillRoundedRectangle(this.x, this.y, this.x+this.width, this.y+this.height, 2, 2, brush);
         if((power == 128 && plr.y < 100) || this.type == 6) {
-            this.x += clamp((plr.x-this.x)/8,-10,10); //huh thats kinda what im going for i guess (it is pretty linear!)
-            this.y += clamp((plr.y-this.y)/8,-10,10);
+            let magnitude = getMagnitude(plr.x-this.x, plr.y-this.y)/10; //FINALLY, LINEAR ATTRACTION
+            this.x += (plr.x-this.x)/magnitude; //clamp((plr.x-this.x)/8,-10,10); //huh thats kinda what im going for i guess (it is pretty linear!)
+            this.y += (plr.y-this.y)/magnitude; //clamp((plr.y-this.y)/8,-10,10);
             this.vy = 0;
             this.vx = 0;
         }

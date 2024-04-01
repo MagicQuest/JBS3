@@ -113,5 +113,5 @@ const wc = CreateWindowClass("winclassniggasfaze", windowProc); //max classname 
 wc.hCursor = LoadCursor(NULL, IDC_HAND);//LoadIcon(NULL, IDI_APPLICATION); //haha just learned that you can use icons instead
 wc.hbrBackground = CreateSolidBrush(RGB(0,255,0));
 
-CreateWindow(WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_TOPMOST, wc, "", WS_BORDER | WS_POPUP | WS_VISIBLE, position.x, position.y, 256*scale, 256*scale, NULL, NULL, hInstance); //now the window is only as big as the faze logo (therefore lagging my computer less)
+CreateWindow(WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_TOPMOST, wc, "", WS_POPUP | WS_VISIBLE, position.x, position.y, 256*scale, 256*scale, NULL, NULL, hInstance); //now the window is only as big as the faze logo (therefore lagging my computer less)
 //"For best drawing performance by the layered window and any underlying windows, the layered window should be as small as possible. An application should also process the message and re-create its layered windows when the display's color depth changes" https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-updatelayeredwindow https://learn.microsoft.com/en-us/previous-versions/ms997507(v=msdn.10)?redirectedfrom=MSDN

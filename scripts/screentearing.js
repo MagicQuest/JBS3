@@ -1,6 +1,6 @@
-let window = FindWindow(NULL, "scripts");
-let dc = GetDC(window);//GetDC(NULL);
-let size = GetClientRect(window);
+//let window = FindWindow(NULL, "scripts");
+let dc = GetDC(NULL);//GetDC(window);
+let size = {right: screenWidth, bottom: screenHeight};//GetClientRect(window);
 
 let lastScreenBmp = CreateCompatibleBitmap(dc, 1920, 1080);
 
