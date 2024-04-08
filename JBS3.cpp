@@ -3947,21 +3947,82 @@ V8FUNC(PlaySoundWrapper) {
     info.GetReturnValue().Set(Number::New(isolate, PlaySoundA(CStringFI(info[0]), (HINSTANCE)IntegerFI(info[1]), IntegerFI(info[2]))));
 }
 
+#include <thread>
+#include <v8-locker.h>
+
 V8FUNC(PlaySoundSpecial) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
+    //HandleScope handle_scope(isolate); //the problem with using a new thread is that i leave this function's scope the moment i return the promise and everything is thrown in the bin so how can i say when it gets destroyed
 
     if (info[1]->IsString()) {
 
+        //int aliasLength = String::Utf8Value(isolate, info[1]).length();
+        //print("aliasLength -0> ");
+        //print(aliasLength);
+        //print(strlen(CStringFI(info[1])));
+        //char* alias = new char[aliasLength];
+        //strcpy_s(alias, aliasLength, CStringFI(info[1])); //oh shoot i could've just used strcpy (instead of memcpy)
+        std::string* alias = new std::string(CStringFI(info[1])); //this does NOT seem good but fuck it we ball (why did this actually work instead of strcpy)
+
+        bool notify = info[2]->IsNumber() && IntegerFI(info[2]) != 0;
+        
+        bool wait = info[3]->IsBoolean() && info[3]->BooleanValue(isolate);
+        
+        HWND maybewindow = (HWND)IntegerFI(info[2]);
+        
         std::string sound = std::string(CStringFI(info[0]));
         //std::string type = sound.substr(sound.length() - 3, 3);  //ok idk why i added the type bruh that was CAP
-        sound = "open \"" + sound + "\" type mpegvideo alias " + CStringFI(info[1]);
+        sound = "open \"" + sound + "\" type mpegvideo alias " + alias->c_str();
         print(sound);
-        mciSendStringA(sound.c_str(), NULL, 0, NULL);
-        bool notify = info[2]->IsNumber() && IntegerFI(info[2]) != 0;
+        //char* alias = CStringFI(info[1]);
         //print(info[2]->IsNumber() << " " << IntegerFI(info[2]));
-        print((std::string("play ") + CStringFI(info[1]) + (info[3]->IsBoolean() ? info[3]->BooleanValue(isolate) ? " wait" : "" : "")+ (notify ? " notify" : "")).c_str());
-        info.GetReturnValue().Set(Number::New(isolate, mciSendStringA((std::string("play ") + CStringFI(info[1]) + (info[3]->IsBoolean() ? info[3]->BooleanValue(isolate) ? " wait" : "" : "")+(notify ? " notify" : "")).c_str(), NULL, 0, (HWND)IntegerFI(info[2]))));
+        print((std::string("play ") + alias->c_str() + (wait ? " wait" : "") + (notify ? " notify" : "")).c_str());
+        //had a bunch of stuff trying to get the short file name instead of using an alias but you have to enable short file names in the registry so that ain't happening (i could use SetShortFileName but idk if im doing all that)
+        print(wait);
+        if (!wait) {
+            //char* soundcstr = new char[sound.size()];
+            //strcpy_s(soundcstr, sound.size(), sound.c_str());
+            std::string* soundcstr = new std::string(sound.c_str());
+            //Local<Promise::Resolver> tempp; //?
+            Persistent<Promise::Resolver> pp = Persistent<Promise::Resolver>(isolate, v8::Promise::Resolver::New(isolate->GetCurrentContext()).ToLocalChecked()); //ok so i think this should be persistent then instaed of local
+            std::thread f([=] {//(auto info, Isolate* isolate, bool notify, bool wait, Local<Promise::Resolver> pp) {
+                //v8::Locker lock(isolate);
+                //v8::Isolate::Scope isolate_scope(isolate); //nigga wtf is this shit
+                // //p = PlaySoundSpecial("E:/Users/megal/source/repos/JBS3/scripts/corner hit 2.mp3", `nigga`, NULL, false);
+                //HandleScope handle_scope(isolate);
+                //fuck all that lemme use a persistent thing (WAIT AM I RETARDED I COULD'VE JUST CALCULATED CStringFI and IntegerFI **BEFORE** THE NEW THREAD) <- i stayed up late asl just to wake up and realize that
+                //int returned = mciSendStringA((std::string("play ") + CStringFI(info[1]) + " wait" + (notify ? " notify" : "")).c_str(), NULL, 0, (HWND)IntegerFI(info[2]));
+                mciSendStringA(soundcstr->c_str(), NULL, 0, NULL);
+                print((std::string("play ") + alias->c_str() + " wait" + (notify ? " notify" : "")).c_str());
+                            //damn mciSendStringA aliases only work if open is called
+                int returned = mciSendStringA((std::string("play ") + alias->c_str() + " wait" + (notify ? " notify" : "")).c_str(), NULL, 0, maybewindow);
+                pp.Get(isolate)->Resolve(isolate->GetCurrentContext(), Number::New(isolate, returned));//Undefined(isolate));
+                //do i have to delete the persistent object since im done (how tf do i do that)
+                //mciSendStringA((std::string("close ") + CStringFI(info[1])).c_str(), NULL, 0, (HWND)IntegerFI(info[2]));
+                mciSendStringA((std::string("close ") + *alias).c_str(), NULL, 0, maybewindow);
+                print("closed i think");
+                alias->clear();
+                delete/*[]*/ alias;
+                soundcstr->clear();
+                delete/*[]*/ soundcstr;
+                //print(wait);
+            });
+            //std::thread thread_object(f);//, info, isolate, notify, wait, pp);
+            info.GetReturnValue().Set(pp.Get(isolate)->GetPromise());
+            f.detach();
+        }
+        else {
+            mciSendStringA(sound.c_str(), NULL, 0, NULL);
+            //print((std::string("play ") + alias + (info[3]->IsBoolean() ? info[3]->BooleanValue(isolate) ? " wait" : "" : "") + (notify ? " notify" : "")).c_str());
+            info.GetReturnValue().Set(Number::New(isolate, mciSendStringA((std::string("play ") + alias->c_str() + " wait" + (notify ? " notify" : "")).c_str(), NULL, 0, (HWND)IntegerFI(info[2]))));
+            mciSendStringA((std::string("close ") + *alias).c_str(), NULL, 0, maybewindow);
+        }
+        //else {
+            //info.GetReturnValue().Set()
+        //}
+        //info.GetReturnValue().Set(Number::New(isolate, mciSendStringA((std::string("play ") + CStringFI(info[1]) + (info[3]->IsBoolean() ? info[3]->BooleanValue(isolate) ? " wait" : "" : "") + (notify ? " notify" : "")).c_str(), NULL, 0, (HWND)IntegerFI(info[2]))));
+        //mciSendStringA((std::string("close ") + CStringFI(info[1])).c_str(), NULL, 0, (HWND)IntegerFI(info[2]));
     }
     else {
         info.GetReturnValue().Set(Number::New(isolate, mciSendStringA(CStringFI(info[0]), NULL, 0, (HWND)IntegerFI(info[2]))));

@@ -72,7 +72,7 @@ function windowProc(hwnd, msg, wp, lp) {
                 types: [
                     {
                         description: "Images",
-                        accept: [".png", ".jpg", ".bmp", ".jpeg"]
+                        accept: [".png", ".jpg", ".bmp", ".jpeg"] //i can't be bothered to implement the mime types :sob:
                     }
                 ]
             }
@@ -97,8 +97,16 @@ function windowProc(hwnd, msg, wp, lp) {
             movewindow = true;
             resize = true;
         }
+        if(GetKey(VK_LEFT)) {
+            position.vx/=1.1;
+            position.vy/=1.1;
+        }else if(GetKey(VK_RIGHT)) {
+            position.vx*=1.1;
+            position.vy*=1.1;
+        }
         position.x += position.vx;
         position.y += position.vy;
+        oldVel = {vx: position.vx, vy: position.vy};
         if(position.x < 0) {
             position.x = 0;
             position.vx *= -1;
@@ -112,6 +120,13 @@ function windowProc(hwnd, msg, wp, lp) {
         }else if(position.y > screenHeight-(256*scale)) {
             position.y = screenHeight-(256*scale);
             position.vy *= -1;
+        }
+        if(oldVel.vx != position.vx && oldVel.vy != position.vy) {
+            //let p = PlaySoundSpecial("E:/Users/megal/source/repos/JBS3/scripts/corner hit 2.mp3", `nigga`, NULL, false);
+            //PlaySound(__dirname+"/corner hit 2.wav", hInstance, SND_FILENAME | SND_ASYNC); //use PlaySound for wav (playsound does not cause memory leaks but wont play more than once at a time)
+            //PLAYSOUNDSPECIAL DOESN'T CAUSE MEMORY LEAKS ANYMORE GRAAAAHHHH (before this update i had to randomize the sound id (so it would play more than once) which lowkey caused a memory leak but not anymore)
+            PlaySoundSpecial(__dirname+"/corner hit 2.wav", `cornerhit`, NULL, false);
+            PlaySoundSpecial(__dirname+"/nice shot.mp3", `niceshot`, NULL, false);
         }
         if(movewindow) {
             SetWindowPos(hwnd, HWND_TOPMOST, position.x, position.y, 256*scale, 256*scale, SWP_NOZORDER);
