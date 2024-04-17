@@ -798,15 +798,27 @@ V8FUNC(EndPaintWrapper) {
     delete lps; //phew
 }
 
+V8FUNC(CreateRectRgnWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    info.GetReturnValue().Set(Number::New(isolate, (long long)CreateRectRgn(IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]))));
+}
+
 V8FUNC(GetDCWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
     HWND window = NULL;
-    if (info[0]->IsNumber()) {
+    if (info[0]->IsNumber()) { //huh as it turns out i don't have to make this check apparently
         window = (HWND)IntegerFI(info[0]);
     }
     //print(window << " get dc window == " << (HWND)NULL);
-    info.GetReturnValue().Set(Number::New(info.GetIsolate(), (long long)GetDC(window)));
+    info.GetReturnValue().Set(Number::New(isolate, (long long)GetDC(window)));
+}
+
+V8FUNC(GetDCExWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    info.GetReturnValue().Set(Number::New(isolate, (long long)GetDCEx((HWND)IntegerFI(info[0]), (HRGN)IntegerFI(info[1]), IntegerFI(info[2]))));
 }
 
 V8FUNC(ReleaseDCWrapper) {
@@ -816,7 +828,7 @@ V8FUNC(ReleaseDCWrapper) {
     if (info[0]->IsNumber()) {
         window = (HWND)IntegerFI(info[0]);
     }
-    info.GetReturnValue().Set(Number::New(info.GetIsolate(), ReleaseDC(window, (HDC)IntegerFI(info[1]))));
+    info.GetReturnValue().Set(Number::New(isolate, ReleaseDC(window, (HDC)IntegerFI(info[1]))));
 }
 
 V8FUNC(TextOutWrapper) {
@@ -3995,7 +4007,7 @@ V8FUNC(PlaySoundSpecial) {
                 //int returned = mciSendStringA((std::string("play ") + CStringFI(info[1]) + " wait" + (notify ? " notify" : "")).c_str(), NULL, 0, (HWND)IntegerFI(info[2]));
                 mciSendStringA(soundcstr->c_str(), NULL, 0, NULL);
                 print((std::string("play ") + alias->c_str() + " wait" + (notify ? " notify" : "")).c_str());
-                            //damn mciSendStringA aliases only work if open is called
+                            //damn mciSendStringA aliases only work if open is called on the same thread! (idk how this was missing in the last push but i noticed it the next day)
                 int returned = mciSendStringA((std::string("play ") + alias->c_str() + " wait" + (notify ? " notify" : "")).c_str(), NULL, 0, maybewindow);
                 pp.Get(isolate)->Resolve(isolate->GetCurrentContext(), Number::New(isolate, returned));//Undefined(isolate));
                 //do i have to delete the persistent object since im done (how tf do i do that)
@@ -4396,6 +4408,155 @@ V8FUNC(DwmEnableBlurBehindWindowWrapper) {
 //    info.GetReturnValue().Set(Number::New(isolate, DwmEnableComposition(IntegerFI(info[0]))));
 //}
 
+V8FUNC(DwmSetWindowAttributeWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    //oooo this is lame i gotta make ifs
+    HWND window = (HWND)IntegerFI(info[0]);
+    int dwmwa = IntegerFI(info[1]);
+
+    HRESULT result=S_OK;
+
+    //switch (dwmwa) { //i do NOT fw switch statements like that but for some reason their performance is (allegedly) crazy 
+        /*case DWMWA_NCRENDERING_ENABLED:*/ //get only
+        //case DWMWA_TRANSITIONS_FORCEDISABLED:
+        //case DWMWA_ALLOW_NCPAINT:
+        //case DWMWA_NONCLIENT_RTL_LAYOUT:
+        //case DWMWA_FORCE_ICONIC_REPRESENTATION:
+        //case DWMWA_HAS_ICONIC_BITMAP:
+        //case DWMWA_DISALLOW_PEEK:
+        //case DWMWA_EXCLUDED_FROM_PEEK:
+        //case DWMWA_CLOAK:
+        //case DWMWA_FREEZE_REPRESENTATION:
+        //case DWMWA_PASSIVE_UPDATE_MODE:
+        //case DWMWA_USE_HOSTBACKDROPBRUSH:
+        //case DWMWA_USE_IMMERSIVE_DARK_MODE:
+    if (dwmwa == DWMWA_NCRENDERING_ENABLED || dwmwa == DWMWA_TRANSITIONS_FORCEDISABLED || dwmwa == DWMWA_ALLOW_NCPAINT || dwmwa == DWMWA_NONCLIENT_RTL_LAYOUT || dwmwa == DWMWA_FORCE_ICONIC_REPRESENTATION || dwmwa == DWMWA_HAS_ICONIC_BITMAP || dwmwa == DWMWA_DISALLOW_PEEK || dwmwa == DWMWA_EXCLUDED_FROM_PEEK || dwmwa == DWMWA_CLOAK || dwmwa == DWMWA_FREEZE_REPRESENTATION || dwmwa == DWMWA_PASSIVE_UPDATE_MODE || dwmwa == DWMWA_USE_HOSTBACKDROPBRUSH || dwmwa == DWMWA_USE_IMMERSIVE_DARK_MODE) {
+        BOOL shits = info[2]->BooleanValue(isolate);
+        result = DwmSetWindowAttribute(window, dwmwa, &shits, sizeof(shits));
+    }else
+            //break;
+
+        //case DWMWA_SYSTEMBACKDROP_TYPE:
+        //case DWMWA_NCRENDERING_POLICY:
+        //case DWMWA_WINDOW_CORNER_PREFERENCE:
+        //case DWMWA_FLIP3D_POLICY:
+    if (dwmwa == DWMWA_SYSTEMBACKDROP_TYPE || dwmwa == DWMWA_NCRENDERING_POLICY || dwmwa == DWMWA_WINDOW_CORNER_PREFERENCE || dwmwa == DWMWA_FLIP3D_POLICY) {
+        int shits = IntegerFI(info[2]);
+        result = DwmSetWindowAttribute(window, dwmwa, &shits, sizeof(shits));
+    }else
+            //break;
+
+        //case DWMWA_BORDER_COLOR:
+        //case DWMWA_CAPTION_COLOR:
+        //case DWMWA_TEXT_COLOR:
+    if (dwmwa == DWMWA_BORDER_COLOR || dwmwa == DWMWA_CAPTION_COLOR || dwmwa == DWMWA_TEXT_COLOR) {
+        COLORREF shits = info[2]->Uint32Value(isolate->GetCurrentContext()).ToChecked(); //im assuming here that unsigned long is equal to unsigned int (int and long MIGHT be the same size idk)
+        result = DwmSetWindowAttribute(window, dwmwa, &shits, sizeof(shits));
+    }
+            //break;
+            /*case DWMWA_VISIBLE_FRAME_BORDER_THICKNESS:
+            UINT shits = info[1]->Uint32Value(isolate->GetCurrentContext()).ToChecked();
+            result = DwmSetWindowAttribute(window, dwmwa, &shits, sizeof(shits));
+
+            break;*/ //get only!
+    //}
+
+    info.GetReturnValue().Set(Number::New(isolate, result));
+}
+
+V8FUNC(DwmGetWindowAttributeWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    //oooo this is lame i gotta make ifs
+
+    HWND window = (HWND)IntegerFI(info[0]);
+    int dwmwa = IntegerFI(info[1]);
+
+    HRESULT hr = S_OK;
+
+    switch (dwmwa) { //oh come on the solution was just to add curly braces after every case statement (found this out after i converted DwmSetWindowAttribute whatever bruh)
+        case DWMWA_NCRENDERING_ENABLED:
+        {
+            BOOL isNCRenderingEnabled{ FALSE };
+            hr = DwmGetWindowAttribute(window,
+                dwmwa,
+                &isNCRenderingEnabled,
+                sizeof(isNCRenderingEnabled));
+            if (hr == S_OK) {
+                info.GetReturnValue().Set(Boolean::New(isolate, isNCRenderingEnabled));
+            }
+            else {
+                //how do i throw an error
+                std::string errorcode = (std::string("HRESULT ERR: ") + std::to_string(hr));
+                info.GetReturnValue().Set(Exception::Error(String::NewFromUtf8(isolate, errorcode.c_str(), NewStringType::kNormal, errorcode.size()).ToLocalChecked())); //idk why it wouldn't except utf8literal
+            }
+        }
+            break;
+
+        case DWMWA_CAPTION_BUTTON_BOUNDS:
+        case DWMWA_EXTENDED_FRAME_BOUNDS:
+        {
+            RECT extendedFrameBounds{ 0,0,0,0 };
+            hr = DwmGetWindowAttribute(window,
+                dwmwa,
+                &extendedFrameBounds,
+                sizeof(extendedFrameBounds));
+
+            if (hr == S_OK) {
+                info.GetReturnValue().Set(jsImpl::createWinRect(isolate, extendedFrameBounds));
+            }
+            else {
+                //how do i throw an error
+                std::string errorcode = (std::string("HRESULT ERR: ") + std::to_string(hr));
+                info.GetReturnValue().Set(Exception::Error(String::NewFromUtf8(isolate, errorcode.c_str(), NewStringType::kNormal, errorcode.size()).ToLocalChecked())); //idk why it wouldn't except utf8literal
+            }
+        }
+            break;
+
+        case DWMWA_SYSTEMBACKDROP_TYPE:
+        case DWMWA_CLOAKED:
+        {
+            int cloaked = 0; //ignore this name LO!
+            hr = DwmGetWindowAttribute(window,
+                dwmwa,
+                &cloaked,
+                sizeof(cloaked));
+            if (hr == S_OK) {
+                info.GetReturnValue().Set(Number::New(isolate, cloaked));
+            }
+            else {
+                //how do i throw an error
+                std::string errorcode = (std::string("HRESULT ERR: ") + std::to_string(hr));
+                info.GetReturnValue().Set(Exception::Error(String::NewFromUtf8(isolate, errorcode.c_str(), NewStringType::kNormal, errorcode.size()).ToLocalChecked())); //idk why it wouldn't except utf8literal
+            }
+        }
+        break;
+
+        case DWMWA_VISIBLE_FRAME_BORDER_THICKNESS:
+        {
+            UINT thickness = 0;
+            hr = DwmGetWindowAttribute(window,
+                dwmwa,
+                &thickness,
+                sizeof(thickness));
+            if (hr == S_OK) {
+                info.GetReturnValue().Set(Uint32::NewFromUnsigned(isolate, thickness));
+            }
+            else {
+                //how do i throw an error
+                std::string errorcode = (std::string("HRESULT ERR: ") + std::to_string(hr));
+                info.GetReturnValue().Set(Exception::Error(String::NewFromUtf8(isolate, errorcode.c_str(), NewStringType::kNormal, errorcode.size()).ToLocalChecked())); //idk why it wouldn't except utf8literal
+            }
+        }
+            break;
+
+    }
+
+}
+
 V8FUNC(NCCALCSIZE_PARAMSWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
@@ -4742,6 +4903,8 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     global->Set(isolate, "EndPaint", FunctionTemplate::New(isolate, EndPaintWrapper));
 
     global->Set(isolate, "GetDC", FunctionTemplate::New(isolate, GetDCWrapper));
+    global->Set(isolate, "GetDCEx", FunctionTemplate::New(isolate, GetDCExWrapper));
+    global->Set(isolate, "CreateRectRgn", FunctionTemplate::New(isolate, CreateRectRgnWrapper));
     global->Set(isolate, "ReleaseDC", FunctionTemplate::New(isolate, ReleaseDCWrapper));
 
     global->Set(isolate, "TextOut", FunctionTemplate::New(isolate, TextOutWrapper));
@@ -4755,7 +4918,6 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     setGlobal(RotateImage);
     setGlobalWrapper(SetTimer);
     setGlobalWrapper(KillTimer);
-
 
     setGlobalWrapper(MAKEROP4);
     setGlobalWrapper(CreatePatternBrush);
@@ -4783,6 +4945,19 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
 
     //https://stackoverflow.com/questions/6707148/foreach-macro-on-macros-arguments
 #define setGlobalConst(g) global->Set(isolate, #g, Number::New(isolate, g))
+    setGlobalConst(DCX_WINDOW);
+    setGlobalConst(DCX_CACHE);
+    setGlobalConst(DCX_NORESETATTRS);
+    setGlobalConst(DCX_CLIPCHILDREN);
+    setGlobalConst(DCX_CLIPSIBLINGS);
+    setGlobalConst(DCX_PARENTCLIP);
+    setGlobalConst(DCX_EXCLUDERGN);
+    setGlobalConst(DCX_INTERSECTRGN);
+    setGlobalConst(DCX_EXCLUDEUPDATE);
+    setGlobalConst(DCX_INTERSECTUPDATE);
+    setGlobalConst(DCX_LOCKWINDOWUPDATE);
+    setGlobalConst(DCX_VALIDATE);
+
     setGlobalConst(LWA_ALPHA); setGlobalConst(LWA_COLORKEY); //SetLayeredWindowAttributes
     setGlobalConst(ULW_ALPHA); setGlobalConst(ULW_COLORKEY); setGlobalConst(ULW_OPAQUE); setGlobalConst(ULW_EX_NORESIZE); setGlobalConst(AC_SRC_ALPHA); setGlobalConst(AC_SRC_OVER);//UpdateLayeredWindow
     setGlobalWrapper(SetGraphicsMode);
@@ -4807,7 +4982,60 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     setGlobalWrapper(DwmDefWindowProc);
     setGlobalWrapper(DwmEnableBlurBehindWindow);
     //setGlobalWrapper(DwmEnableComposition);
+    setGlobalWrapper(DwmSetWindowAttribute);
+    setGlobalWrapper(DwmGetWindowAttribute);
     setGlobalWrapper(NCCALCSIZE_PARAMS);
+
+    setGlobalConst(DWMWA_NCRENDERING_ENABLED);
+    setGlobalConst(DWMWA_NCRENDERING_POLICY);
+    setGlobalConst(DWMWA_TRANSITIONS_FORCEDISABLED);
+    setGlobalConst(DWMWA_ALLOW_NCPAINT);
+    setGlobalConst(DWMWA_CAPTION_BUTTON_BOUNDS);
+    setGlobalConst(DWMWA_NONCLIENT_RTL_LAYOUT);
+    setGlobalConst(DWMWA_FORCE_ICONIC_REPRESENTATION);
+    setGlobalConst(DWMWA_FLIP3D_POLICY);
+    setGlobalConst(DWMWA_EXTENDED_FRAME_BOUNDS);
+    setGlobalConst(DWMWA_HAS_ICONIC_BITMAP);
+    setGlobalConst(DWMWA_DISALLOW_PEEK);
+    setGlobalConst(DWMWA_EXCLUDED_FROM_PEEK);
+    setGlobalConst(DWMWA_CLOAK);
+    setGlobalConst(DWMWA_CLOAKED);
+    setGlobalConst(DWMWA_FREEZE_REPRESENTATION);
+    setGlobalConst(DWMWA_PASSIVE_UPDATE_MODE);
+    setGlobalConst(DWMWA_USE_HOSTBACKDROPBRUSH);
+    setGlobalConst(DWMWA_USE_IMMERSIVE_DARK_MODE );
+    setGlobalConst(DWMWA_WINDOW_CORNER_PREFERENCE );
+    setGlobalConst(DWMWA_BORDER_COLOR);
+    setGlobalConst(DWMWA_CAPTION_COLOR);
+    setGlobalConst(DWMWA_TEXT_COLOR);
+    setGlobalConst(DWMWA_VISIBLE_FRAME_BORDER_THICKNESS);
+    setGlobalConst(DWMWA_SYSTEMBACKDROP_TYPE);
+    //setGlobalConst(DWMWA_LAST);
+
+    setGlobalConst(DWMFLIP3D_DEFAULT);
+    setGlobalConst(DWMFLIP3D_EXCLUDEBELOW);
+    setGlobalConst(DWMFLIP3D_EXCLUDEABOVE);
+    //setGlobalConst(DWMFLIP3D_LAST);
+
+    setGlobalConst(DWMWCP_DEFAULT);
+    setGlobalConst(DWMWCP_DONOTROUND);
+    setGlobalConst(DWMWCP_ROUND);
+    setGlobalConst(DWMWCP_ROUNDSMALL);
+
+    setGlobalConst(DWMWA_COLOR_NONE);
+    setGlobalConst(DWMWA_COLOR_DEFAULT);
+
+    setGlobalConst(DWMNCRP_USEWINDOWSTYLE);
+    setGlobalConst(DWMNCRP_DISABLED);
+    setGlobalConst(DWMNCRP_ENABLED);
+    //setGlobalConst(DWMNCRP_LAST);
+
+    setGlobalConst(DWMSBT_AUTO);
+    setGlobalConst(DWMSBT_NONE);
+    setGlobalConst(DWMSBT_MAINWINDOW);
+    setGlobalConst(DWMSBT_TRANSIENTWINDOW);
+    setGlobalConst(DWMSBT_TABBEDWINDOW);
+
     setGlobalWrapper(DefWindowProc);
 
     setGlobalWrapper(SwitchToThisWindow);

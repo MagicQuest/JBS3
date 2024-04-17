@@ -119,7 +119,7 @@ for(let i = 0; i < res; i++) {
 const gdiFonts = [];
 
 function init(hwnd) {
-                    //for some reason using ID2D1DCRenderTarget started glitching out (it wouldn't show minesweeper it would just copy a frame of the desktop?)
+                    //for some reason using ID2D1DCRenderTarget started glitching out (it wouldn't show minesweeper it would just copy a frame of the desktop? (windows 11))
     d2d = createCanvas("d2d", ID2D1RenderTarget, hwnd); //with ID2D1DCRenderTarget you are allowed to draw to the desktop by setting hwnd to null!
                         //just created __dirname for this example
     tileBmp = d2d.CreateBitmapFromFilename(`${__dirname}/tile.png`);//"D:/scripts/jbs/minesweeper/tile.png");
@@ -332,7 +332,7 @@ function loop() {
     i++;
 }
 
-const WINCLASSEXW = CreateWindowClass("WinClass", /*init, */windowProc, loop);
+const WINCLASSEXW = CreateWindowClass("WinClass", /*init, */windowProc, loop); //we don't go to ravenholm (loop)
 WINCLASSEXW.hCursor = defaultCursor;
 //WINCLASSEXA.hIcon = trolIcon;
 //WINCLASSEXA.hIconSm = trolIcon;
