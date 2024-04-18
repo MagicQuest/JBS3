@@ -807,12 +807,12 @@ V8FUNC(CreateRectRgnWrapper) {
 V8FUNC(GetDCWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
-    HWND window = NULL;
-    if (info[0]->IsNumber()) { //huh as it turns out i don't have to make this check apparently
-        window = (HWND)IntegerFI(info[0]);
-    }
+    //HWND window = (HWND)IntegerFI(info[0]);
+    //if (info[0]->IsNumber()) { //huh as it turns out i don't have to make this check apparently
+    //    window = (HWND)IntegerFI(info[0]);
+    //}
     //print(window << " get dc window == " << (HWND)NULL);
-    info.GetReturnValue().Set(Number::New(isolate, (long long)GetDC(window)));
+    info.GetReturnValue().Set(Number::New(isolate, (long long)GetDC((HWND)IntegerFI(info[0]))));
 }
 
 V8FUNC(GetDCExWrapper) {
@@ -824,20 +824,21 @@ V8FUNC(GetDCExWrapper) {
 V8FUNC(ReleaseDCWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
-    HWND window = NULL;
-    if (info[0]->IsNumber()) {
-        window = (HWND)IntegerFI(info[0]);
-    }
-    info.GetReturnValue().Set(Number::New(isolate, ReleaseDC(window, (HDC)IntegerFI(info[1]))));
+    //HWND window = (HWND)IntegerFI(info[0]); //yeah back in the day i think i thought it would error of there was no info[0th] argument
+    //if (info[0]->IsNumber()) {
+    //    window = (HWND)IntegerFI(info[0]);
+    //}
+    info.GetReturnValue().Set(Number::New(isolate, ReleaseDC((HWND)IntegerFI(info[0]), (HDC)IntegerFI(info[1]))));
 }
 
 V8FUNC(TextOutWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
     HDC dc = (HDC)IntegerFI(info[0]);
-    const wchar_t* words = WStringFI(info[3]);
+    //const wchar_t* words = WStringFI(info[3]); //for some reason storing WStringFI into wchar_t* sometimes gets corrupted
     //print(words << " words");
-    info.GetReturnValue().Set(TextOut(dc, IntegerFI(info[1]), IntegerFI(info[2]), words, wcslen(words)));
+    //print(wcslen(WStringFI(info[3])) << " " << info[3].As<String>()->Length());
+    info.GetReturnValue().Set(TextOut(dc, IntegerFI(info[1]), IntegerFI(info[2]), WStringFI(info[3]), info[3].As<String>()->Length()));//wcslen(words)));
 }
 
 V8FUNC(BitBltWrapper) {
@@ -3746,30 +3747,52 @@ V8FUNC(GetObjectDIBITMAP) {
     info.GetReturnValue().Set(jsDIBSECTION);
 }
 
+V8FUNC(CreateDIBitmapSimple) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    v8::Local<v8::Context> context = isolate->GetCurrentContext();
+    Local<Object> b = Object::New(isolate);
+    Local<Object> BMIH = Object::New(isolate);
+    BMIH->Set(context, LITERAL("biWidth"), info[0]);
+    BMIH->Set(context, LITERAL("biHeight"), info[1]);
+    BMIH->Set(context, LITERAL("biBitCount"), IntegerFI(info[2]) ? info[2].As<Number>() : Number::New(isolate, 32)); //for some reason i have to cast info to number in order to use '?'
+    BMIH->Set(context, LITERAL("biPlanes"), IntegerFI(info[3]) ? info[3].As<Number>() : Number::New(isolate, 1));
+    BMIH->Set(context, LITERAL("biSizeImage"), info[4]);
+    BMIH->Set(context, LITERAL("biCompression"), info[5]);
+    BMIH->Set(context, LITERAL("biXPelsPerMeter"), info[6]);
+    BMIH->Set(context, LITERAL("biYPelsPerMeter"), info[7]);
+    BMIH->Set(context, LITERAL("biClrUsed"), info[8]);
+    BMIH->Set(context, LITERAL("biClrImportant"), info[9]);
+
+    b->Set(context, LITERAL("dsBmih"), BMIH);
+    info.GetReturnValue().Set(b);
+}
+
 V8FUNC(CreateDIBSectionWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
+    v8::Local<v8::Context> context = isolate->GetCurrentContext();
 
     Local<Object> jsBITMAP = info[1].As<Object>();
-    
+
     //imma assume this all works and im closing VS
 	//https://stackoverflow.com/questions/25713117/what-is-the-difference-between-bisizeimage-bisize-and-bfsize
     BITMAPINFO bmi{0};
-    if(jsBITMAP->HasRealNamedProperty(isolate->GetCurrentContext(), LITERAL("dsBmih")).FromJust()) {
-        Local<Object> jsBMIH = jsBITMAP->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("dsBmih")).ToLocalChecked().As<Object>();
-        bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);//IntegerFI(jsBMIH->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("biSize")).ToLocalChecked());
-        bmi.bmiHeader.biWidth = IntegerFI(jsBMIH->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("biWidth")).ToLocalChecked());
-        bmi.bmiHeader.biHeight = IntegerFI(jsBMIH->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("biHeight")).ToLocalChecked());
-        bmi.bmiHeader.biPlanes = IntegerFI(jsBMIH->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("biPlanes")).ToLocalChecked());
-        bmi.bmiHeader.biBitCount = IntegerFI(jsBMIH->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("biBitCount")).ToLocalChecked());
-        bmi.bmiHeader.biCompression = IntegerFI(jsBMIH->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("biCompression")).ToLocalChecked());
-        bmi.bmiHeader.biSizeImage = IntegerFI(jsBMIH->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("biSizeImage")).ToLocalChecked());
-        bmi.bmiHeader.biXPelsPerMeter = IntegerFI(jsBMIH->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("biXPelsPerMeter")).ToLocalChecked());
-        bmi.bmiHeader.biYPelsPerMeter = IntegerFI(jsBMIH->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("biYPelsPerMeter")).ToLocalChecked());
-        bmi.bmiHeader.biClrUsed = IntegerFI(jsBMIH->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("biClrUsed")).ToLocalChecked());
-        bmi.bmiHeader.biClrImportant = IntegerFI(jsBMIH->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("biClrImportant")).ToLocalChecked());
+    if(jsBITMAP->HasRealNamedProperty(context, LITERAL("dsBmih")).FromJust()) {
+        Local<Object> jsBMIH = jsBITMAP->GetRealNamedProperty(context, LITERAL("dsBmih")).ToLocalChecked().As<Object>();
+        bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);//IntegerFI(jsBMIH->GetRealNamedProperty(context, LITERAL("biSize")).ToLocalChecked());
+        bmi.bmiHeader.biWidth = IntegerFI(jsBMIH->GetRealNamedProperty(context, LITERAL("biWidth")).ToLocalChecked());
+        bmi.bmiHeader.biHeight = IntegerFI(jsBMIH->GetRealNamedProperty(context, LITERAL("biHeight")).ToLocalChecked());
+        bmi.bmiHeader.biPlanes = IntegerFI(jsBMIH->GetRealNamedProperty(context, LITERAL("biPlanes")).ToLocalChecked());
+        bmi.bmiHeader.biBitCount = IntegerFI(jsBMIH->GetRealNamedProperty(context, LITERAL("biBitCount")).ToLocalChecked());
+        bmi.bmiHeader.biCompression = IntegerFI(jsBMIH->GetRealNamedProperty(context, LITERAL("biCompression")).ToLocalChecked());
+        bmi.bmiHeader.biSizeImage = IntegerFI(jsBMIH->GetRealNamedProperty(context, LITERAL("biSizeImage")).ToLocalChecked());
+        bmi.bmiHeader.biXPelsPerMeter = IntegerFI(jsBMIH->GetRealNamedProperty(context, LITERAL("biXPelsPerMeter")).ToLocalChecked());
+        bmi.bmiHeader.biYPelsPerMeter = IntegerFI(jsBMIH->GetRealNamedProperty(context, LITERAL("biYPelsPerMeter")).ToLocalChecked());
+        bmi.bmiHeader.biClrUsed = IntegerFI(jsBMIH->GetRealNamedProperty(context, LITERAL("biClrUsed")).ToLocalChecked());
+        bmi.bmiHeader.biClrImportant = IntegerFI(jsBMIH->GetRealNamedProperty(context, LITERAL("biClrImportant")).ToLocalChecked());
 
-        //Local<ArrayBuffer> jsArrayBuffer = jsBITMAP->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("dsBm")).ToLocalChecked().As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("bmBits")).ToLocalChecked();
+        //Local<ArrayBuffer> jsArrayBuffer = jsBITMAP->GetRealNamedProperty(context, LITERAL("dsBm")).ToLocalChecked().As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("bmBits")).ToLocalChecked();
     
         //BYTE* bytes;
         //memset(bytes, 0, jsArrayBuffer->ByteLength());
@@ -3777,7 +3800,7 @@ V8FUNC(CreateDIBSectionWrapper) {
         //for (size_t i = 0; i < jsArrayBuffer->ByteLength(); i++) {
         //
         //}
-        BYTE* bytes;
+        BYTE* bytes = NULL;
         
         info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)CreateDIBSection((HDC)IntegerFI(info[0]), &bmi, IntegerFI(info[2]), (void**) &bytes, NULL, NULL)));
     }
@@ -4290,7 +4313,7 @@ V8FUNC(DwmExtendFrameIntoClientAreaWrapper) { //https://learn.microsoft.com/en-u
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
 
-    MARGINS inset;
+    MARGINS inset{-1};
     inset.cxLeftWidth = IntegerFI(info[1]);
     inset.cyTopHeight = IntegerFI(info[2]);
     inset.cxRightWidth = IntegerFI(info[3]);
@@ -4407,6 +4430,70 @@ V8FUNC(DwmEnableBlurBehindWindowWrapper) {
 //
 //    info.GetReturnValue().Set(Number::New(isolate, DwmEnableComposition(IntegerFI(info[0]))));
 //}
+
+typedef enum {
+    ACCENT_DISABLED = 0,
+    ACCENT_ENABLE_GRADIENT = 1,
+    ACCENT_ENABLE_TRANSPARENTGRADIENT = 2,
+    ACCENT_ENABLE_BLURBEHIND = 3,
+    ACCENT_INVALID_STATE = 4,
+    _ACCENT_STATE_SIZE = 0xFFFFFFFF
+} ACCENT_STATE;
+
+struct ACCENTPOLICY
+{
+    int nAccentState;
+    int nFlags;
+    int nGradientColor;
+    int nAnimationId;
+};
+
+struct WINCOMPATTRDATA
+{
+    int  nAttribute;
+    void* pData;
+    unsigned int ulSizeOfData;
+};
+
+//dang i had hella tabs related to SetWindowComposition and friends
+
+//https://stackoverflow.com/questions/74582735/winapi-blurring-a-window-fails
+//https://learn.microsoft.com/en-us/answers/questions/1123887/setwindowcompositionattribute-after-setting-transp
+//https://stackoverflow.com/questions/63426740/what-are-the-requirements-for-window-to-be-blurred-except-setwindowcompositiona
+//https://gist.github.com/riverar/fd6525579d6bbafc6e48
+//https://www.reddit.com/r/AutoHotkey/comments/125b120/set_window_aero_translucentblur_effects_win_10/
+//https://stackoverflow.com/questions/63426740/what-are-the-requirements-for-window-to-be-blurred-except-
+//https://github.com/jdmansour/mintty/blob/glass/src/winmain.c#L683 
+//https://stackoverflow.com/questions/32335945/blur-behind-window-with-titlebar-in-windows-10-stopped-working-after-windows-up
+//https://stackoverflow.com/questions/32724187/how-do-you-set-the-glass-blend-colour-on-windows-10
+//https://vhanla.codigobit.info/2015/07/enable-windows-10-aero-glass-aka-blur.html
+//im honestly shocked this function works because DwmEnableBlurBehindWindow doesn't work for windows 11 and the replacement function (DwmSetWindowAttribute)'s acrylic is slightly different than SetWindowCompositionAttribute
+V8FUNC(SetWindowCompositionAttributeWrapper) { //i was thinking to myself "huh i thought i already added this function" but then i looked it up and realized not only is it undocumented but i have to LOADLIBRARY IT from user32
+    using namespace v8; //DWMACCENTPOLICY
+    Isolate* isolate = info.GetIsolate();
+    const HINSTANCE user32 = LoadLibrary(L"user32.dll");
+    if (!user32) {
+        info.GetReturnValue().Set(Number::New(isolate, 0)); //returns 0 if failed
+    }
+    else {
+        typedef bool(WINAPI* pSetWindowCompositionAttribute)(HWND, WINCOMPATTRDATA*);
+
+        const pSetWindowCompositionAttribute SetWindowCompositionAttribute = (pSetWindowCompositionAttribute)GetProcAddress(user32, "SetWindowCompositionAttribute");
+        if (!SetWindowCompositionAttribute)
+        {
+            FreeLibrary(user32);
+            info.GetReturnValue().Set(Number::New(isolate, 0)); //returns 0 if failed
+            return; // Failed to get SetWindowCompositionAttribute function
+        }
+
+        ACCENTPOLICY    policy{ IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]), IntegerFI(info[4]) }; //https://www.unknowncheats.me/forum/general-programming-and-reversing/617284-blurring-imgui-basically-window-using-acrylic-blur.html
+        WINCOMPATTRDATA data{ 19, &policy, sizeof(ACCENTPOLICY) }; //wait wait is it the sizeof ACCENTPOLICY or sizeof WINCOMPATTRDATA because this -> https://github.com/jdmansour/mintty/blob/glass/src/winmain.c#L683 says otherwise
+        bool            success = SetWindowCompositionAttribute((HWND)IntegerFI(info[0]), &data);
+
+        FreeLibrary(user32);
+        info.GetReturnValue().Set(Boolean::New(isolate, success));
+    }
+}
 
 V8FUNC(DwmSetWindowAttributeWrapper) {
     using namespace v8;
@@ -4555,6 +4642,31 @@ V8FUNC(DwmGetWindowAttributeWrapper) {
 
     }
 
+}
+
+V8FUNC(DwmSetIconicThumbnailWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, DwmSetIconicThumbnail((HWND)IntegerFI(info[0]), (HBITMAP)IntegerFI(info[1]), (DWORD)IntegerFI(info[2]))));
+}
+
+V8FUNC(DwmSetIconicLivePreviewBitmapWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    if (info[2]->IsNullOrUndefined()) {
+        info.GetReturnValue().Set(Number::New(isolate, DwmSetIconicLivePreviewBitmap((HWND)IntegerFI(info[0]), (HBITMAP)IntegerFI(info[1]), NULL, (DWORD)IntegerFI(info[3]))));
+    }
+    else {
+        POINT shits{ IntegerFI(info[2].As<Array>()->Get(isolate->GetCurrentContext(), 0).ToLocalChecked()) ,IntegerFI(info[2].As<Array>()->Get(isolate->GetCurrentContext(), 1).ToLocalChecked()) };
+        info.GetReturnValue().Set(Number::New(isolate, DwmSetIconicLivePreviewBitmap((HWND)IntegerFI(info[0]), (HBITMAP)IntegerFI(info[1]), &shits, (DWORD)IntegerFI(info[3]))));
+    }
+}
+
+V8FUNC(DwmInvalidateIconicBitmapsWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    info.GetReturnValue().Set(Number::New(isolate, DwmInvalidateIconicBitmaps((HWND)IntegerFI(info[0]))));
 }
 
 V8FUNC(NCCALCSIZE_PARAMSWrapper) {
@@ -4930,6 +5042,7 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     setGlobal(GetObjectHBRUSH);
     setGlobal(GetObjectHFONT);
     global->Set(isolate, "GetObjectHICON", FunctionTemplate::New(isolate, GetIconInfoWrapper)); setGlobalWrapper(GetIconInfo); setGlobalWrapper(CreateIconIndirect);
+    setGlobal(CreateDIBitmapSimple);
     setGlobalWrapper(CreateBitmapIndirect); //accidently had this written twice and v8 spit out some complete GARBAGE of an error (VERY LUCKILY i caught it after just a minute of thinking)
     setGlobalWrapper(CreatePenIndirect);
     setGlobalWrapper(CreateBrushIndirect);
@@ -4984,7 +5097,27 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     //setGlobalWrapper(DwmEnableComposition);
     setGlobalWrapper(DwmSetWindowAttribute);
     setGlobalWrapper(DwmGetWindowAttribute);
+    setGlobalWrapper(DwmSetIconicThumbnail);
+    setGlobalWrapper(DwmSetIconicLivePreviewBitmap);
+    setGlobalWrapper(DwmInvalidateIconicBitmaps);
+    setGlobalWrapper(SetWindowCompositionAttribute);
     setGlobalWrapper(NCCALCSIZE_PARAMS);
+
+    setGlobalConst(ACCENT_DISABLED);
+    setGlobalConst(ACCENT_ENABLE_GRADIENT);
+    setGlobalConst(ACCENT_ENABLE_TRANSPARENTGRADIENT);
+    setGlobalConst(ACCENT_ENABLE_BLURBEHIND);
+    setGlobalConst(ACCENT_INVALID_STATE);
+
+    setGlobalConst(WM_CLIPBOARDUPDATE);
+    setGlobalConst(WM_DWMCOMPOSITIONCHANGED);
+    setGlobalConst(WM_DWMNCRENDERINGCHANGED);
+    setGlobalConst(WM_DWMCOLORIZATIONCOLORCHANGED);
+    setGlobalConst(WM_DWMWINDOWMAXIMIZEDCHANGE);
+    setGlobalConst(WM_DWMSENDICONICTHUMBNAIL);
+    setGlobalConst(WM_DWMSENDICONICLIVEPREVIEWBITMAP);
+    setGlobalConst(WM_GETTITLEBARINFOEX);
+
 
     setGlobalConst(DWMWA_NCRENDERING_ENABLED);
     setGlobalConst(DWMWA_NCRENDERING_POLICY);
