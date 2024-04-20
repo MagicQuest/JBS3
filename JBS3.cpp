@@ -2674,6 +2674,27 @@ V8FUNC(RGBWRAPPER) {
     info.GetReturnValue().Set(Number::New(isolate, RGB(IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]))));
 }
 
+V8FUNC(GetRValueWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, GetRValue(IntegerFI(info[0]))));
+}
+
+V8FUNC(GetGValueWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, GetGValue(IntegerFI(info[0]))));
+}
+
+V8FUNC(GetBValueWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, GetBValue(IntegerFI(info[0]))));
+}
+
 V8FUNC(GetStretchBltModeWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
@@ -3536,38 +3557,49 @@ V8FUNC(MAKEROP4Wrapper) {
     Isolate* isolate = info.GetIsolate();
     info.GetReturnValue().Set(Number::New(info.GetIsolate(), MAKEROP4(IntegerFI(info[0]), IntegerFI(info[1]))));
 }
+#include <v8-typed-array.h>  //wtf the one-argument version of static_asert is not enabled in this mode (DO I HAVE TO SWITCH TO C++ 17???)
+//nah what the fuckl one of the lines (Ln: 26) said #if V8_ENABLE_SANDBOX had a weird error so i changed it to #ifdef V8_ENABLE_SANDBOX and it compiled?????
+//yeah watch out my edit is NOT synced to github so if this is a problem you gotta change v8-typed-array.h yourself (also i think i changed another thing so that setTimeout would work)
 
+//probably make GetDIBits
 V8FUNC(StretchDIBitsWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
+    //Local<Context> context = isolate->GetCurrentContext();
+    //std::string bits;
+    //Local<Array> jsBits = info[9].As<Array>(); //hold on Array has an Iterate method that is allegedly faster than repeated Get()s
+    //before i do that weird array thing i FEEL like something like Uint32Array can just copy the data over
+    Local<Uint32Array> jsBits = info[9].As<Uint32Array>();
+    DWORD* data = new DWORD[jsBits->Length()];
+    jsBits->CopyContents(data, jsBits->ByteLength()); //hell yeah (i was using jsBits->Length() instead of ByteLength)
 
-    std::string bits;
-    Local<Array> jsBits = info[9].As<Array>();
-    for (int i = 0; i < jsBits->Length(); i++) {
-        bits.push_back((char)jsBits->Get(isolate->GetCurrentContext(), i).ToLocalChecked()->IntegerValue(isolate->GetCurrentContext()).FromJust());
-    }
-    HDC dc = (HDC)IntegerFI(info[0]);
+    //for (int i = 0; i < jsBits->Length(); i++) { //could lowkey be a bottleneck
+    //    //bits.push_back((char)jsBits->Get(isolate->GetCurrentContext(), i).ToLocalChecked()->IntegerValue(isolate->GetCurrentContext()).FromJust());
+    //    data[i] = jsBits->Get(context, i).ToLocalChecked()->Uint32Value(context).FromJust();
+    //}
+    
+    //HDC dc = (HDC)IntegerFI(info[0]);
 
-    int ul = CHECKJPEGFORMAT;
-    print(jsBits->Length() << " " << bits.length());
-    if (
-        // Check if CHECKJPEGFORMAT exists: 
-
-        (ExtEscape(dc, QUERYESCSUPPORT,
-            sizeof(ul), (LPCSTR) & ul, 0, 0) > 0) &&
-
-        // Check if CHECKJPEGFORMAT executed without error: 
-
-        (ExtEscape(dc, CHECKJPEGFORMAT,
-            bits.length(), &bits[0], sizeof(ul), (LPSTR)&ul) > 0) &&
-
-        // Check status code returned by CHECKJPEGFORMAT: 
-
-        (ul == 1)
-        )
-    {
-        print("WORKING CHECK JPEG");
-    }
+    //int ul = CHECKJPEGFORMAT;
+    //print(jsBits->Length() << " " << bits.length());
+    //if (
+    //    // Check if CHECKJPEGFORMAT exists: 
+    //
+    //    (ExtEscape(dc, QUERYESCSUPPORT,
+    //        sizeof(ul), (LPCSTR) & ul, 0, 0) > 0) &&
+    //
+    //    // Check if CHECKJPEGFORMAT executed without error: 
+    //
+    //    (ExtEscape(dc, CHECKJPEGFORMAT,
+    //        bits.length(), &bits[0], sizeof(ul), (LPSTR)&ul) > 0) &&
+    //
+    //    // Check status code returned by CHECKJPEGFORMAT: 
+    //
+    //    (ul == 1)
+    //    )
+    //{
+    //    print("WORKING CHECK JPEG");
+    //}
     //print(bits);
 
     BITMAPINFO bmi;//{0};
@@ -3576,11 +3608,48 @@ V8FUNC(StretchDIBitsWrapper) {
     bmi.bmiHeader.biWidth = IntegerFI(info[10]);
     bmi.bmiHeader.biHeight = -IntegerFI(info[11]); // top-down image 
     bmi.bmiHeader.biPlanes = 1;
-    bmi.bmiHeader.biBitCount = 0;
-    bmi.bmiHeader.biCompression = IntegerFI(info[12]);
-    bmi.bmiHeader.biSizeImage = bits.length();//IntegerFI(info[10])*IntegerFI(info[11]);
+    bmi.bmiHeader.biBitCount = IntegerFI(info[12]); //?????
+    bmi.bmiHeader.biCompression = IntegerFI(info[13]);
+    bmi.bmiHeader.biSizeImage = 0; //bits.length(); //IntegerFI(info[10])*IntegerFI(info[11]);
     
-    info.GetReturnValue().Set(Number::New(isolate, StretchDIBits(dc, IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]), IntegerFI(info[4]), IntegerFI(info[5]), IntegerFI(info[6]), IntegerFI(info[7]), IntegerFI(info[8]), &bits[0], &bmi, DIB_RGB_COLORS, IntegerFI(info[13]))));
+    info.GetReturnValue().Set(Number::New(isolate, StretchDIBits((HDC)IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]), IntegerFI(info[4]), IntegerFI(info[5]), IntegerFI(info[6]), IntegerFI(info[7]), IntegerFI(info[8]), data/*&bits[0]*/, &bmi, DIB_RGB_COLORS, IntegerFI(info[14]))));
+    delete[] data; //my fault og
+}
+
+//https://forums.codeguru.com/showthread.php?487633-32-bit-DIB-from-24-bit-bitmap
+//
+V8FUNC(GetDIBitsWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+
+    long width = IntegerFI(info[4]);
+    long height = IntegerFI(info[5]);
+    DWORD* bits = new DWORD[width*height*sizeof(DWORD)]; //bruh i just had to initialize it with a chunk of mem
+
+    BITMAPINFO bmi;//{0};
+    memset(&bmi, 0, sizeof(bmi));
+    bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+    bmi.bmiHeader.biWidth = width;
+    bmi.bmiHeader.biHeight = -height;
+    bmi.bmiHeader.biPlanes = 1;
+    bmi.bmiHeader.biBitCount = IntegerFI(info[6]);
+    bmi.bmiHeader.biCompression = IntegerFI(info[7]);
+    bmi.bmiHeader.biSizeImage = 0;
+
+    if (GetDIBits((HDC)IntegerFI(info[0]), (HBITMAP)IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]), bits, &bmi, DIB_RGB_COLORS)) {
+        print(bits[0]);
+        Local<ArrayBuffer> ab = ArrayBuffer::New(isolate, (width * height)*sizeof(DWORD)); //honestly this math is a guess especially the sizeof part
+        memcpy(ab->Data(), bits, width * height* sizeof(DWORD)); //GULP
+        delete[] bits;
+        Local<Uint32Array> arr = Uint32Array::New(ab, 0, width*height); //weird if i multiply this one by sizeof(DWORD) v8 spits out garbage and crashes bad
+        info.GetReturnValue().Set(arr);
+    }
+    else {
+        std::string str = (std::string("GetDIBits failed with code ") + std::to_string(GetLastError()));
+        Local<Value> shit = Exception::Error(String::NewFromUtf8(isolate, str.c_str(), NewStringType::kNormal, str.length()).ToLocalChecked());
+        info.GetReturnValue().Set(shit);
+    }
 }
 
 V8FUNC(PatBltWrapper) {
@@ -3768,6 +3837,10 @@ V8FUNC(CreateDIBitmapSimple) {
     info.GetReturnValue().Set(b);
 }
 
+//struct SMS {
+//    DWORD* bits = NULL;
+//};
+
 V8FUNC(CreateDIBSectionWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
@@ -3800,9 +3873,34 @@ V8FUNC(CreateDIBSectionWrapper) {
         //for (size_t i = 0; i < jsArrayBuffer->ByteLength(); i++) {
         //
         //}
-        BYTE* bytes = NULL;
+        //DWORD* temp = new DWORD[bmi.bmiHeader.biWidth*bmi.bmiHeader.biHeight];
+        //DWORD** bits = &temp;
+        DWORD* bits = NULL; //https://learn.microsoft.com/en-us/shows/pdc-pdc08/pc43 (40:26) raymond uses DWORD instead of byte
+        //SMS* bparent = new SMS;
+
+        Local<ObjectTemplate> interf = ObjectTemplate::New(isolate);
+        interf->Set(isolate, "bitmap", Number::New(isolate, (LONG_PTR)CreateDIBSection((HDC)IntegerFI(info[0]), &bmi, IntegerFI(info[2]), (void**)&bits, NULL, NULL)));
         
-        info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)CreateDIBSection((HDC)IntegerFI(info[0]), &bmi, IntegerFI(info[2]), (void**) &bytes, NULL, NULL)));
+        //Local<ObjectTemplate> jsBobject = ObjectTemplate::New(isolate);
+        interf->Set(isolate, "SetBit", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            //print(IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("bits")).ToLocalChecked()));
+            DWORD* bits = (DWORD*)IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("bits")).ToLocalChecked()); // -///-
+            bits[IntegerFI(info[0])] = info[1].As<Uint32>()->Value();//IntegerFI(info[1]);
+        }));
+        interf->Set(isolate, "GetBit", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            //print(IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("bits")).ToLocalChecked()));
+            DWORD* bits = (DWORD*)IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("bits")).ToLocalChecked()); // -///-
+            info.GetReturnValue().Set(Number::New(isolate, bits[IntegerFI(info[0])]));
+            //bits[IntegerFI(info[0])] = info[1].As<Uint32>()->Value();//IntegerFI(info[1]);
+        }));
+        
+        interf->Set(isolate, "bits", Number::New(isolate, (LONG_PTR)bits)); //oops i forgot how pointers worked and passed the pointer to bits (&bits) instead of just the pointer itself
+
+        Local<Object> result = interf->NewInstance(context).ToLocalChecked(); // aw man
+
+        info.GetReturnValue().Set(result);
     }
 }
 
@@ -4125,27 +4223,34 @@ V8FUNC(AnimateWindowWrapper) { //https://www.youtube.com/watch?v=meIci7gOTLk
 
 //#error update layered window
 //https://stackoverflow.com/questions/18383681/setlayeredwindowattributes-to-make-a-window-transparent-is-only-working-part-of
+//https://stackoverflow.com/questions/67689087/correct-way-to-handle-and-redraw-a-layered-window-with-a-bitmap
+//https://www.purebasic.fr/english/viewtopic.php?t=49781
+//http://www.blichmann.de/downloads/translucency_tutorial.pdf
 V8FUNC(UpdateLayeredWindowWrapper) { //https://cplusplus.com/forum/windows/107905/
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
-
-    LPPOINT pptdst = NULL;
+    
+    //LPPOINT pptdst = NULL;
+    POINT dst{0};
     //memset(pptdst, 0, sizeof(POINT));
     if (!info[2]->IsNumber()) {
         Local<Object> jsPOINT = info[2].As<Object>();
-        pptdst = new POINT{(long)IntegerFI(jsPOINT->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("x")).ToLocalChecked()), (long)IntegerFI(jsPOINT->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("y")).ToLocalChecked())};
+        /*pptdst = new POINT*/dst = POINT{(long)IntegerFI(jsPOINT->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("x")).ToLocalChecked()), (long)IntegerFI(jsPOINT->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("y")).ToLocalChecked())};
+        //print("point: [" << dst.x << "," << dst.y << "]l");
     }
-    LPSIZE psize = NULL;
+    SIZE size{0};
     if (!info[3]->IsNumber()) {
         Local<Object> jsSIZE = info[3].As<Object>(); //info[2].As<Object>(); //OOPS
-        print(IntegerFI(jsSIZE->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("width")).ToLocalChecked()));
-        print(IntegerFI(jsSIZE->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("height")).ToLocalChecked()));
-        psize = new SIZE{ (long)IntegerFI(jsSIZE->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("width")).ToLocalChecked()), (long)IntegerFI(jsSIZE->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("height")).ToLocalChecked()) };
+        //print(IntegerFI(jsSIZE->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("width")).ToLocalChecked()));
+        //print(IntegerFI(jsSIZE->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("height")).ToLocalChecked()));
+        /*psize = new SIZE*/size = SIZE{(long)IntegerFI(jsSIZE->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("width")).ToLocalChecked()), (long)IntegerFI(jsSIZE->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("height")).ToLocalChecked())};
+        //print("size: [" << size.cx << "," << size.cy << "]l");
     }
-    LPPOINT ppsrc = NULL;
+    POINT src{0};// = NULL;
     if (!info[5]->IsNumber()) {
         Local<Object> jsPOINT = info[5].As<Object>();//info[2].As<Object>();
-        ppsrc = new POINT{ (long)IntegerFI(jsPOINT->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("x")).ToLocalChecked()), (long)IntegerFI(jsPOINT->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("y")).ToLocalChecked()) };
+        /*ppsrc = new POINT*/src = POINT{(long)IntegerFI(jsPOINT->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("x")).ToLocalChecked()), (long)IntegerFI(jsPOINT->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("y")).ToLocalChecked())};
+        //print("src point: [" << src.x << "," << src.y << "]l");
     }
 
     BLENDFUNCTION bfunc{ 0 };
@@ -4153,16 +4258,18 @@ V8FUNC(UpdateLayeredWindowWrapper) { //https://cplusplus.com/forum/windows/10790
     bfunc.SourceConstantAlpha = IntegerFI(info[7]);
     bfunc.AlphaFormat = IntegerFI(info[8]);
 
-    info.GetReturnValue().Set(Number::New(isolate, UpdateLayeredWindow((HWND)IntegerFI(info[0]), (HDC)IntegerFI(info[1]), pptdst, psize, (HDC)IntegerFI(info[4]), ppsrc, IntegerFI(info[6]), &bfunc, IntegerFI(info[9]))));
-    if (pptdst != NULL) {
-        delete pptdst;
-    }
-    if (psize != NULL) {
-        delete psize;
-    }
-    if (ppsrc != NULL) {
-        delete ppsrc;
-    }
+    //print(IntegerFI(info[0]) << " " << IntegerFI(info[1]) << " " << info[2]->IsNumber() << " " << info[3]->IsNumber() << " " << IntegerFI(info[4]) << " " << info[5]->IsNumber() << " " << IntegerFI(info[6]) << " " << IntegerFI(info[7]) << " " << IntegerFI(info[8]) << " " << IntegerFI(info[9]));
+    
+    info.GetReturnValue().Set(Number::New(isolate, UpdateLayeredWindow((HWND)IntegerFI(info[0]), (HDC)IntegerFI(info[1]), info[2]->IsNumber() ? NULL : &dst, info[3]->IsNumber() ? NULL : &size, (HDC)IntegerFI(info[4]), info[5]->IsNumber() ? NULL : &src, IntegerFI(info[6]), &bfunc, IntegerFI(info[9]))));
+    //if (pptdst != NULL) {
+    //    delete pptdst;
+    //}
+    //if (psize != NULL) {
+    //    delete psize;
+    //}
+    //if (ppsrc != NULL) {
+    //    delete ppsrc;
+    //}
 }
 
 V8FUNC(SetLayeredWindowAttributesWrapper) {
@@ -4467,7 +4574,7 @@ struct WINCOMPATTRDATA
 //https://stackoverflow.com/questions/32335945/blur-behind-window-with-titlebar-in-windows-10-stopped-working-after-windows-up
 //https://stackoverflow.com/questions/32724187/how-do-you-set-the-glass-blend-colour-on-windows-10
 //https://vhanla.codigobit.info/2015/07/enable-windows-10-aero-glass-aka-blur.html
-//im honestly shocked this function works because DwmEnableBlurBehindWindow doesn't work for windows 11 and the replacement function (DwmSetWindowAttribute)'s acrylic is slightly different than SetWindowCompositionAttribute
+//im honestly shocked this function works because DwmEnableBlurBehindWindow doesn't work past windows 8 and the replacement function (DwmSetWindowAttribute)'s acrylic is slightly different than SetWindowCompositionAttribute
 V8FUNC(SetWindowCompositionAttributeWrapper) { //i was thinking to myself "huh i thought i already added this function" but then i looked it up and realized not only is it undocumented but i have to LOADLIBRARY IT from user32
     using namespace v8; //DWMACCENTPOLICY
     Isolate* isolate = info.GetIsolate();
@@ -4962,7 +5069,7 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     
     //Local<ObjectTemplate> console = ObjectTemplate::New(isolate);
     //console->Set(isolate, "log", FunctionTemplate::New(isolate, Print));
-
+    //
     //global->Set(isolate, "console", console);
 
     global->Set(isolate, "print", FunctionTemplate::New(isolate, Print));
@@ -5024,6 +5131,7 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     global->Set(isolate, "BitBlt", FunctionTemplate::New(isolate, BitBltWrapper));
     global->Set(isolate, "StretchBlt", FunctionTemplate::New(isolate, StretchBltWrapper));
     setGlobalWrapper(StretchDIBits);
+    setGlobalWrapper(GetDIBits);
     setGlobalWrapper(PatBlt);
     setGlobalWrapper(MaskBlt);
     setGlobalWrapper(PlgBlt);
@@ -5772,6 +5880,9 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
     setGlobalConst(SWP_ASYNCWINDOWPOS); setGlobalConst(SWP_DEFERERASE); setGlobalConst(SWP_DRAWFRAME); setGlobalConst(SWP_FRAMECHANGED); setGlobalConst(SWP_HIDEWINDOW); setGlobalConst(SWP_NOACTIVATE); setGlobalConst(SWP_NOCOPYBITS); setGlobalConst(SWP_NOMOVE); setGlobalConst(SWP_NOOWNERZORDER); setGlobalConst(SWP_NOREDRAW); setGlobalConst(SWP_NOREPOSITION); setGlobalConst(SWP_NOSENDCHANGING); setGlobalConst(SWP_NOSIZE); setGlobalConst(SWP_NOZORDER); setGlobalConst(SWP_SHOWWINDOW);
 
     global->Set(isolate, "RGB", FunctionTemplate::New(isolate, RGBWRAPPER));
+    global->Set(isolate, "GetRValue", FunctionTemplate::New(isolate, GetRValueWrapper));
+    global->Set(isolate, "GetGValue", FunctionTemplate::New(isolate, GetGValueWrapper));
+    global->Set(isolate, "GetBValue", FunctionTemplate::New(isolate, GetBValueWrapper));
 
     setGlobalWrapper(WindowFromDC);
     setGlobalWrapper(WindowFromPoint);
@@ -5920,7 +6031,9 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInstance, char* nCmdList, int
     //ok 1.3.2 because i changed child_process to system
     //1.3.3 because i finally figured out how to get Utf16 strings as wchars
     //1.4.3 because i finally figured out how to get Utf16 strings as wchars (and completely changed how CreateWindow works)
-    print("JBS3 -> Version 1.4.4"); //so idk how normal version things work so the first number will probably stay one --- i will increment the second number if i change an existing function like when i remade the CreateWindowClass and CreateWindow functions --- i might random increment the third number if i feel like it
+    //1.4.7 because i added loads of Dwm functions aswell as SetWindowCompositionAttribute
+    //1.4.99 finally figured out UpdateLayeredWindow
+    print("JBS3 -> Version 1.4.99"); //so idk how normal version things work so the first number will probably stay one --- i will increment the second number if i change an existing function like when i remade the CreateWindowClass and CreateWindow functions --- i might random increment the third number if i feel like it
     print(screenWidth << "x" << screenHeight);
     
 

@@ -109,7 +109,7 @@ function windowProc(hwnd, msg, wp, lp) {
         let hbm = CreateDIBSection(screen, CreateDIBitmapSimple(mwidth, mheight, 32), DIB_RGB_COLORS); //WTF THIS ACTUALLY WORKED????
         //hbm = CreateBitmapIndirect(GetObjectHBITMAP(hbm)); //wow this line lowkey actually works
         const memDC = CreateCompatibleDC(screen);
-        SelectObject(memDC, hbm); //memDC points to missingTextureBmp and drawing to memDC will also draw onto missingTextureBmp!
+        SelectObject(memDC, hbm.bitmap); //memDC points to missingTextureBmp and drawing to memDC will also draw onto missingTextureBmp!
         SelectObject(memDC, GetStockObject(DC_BRUSH));
         SetDCBrushColor(memDC, RGB(255,127,255));
         FillRect(memDC, 0, 0, mwidth, mheight, NULL);
@@ -126,10 +126,10 @@ function windowProc(hwnd, msg, wp, lp) {
         //BitBlt(screen, 0, 0, mwidth, mheight, memDC, 0, 0, SRCCOPY);
         DeleteDC(memDC);    
         DeleteDC(memDC2);    
-        if(hbm) {
-            print(e=DwmSetIconicThumbnail(hwnd, hbm, 0), "set"); //it seems like you can call this anywhere but if it's outside of the given width and height it freaks out (so i save HIWORD(lp) and LOWORD(lp) to mwidth and mheight so i can use them elsewhere)
+        if(hbm && hbm.bitmap) {
+            print(e=DwmSetIconicThumbnail(hwnd, hbm.bitmap, 0), "set"); //it seems like you can call this anywhere but if it's outside of the given width and height it freaks out (so i save HIWORD(lp) and LOWORD(lp) to mwidth and mheight so i can use them elsewhere)
             print(_com_error(e));
-            DeleteObject(hbm);
+            DeleteObject(hbm.bitmap);
         }
         ReleaseDC(hwnd, screen);
     }else if(msg == WM_DWMSENDICONICLIVEPREVIEWBITMAP) { //updated every time you peek (hover over the window on the taskbar)
@@ -139,7 +139,7 @@ function windowProc(hwnd, msg, wp, lp) {
         const screen = GetDC(hwnd);
         let hbm = CreateDIBSection(screen, CreateDIBitmapSimple(mwidth, mheight, 32), DIB_RGB_COLORS);
         const memDC = CreateCompatibleDC(screen);
-        SelectObject(memDC, hbm); //memDC points to missingTextureBmp and drawing to memDC will also draw onto missingTextureBmp!
+        SelectObject(memDC, hbm.bitmap); //memDC points to missingTextureBmp and drawing to memDC will also draw onto missingTextureBmp!
         SelectObject(memDC, GetStockObject(DC_BRUSH));
         SetDCBrushColor(memDC, RGB(0,255,127));
         FillRect(memDC, 0, 0, mwidth, mheight, NULL);
@@ -155,11 +155,11 @@ function windowProc(hwnd, msg, wp, lp) {
         //BitBlt(screen, 0, 0, mwidth, mheight, memDC, 0, 0, SRCCOPY);
         DeleteDC(memDC);
         DeleteDC(memDC2);
-        if (hbm)
+        if (hbm && hbm.bitmap)
         {
-            print(e=DwmSetIconicLivePreviewBitmap(hwnd, hbm, NULL, 1),"im feeling it");
+            print(e=DwmSetIconicLivePreviewBitmap(hwnd, hbm.bitmap, NULL, 1),"im feeling it");
             print(_com_error(e));
-            DeleteObject(hbm);
+            DeleteObject(hbm.bitmap);
         }
         ReleaseDC(hwnd, screen);
     }else if(msg == WM_TIMER) {
@@ -185,7 +185,7 @@ function windowProc(hwnd, msg, wp, lp) {
             let hbm = CreateDIBSection(screen, CreateDIBitmapSimple(mwidth, mheight, 32), DIB_RGB_COLORS); //WTF THIS ACTUALLY WORKED????
             //hbm = CreateBitmapIndirect(GetObjectHBITMAP(hbm)); //wow this line lowkey actually works
             const memDC = CreateCompatibleDC(screen);
-            SelectObject(memDC, hbm); //memDC points to missingTextureBmp and drawing to memDC will also draw onto missingTextureBmp!
+            SelectObject(memDC, hbm.bitmap); //memDC points to missingTextureBmp and drawing to memDC will also draw onto missingTextureBmp!
             SelectObject(memDC, GetStockObject(DC_BRUSH));
             SetDCBrushColor(memDC, RGB(255,127,255));
             FillRect(memDC, 0, 0, mwidth, mheight, NULL);
@@ -200,30 +200,30 @@ function windowProc(hwnd, msg, wp, lp) {
             SetStretchBltMode(memDC, HALFTONE);
             StretchBlt(memDC, Math.random()*mwidth, Math.random()*mheight, 44, 36, memDC2, 0, 0, 220, 183, SRCCOPY);
             //BitBlt(screen, 0, 0, mwidth, mheight, memDC, 0, 0, SRCCOPY);
-            DeleteDC(memDC);    
-            DeleteDC(memDC2);    
-            if(hbm) {
-                print(e=DwmSetIconicThumbnail(hwnd, hbm, 0), "set");
+            DeleteDC(memDC);
+            DeleteDC(memDC2);
+            if(hbm && hbm.bitmap) {
+                print(e=DwmSetIconicThumbnail(hwnd, hbm.bitmap, 0), "set");
                 print(_com_error(e));
-                DeleteObject(hbm);
+                DeleteObject(hbm.bitmap);
             }
             ReleaseDC(hwnd, screen);
         }
     }
-    /*else if(msg == WM_NCPAINT) {
-        //print("PAINT",hwnd, wp, DCX_WINDOW | DCX_INTERSECTRGN);
-        const dc = GetDCEx(hwnd, wp, DCX_WINDOW|DCX_INTERSECTRGN); //https://learn.microsoft.com/en-us/windows/win32/gdi/wm-ncpaint
-        TextOut(dc, 12, 0, "click ot ranrenaifasf ran yakumos");
-        TextOut(dc, 12, 12, "click ot ranrenaifasf ran yakumos");
-        TextOut(dc, 12, 24, "click ot ranrenaifasf ran yakumos");
-        DrawIcon(dc, 0, 0, icon);
-        ReleaseDC(hwnd, dc);
-        //ps = BeginPaint(hwnd);
-        //
-        //TextOut(ps.hdc, 12, 12, "click to randomize colorz!");
-        //
-        //EndPaint(hwnd, ps);
-    }*/
+    //else if(msg == WM_NCPAINT) {
+    //    //print("PAINT",hwnd, wp, DCX_WINDOW | DCX_INTERSECTRGN);
+    //    const dc = GetWindowDC(hwnd);//GetDCEx(hwnd, wp, DCX_WINDOW|DCX_INTERSECTRGN); //https://learn.microsoft.com/en-us/windows/win32/gdi/wm-ncpaint
+    //    TextOut(dc, 12, 0, "click ot ranrenaifasf ran yakumos");
+    //    TextOut(dc, 12, 12, "click ot ranrenaifasf ran yakumos");
+    //    TextOut(dc, 12, 24, "click ot ranrenaifasf ran yakumos");
+    //    DrawIcon(dc, 0, 0, icon);
+    //    ReleaseDC(hwnd, dc);
+    //    //ps = BeginPaint(hwnd);
+    //    //
+    //    //TextOut(ps.hdc, 12, 12, "click to randomize colorz!");
+    //    //
+    //    //EndPaint(hwnd, ps);
+    //}
     else if(msg == WM_DESTROY) {
         PostQuitMessage(0);
     }//else {
