@@ -17,7 +17,7 @@ function windowProc(hwnd, msg, wp, lp) {
 
         const memDC = CreateCompatibleDC(dc);
 
-        const ddb = CreateCompatibleBitmap(dc, tobject.bmWidth, tobject.bmHeight); //ok i have NO IDEA WHY you have to create a compatible bitmap, draw the real bitmap (hbm.bitmap) into the compatible bitmap and use THAT memDC for UpdateLayeredWindow
+        const ddb = CreateCompatibleBitmap(dc, tobject.bmWidth, tobject.bmHeight);
         SelectObject(memDC, ddb);
         BitBlt(memDC, 0, 0, tobject.bmWidth, tobject.bmHeight, trollDC, 0, 0, SRCCOPY);
     
@@ -26,6 +26,7 @@ function windowProc(hwnd, msg, wp, lp) {
         trollDIBits = GetDIBits(dc, ddb, 0, tobject.bmHeight, tobject.bmWidth, tobject.bmHeight, 32, BI_RGB);
 
         DeleteObject(ddb);
+        DeleteDC(trollDC);
         DeleteDC(memDC);
         ReleaseDC(hwnd, dc);
     }else if(msg == WM_PAINT) {

@@ -1,3 +1,5 @@
+const blurRGBA = eval(require("fs").read(__dirname+"/fastblur.js"));
+
 let troll = LoadImage(NULL, __dirname+(Math.random() > .5 ? "/troll.bmp" : "/imagine.bmp"), IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE);
 let tobject = GetObjectHBITMAP(troll)
 
@@ -13,38 +15,42 @@ function random(max) {
 }
 
 function blurHBM(blurSize) {
-    trollDIB = [];
-
-    for(let y = 0; y < cy; y++) {
-        trollDIB.push([]);
-        for(let x = 0; x < cx; x++) {
-            const color = hbm.GetBit(x+y*cx);
-            trollDIB[y].push([GetRValue(color), GetGValue(color), GetBValue(color)]);
-        }
-    }
-
-    const blurAmount = (Math.abs(-blurSize)*2+1)**2;
-
-    for(let y = 0; y < cy; y++) {
-        for(let x = 0; x < cx; x++) {
-            //convolution average blur (i think?)
-            let color = [0,0,0];
-            
-            if(blurSize == 0) {
-                color = trollDIB[y][x];
-            }else {
-                for(let i = -blurSize; i <= blurSize; i++) {
-                    for(let j = -blurSize; j <= blurSize; j++) {
-                        //print(Math.max(0, Math.min(32-1, y+i)), Math.max(0, Math.min(cx-1, x+j)));
-                        color = color.map((v, k) => v+trollDIB[Math.max(0, Math.min(cy-1, y+i))][Math.max(0, Math.min(cx-1, x+j))][k]);
-                    }
-                }
-                color = color.map((v) => v/blurAmount);
-            }
-
-            hbm.SetBit(x+y*cx, RGB(...color));
-        }
-    }
+    const bits = hbm.GetBits();
+    blurRGBA(bits, hbm.width, hbm.height, blurSize); //NAH NO WAY THIS IS INSANE (it's at least 500x faster than my convolution average blur)
+    //print(bits);
+    hbm.SetBits(bits);
+    //trollDIB = [];
+    //
+    //for(let y = 0; y < cy; y++) {
+    //    trollDIB.push([]);
+    //    for(let x = 0; x < cx; x++) {
+    //        const color = hbm.GetBit(x+y*cx);
+    //        trollDIB[y].push([GetRValue(color), GetGValue(color), GetBValue(color)]);
+    //    }
+    //}
+    //
+    //const blurAmount = (Math.abs(-blurSize)*2+1)**2;
+    //
+    //for(let y = 0; y < cy; y++) {
+    //    for(let x = 0; x < cx; x++) {
+    //        //convolution average blur (i think?)
+    //        let color = [0,0,0];
+    //        
+    //        if(blurSize == 0) {
+    //            color = trollDIB[y][x];
+    //        }else {
+    //            for(let i = -blurSize; i <= blurSize; i++) {
+    //                for(let j = -blurSize; j <= blurSize; j++) {
+    //                    //print(Math.max(0, Math.min(32-1, y+i)), Math.max(0, Math.min(cx-1, x+j)));
+    //                    color = color.map((v, k) => v+trollDIB[Math.max(0, Math.min(cy-1, y+i))][Math.max(0, Math.min(cx-1, x+j))][k]);
+    //                }
+    //            }
+    //            color = color.map((v) => v/blurAmount);
+    //        }
+    //
+    //        hbm.SetBit(x+y*cx, RGB(...color));
+    //    }
+    //}
 }
 
 function windowProc(hwnd, msg, wp, lp) {
@@ -71,9 +77,9 @@ function windowProc(hwnd, msg, wp, lp) {
 
         ReleaseDC(hwnd, dc);
 
-        //SetTimer(hwnd, 0, 5000);
+        //SetTimer(hwnd, 0, 32);
     }else if(msg == WM_PAINT) {
-        print("whatchunoaibaot");
+        //print("whatchunoaibaot");
 
         const ps = BeginPaint(hwnd);
 
@@ -118,4 +124,4 @@ const wc = CreateWindowClass("winclass", windowProc);
 wc.hbrBackground = COLOR_WINDOW+1;
 wc.hCursor = LoadCursor(NULL, IDC_HAND);
 
-window = CreateWindow(WS_EX_OVERLAPPEDWINDOW, wc, "dibits2.js", WS_OVERLAPPEDWINDOW | WS_VISIBLE, (1920-cx)/2, (1080-cy)/2, cx+16, cy+39, NULL, NULL, hInstance);
+window = CreateWindow(WS_EX_OVERLAPPEDWINDOW, wc, "dibits2.js - click to blur screen!", WS_OVERLAPPEDWINDOW | WS_VISIBLE, (1920-cx)/2, (1080-cy)/2, cx+16, cy+39, NULL, NULL, hInstance);

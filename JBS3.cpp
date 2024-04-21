@@ -3625,7 +3625,9 @@ V8FUNC(GetDIBitsWrapper) {
 
     long width = IntegerFI(info[4]);
     long height = IntegerFI(info[5]);
-    DWORD* bits = new DWORD[width*height*sizeof(DWORD)]; //bruh i just had to initialize it with a chunk of mem
+    int bitCount = IntegerFI(info[6]);
+    auto stride = ((((width * bitCount) + 31) & ~31) >> 3);
+    DWORD* bits = new DWORD[width*height]; //bruh i just had to initialize it with a chunk of mem
 
     BITMAPINFO bmi;//{0};
     memset(&bmi, 0, sizeof(bmi));
@@ -3633,14 +3635,16 @@ V8FUNC(GetDIBitsWrapper) {
     bmi.bmiHeader.biWidth = width;
     bmi.bmiHeader.biHeight = -height;
     bmi.bmiHeader.biPlanes = 1;
-    bmi.bmiHeader.biBitCount = IntegerFI(info[6]);
+    bmi.bmiHeader.biBitCount = bitCount;
     bmi.bmiHeader.biCompression = IntegerFI(info[7]);
     bmi.bmiHeader.biSizeImage = 0;
 
+    //wait apparently you are supposed to call GetDIBits twice (if it ain't broken i aint fixing it) https://forums.codeguru.com/showthread.php?450748-Problem-with-GetDIBits-function
+
     if (GetDIBits((HDC)IntegerFI(info[0]), (HBITMAP)IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]), bits, &bmi, DIB_RGB_COLORS)) {
-        print(bits[0]);
-        Local<ArrayBuffer> ab = ArrayBuffer::New(isolate, (width * height)*sizeof(DWORD)); //honestly this math is a guess especially the sizeof part
-        memcpy(ab->Data(), bits, width * height* sizeof(DWORD)); //GULP
+        //print(bits[0]);
+        Local<ArrayBuffer> ab = ArrayBuffer::New(isolate, height*stride); //honestly this math is a guess especially the sizeof part
+        memcpy(ab->Data(), bits, height*stride); //GULP
         delete[] bits;
         Local<Uint32Array> arr = Uint32Array::New(ab, 0, width*height); //weird if i multiply this one by sizeof(DWORD) v8 spits out garbage and crashes bad
         info.GetReturnValue().Set(arr);
@@ -3885,18 +3889,49 @@ V8FUNC(CreateDIBSectionWrapper) {
         interf->Set(isolate, "SetBit", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
             Isolate* isolate = info.GetIsolate();
             //print(IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("bits")).ToLocalChecked()));
-            DWORD* bits = (DWORD*)IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("bits")).ToLocalChecked()); // -///-
+            DWORD* bits = (DWORD*)IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("_bits")).ToLocalChecked()); // -///-
             bits[IntegerFI(info[0])] = info[1].As<Uint32>()->Value();//IntegerFI(info[1]);
         }));
         interf->Set(isolate, "GetBit", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
             Isolate* isolate = info.GetIsolate();
             //print(IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("bits")).ToLocalChecked()));
-            DWORD* bits = (DWORD*)IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("bits")).ToLocalChecked()); // -///-
+            DWORD* bits = (DWORD*)IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("_bits")).ToLocalChecked()); // -///-
             info.GetReturnValue().Set(Number::New(isolate, bits[IntegerFI(info[0])]));
             //bits[IntegerFI(info[0])] = info[1].As<Uint32>()->Value();//IntegerFI(info[1]);
         }));
-        
-        interf->Set(isolate, "bits", Number::New(isolate, (LONG_PTR)bits)); //oops i forgot how pointers worked and passed the pointer to bits (&bits) instead of just the pointer itself
+        interf->Set(isolate, "GetBits", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            LONG width = IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("width")).ToLocalChecked());
+            LONG height = IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("height")).ToLocalChecked());
+            int bitCount = IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("bitCount")).ToLocalChecked());
+            auto stride = ((((width * bitCount) + 31) & ~31) >> 3);
+            //print(IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("bits")).ToLocalChecked()));
+            DWORD* bits = (DWORD*)IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("_bits")).ToLocalChecked()); // -///-
+            Local<ArrayBuffer> ab = ArrayBuffer::New(isolate, height*stride); //honestly this math is a guess especially the sizeof part
+            memcpy(ab->Data(), bits, height*stride); //GULP
+            //delete[] bits;
+            Local<Uint32Array> arr = Uint32Array::New(ab, 0, width*height); //weird if i multiply this one by sizeof(DWORD) v8 spits out garbage and crashes bad
+            info.GetReturnValue().Set(arr);
+            //bits[IntegerFI(info[0])] = info[1].As<Uint32>()->Value();//IntegerFI(info[1]);
+        }));
+        interf->Set(isolate, "SetBits", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            LONG width = IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("width")).ToLocalChecked());
+            LONG height = IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("height")).ToLocalChecked());
+            int bitCount = IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("bitCount")).ToLocalChecked());
+            auto stride = ((((width * bitCount) + 31) & ~31) >> 3);
+            
+            //print(IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("bits")).ToLocalChecked()));
+            DWORD* bits = (DWORD*)IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("_bits")).ToLocalChecked()); // -///-
+            Local<Uint32Array> jsBits = info[0].As<Uint32Array>();
+            jsBits->CopyContents(bits, height * stride);
+            //bits[IntegerFI(info[0])] = info[1].As<Uint32>()->Value();//IntegerFI(info[1]);
+        }));
+
+        interf->Set(isolate, "_bits", Number::New(isolate, (LONG_PTR)bits)); //oops i forgot how pointers worked and passed the pointer to bits (&bits) instead of just the pointer itself
+        interf->Set(isolate, "bitCount", Number::New(isolate, bmi.bmiHeader.biBitCount));
+        interf->Set(isolate, "width", Number::New(isolate, bmi.bmiHeader.biWidth)); //idk how to make read only lol.
+        interf->Set(isolate, "height", Number::New(isolate, abs(bmi.bmiHeader.biHeight)));
 
         Local<Object> result = interf->NewInstance(context).ToLocalChecked(); // aw man
 
@@ -4776,6 +4811,23 @@ V8FUNC(DwmInvalidateIconicBitmapsWrapper) {
     info.GetReturnValue().Set(Number::New(isolate, DwmInvalidateIconicBitmaps((HWND)IntegerFI(info[0]))));
 }
 
+V8FUNC(SetWindowDisplayAffinityWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    info.GetReturnValue().Set(Number::New(isolate, SetWindowDisplayAffinity((HWND)IntegerFI(info[0]), (DWORD)IntegerFI(info[1]))));
+}
+
+V8FUNC(GetWindowDisplayAffinityWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    DWORD aff = -1;
+
+    GetWindowDisplayAffinity((HWND)IntegerFI(info[0]), &aff);
+
+    info.GetReturnValue().Set(Number::New(isolate, aff));
+}
+
 V8FUNC(NCCALCSIZE_PARAMSWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
@@ -5211,6 +5263,13 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     setGlobalWrapper(SetWindowCompositionAttribute);
     setGlobalWrapper(NCCALCSIZE_PARAMS);
 
+    setGlobalWrapper(SetWindowDisplayAffinity);
+    setGlobalWrapper(GetWindowDisplayAffinity);
+
+    setGlobalConst(WDA_NONE);
+    setGlobalConst(WDA_MONITOR);
+    setGlobalConst(WDA_EXCLUDEFROMCAPTURE);
+
     setGlobalConst(ACCENT_DISABLED);
     setGlobalConst(ACCENT_ENABLE_GRADIENT);
     setGlobalConst(ACCENT_ENABLE_TRANSPARENTGRADIENT);
@@ -5335,6 +5394,22 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     setGlobalWrapper(ClientToScreen);
     setGlobalWrapper(SetRect);
     setGlobalWrapper(SetROP2);
+
+    setGlobalConst(SW_HIDE           );
+    setGlobalConst(SW_SHOWNORMAL     );
+    setGlobalConst(SW_NORMAL         );
+    setGlobalConst(SW_SHOWMINIMIZED  );
+    setGlobalConst(SW_SHOWMAXIMIZED  );
+    setGlobalConst(SW_MAXIMIZE       );
+    setGlobalConst(SW_SHOWNOACTIVATE );
+    setGlobalConst(SW_SHOW           );
+    setGlobalConst(SW_MINIMIZE       );
+    setGlobalConst(SW_SHOWMINNOACTIVE);
+    setGlobalConst(SW_SHOWNA         );
+    setGlobalConst(SW_RESTORE        );
+    setGlobalConst(SW_SHOWDEFAULT    );
+    setGlobalConst(SW_FORCEMINIMIZE  );
+    setGlobalConst(SW_MAX);
     
     setGlobalConst(R2_BLACK); setGlobalConst(R2_COPYPEN); setGlobalConst(R2_MASKNOTPEN); setGlobalConst(R2_MASKPEN); setGlobalConst(R2_MASKPENNOT); setGlobalConst(R2_MERGENOTPEN); setGlobalConst(R2_MERGEPEN); setGlobalConst(R2_MERGEPENNOT); setGlobalConst(R2_NOP); setGlobalConst(R2_NOT); setGlobalConst(R2_NOTCOPYPEN); setGlobalConst(R2_NOTMASKPEN); setGlobalConst(R2_NOTMERGEPEN); setGlobalConst(R2_NOTXORPEN); setGlobalConst(R2_WHITE); setGlobalConst(R2_XORPEN);
 
