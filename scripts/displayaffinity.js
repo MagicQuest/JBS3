@@ -98,6 +98,7 @@ function windowProc(hwnd, msg, wp, lp) {
             }
             nodraw = false;
             scaleTime = Date.now()/1000;
+	    scale = 10;
         }
         if(scale > 1) {
             RedrawWindow(hwnd, 0, 0, windowcx, windowcy, NULL, RDW_INVALIDATE | RDW_UPDATENOW);

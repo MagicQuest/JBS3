@@ -2582,7 +2582,7 @@ V8FUNC(DestroyWindowWrapper) {
 V8FUNC(GET_X_LPARAMWRAPPER) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
-    info.GetReturnValue().Set(((int)(short)LOWORD(IntegerFI(info[0])))); //the reason i didn't use the actual GET_X_LPARAM macro was because i didn't know i had to include <windowsx.h> and so i just used LOWORD!
+    info.GetReturnValue().Set(((int)(short)LOWORD(IntegerFI(info[0])))); //the reason i didn't use the actual GET_X_LPARAM macro was because i didn't know i had to include <windowsx.h> and so i just used LOWORD! (ok i just checked and idek if windowsx.h is a real header)
 }
 
 V8FUNC(GET_Y_LPARAMWRAPPER) {
@@ -5113,6 +5113,15 @@ void showDirectoryPicker(const v8::FunctionCallbackInfo<v8::Value>& info) {
     }
 }
 
+V8FUNC(GetClassNameWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    wchar_t* className = new wchar_t[256];
+    int length = GetClassNameW((HWND)IntegerFI(info[0]), className, 256);
+    info.GetReturnValue().Set(String::NewFromTwoByte(isolate, (const uint16_t*)className, NewStringType::kNormal, length).ToLocalChecked());
+    delete[] className;
+}
+
 v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     using namespace v8;
 
@@ -5738,7 +5747,8 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
     setGlobalWrapper(CreateCompatibleBitmap);
     setGlobalWrapper(CreateCompatibleDC);
     setGlobalWrapper(CreateBitmap);
-    
+    setGlobalWrapper(GetClassName);
+
     setGlobalWrapper(Rectangle);
 
     global->Set(isolate, "GetDefaultFont", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
