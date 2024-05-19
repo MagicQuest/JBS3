@@ -145,6 +145,7 @@
   <ItemGroup>
     <ClInclude Include="console2.h" />
     <ClInclude Include="Direct2D.h" />
+    <ClInclude Include="DllCall.h" />
     <ClInclude Include="guicon.h" />
     <ClInclude Include="JSTimer.h" />
     <ClInclude Include="JSWindow.h" />
