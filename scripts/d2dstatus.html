@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>d2dstatus</title>
+    <style>
+        li::after {
+            content: " ✅";
+        }
+        li.NO::after, li.NOPE::after {
+            content: " ❌";
+        }
+        li.NOPE {
+            text-decoration: line-through;
+        }
+        li.i {
+            text-decoration: underline;
+            font-weight: bold;
+        }
+        li.internal {
+            cursor: help;
+            text-decoration: underline dotted;
+        }
+        li.UNTESTED::after {
+            content: " ➖"
+        }
+        li.UNTESTED {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <p>D2D</p>
+    <ul>
+        <li>renderTarget</li>
+        <ul>
+            <li>BeginDraw</li>
+            <li>Clear</li>
+            <li>CreateBitmap</li>
+            <li>CreateBitmapBrush</li>
+            <li>CreateBitmapFromWicBitmap (CreateBitmapFromFilename)</li>
+            <li class="NO">CreateCompatibleRenderTarget</li>
+            <li>CreateGradientStopCollection</li>
+            <li class="NO">CreateLayer</li>
+            <li>CreateLinearGradientBrush</li>
+            <li class="NO">CreateMesh</li>
+            <li>CreateRadialGradientBrush</li>
+            <li class="NO">CreateSharedBitmap</li>
+            <li>CreateSolidColorBrush</li>
+            <li>DrawBitmap</li>
+            <li>DrawEllipse</li>
+            <li class="NO">DrawGeometry</li>
+            <li class="NO">DrawGlyphRun</li>
+            <li>DrawLine</li>
+            <li>DrawRectangle</li>
+            <li>DrawRoundedRectangle</li>
+            <li class="NO i">DrawTextLayout</li>
+            <li>DrawTextW</li>
+            <li>EndDraw</li>
+            <li>FillEllipse</li>
+            <li class="NO">FillGeometry</li>
+            <li class="NO">FillMesh</li>
+            <li class="NO">FillOpacityMask</li>
+            <li>FillRectangle</li>
+            <li>FillRoundedRectangle</li>
+            <li>Flush</li>
+            <li>GetAntialiasMode</li>
+            <li>GetDpi</li>
+            <li>SetDpi</li>
+            <li class="NOPE">GetFactory</li>
+            <li>GetMaximumBitmapSize</li>
+            <li class="NO">GetPixelFormat</li>
+            <li>GetPixelSize</li>
+            <li>GetSize</li>
+            <li class="NO">GetTags</li>
+            <li class="NO">SetTags</li>
+            <li class="NO">GetTextAntialiasMode</li>
+            <li class="NO">SetTextAntialiasMode</li>
+            <li class="NO">GetTextRenderingParams</li>
+            <li class="NO">SetTextRenderingParams</li>
+            <li>GetTransform</li>
+            <li>SetTransform</li>
+            <li>IsSupported</li>
+            <li class="NO">PopAxisAlignedClip</li>
+            <li class="NO">PopLayer</li>
+            <li class="NO">PushAxisAlignedClip</li>
+            <li class="NO">PushLayer</li>
+            <li>Release</li>
+            <li>RestoreDrawingState</li>
+            <li>SaveDrawingState</li>
+            <li>SetAntialiasMode</li>
+        </ul>
+        <li>ID2D1SolidColorBrush</li>
+        <ul>
+            <li>SetOpacity</li>
+            <li>GetOpacity</li>
+            <li>GetTransform</li>
+            <li>SetTransform</li>
+            <li>SetColor</li>
+            <li>GetColor</li>
+        </ul>
+        <li>IDWriteTextFormat</li>
+        <ul>
+            <li>GetFlowDirection</li>
+            <li class="NO">GetFontCollection</li>
+            <li>GetFontFamilyName</li>
+            <li>GetFontFamilyNameLength</li>
+            <li>GetFontSize</li>
+            <li>GetFontStretch</li>
+            <li>GetFontStyle</li>
+            <li>GetFontWeight</li>
+            <li>GetIncrementalTabStop</li>
+            <li>GetLineSpacing</li>
+            <li class="NO">GetLocaleName</li>
+            <li class="NO">GetLocaleNameLength</li>
+            <li>GetParagraphAlignment</li>
+            <li>GetReadingDirection</li>
+            <li>GetTextAlignment</li>
+            <li>GetTrimming</li>
+            <li>GetWordWrapping</li>
+            <li>SetFlowDirection</li>
+            <li>SetIncrementalTabStop</li>
+            <li>SetLineSpacing</li>
+            <li>SetParagraphAlignment</li>
+            <li>SetReadingDirection</li>
+            <li>SetTextAlignment</li>
+            <li>SetTrimming</li>
+            <li>SetWordWrapping</li>
+            <li class="NO">SetFontSize</li>
+            <li>Release</li>
+        </ul>
+        <li>ID2D1Bitmap</li>
+        <ul>
+            <li>CopyFromBitmap</li>
+            <li class="NO">CopyFromMemory</li>
+            <li>CopyFromRenderTarget</li>
+            <li>GetDpi</li>
+            <li class="NOPE">GetFactory</li>
+            <li>GetPixelFormat</li>
+            <li>GetPixelSize</li>
+            <li>GetSize</li>
+        </ul>
+        <li>ID2D1BitmapBrush</li>
+        <ul>
+            <li>GetExtendModeX</li>
+            <li>GetExtendModeY</li>
+            <li>GetExtendMode</li>
+            <li>GetInterpolationMode</li>
+            <li>SetExtendModeX</li>
+            <li>SetExtendModeY</li>
+            <li>SetExtendMode</li>
+            <li>SetInterpolationMode</li>
+            <li>SetBitmap</li>
+            <li>GetBitmap</li>
+            <li>GetTransform</li>
+            <li>SetTransform</li>
+            <li>SetOpacity</li>
+            <li>GetOpacity</li>
+        </ul>
+        <li>ID2D1LinearGradientBrush</li>
+        <ul>
+            <li>GetEndPoint</li>
+            <li class="NOPE">GetFactory</li>
+            <li class="NOPE">GetGradientStopCollection</li>
+            <li>GetOpacity</li>
+            <li>GetStartPoint</li>
+            <li>GetTransform</li>
+            <li>SetTransform</li>
+            <li>SetEndPoint</li>
+            <li>SetOpacity</li>
+            <li>SetStartPoint</li>
+        </ul>
+        <li>ID2D1RadialGradientBrush</li>
+        <ul>
+            <li>GetTransform</li>
+            <li>SetTransform</li>
+            <li>SetOpacity</li>
+            <li>GetOpacity</li>
+            <li class="NOPE">GetFactory</li>
+            <li>GetCenter</li>
+            <li class="NOPE">GetGradientStopCollection</li>
+            <li>GetGradientOriginOffset</li>
+            <li>GetRadiusY</li>
+            <li>GetRadiusX</li>
+            <li>GetRadius</li>
+            <li>SetCenter</li>
+            <li>SetGradientOriginOffset</li>
+            <li>SetRadiusX</li>
+            <li>SetRadiusY</li>
+            <li>SetRadius</li>
+        </ul>
+        <li>Matrix3x2F</li>
+        <ul>
+            <li>Determinant</li>
+            <li>Identity</li>
+            <li class="UNTESTED">Invert</li>
+            <li>IsIdentity</li>
+            <li>IsInvertible</li>
+            <li class="NO internal">ReinterpretBaseType</li>
+            <li>Rotation</li>
+            <li>Scale</li>
+            <li>SetProduct</li>
+            <li>Skew</li>
+            <li class="NO">TransformPoint</li>
+            <li>Translation</li>
+        </ul>
+    </ul>
+</body>
+</html>

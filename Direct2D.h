@@ -3,6 +3,7 @@
 #include <d2d1.h>
 #include <wincodec.h>
 #include <dwrite_3.h>
+#include "goodmacrosfordirect2dandwichelper.h"
 //#include <v8.h>
 
 //using namespace v8;
@@ -21,7 +22,6 @@ public:
 	ID2D1Factory* factory;
 	IDWriteFactory7* textfactory; //lol forgo to capitaliez f
 	ID2D1SolidColorBrush* clearBrush;
-	IWICImagingFactory2* wicFactory;
 	ID2D1DrawingStateBlock* drawingStateBlock;
 	int type;
 	HWND window;
@@ -32,7 +32,6 @@ public:
 		renderTarget = nullptr;
 		textfactory = nullptr;
 		clearBrush = nullptr;
-		wicFactory = nullptr;
 		drawingStateBlock = nullptr;
 		//textFormat = nullptr;
 	}
@@ -49,9 +48,6 @@ public:
 		}
 		if (clearBrush != nullptr) {
 			clearBrush->Release();
-		}
-		if (wicFactory != nullptr) {
-			wicFactory->Release();
 		}
 		if (drawingStateBlock != nullptr) {
 			drawingStateBlock->Release();

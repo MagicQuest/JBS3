@@ -38,7 +38,7 @@
 #pragma comment(lib, "Userenv.lib")
 #endif
 
-#include <comdef.h>
+#include <comdef.h> //_com_error
 
 //user32.lib; advapi32.lib; iphlpapi.lib; userenv.lib; ws2_32.lib; dbghelp.lib; ole32.lib; uuid.lib; kernel32.lib; user32.lib; gdi32.lib; winspool.lib; shell32.lib; ole32.lib; oleaut32.lib; uuid.lib; comdlg32.lib; advapi32.lib
 //#pragma comment(lib, "psapi.lib")
@@ -1185,7 +1185,10 @@ V8FUNC(BeepWrapper) {
     info.GetReturnValue().Set(Beep(IntegerFI(info[0]), IntegerFI(info[1])));
 }
 
+//weird how defining the macros in goodmacrosfordirect2dandwichelper.h right here caused visual studio to die
+
 #include "Direct2D.h"
+#include "WICHelper.h"
 
 #pragma comment(lib, "d2d1.lib")
 #pragma comment(lib, "dwrite.lib")
@@ -1197,7 +1200,7 @@ V8FUNC(BeepWrapper) {
 
 namespace DIRECT2D {
     using namespace v8;
-    Local<Object> getMatrixImpl(Isolate* isolate, D2D1_MATRIX_3X2_F matrix) {
+    Local<Object> getMatrixFImpl(Isolate* isolate, D2D1_MATRIX_3X2_F matrix) {
         Local<Object> jsMatrix = Object::New(isolate);
 
         Local<Context> context = isolate->GetCurrentContext();
@@ -1238,7 +1241,7 @@ namespace DIRECT2D {
         return jsMatrix;
     }
 
-    D2D1_MATRIX_3X2_F fromJSMatrix(Isolate* isolate, Local<Object> jsMatrix) {//D2D1_MATRIX_3X2_F matrix) {
+    D2D1_MATRIX_3X2_F fromJSMatrixF(Isolate* isolate, Local<Object> jsMatrix) {//D2D1_MATRIX_3X2_F matrix) {
         D2D1_MATRIX_3X2_F matrix{};
 
         Local<Context> context = isolate->GetCurrentContext();
@@ -1272,6 +1275,50 @@ namespace DIRECT2D {
         return matrix;
     }
 
+    void setJSMatrixF(Isolate* isolate, D2D1_MATRIX_3X2_F matrix, Local<Object> jsMatrix) {//D2D1_MATRIX_3X2_F matrix) {
+        Local<Context> context = isolate->GetCurrentContext();
+
+        jsMatrix->Set(context, LITERAL("dx"), Number::New(isolate, matrix.dx));
+        jsMatrix->Set(context, LITERAL("dy"), Number::New(isolate, matrix.dy));
+
+        Local<Array> jsM = Array::New(isolate, 3);
+        Local<Array> jsM1 = Array::New(isolate, 2);
+        jsM1->Set(context, 0, Number::New(isolate, matrix.m[0][0]));
+        jsM1->Set(context, 1, Number::New(isolate, matrix.m[0][1]));
+
+        Local<Array> jsM2 = Array::New(isolate, 2);
+        jsM2->Set(context, 0, Number::New(isolate, matrix.m[1][0]));
+        jsM2->Set(context, 1, Number::New(isolate, matrix.m[1][1]));
+
+        Local<Array> jsM3 = Array::New(isolate, 2);
+        jsM3->Set(context, 0, Number::New(isolate, matrix.m[2][0]));
+        jsM3->Set(context, 1, Number::New(isolate, matrix.m[2][1]));
+
+        jsM->Set(context, 0, jsM1);
+        jsM->Set(context, 1, jsM2);
+        jsM->Set(context, 2, jsM3);
+
+        jsMatrix->Set(context, LITERAL("m"), jsM);
+        jsMatrix->Set(context, LITERAL("m11"), Number::New(isolate, matrix.m11));
+        jsMatrix->Set(context, LITERAL("m12"), Number::New(isolate, matrix.m12));
+        jsMatrix->Set(context, LITERAL("m21"), Number::New(isolate, matrix.m21));
+        jsMatrix->Set(context, LITERAL("m22"), Number::New(isolate, matrix.m22));
+
+        jsMatrix->Set(context, LITERAL("_11"), Number::New(isolate, matrix._11));
+        jsMatrix->Set(context, LITERAL("_12"), Number::New(isolate, matrix._12));
+        jsMatrix->Set(context, LITERAL("_21"), Number::New(isolate, matrix._21));
+        jsMatrix->Set(context, LITERAL("_22"), Number::New(isolate, matrix._22));
+        jsMatrix->Set(context, LITERAL("_31"), Number::New(isolate, matrix._31));
+        jsMatrix->Set(context, LITERAL("_32"), Number::New(isolate, matrix._32));
+    }
+
+    D2D1::Matrix3x2F fromJSMatrix3x2(Isolate* isolate, Local<Object> jsMatrix) {//D2D1_MATRIX_3X2_F matrix) {
+        Local<Context> context = isolate->GetCurrentContext();
+
+        D2D1::Matrix3x2F matrix(FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_11")).ToLocalChecked()), FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_12")).ToLocalChecked()), FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_21")).ToLocalChecked()), FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_22")).ToLocalChecked()), FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_31")).ToLocalChecked()), FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_32")).ToLocalChecked()));
+        return matrix;
+    }
+
     Local<ObjectTemplate> getIUnknownImpl(Isolate* isolate, void* ptr) {
         Local<ObjectTemplate> jsGenericIU = ObjectTemplate::New(isolate);
 
@@ -1280,9 +1327,19 @@ namespace DIRECT2D {
             Isolate* isolate = info.GetIsolate();
             IUnknown* ptr = (IUnknown*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
             ptr->Release();
-            }));
+        }));
 
         return jsGenericIU;
+    }
+
+    Local<ObjectTemplate> getWICBitmapImpl(Isolate* isolate, /*IWICBitmapSource*/IWICFormatConverter* wicBitmap) {
+        Local<ObjectTemplate> jsConverter = getIUnknownImpl(isolate, wicBitmap);
+
+        jsConverter->Set(isolate, "CopyPixels", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+
+        }));
+
+        return jsConverter;
     }
 
     Local<ObjectTemplate> getDefaultBrushImpl(Isolate* isolate, ID2D1Brush* newBrush, const char* type = "solid") {
@@ -1308,12 +1365,12 @@ namespace DIRECT2D {
             ID2D1Brush* newBrush = (ID2D1Brush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
             D2D1::Matrix3x2F::D2D_MATRIX_3X2_F matrix;
             newBrush->GetTransform(&matrix);
-            info.GetReturnValue().Set(DIRECT2D::getMatrixImpl(isolate, matrix));
+            info.GetReturnValue().Set(DIRECT2D::getMatrixFImpl(isolate, matrix));
         }));
         jsBrush->Set(isolate, "SetTransform", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
             Isolate* isolate = info.GetIsolate();
             ID2D1Brush* newBrush = (ID2D1Brush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-            newBrush->SetTransform(DIRECT2D::fromJSMatrix(isolate, info[0].As<Object>()));
+            newBrush->SetTransform(DIRECT2D::fromJSMatrixF(isolate, info[0].As<Object>()));
         }));
 
         return jsBrush;
@@ -1458,7 +1515,7 @@ namespace DIRECT2D {
         return max(min(-(abs(6*x-3)-2.25)/1.5, 1), 0);
     }
 
-    ID2D1Brush* AdjustGradients(Isolate* isolate, Local<Object> jsBrush, D2D1_POINT_2F point0, D2D1_POINT_2F point1, float angle = 0.0F) {
+    ID2D1Brush* AdjustGradients(Isolate* isolate, Local<Object> jsBrush, D2D1_POINT_2F point0, D2D1_POINT_2F point1, float angle = 0.0F) { //unfortunately deprecated due to me finally added SetTransform (because i thought it would be too hard)
         const char* brushType = CStringFI(jsBrush->Get(isolate->GetCurrentContext(), LITERAL("brush")).ToLocalChecked());
         ID2D1Brush* bruh = (ID2D1Brush*)jsBrush->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()->IntegerValue(isolate->GetCurrentContext()).FromJust();
         if (strcmp(brushType, "radial") == 0) {
@@ -2028,81 +2085,103 @@ V8FUNC(createCanvas) {
         
             info.GetReturnValue().Set(jsBitmap->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
         }));
-        context->Set(isolate, "CreateBitmapFromFilename", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+        context->Set(isolate, "CreateBitmapFromWicBitmap", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
             Isolate* isolate = info.GetIsolate();
             Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-            //IWICImagingFactory2* wicFactory = nullptr;
-            //
-            //HRESULT shit = CoCreateInstance(CLSID_WICImagingFactory, NULL, CLSCTX_INPROC_SERVER, IID_IWICImagingFactory, (LPVOID*)&wicFactory);
-            //
+            IWICFormatConverter* wicConverter = (IWICFormatConverter*)info[0].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();//IntegerFI(info[0]);
+            ID2D1Bitmap* bmp;
+        
+            RetIfFailed(d2d->renderTarget->CreateBitmapFromWicBitmap(wicConverter, NULL, &bmp), "failed d2d->renderTarget->CreateBitmapFromWicBitmap");
             //if (shit != S_OK) {
-            //    MessageBoxA(NULL, "yo shit FUCKED UP co create instance WIC image", "yeah we failed to create the wic factory (loading the bitmap)", MB_OK | MB_ICONERROR);
+            //    MessageBoxA(NULL, "failed d2d->renderTarget->CreateBitmapFromWicBitmap (probably use _com_error(GetLastError()) to learn more)", "load bitmap wicConverter", MB_OK | MB_ICONERROR);
             //    return;
             //}
-
-            IWICBitmapDecoder* wicDecoder = NULL;
-
-            const char* text = CStringFI(info[0]);
-            size_t length = strlen(text);
-            std::wstring filenamews(length, L'#');
-            mbstowcs(&filenamews[0], text, length);
-
-            HRESULT shit = d2d->wicFactory->CreateDecoderFromFilename(filenamews.c_str(), NULL, GENERIC_READ, WICDecodeMetadataCacheOnLoad, &wicDecoder);
-            if (shit != S_OK) {
-                MessageBoxA(NULL, "NewWICBitmap likely failed because the file was not found", "yeah we failed that hoe (CreateDecoderFromFilename)", MB_OK | MB_ICONERROR);
-                return;
-            }
-
-            IWICBitmapFrameDecode* wicFrame = NULL;
-            shit = wicDecoder->GetFrame(0, &wicFrame);
-
-            if (shit != S_OK) {
-                MessageBoxA(NULL, "GetFirstFrameWiC", "yeah we failed the hoe (wicDecoder->GetFrame(0, &wicFrame))", MB_OK | MB_ICONERROR);
-                wicDecoder->Release();
-                return;
-            }
-
-            IWICFormatConverter* wicConverter = NULL;
-            shit = d2d->wicFactory->CreateFormatConverter(&wicConverter);
-
-            if (shit != S_OK) {
-                MessageBoxA(NULL, "Wic converter", "failed wicFactory->CreateFormatConverter(&wicConverter)", MB_OK | MB_ICONERROR);
-                wicDecoder->Release();
-                wicFrame->Release();
-                return;
-            }
-
-            shit = wicConverter->Initialize(wicFrame, GUID_WICPixelFormat32bppPBGRA, WICBitmapDitherTypeNone, NULL, 0.0, WICBitmapPaletteTypeCustom);
-            if (shit != S_OK) {
-                MessageBoxA(NULL, "WIC CONVERTER2", "failed wicConverter->Initialize", MB_OK | MB_ICONERROR);
-                wicDecoder->Release();
-                wicFrame->Release();
-                wicConverter->Release();
-                return;
-            }
-
-            ID2D1Bitmap* bmp;
-
-            shit = d2d->renderTarget->CreateBitmapFromWicBitmap(wicConverter, NULL, &bmp);
-            if (shit != S_OK) {
-                MessageBoxA(NULL, "failed d2d->renderTarget->CreateBitmapFromWicBitmap (probably use _com_error(GetLastError()) to learn more)", "load bitmap wicConverter", MB_OK | MB_ICONERROR);
-                wicDecoder->Release();
-                wicConverter->Release();
-                wicFrame->Release();
-                return;
-            }
             
-
-            //wicFactory->Release();
-            wicDecoder->Release();
-            wicConverter->Release();
-            wicFrame->Release();
-
+            if (info[1]->BooleanValue(isolate)) {
+                wicConverter->Release();
+            }
+        
             Local<ObjectTemplate> jsBitmap = DIRECT2D::getBitmapImpl(isolate, bmp);//DIRECT2D::getIUnknownImpl(isolate, bmp);//ObjectTemplate::New(isolate);
-
+        
             info.GetReturnValue().Set(jsBitmap->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
         }));
+        //context->Set(isolate, "CreateBitmapFromFilename", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+        //    Isolate* isolate = info.GetIsolate();
+        //    Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+        //
+        //    //IWICImagingFactory2* wicFactory = nullptr;
+        //    //
+        //    //HRESULT shit = CoCreateInstance(CLSID_WICImagingFactory, NULL, CLSCTX_INPROC_SERVER, IID_IWICImagingFactory, (LPVOID*)&wicFactory);
+        //    //
+        //    //if (shit != S_OK) {
+        //    //    MessageBoxA(NULL, "yo shit FUCKED UP co create instance WIC image", "yeah we failed to create the wic factory (loading the bitmap)", MB_OK | MB_ICONERROR);
+        //    //    return;
+        //    //}
+        //
+        //    IWICBitmapDecoder* wicDecoder = NULL;
+        //
+        //    //const char* text = CStringFI(info[0]); //ayo WTF is this
+        //    //size_t length = strlen(text);
+        //    //std::wstring filenamews(length, L'#');
+        //    //mbstowcs(&filenamews[0], text, length);
+        //    
+        //    const wchar_t* filenamews = WStringFI(info[0]);
+        //
+        //    HRESULT shit = d2d->wicFactory->CreateDecoderFromFilename(filenamews/*.c_str()*/, NULL, GENERIC_READ, WICDecodeMetadataCacheOnLoad, &wicDecoder);
+        //    if (shit != S_OK) {
+        //        MessageBoxA(NULL, "NewWICBitmap likely failed because the file was not found", "yeah we failed that hoe (CreateDecoderFromFilename)", MB_OK | MB_ICONERROR);
+        //        return;
+        //    }
+        //
+        //    IWICBitmapFrameDecode* wicFrame = NULL;
+        //    shit = wicDecoder->GetFrame(0, &wicFrame);
+        //
+        //    if (shit != S_OK) {
+        //        MessageBoxA(NULL, "GetFirstFrameWiC", "yeah we failed the hoe (wicDecoder->GetFrame(0, &wicFrame))", MB_OK | MB_ICONERROR);
+        //        wicDecoder->Release();
+        //        return;
+        //    }
+        //
+        //    IWICFormatConverter* wicConverter = NULL;
+        //    shit = d2d->wicFactory->CreateFormatConverter(&wicConverter);
+        //
+        //    if (shit != S_OK) {
+        //        MessageBoxA(NULL, "Wic converter", "failed wicFactory->CreateFormatConverter(&wicConverter)", MB_OK | MB_ICONERROR);
+        //        wicDecoder->Release();
+        //        wicFrame->Release();
+        //        return;
+        //    }
+        //
+        //    shit = wicConverter->Initialize(wicFrame, GUID_WICPixelFormat32bppPBGRA, WICBitmapDitherTypeNone, NULL, 0.0, WICBitmapPaletteTypeCustom);
+        //    if (shit != S_OK) {
+        //        MessageBoxA(NULL, "WIC CONVERTER2", "failed wicConverter->Initialize", MB_OK | MB_ICONERROR);
+        //        wicDecoder->Release();
+        //        wicFrame->Release();
+        //        wicConverter->Release();
+        //        return;
+        //    }
+        //
+        //    ID2D1Bitmap* bmp;
+        //
+        //    shit = d2d->renderTarget->CreateBitmapFromWicBitmap(wicConverter, NULL, &bmp);
+        //    if (shit != S_OK) {
+        //        MessageBoxA(NULL, "failed d2d->renderTarget->CreateBitmapFromWicBitmap (probably use _com_error(GetLastError()) to learn more)", "load bitmap wicConverter", MB_OK | MB_ICONERROR);
+        //        wicDecoder->Release();
+        //        wicConverter->Release();
+        //        wicFrame->Release();
+        //        return;
+        //    }
+        //    
+        //
+        //    //wicFactory->Release();
+        //    wicDecoder->Release();
+        //    wicConverter->Release();
+        //    wicFrame->Release();
+        //
+        //    Local<ObjectTemplate> jsBitmap = DIRECT2D::getBitmapImpl(isolate, bmp);//DIRECT2D::getIUnknownImpl(isolate, bmp);//ObjectTemplate::New(isolate);
+        //
+        //    info.GetReturnValue().Set(jsBitmap->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
+        //}));
         context->Set(isolate, "DrawBitmap", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
             Isolate* isolate = info.GetIsolate();
             Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
@@ -2455,7 +2534,7 @@ V8FUNC(createCanvas) {
             Isolate* isolate = info.GetIsolate();
             Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
             D2D1_MATRIX_3X2_F matrix; d2d->renderTarget->GetTransform(&matrix);
-            info.GetReturnValue().Set(DIRECT2D::getMatrixImpl(isolate, matrix));
+            info.GetReturnValue().Set(DIRECT2D::getMatrixFImpl(isolate, matrix));
             
             //D2D1_MATRIX_3X2_F* matrix = new D2D1_MATRIX_3X2_F(); d2d->renderTarget->GetTransform(matrix);
             
@@ -2478,7 +2557,7 @@ V8FUNC(createCanvas) {
             Isolate* isolate = info.GetIsolate();
             Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
             
-            d2d->renderTarget->SetTransform(DIRECT2D::fromJSMatrix(isolate, info[0].As<Object>()));
+            d2d->renderTarget->SetTransform(DIRECT2D::fromJSMatrixF(isolate, info[0].As<Object>()));
             //d2d->renderTarget->SetTransform(matrix);
         }));
         context->Set(isolate, "DrawGradientRoundedRectangle", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
@@ -2504,6 +2583,41 @@ V8FUNC(createCanvas) {
             
             d2d->renderTarget->FillRoundedRectangle(D2D1::RoundedRect(D2D1::RectF(FloatFI(info[0]), FloatFI(info[1]), FloatFI(info[2]), FloatFI(info[3])), FloatFI(info[4]), FloatFI(info[5])), brush);
         }));
+        context->Set(isolate, "Flush", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            //Local<Context> context = isolate->GetCurrentContext();
+            Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            //D2D1_TAG tag1;
+            //D2D1_TAG tag2;
+            //HRESULT s = d2d->renderTarget->Flush(&tag1, &tag2);
+            //Local<Array> jsArray = Array::New(isolate, 2);
+            //jsArray->Set(context, 0, );
+            info.GetReturnValue().Set(Number::New(isolate, d2d->renderTarget->Flush()));
+        }));
+        context->Set(isolate, "GetAntialiasMode", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            
+            info.GetReturnValue().Set(d2d->renderTarget->GetAntialiasMode());
+        }));
+        context->Set(isolate, "SetAntialiasMode", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            
+            d2d->renderTarget->SetAntialiasMode((D2D1_ANTIALIAS_MODE)IntegerFI(info[0]));
+        }));
+        context->Set(isolate, "SetDpi", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            
+            d2d->renderTarget->SetDpi(FloatFI(info[0]), FloatFI(info[1]));
+        }));
+        context->Set(isolate, "GetMaximumBitmapSize", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            
+            info.GetReturnValue().Set(d2d->renderTarget->GetMaximumBitmapSize());
+        }));
         context->Set(isolate, "FillGradientRoundedRectangle", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
             Isolate* isolate = info.GetIsolate();
             Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
@@ -2521,6 +2635,16 @@ V8FUNC(createCanvas) {
             D2D1_SIZE_F sizeF = d2d->renderTarget->GetSize();
             shit->Set(isolate->GetCurrentContext(), LITERAL("width"), Number::New(isolate, sizeF.width));
             shit->Set(isolate->GetCurrentContext(), LITERAL("height"), Number::New(isolate, sizeF.height));
+            info.GetReturnValue().Set(shit);
+        }));
+        context->Set(isolate, "GetPixelSize", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+            Local<Object> shit = Object::New(isolate);
+            D2D1_SIZE_U sizeU = d2d->renderTarget->GetPixelSize();
+            shit->Set(isolate->GetCurrentContext(), LITERAL("width"), Number::New(isolate, sizeU.width));
+            shit->Set(isolate->GetCurrentContext(), LITERAL("height"), Number::New(isolate, sizeU.height));
             info.GetReturnValue().Set(shit);
         }));
         context->Set(isolate, "DrawLine", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
@@ -2560,21 +2684,53 @@ V8FUNC(createCanvas) {
         Local<ObjectTemplate> matrixhelper = ObjectTemplate::New(isolate);
         matrixhelper->Set(isolate, "Identity", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
             Isolate* isolate = info.GetIsolate();
-            info.GetReturnValue().Set(DIRECT2D::getMatrixImpl(isolate, D2D1::Matrix3x2F::Identity()));
+            info.GetReturnValue().Set(DIRECT2D::getMatrixFImpl(isolate, D2D1::Matrix3x2F::Identity()));
+        }));
+        matrixhelper->Set(isolate, "IsIdentity", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            D2D1::Matrix3x2F matrix = DIRECT2D::fromJSMatrix3x2(isolate, info[0].As<Object>());
+            info.GetReturnValue().Set(matrix.IsIdentity());
+        }));
+        matrixhelper->Set(isolate, "IsInvertible", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            D2D1::Matrix3x2F matrix = DIRECT2D::fromJSMatrix3x2(isolate, info[0].As<Object>());
+            info.GetReturnValue().Set(matrix.IsInvertible());
+        }));
+        matrixhelper->Set(isolate, "Determinant", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            D2D1::Matrix3x2F matrix = DIRECT2D::fromJSMatrix3x2(isolate, info[0].As<Object>());
+            info.GetReturnValue().Set(matrix.Determinant());
+        }));
+        matrixhelper->Set(isolate, "Scale", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            info.GetReturnValue().Set(DIRECT2D::getMatrixFImpl(isolate, D2D1::Matrix3x2F::Scale(FloatFI(info[0]), FloatFI(info[1]), D2D1::Point2F(FloatFI(info[2]), FloatFI(info[3])))));
+        }));
+        matrixhelper->Set(isolate, "Skew", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            info.GetReturnValue().Set(DIRECT2D::getMatrixFImpl(isolate, D2D1::Matrix3x2F::Skew(FloatFI(info[0]), FloatFI(info[1]), D2D1::Point2F(FloatFI(info[2]), FloatFI(info[3])))));
+        }));
+        matrixhelper->Set(isolate, "Invert", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            D2D1::Matrix3x2F matrix = DIRECT2D::fromJSMatrix3x2(isolate, info[0].As<Object>());
+            info.GetReturnValue().Set(matrix.Invert());
+            DIRECT2D::setJSMatrixF(isolate, matrix, info[0].As<Object>()); //ok this seems kinda weird but not THAT weird
         }));
         matrixhelper->Set(isolate, "Rotation", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
             Isolate* isolate = info.GetIsolate();
-            info.GetReturnValue().Set(DIRECT2D::getMatrixImpl(isolate, D2D1::Matrix3x2F::Rotation(FloatFI(info[0]), D2D1::Point2F(FloatFI(info[1]), FloatFI(info[2])))));
+            info.GetReturnValue().Set(DIRECT2D::getMatrixFImpl(isolate, D2D1::Matrix3x2F::Rotation(FloatFI(info[0]), D2D1::Point2F(FloatFI(info[1]), FloatFI(info[2])))));
         }));
         matrixhelper->Set(isolate, "Translation", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
             Isolate* isolate = info.GetIsolate();
-            info.GetReturnValue().Set(DIRECT2D::getMatrixImpl(isolate, D2D1::Matrix3x2F::Translation(FloatFI(info[0]), FloatFI(info[1]))));
+            info.GetReturnValue().Set(DIRECT2D::getMatrixFImpl(isolate, D2D1::Matrix3x2F::Translation(FloatFI(info[0]), FloatFI(info[1]))));
         }));
         matrixhelper->Set(isolate, "SetProduct", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
             Isolate* isolate = info.GetIsolate();
-            D2D1::Matrix3x2F matrix = D2D1::Matrix3x2F();
-            matrix.SetProduct(*(D2D1::Matrix3x2F*)IntegerFI(info[0]), *(D2D1::Matrix3x2F*)IntegerFI(info[1]));
-            info.GetReturnValue().Set(DIRECT2D::getMatrixImpl(isolate, matrix));
+            
+            D2D1::Matrix3x2F matrix = DIRECT2D::fromJSMatrix3x2(isolate, info[0].As<Object>());//D2D1::Matrix3x2F();
+            D2D1::Matrix3x2F matrix2 = DIRECT2D::fromJSMatrix3x2(isolate, info[1].As<Object>());//D2D1::Matrix3x2F();
+            info.GetReturnValue().Set(DIRECT2D::getMatrixFImpl(isolate, matrix*matrix2));
+            //matrix.SetProduct(*(D2D1::Matrix3x2F*)IntegerFI(info[0]), *(D2D1::Matrix3x2F*)IntegerFI(info[1]));
+            //info.GetReturnValue().Set(DIRECT2D::getMatrixImpl(isolate, matrix));
         }));
         matrixhelper->Set(isolate, "FromMatrix", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
             Isolate* isolate = info.GetIsolate();
@@ -2584,7 +2740,14 @@ V8FUNC(createCanvas) {
             D2D1::Matrix3x2F* matrix = new D2D1::Matrix3x2F(FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_11")).ToLocalChecked()), FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_12")).ToLocalChecked()), FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_21")).ToLocalChecked()), FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_22")).ToLocalChecked()), FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_31")).ToLocalChecked()), FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_32")).ToLocalChecked()));
             info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)matrix));
         }));
-        
+        matrixhelper->Set(isolate, "DeleteMatrix", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            
+            D2D1::Matrix3x2F* matrix = (D2D1::Matrix3x2F*)IntegerFI(info[0]);
+            delete matrix;
+            info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)matrix));
+        }));
+
         context->Set(isolate, "Matrix3x2", matrixhelper);
 
         context->Set(isolate, "Release", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
@@ -5248,7 +5411,7 @@ V8FUNC(DllCallWrapper) {
     //    return Array::CallbackResult::kContinue;
     //}, &argv);
     //im sorry bruh but the restrictions that Iterate puts on you is not worth it for like 10 arguments
-    for (int i = 0; i < args->Length(); i++) {
+    for (int i = 0; i < args->Length(); i++) { //well idk if this knowledge does anything but there is a private field in v8::IndirectHandleBase that holds a location_ ptr (but idk if that would work as void* because i would be passing for example, an int* to a function that expects int (so the address is used as the number))
         Local<Value> element = args->Get(context, i).ToLocalChecked();
         void* value = nullptr;
         //if (element->IsString()) {
@@ -5379,6 +5542,224 @@ V8FUNC(DllLoad) {
     info.GetReturnValue().Set(func);//closure->InstanceTemplate()->NewInstance(isolate->GetCurrentContext()).ToLocalChecked()); //ohj
 }
 
+V8FUNC(InitializeWIC) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    Local<Context> context = isolate->GetCurrentContext();
+
+    WICHelper* WICObj = new WICHelper();
+    if (WICObj->Init()) {
+        Local<ObjectTemplate> wic = ObjectTemplate::New(isolate);
+        wic->Set(isolate, "internalPtr", Number::New(isolate, (LONG_PTR)WICObj));
+        wic->Set(isolate, "LoadDecoder", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            //Local<Context> context = isolate->GetCurrentContext();
+            WICHelper* WICObj = (WICHelper*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            IWICBitmapDecoder* wicDecoder = NULL;
+
+            RetIfFailed(WICObj->wicFactory->CreateDecoderFromFilename(WStringFI(info[0]), NULL, GENERIC_READ, WICDecodeMetadataCacheOnLoad, &wicDecoder), "yeah we failed that hoe (CreateDecoderFromFilename)");
+            Local<ObjectTemplate> jsDecoder = DIRECT2D::getIUnknownImpl(isolate, wicDecoder);//ObjectTemplate::New(isolate);
+
+            jsDecoder->Set(isolate, "GetFrameCount", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                Local<Context> context = isolate->GetCurrentContext();
+                IWICBitmapDecoder* wicDecoder = (IWICBitmapDecoder*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                UINT pCount; wicDecoder->GetFrameCount(&pCount);
+
+                info.GetReturnValue().Set(pCount);
+            }));
+            jsDecoder->Set(isolate, "GetBitmapFrame", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                Local<Context> context = isolate->GetCurrentContext();
+                IWICBitmapDecoder* wicDecoder = (IWICBitmapDecoder*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                WICHelper* WICObj = (WICHelper*)info[0].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                
+                IWICBitmapFrameDecode* wicFrame = NULL;
+                HRESULT err = wicDecoder->GetFrame(IntegerFI(info[1]), &wicFrame);
+                if (err != S_OK) {
+                    //MessageBoxA(NULL, "GetFirstFrameWiC", "yeah we failed the hoe (wicDecoder->GetFrame(0, &wicFrame))", MB_OK | MB_ICONERROR);
+                    ERRORMB(err, "yeah we failed the hoe (wicDecoder->GetFrame(frame, &wicFrame))");
+                    //wicDecoder->Release();
+                    return;// nullptr;
+                }
+
+                Local<Array> id = info[2].As<Array>();
+                GUID shit = { IntegerFI(id->Get(context, 0).ToLocalChecked()),
+                    IntegerFI(id->Get(context, 1).ToLocalChecked()),
+                    IntegerFI(id->Get(context, 2).ToLocalChecked()),
+                    IntegerFI(id->Get(context, 3).ToLocalChecked()),
+                    IntegerFI(id->Get(context, 4).ToLocalChecked()),
+                    IntegerFI(id->Get(context, 5).ToLocalChecked()),
+                    IntegerFI(id->Get(context, 6).ToLocalChecked()),
+                    IntegerFI(id->Get(context, 7).ToLocalChecked()),
+                    IntegerFI(id->Get(context, 8).ToLocalChecked()),
+                    IntegerFI(id->Get(context, 9).ToLocalChecked()),
+                    IntegerFI(id->Get(context, 10).ToLocalChecked()) };
+
+                IWICFormatConverter* wicConverter = WICObj->LoadBitmapFromFrame(wicDecoder, wicFrame, shit, false);
+                info.GetReturnValue().Set(DIRECT2D::getWICBitmapImpl(isolate, wicConverter)->NewInstance(context).ToLocalChecked());//(Number::New(isolate, (LONG_PTR)wicConverter));
+            }));
+            //jsDecoder->Set(isolate, "GetFrame", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            //    Isolate* isolate = info.GetIsolate();
+            //    IWICBitmapDecoder* wicDecoder = (IWICBitmapDecoder*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            //    IWICBitmapFrameDecode* wicFrame = NULL;
+            //    HRESULT shit = wicDecoder->GetFrame(IntegerFI(info[0]), &wicFrame);
+            //
+            //    if (shit != S_OK) {
+            //        //MessageBoxA(NULL, "GetFirstFrameWiC", "yeah we failed the hoe (wicDecoder->GetFrame(0, &wicFrame))", MB_OK | MB_ICONERROR);
+            //        ERRORMB(shit, "yeah we failed the hoe (wicDecoder->GetFrame(frame, &wicFrame))");
+            //        //wicDecoder->Release();
+            //        return;// nullptr;
+            //    }
+            //
+            //    Local<ObjectTemplate> jsFrame = DIRECT2D::getIUnknownImpl(isolate, wicFrame);
+            //
+            //    jsFrame->Set(isolate, "CopyPixels", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            //        
+            //    }));
+            //
+            //    info.GetReturnValue().Set(jsFrame->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
+            //}));
+
+            info.GetReturnValue().Set(jsDecoder->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
+            //info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)wicDecoder));
+        }));
+        wic->Set(isolate, "LoadBitmapFromFilename", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            Local<Context> context = isolate->GetCurrentContext();
+            WICHelper* WICObj = (WICHelper*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            Local<Array> id = info[1].As<Array>();
+            GUID shit = { IntegerFI(id->Get(context, 0).ToLocalChecked()),
+                IntegerFI(id->Get(context, 1).ToLocalChecked()),
+                IntegerFI(id->Get(context, 2).ToLocalChecked()),
+                IntegerFI(id->Get(context, 3).ToLocalChecked()),
+                IntegerFI(id->Get(context, 4).ToLocalChecked()),
+                IntegerFI(id->Get(context, 5).ToLocalChecked()),
+                IntegerFI(id->Get(context, 6).ToLocalChecked()),
+                IntegerFI(id->Get(context, 7).ToLocalChecked()),
+                IntegerFI(id->Get(context, 8).ToLocalChecked()),
+                IntegerFI(id->Get(context, 9).ToLocalChecked()),
+                IntegerFI(id->Get(context, 10).ToLocalChecked())};
+            //unsigned long  Data1;
+            //unsigned short Data2;
+            //unsigned short Data3;
+            //unsigned char  Data4[8];
+
+            IWICFormatConverter* wicConverter = WICObj->LoadBitmapFromFilename(WStringFI(info[0]), shit, IntegerFI(info[2]));
+
+            info.GetReturnValue().Set(DIRECT2D::getWICBitmapImpl(isolate, wicConverter)->NewInstance(context).ToLocalChecked());//Number::New(isolate, (LONG_PTR)wicConverter));
+        }));
+        wic->Set(isolate, "Release", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            WICHelper* WICObj = (WICHelper*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            delete WICObj; //destructor releases wicFactory (in theory)
+        }));
+        info.GetReturnValue().Set(wic->NewInstance(context).ToLocalChecked());
+    }
+}
+
+V8FUNC(ScopeGUIDs) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    Local<Context> context = isolate->GetCurrentContext();
+    Local<Object> global = info[0].As<Object>(); //uhh idk about this one
+    //global->Set(context, LITERAL("was"), LITERAL("GYTAT"));
+    #define setGlobalGUID(id) { Local<Value> elem##id[] = {Number::New(isolate, id.Data1), Number::New(isolate, id.Data2), Number::New(isolate, id.Data3), Number::New(isolate, id.Data4[0]), Number::New(isolate, id.Data4[1]), Number::New(isolate, id.Data4[2]), Number::New(isolate, id.Data4[3]), Number::New(isolate, id.Data4[4]), Number::New(isolate, id.Data4[5]), Number::New(isolate, id.Data4[6]), Number::New(isolate, id.Data4[7])}; Local<Array> jsArr##id = Array::New(isolate, elem##id, 11); global->Set(context, LITERAL(#id), jsArr##id); }
+    setGlobalGUID(GUID_WICPixelFormatDontCare); //i had a little regex help on this hoe /GUID_\w+/g regexr.com/80jco
+    setGlobalGUID(GUID_WICPixelFormat1bppIndexed);
+    setGlobalGUID(GUID_WICPixelFormat2bppIndexed);
+    setGlobalGUID(GUID_WICPixelFormat4bppIndexed);
+    setGlobalGUID(GUID_WICPixelFormat8bppIndexed);
+    setGlobalGUID(GUID_WICPixelFormatBlackWhite);
+    setGlobalGUID(GUID_WICPixelFormat2bppGray);
+    setGlobalGUID(GUID_WICPixelFormat4bppGray);
+    setGlobalGUID(GUID_WICPixelFormat8bppGray);
+    setGlobalGUID(GUID_WICPixelFormat8bppAlpha);
+    setGlobalGUID(GUID_WICPixelFormat16bppBGR555);
+    setGlobalGUID(GUID_WICPixelFormat16bppBGR565);
+    setGlobalGUID(GUID_WICPixelFormat16bppBGRA5551);
+    setGlobalGUID(GUID_WICPixelFormat16bppGray);
+    setGlobalGUID(GUID_WICPixelFormat24bppBGR);
+    setGlobalGUID(GUID_WICPixelFormat24bppRGB);
+    setGlobalGUID(GUID_WICPixelFormat32bppBGR);
+    setGlobalGUID(GUID_WICPixelFormat32bppBGRA);
+    setGlobalGUID(GUID_WICPixelFormat32bppPBGRA);
+    setGlobalGUID(GUID_WICPixelFormat32bppGrayFloat);
+    setGlobalGUID(GUID_WICPixelFormat32bppRGB);
+    setGlobalGUID(GUID_WICPixelFormat32bppRGBA);
+    setGlobalGUID(GUID_WICPixelFormat32bppPRGBA);
+    setGlobalGUID(GUID_WICPixelFormat48bppRGB);
+    setGlobalGUID(GUID_WICPixelFormat48bppBGR);
+    setGlobalGUID(GUID_WICPixelFormat64bppRGB);
+    setGlobalGUID(GUID_WICPixelFormat64bppRGBA);
+    setGlobalGUID(GUID_WICPixelFormat64bppBGRA);
+    setGlobalGUID(GUID_WICPixelFormat64bppPRGBA);
+    setGlobalGUID(GUID_WICPixelFormat64bppPBGRA);
+    setGlobalGUID(GUID_WICPixelFormat16bppGrayFixedPoint);
+    setGlobalGUID(GUID_WICPixelFormat32bppBGR101010);
+    setGlobalGUID(GUID_WICPixelFormat48bppRGBFixedPoint);
+    setGlobalGUID(GUID_WICPixelFormat48bppBGRFixedPoint);
+    setGlobalGUID(GUID_WICPixelFormat96bppRGBFixedPoint);
+    setGlobalGUID(GUID_WICPixelFormat96bppRGBFloat);
+    setGlobalGUID(GUID_WICPixelFormat128bppRGBAFloat);
+    setGlobalGUID(GUID_WICPixelFormat128bppPRGBAFloat);
+    setGlobalGUID(GUID_WICPixelFormat128bppRGBFloat);
+    setGlobalGUID(GUID_WICPixelFormat32bppCMYK);
+    setGlobalGUID(GUID_WICPixelFormat64bppRGBAFixedPoint);
+    setGlobalGUID(GUID_WICPixelFormat64bppBGRAFixedPoint);
+    setGlobalGUID(GUID_WICPixelFormat64bppRGBFixedPoint);
+    setGlobalGUID(GUID_WICPixelFormat128bppRGBAFixedPoint);
+    setGlobalGUID(GUID_WICPixelFormat128bppRGBFixedPoint);
+    setGlobalGUID(GUID_WICPixelFormat64bppRGBAHalf);
+    setGlobalGUID(GUID_WICPixelFormat64bppPRGBAHalf);
+    setGlobalGUID(GUID_WICPixelFormat64bppRGBHalf);
+    setGlobalGUID(GUID_WICPixelFormat48bppRGBHalf);
+    setGlobalGUID(GUID_WICPixelFormat32bppRGBE);
+    setGlobalGUID(GUID_WICPixelFormat16bppGrayHalf);
+    setGlobalGUID(GUID_WICPixelFormat32bppGrayFixedPoint);
+    setGlobalGUID(GUID_WICPixelFormat32bppRGBA1010102);
+    setGlobalGUID(GUID_WICPixelFormat32bppRGBA1010102XR);
+    setGlobalGUID(GUID_WICPixelFormat32bppR10G10B10A2);
+    setGlobalGUID(GUID_WICPixelFormat32bppR10G10B10A2HDR10);
+    setGlobalGUID(GUID_WICPixelFormat64bppCMYK);
+    setGlobalGUID(GUID_WICPixelFormat24bpp3Channels);
+    setGlobalGUID(GUID_WICPixelFormat32bpp4Channels);
+    setGlobalGUID(GUID_WICPixelFormat40bpp5Channels);
+    setGlobalGUID(GUID_WICPixelFormat48bpp6Channels);
+    setGlobalGUID(GUID_WICPixelFormat56bpp7Channels);
+    setGlobalGUID(GUID_WICPixelFormat64bpp8Channels);
+    setGlobalGUID(GUID_WICPixelFormat48bpp3Channels);
+    setGlobalGUID(GUID_WICPixelFormat64bpp4Channels);
+    setGlobalGUID(GUID_WICPixelFormat80bpp5Channels);
+    setGlobalGUID(GUID_WICPixelFormat96bpp6Channels);
+    setGlobalGUID(GUID_WICPixelFormat112bpp7Channels);
+    setGlobalGUID(GUID_WICPixelFormat128bpp8Channels);
+    setGlobalGUID(GUID_WICPixelFormat40bppCMYKAlpha);
+    setGlobalGUID(GUID_WICPixelFormat80bppCMYKAlpha);
+    setGlobalGUID(GUID_WICPixelFormat32bpp3ChannelsAlpha);
+    setGlobalGUID(GUID_WICPixelFormat40bpp4ChannelsAlpha);
+    setGlobalGUID(GUID_WICPixelFormat48bpp5ChannelsAlpha);
+    setGlobalGUID(GUID_WICPixelFormat56bpp6ChannelsAlpha);
+    setGlobalGUID(GUID_WICPixelFormat64bpp7ChannelsAlpha);
+    setGlobalGUID(GUID_WICPixelFormat72bpp8ChannelsAlpha);
+    setGlobalGUID(GUID_WICPixelFormat64bpp3ChannelsAlpha);
+    setGlobalGUID(GUID_WICPixelFormat80bpp4ChannelsAlpha);
+    setGlobalGUID(GUID_WICPixelFormat96bpp5ChannelsAlpha);
+    setGlobalGUID(GUID_WICPixelFormat112bpp6ChannelsAlpha);
+    setGlobalGUID(GUID_WICPixelFormat128bpp7ChannelsAlpha);
+    setGlobalGUID(GUID_WICPixelFormat144bpp8ChannelsAlpha);
+    setGlobalGUID(GUID_WICPixelFormat8bppY);
+    setGlobalGUID(GUID_WICPixelFormat8bppCb);
+    setGlobalGUID(GUID_WICPixelFormat8bppCr);
+    setGlobalGUID(GUID_WICPixelFormat16bppCbCr);
+    setGlobalGUID(GUID_WICPixelFormat16bppYQuantizedDctCoefficients);
+    setGlobalGUID(GUID_WICPixelFormat16bppCbQuantizedDctCoefficients);
+    setGlobalGUID(GUID_WICPixelFormat16bppCrQuantizedDctCoefficients);
+    
+    #undef setGlobalGUID
+}
+
 v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     using namespace v8;
 
@@ -5502,6 +5883,30 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     setGlobalConst(VAR_BOOLEAN);
     setGlobalConst(VAR_CSTRING);
     setGlobalConst(VAR_WSTRING);
+
+//#define setGlobalGUID(id) { Local<Value> elem##id[] = {Number::New(isolate, id.Data1), Number::New(isolate, id.Data2), Number::New(isolate, id.Data3), Number::New(isolate, id.Data4[0]), Number::New(isolate, id.Data4[1]), Number::New(isolate, id.Data4[2]), Number::New(isolate, id.Data4[3]), Number::New(isolate, id.Data4[4]), Number::New(isolate, id.Data4[5]), Number::New(isolate, id.Data4[6]), Number::New(isolate, id.Data4[7])}; Local<Array> jsArr##id = Array::New(isolate, elem##id, 11); global->Set(isolate, #id, jsArr##id); }
+    //setGlobalGUID(GUID_WICPixelFormat32bppPBGRA);
+    setGlobal(ScopeGUIDs);
+    setGlobal(InitializeWIC);
+    //yo wtf i don't think you can use Arrays without a context???
+    //{ 
+    //    Local<Value> elemid[11] = { Number::New(isolate, 1),
+    //        Number::New(isolate, 2),
+    //        Number::New(isolate, 3),
+    //        Number::New(isolate, 40),
+    //        Number::New(isolate, 41),
+    //        Number::New(isolate, 42),
+    //        Number::New(isolate, 43),
+    //        Number::New(isolate, 44),
+    //        Number::New(isolate, 45),
+    //        Number::New(isolate, 46),
+    //        Number::New(isolate, 47)
+    //    };
+    //    //Local<Array> jsArrid = Array::New(isolate, elemid, sizeof(double)*11);
+    //    Local<Array> jsArrid = Array::New(isolate, elemid, 11);
+    //    global->Set(isolate, "was", jsArrid);
+    //}
+    //Local<Array> jsArr = Array::New(isolate, elem##id, 13);
 
     setGlobalConst(DCX_WINDOW);
     setGlobalConst(DCX_CACHE);
@@ -5772,6 +6177,14 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     setGlobalConst(D2D1_EXTEND_MODE_WRAP);
     setGlobalConst(D2D1_EXTEND_MODE_MIRROR);
     setGlobalConst(D2D1_EXTEND_MODE_FORCE_DWORD);
+
+    setGlobalConst(D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
+    
+    /// <summary>
+    /// Each pixel is rendered if its pixel center is contained by the geometry.
+    /// </summary>
+    setGlobalConst(D2D1_ANTIALIAS_MODE_ALIASED);
+        setGlobalConst(D2D1_ANTIALIAS_MODE_FORCE_DWORD);
 
 //#define D2D1_BITMAP_INTERPOLATION_MODE_NEAREST_NEIGHBOR D2D1_BITMAP_INTERPOLATION_MODE_NEAREST_NEIGHBOR
 //#define D2D1_BITMAP_INTERPOLATION_MODE_LINEAR D2D1_BITMAP_INTERPOLATION_MODE_LINEAR

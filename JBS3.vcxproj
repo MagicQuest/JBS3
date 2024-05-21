@@ -136,8 +136,10 @@
   <ItemGroup>
     <ClCompile Include="console2.cpp" />
     <ClCompile Include="Direct2D.cpp" />
+    <ClCompile Include="goodmacrosfordirect2dandwichelper.h" />
     <ClCompile Include="guicon.cpp" />
     <ClCompile Include="JBS3.cpp" />
+    <ClCompile Include="WICHelper.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="bababooey.rc" />
@@ -150,6 +152,7 @@
     <ClInclude Include="JSTimer.h" />
     <ClInclude Include="JSWindow.h" />
     <ClInclude Include="resource.h" />
+    <ClInclude Include="WICHelper.h" />
   </ItemGroup>
   <ItemGroup>
     <Image Include="jbs3.ico" />
