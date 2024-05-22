@@ -206,5 +206,37 @@
             <li>Translation</li>
         </ul>
     </ul>
+    <p>WIC</p>
+    <ul>
+        <li>IWICBitmapSource</li>
+        <ul>
+            <li class="NOPE">CopyPalette</li>
+            <li>CopyPixels</li>
+            <li>GetPixelFormat</li>
+            <li>GetResolution</li>
+            <li>GetSize</li>
+        </ul>
+        <li>IWICFormatEncoder -> IWICBitmapSource</li>
+        <li>IWICBitmapDecoder</li>
+        <ul>
+            <li class="NOPE">::CopyPalette</li>
+            <li class="NOPE">::GetColorContexts</li>
+            <li>::GetContainerFormat</li>
+            <li class="NOPE">::GetDecoderInfo</li>
+            <li>::GetFrame</li>
+            <li>::GetFrameCount</li>
+            <li class="NOPE">::GetMetadataQueryReader</li>
+            <li>::GetPreview</li>
+            <li>::GetThumbnail</li>
+            <li class="NOPE">::Initialize</li>
+            <li class="NOPE">::QueryCapability</li>
+        </ul>
+        <li>IWICBitmapFrameDecode -> IWICBitmapSource</li>
+        <ul>
+            <li class="NOPE">GetColorContexts</li>
+            <li class="NOPE">GetMetadataQueryReader</li>
+            <li>GetThumbnail</li>
+        </ul>
+    </ul>
 </body>
 </html>

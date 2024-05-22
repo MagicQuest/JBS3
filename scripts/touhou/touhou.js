@@ -3,6 +3,7 @@
 
 //const icon = LoadImage(NULL,);
 
+let wic;
 let d2d, font, scoreFont, brush, starPng;
 
 var score = 0, power = 0, pointCount = 0, lifes = 4, bombs = 3, continues = 3, powerstreak = 0, powerLevel = 0; //lives/lifes
@@ -95,7 +96,7 @@ class Entity { //crazy thing JBS2 didn't have -> ES6!
     }
 }
 
-class CircleEffect { //no extend because it doesn't need it (also now that im thinking about it inheritance doesn't really matter as much in JS as c++ or java because there are no strict types)
+class CircleEffect { //no extend because it doesn't need it (also now that im thinking about it inheritance doesn't really matter as much in JS as c++ or java because there are no strict types (ok yeah but can't you inherit like methods and stuff that's convenient))
     constructor(x, y, startRadius, endRadius, startOpacity, endOpacity = 0, fadeSec) {
         this.x = x;
         this.y = y;
@@ -675,7 +676,8 @@ let del = [];
 
 function windowProc(hwnd, msg, wp, lp) {
     if(msg == WM_CREATE) {
-        d2d = createCanvas("d2d", ID2D1RenderTarget, hwnd);
+        wic = InitializeWIC();
+        d2d = createCanvas("d2d", ID2D1RenderTarget, hwnd, wic);
         font = d2d.CreateFont("impact", 40);
         scoreFont = d2d.CreateFont("Comic sans ms", 20);
         brush = d2d.CreateSolidColorBrush(1.0,1.0,1.0);
@@ -786,7 +788,7 @@ function windowProc(hwnd, msg, wp, lp) {
                 entities.splice(i, 1);
             }else {
                 if(!(ent instanceof Enemy)) {//INSTANCEOF IS CRAZY!?
-                    throw ent;
+                    throw ent; //this line is actually bonkers
                 }
                 //let findex = fairies.findIndex(element => element.x == ent.x && element.y == ent.y && element.constructor.name == ent.constructor.name);
                 ////delete fairies[findex];
@@ -815,6 +817,12 @@ function windowProc(hwnd, msg, wp, lp) {
         //entities.push(new FairyBullet(mouse.x, mouse.y, Math.random(),Math.random()));
     }else if(msg == WM_DESTROY) {
         PostQuitMessage(0);
+        font.Release();
+        scoreFont.Release();
+        brush.Release();
+        starPng.Release();
+        d2d.Release();
+        wic.Release();
     }
 }
 

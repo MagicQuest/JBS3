@@ -1,7 +1,8 @@
-//i was about to make this with GDI but i remembered that d2d can load pngs soooo
+//i was about to make this with GDI but i remembered that d2d can load pngs soooo (well hold on GDI is about to load pngs too just wait)
 //const bitmaps = [];
 //const masks = [];
 
+let wic;
 let d2d, keyBrush;
 const pngs = [];
 
@@ -19,8 +20,8 @@ function windowProc(hwnd, msg, wp, lp) {
         //SendMessage(button, WM_SETFONT, CreateFontSimple("Impact", 20, 40), true); //you should DeleteObject but i can't be bothered to do it
         SetLayeredWindowAttributes(hwnd, RGB(0,255,0), 0, LWA_COLORKEY); //full green is transparent
         //RedrawWindow(hwnd, 0, 0, 1920, 1080, NULL, RDW_INVALIDATE | RDW_UPDATENOW);
-
-        d2d = createCanvas("d2d", ID2D1RenderTarget, hwnd); //both ID2D1RenderTarget and ID2D1DCRenderTarget works but while resizing, ID2D1RenderTarget doesn't freeze
+        wic = InitializeWIC();
+        d2d = createCanvas("d2d", ID2D1RenderTarget, hwnd, wic); //both ID2D1RenderTarget and ID2D1DCRenderTarget works but while resizing, ID2D1RenderTarget doesn't freeze
         keyBrush = d2d.CreateSolidColorBrush(0.0,1.0,0.0); //green screen brush
 
         for(let i = 1; i < 25; i++) {
@@ -38,6 +39,12 @@ function windowProc(hwnd, msg, wp, lp) {
         }
     }else if(msg == WM_DESTROY) {
         PostQuitMessage(0);
+        for(const png of pngs) {
+            png.Release();
+        }
+        keyBrush.Release();
+        d2d.Release();
+        wic.Release();
     //}else if(msg == WM_COMMAND) {
     //    if(lp == button) {
     //        print("cick?");

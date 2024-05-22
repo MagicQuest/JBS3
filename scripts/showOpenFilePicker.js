@@ -12,6 +12,9 @@ let filepicking = false;
 
 let bBCH = -1; //bounces Before Corner Hit
 
+//const wic = InitializeWIC(); //ScopeGUIDs(wic); //haha this lets me do wic.GUID_WICPixelFormat32bppPBGRA instead of it just being global
+let wic;
+
 function calculateBouncesToMaxWin() {
     if(!edited) {
         return;
@@ -52,13 +55,15 @@ function calculateBouncesToMaxWin() {
 
 function windowProc(hwnd, msg, wp, lp) {
     if(msg == WM_CREATE) {
-        d2d = createCanvas("d2d", ID2D1RenderTarget, hwnd);
+        wic = InitializeWIC();
+        d2d = createCanvas("d2d", ID2D1RenderTarget, hwnd, wic); //passing wic allows you to use CreateBitmapFromFilename like normal (in theory because i haven;t made this a think yet)
         
         font = d2d.CreateFont("impact", 40);
         smallFont = d2d.CreateFont("impact", 18);
         brush = d2d.CreateSolidColorBrush(1.0,1.0,1.0);
         
         image = d2d.CreateBitmapFromFilename(__dirname+"/boxside.png");
+        //image = d2d.CreateBitmapFromWicBitmap(wic.LoadBitmapFromFilename(__dirname+"/boxside.png", wic.GUID_WICPixelFormat32bppPBGRA, 0), true);
 
         InvalidateRect(hwnd, 0, 0, 256*scale, 256*scale, true);
         UpdateWindow(hwnd); //draw immediately
@@ -93,6 +98,12 @@ function windowProc(hwnd, msg, wp, lp) {
         }
     }else if(msg == WM_DESTROY) {
         PostQuitMessage(0);
+        image.Release();
+        font.Release();
+        smallFont.Release();
+        brush.Release();
+        d2d.Release();
+        wic.Release();
     }else if(msg == WM_PAINT) {
         d2d.BeginDraw();
         //d2d.Clear(0,1,0);
@@ -132,6 +143,8 @@ function windowProc(hwnd, msg, wp, lp) {
             file = showOpenFilePicker(options);
             if(file) { //showOpenFilePicker returns undefined if yuo cancel
                 edited = true;
+                //ay hold on now i don't release the first image?!
+                image.Release();
                 image = d2d.CreateBitmapFromFilename(file[0]); //showOpenFilePicker always returns a list so im choosing the first element (just like the browser version of this function)
                 position.vx = Math.random() > .5 ? -5 : 5;
                 position.vy = Math.random() > .5 ? -5 : 5;

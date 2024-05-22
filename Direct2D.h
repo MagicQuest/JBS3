@@ -23,6 +23,7 @@ public:
 	IDWriteFactory7* textfactory; //lol forgo to capitaliez f
 	ID2D1SolidColorBrush* clearBrush;
 	ID2D1DrawingStateBlock* drawingStateBlock;
+	IWICImagingFactory2* wicFactory;
 	int type;
 	HWND window;
 	//IDWriteTextFormat* textFormat;
@@ -33,6 +34,7 @@ public:
 		textfactory = nullptr;
 		clearBrush = nullptr;
 		drawingStateBlock = nullptr;
+		wicFactory = nullptr;
 		//textFormat = nullptr;
 	}
 

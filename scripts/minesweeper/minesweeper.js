@@ -12,6 +12,7 @@ const tiles = [];
 
 const trolIcon = LoadImage(NULL, `${__dirname}/troll.ico`, IMAGE_ICON, 0, 0, LR_SHARED | LR_LOADFROMFILE);
 
+let wic;
 let d2d;
 let tileBmp, bombBmp, flagBmp, revealedBmp, backgroundImg;//, tiledRevealedBmp, revealedBmpBrush;//, tileBmpBrush;
 let font, colorBrush;
@@ -119,8 +120,10 @@ for(let i = 0; i < res; i++) {
 const gdiFonts = [];
 
 function init(hwnd) {
+    wic = InitializeWIC();
                     //for some reason using ID2D1DCRenderTarget started glitching out (it wouldn't show minesweeper it would just copy a frame of the desktop? (windows 11))
-    d2d = createCanvas("d2d", ID2D1RenderTarget, hwnd); //with ID2D1DCRenderTarget you are allowed to draw to the desktop by setting hwnd to null!
+    d2d = createCanvas("d2d", ID2D1RenderTarget, hwnd, wic); //with ID2D1DCRenderTarget you are allowed to draw to the desktop by setting hwnd to null!
+    //d2d.BindDC(hwnd, dc = GetDC(hwnd)); ReleaseDC(hwnd, dc);                
                         //just created __dirname for this example
     tileBmp = d2d.CreateBitmapFromFilename(`${__dirname}/tile.png`);//"D:/scripts/jbs/minesweeper/tile.png");
     bombBmp = d2d.CreateBitmapFromFilename(`${__dirname}/tile_bomb.png`);
@@ -205,6 +208,9 @@ function windowProc(hwnd, msg, wp, lp) {
         if(wp == "P".charCodeAt(0)) {
             img = showOpenFilePicker({types: [{description: "Images", accept: [".png", ".jp*", ".bmp"]}]});
             if(img) {
+                if(backgroundImg) {
+                    backgroundImg.Release();
+                }
                 backgroundImg = d2d.CreateBitmapFromFilename(img);
             }
         }
@@ -341,7 +347,7 @@ window = CreateWindow(WS_EX_OVERLAPPEDWINDOW, WINCLASSEXW/*A*/, `😂Minesweeper
 
 console.log(window, args);
 
-//clean up
+//clean up (yeah this is kinda weird i could've put all of this in the WM_DESTROY if in winproc but it's fine)
 for(const font of gdiFonts) {
     DeleteObject(font);
 }
@@ -351,4 +357,8 @@ tileBmp.Release();
 bombBmp.Release();
 flagBmp.Release();
 revealedBmp.Release();
+if(backgroundImg) {
+    backgroundImg.Release();
+}
 d2d.Release();
+wic.Release();

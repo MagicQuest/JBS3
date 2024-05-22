@@ -1,4 +1,4 @@
-//creative way of loading PNGs into an HBITMAP using d2d
+//creative way of loading PNGs into an HBITMAP using d2d (now that WIC is no longer connected to d2d this is only for historical purposes (idk what im talking bout))
 
 const width = 900;
 const height = 900;
@@ -12,6 +12,8 @@ let mouse = {x: 0, y: 0};
 
 let loadedPng = true;
 
+const wic = InitializeWIC();
+
 function init(hwnd) {
     InvalidateRect(hwnd, 0, 0, width, height, true);
     UpdateWindow(hwnd); //draw immediately
@@ -23,7 +25,8 @@ function init(hwnd) {
 }
 
 function loadPng(hwnd, dc, filename) {
-    const d2d = createCanvas("d2d", ID2D1DCRenderTarget, hwnd);
+    const d2d = createCanvas("d2d", ID2D1DCRenderTarget, hwnd, wic); //this also works with ID2D1RenderTarget instead
+    d2d.BindDC(hwnd, dc); //oh shoot i was wondering why this wouldn't work but the dc that's passed in this function is not one from GetDC(hwnd)
     print(filename);
     const png = d2d.CreateBitmapFromFilename(filename);
     const size = png.GetPixelSize();
@@ -49,6 +52,7 @@ function windowProc(hwnd, msg, wp, lp) {
         init(hwnd);
     }else if(msg == WM_MOUSEMOVE) {
         mouse = MAKEPOINTS(lp);
+        print("MPOVE");
         InvalidateRect(hwnd, 0, 0, width, height, true);
         UpdateWindow(hwnd);
     }else if(msg == WM_PAINT) {
