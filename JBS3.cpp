@@ -1353,6 +1353,10 @@ namespace DIRECT2D {
             Isolate* isolate = info.GetIsolate();
             Local<Context> context = isolate->GetCurrentContext();
             IWICBitmapSource* wicConverter = (IWICBitmapSource*)info.This()->GetRealNamedProperty(context, LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(context).FromJust();
+            //ok im not gonna lie everytime i use GetPixels i forget i need to pass wic
+            if (!info[0]->BooleanValue(isolate)) {
+                MessageBoxA(NULL, "ay bro i think you forgot to pass wic as the first argument bro", "GetPixels", MB_OK | MB_ICONHAND);
+            }
             WICHelper* wic = (WICHelper*)IntegerFI(info[0].As<Object>()->GetRealNamedProperty(context, LITERAL("internalPtr")).ToLocalChecked());
 
             UINT width, height;
@@ -1386,6 +1390,13 @@ namespace DIRECT2D {
             UINT bitCount;
             RetIfFailed(pIPixelFormatInfo->GetBitsPerPixel(&bitCount), "GetBitsPerPixel failed (literally right there what happened)");
 
+            if (info[1]->BooleanValue(isolate)) {
+                IWICBitmapFlipRotator* pIFlipRotator = NULL;
+                RetIfFailed(wic->wicFactory->CreateBitmapFlipRotator(&pIFlipRotator), "CreateBitmapFlipRotator failed (GetPixels)");
+                RetIfFailed(pIFlipRotator->Initialize(wicConverter, (WICBitmapTransformOptions)IntegerFI(info[1])), "pIFlipRotator->Initialize error");
+                //pIFlipRotator->Release();
+                wicConverter = pIFlipRotator; //luckily IWICBitmapFlipRotator is a child of IWICBitmapSource
+            }
 
             auto stride = ((((width * bitCount) + 31) & ~31) >> 3);
             DWORD* bits = new DWORD[width * height]; //bruh i just had to initialize it with a chunk of mem
@@ -1398,6 +1409,9 @@ namespace DIRECT2D {
             delete[] bits;
             Local<Uint32Array> arr = Uint32Array::New(ab, 0, width * height); //weird if i multiply this one by sizeof(DWORD) v8 spits out garbage and crashes bad
             info.GetReturnValue().Set(arr);
+            if (info[1]->BooleanValue(isolate)) {
+                wicConverter->Release(); //release the internal pIFlipRotator
+            }
         }));
 
         jsConverter->Set(isolate, "GetResolution", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
@@ -1439,6 +1453,23 @@ namespace DIRECT2D {
             RetIfFailed(wicConverter->GetPixelFormat(&format), "GetPixelFormat failed LO!"); //bruh i don't even say LO! anymore i just put it around ironically now
             Local<Value> elem[] = { Number::New(isolate, format.Data1), Number::New(isolate, format.Data2), Number::New(isolate, format.Data3), Number::New(isolate, format.Data4[0]), Number::New(isolate, format.Data4[1]), Number::New(isolate, format.Data4[2]), Number::New(isolate, format.Data4[3]), Number::New(isolate, format.Data4[4]), Number::New(isolate, format.Data4[5]), Number::New(isolate, format.Data4[6]), Number::New(isolate, format.Data4[7]) };
             info.GetReturnValue().Set(Array::New(isolate, elem, 11));
+        }));
+
+        jsConverter->Set(isolate, "Resize", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            Local<Context> context = isolate->GetCurrentContext();
+            WICHelper* WICObj = (WICHelper*)IntegerFI(info[0].As<Object>()->GetRealNamedProperty(context, LITERAL("internalPtr")).ToLocalChecked());
+            IWICBitmapSource* wicConverter = (IWICBitmapSource*)info.This()->GetRealNamedProperty(context, LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(context).FromJust();
+            IWICBitmapScaler* pIScaler = NULL;
+        
+            RetIfFailed(WICObj->wicFactory->CreateBitmapScaler(&pIScaler), "CreateBitmapScaler (ResizeBitmap)");
+            RetIfFailed(pIScaler->Initialize(
+                wicConverter,                    // Bitmap source to scale.
+                IntegerFI(info[1]),                         // Scale width to half of original.
+                IntegerFI(info[2]),                        // Scale height to half of original.
+                (WICBitmapInterpolationMode)IntegerFI(info[3])), "pIScaler Initialize");   // Use Fant mode interpolation.
+            wicConverter->Release();
+            info.This()->Set(context, LITERAL("internalPtr"), Number::New(isolate, (LONG_PTR)pIScaler)); //kinda crazy LO!
         }));
         //ok chatgpt said i should convert the objecttemplate to an object before setting an array?
 
@@ -1680,6 +1711,19 @@ namespace DIRECT2D {
         }
         return bruh;
     }
+}
+
+//#include "GL/glew.c"
+//wait hold on i didn't use GLEW_STATIC so lets just see
+#include "GL/glew.h" //oh all i had to do was import glew.c (fix it) and include glew.h
+//#pragma comment(lib, "glew/glew32.lib") //do i gotta link the dll too or am i linking this lib wrong ? $(ProjectDir)glew\glew32.dll
+//#pragma comment(lib, "GL/libglew32.lib") //ok hold on i gotta do something weird so it's a static link
+#pragma comment(lib, "opengl32.lib")
+
+void GLAPIENTRY glMessageCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, const void* userParam)
+{
+    MessageBoxA(NULL, (std::string("GL CALLBACK: ") + (type == GL_DEBUG_TYPE_ERROR ? "** GL ERROR **" : "") + " type = " + std::to_string(type) + ", severity = " + std::to_string(severity) + ", message = " + message).c_str(), NULL, MB_OK | MB_ICONERROR); //just learned that passing null for the title will just default to "Error"
+    fprintf(stderr, "GL CALLBACK: %s type = 0x%x, severity = 0x%x, message = %s\n", (type == GL_DEBUG_TYPE_ERROR ? "** GL ERROR **" : ""), type, severity, message);
 }
 
 V8FUNC(createCanvas) {
@@ -2802,6 +2846,352 @@ V8FUNC(createCanvas) {
     else if (strcmp(contextType, "d3d") == 0 || strcmp(contextType, "direct3d") == 0 || strcmp(contextType, "directx") == 0) {
         print("d3d");
     }
+    else if (strcmp(contextType, "gl") == 0 || strcmp(contextType, "webgl") == 0) {
+        HWND window = (HWND)IntegerFI(info[2]);
+        //RECT r{}; GetClientRect(window, &r);
+
+        //print(r.left);
+        //print(r.right);
+        //print(r.top);
+        //print(r.bottom);
+
+        HDC hdc = GetDC(window);
+
+        PIXELFORMATDESCRIPTOR pfd = {
+            sizeof(PIXELFORMATDESCRIPTOR),   // size of this pfd  
+            1,                     // version number  
+            PFD_DRAW_TO_WINDOW |   // support window  
+            PFD_SUPPORT_OPENGL |   // support OpenGL  
+            PFD_DOUBLEBUFFER,      // double buffered  
+            PFD_TYPE_RGBA,         // RGBA type  
+            32,                    // 32-bit color depth  
+            0, 0, 0, 0, 0, 0,      // color bits ignored  
+            0,                     // no alpha buffer  
+            0,                     // shift bit ignored  
+            0,                     // no accumulation buffer  
+            0, 0, 0, 0,            // accum bits ignored  
+            32,                    // 32-bit z-buffer  
+            0,                     // no stencil buffer  
+            0,                     // no auxiliary buffer  
+            PFD_MAIN_PLANE,        // main layer  
+            0,                     // reserved  
+            0, 0, 0                // layer masks ignored  
+        };
+
+
+        int format = ChoosePixelFormat(hdc, &pfd);
+
+        SetPixelFormat(hdc, format, &pfd);
+
+#define WGL_CONTEXT_MAJOR_VERSION_ARB     0x2091
+#define WGL_CONTEXT_MINOR_VERSION_ARB     0x2092
+#define WGL_CONTEXT_FLAGS_ARB             0x2094
+#define WGL_CONTEXT_CORE_PROFILE_BIT_ARB  0x00000001
+#define WGL_CONTEXT_PROFILE_MASK_ARB      0x9126
+
+        //typedef HGLRC(WINAPI* PFNWGLCREATECONTEXTATTRIBSARBPROC) (HDC hDC, HGLRC hShareContext, const int* attribList);
+        //
+        //PFNWGLCREATECONTEXTATTRIBSARBPROC wglCreateContextAttribsARB =
+        //    (PFNWGLCREATECONTEXTATTRIBSARBPROC)wglGetProcAddress("wglCreateContextAttribsARB");
+
+        HGLRC tempRC = wglCreateContext(hdc);
+        wglMakeCurrent(hdc, tempRC);
+
+        glewExperimental = GL_TRUE;
+        glewInit();
+
+        typedef HGLRC WINAPI wglCreateContextAttribsARB_type(HDC hdc, HGLRC hShareContext,
+            const int* attribList);
+        wglCreateContextAttribsARB_type* wglCreateContextAttribsARB;
+        wglCreateContextAttribsARB = (wglCreateContextAttribsARB_type*)wglGetProcAddress(
+            "wglCreateContextAttribsARB");
+
+        int gl33_attribs[] =
+        {
+            WGL_CONTEXT_MAJOR_VERSION_ARB, 3,
+            WGL_CONTEXT_MINOR_VERSION_ARB, 3,
+            //WGL_CONTEXT_PROFILE_MASK_ARB,  WGL_CONTEXT_CORE_PROFILE_BIT_ARB,
+            0,
+        };
+        print(wglCreateContextAttribsARB);
+        HGLRC hglrc = wglCreateContextAttribsARB(hdc, 0, gl33_attribs);//wglCreateContext(hdc);
+        if (hglrc == NULL) {
+            MessageBoxA(NULL, "KILLING MYSELF", "HELP BRO IM PLAYING FORTNITE", MB_CANCELTRYCONTINUE);
+        }
+        wglMakeCurrent(NULL, NULL);
+        wglDeleteContext(tempRC);
+        wglMakeCurrent(hdc, hglrc);
+
+        context->Set(isolate, "HGLRC", Number::New(isolate, (LONG_PTR)hglrc));
+        context->Set(isolate, "HDC", Number::New(isolate, (LONG_PTR)hdc));
+        
+
+        glEnable(GL_DEBUG_OUTPUT);
+        glDebugMessageCallback(glMessageCallback, 0);
+
+        GLuint vao; glGenVertexArrays(1, &vao); glBindVertexArray(vao);
+
+#define INFOLOG_LEN 512
+#define V8GLFUNC(x) context->Set(isolate, x, FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) { \
+                    Isolate* isolate = info.GetIsolate();
+        V8GLFUNC("viewport") //ok this looks really weird but im tryna speed up this process
+            glViewport(IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]));
+        })); //this could have been a macro too like ENDGLFUNC but idgaf
+        V8GLFUNC("clearColor")
+            glClearColor(FloatFI(info[0]), FloatFI(info[1]), FloatFI(info[2]), FloatFI(info[3]));
+        }));
+        V8GLFUNC("clear")
+            glClear(IntegerFI(info[0]));
+        }));
+        V8GLFUNC("createShader")
+            info.GetReturnValue().Set(glCreateShader(IntegerFI(info[0])));
+        }));
+        V8GLFUNC("shaderSource")
+            //const char* source = CStringFI(info[1]);
+            std::string source = std::string(CStringFI(info[1]));
+            const char* lemmeputitinalanguageytoucanunderstand = source.c_str(); //this weird ass technique stopped the weird corruption garbage issue
+            //GLint len = info[1].As<String>()->Utf8Length(isolate);
+            glShaderSource(IntegerFI(info[0]), 1, &lemmeputitinalanguageytoucanunderstand, NULL);//&len);//NULL);
+        }));
+        V8GLFUNC("compileShader")
+            glCompileShader(IntegerFI(info[0]));
+        }));
+        V8GLFUNC("getShaderParameter")
+            GLint success;
+            glGetShaderiv(IntegerFI(info[0]), IntegerFI(info[1]), &success);
+            info.GetReturnValue().Set(success);
+        }));
+        V8GLFUNC("getShaderInfoLog")
+            char infoLog[INFOLOG_LEN];
+            glGetShaderInfoLog(IntegerFI(info[0]), INFOLOG_LEN, NULL, infoLog);
+            info.GetReturnValue().Set(String::NewFromUtf8(isolate, infoLog).ToLocalChecked());
+        }));
+        V8GLFUNC("createProgram")
+            info.GetReturnValue().Set(glCreateProgram());
+        }));
+        V8GLFUNC("attachShader")
+            glAttachShader(IntegerFI(info[0]), IntegerFI(info[1]));
+        }));
+        V8GLFUNC("linkProgram")
+            glLinkProgram(IntegerFI(info[0]));
+        }));
+        V8GLFUNC("detachShader")
+            glDetachShader(IntegerFI(info[0]), IntegerFI(info[1]));
+        }));
+        V8GLFUNC("deleteShader")
+            glDeleteShader(IntegerFI(info[0]));
+        }));
+        V8GLFUNC("getProgramParameter")
+            GLint success;
+            glGetProgramiv(IntegerFI(info[0]), IntegerFI(info[1]), &success);
+            info.GetReturnValue().Set(success);
+        }));
+        V8GLFUNC("getProgramInfoLog")
+            char infoLog[INFOLOG_LEN];
+            glGetProgramInfoLog(IntegerFI(info[0]), INFOLOG_LEN, NULL, infoLog);
+            info.GetReturnValue().Set(String::NewFromUtf8(isolate, infoLog).ToLocalChecked());
+        }));
+        V8GLFUNC("createBuffer")
+            //bruh in gl on the c++ side there is no function called createBuffer BUT LUCKILY the webgl spec actually says it's related to glGenBuffers! (https://registry.khronos.org/webgl/specs/latest/1.0/#5.14.5)
+            GLuint buffer; glGenBuffers(1, &buffer); //this boogie is for real got so much canneed heat in my heels yeah gone dance tgone dance my blues away to night YOU KNOW THIS BOOGIE IS FOR REAL GOT SO MUCH CANNED HEAT IN MY HEELS YEAH GONE DANCE GONE DACEN YBOOOOGES AWAY Y TO NIGHT DANCE ! COME ON GOT CANNED HEAT IN MY HEELS  TONIGHT
+            info.GetReturnValue().Set(buffer);
+        }));
+        V8GLFUNC("bindBuffer")
+            glBindBuffer(IntegerFI(info[0]), IntegerFI(info[1]));
+        }));
+        V8GLFUNC("bufferData")
+            Local<Float32Array> jsData = info[1].As<Float32Array>();
+            GLfloat* data = new GLfloat[jsData->Length()]; jsData->CopyContents(data, jsData->ByteLength());
+            glBufferData(IntegerFI(info[0]), jsData->ByteLength(), data, IntegerFI(info[2]));
+            //oops i forgot to delete data
+            delete[] data;
+        }));
+        V8GLFUNC("getAttribLocation")
+            info.GetReturnValue().Set(glGetAttribLocation(IntegerFI(info[0]), CStringFI(info[1])));
+        }));
+        V8GLFUNC("vertexAttribPointer")
+            glVertexAttribPointer(IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]), IntegerFI(info[4]), (void*)IntegerFI(info[5]));
+        }));
+        V8GLFUNC("enableVertexAttribArray")
+            glEnableVertexAttribArray(IntegerFI(info[0]));
+        }));
+        V8GLFUNC("useProgram")
+            glUseProgram(IntegerFI(info[0]));
+        }));
+        V8GLFUNC("validateProgram")
+            glValidateProgram(IntegerFI(info[0]));
+        }));
+        V8GLFUNC("getUniformLocation")
+            info.GetReturnValue().Set(glGetUniformLocation(IntegerFI(info[0]), CStringFI(info[1])));
+        }));
+        V8GLFUNC("createTexture")
+            GLuint iChannel0;
+            glCreateTextures(GL_TEXTURE_2D, 1, &iChannel0);//textures);
+            info.GetReturnValue().Set(iChannel0);
+            //GLuint iChannel0 = textures[0];
+            //glActiveTexture(GL_TEXTURE0);
+            //glBindTexture(GL_TEXTURE_2D, iChannel0);
+        }));
+        V8GLFUNC("bindTexture")
+            glBindTexture(IntegerFI(info[0]), IntegerFI(info[1]));
+        }));
+        V8GLFUNC("activeTexture")
+            glActiveTexture(IntegerFI(info[0]));
+        }));
+        V8GLFUNC("texImage2D")
+            void* data = nullptr;
+            if (info[8]->BooleanValue(isolate)) {
+                Local<Float32Array> jsData = info[8].As<Float32Array>();
+                data = new void*[jsData->Length()]; //i swear earlier it told me that you couldn't do this
+                jsData->CopyContents(data, jsData->ByteLength());
+            }
+            glTexImage2D(IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]), IntegerFI(info[4]), IntegerFI(info[5]), IntegerFI(info[6]), IntegerFI(info[7]), data);
+            delete[] data;
+        }));
+        V8GLFUNC("readBuffer")
+            glReadBuffer(IntegerFI(info[0]));
+        }));
+        V8GLFUNC("copyTexImage2D")
+            //glReadBuffer(GL_FRONT);
+            glCopyTexImage2D(IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]), IntegerFI(info[4]), IntegerFI(info[5]), IntegerFI(info[6]), IntegerFI(info[7]));
+        }));
+        V8GLFUNC("generateMipmap")
+            glGenerateMipmap(IntegerFI(info[0]));
+        }));
+        V8GLFUNC("texParameteri")
+            glTexParameteri(IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]));
+        }));
+        V8GLFUNC("texParameterf")
+            glTexParameterf(IntegerFI(info[0]), IntegerFI(info[1]), FloatFI(info[2]));
+        }));
+        V8GLFUNC("pixelStorei")
+            glPixelStorei(IntegerFI(info[0]), IntegerFI(info[1]));
+        }));
+        V8GLFUNC("pixelStoref")
+            glPixelStoref(IntegerFI(info[0]), FloatFI(info[1]));
+        }));
+
+        //uhoh how tf am i gonna add all the uniformxxx functions bruh this is gonna take ->|forever (OHHHHHH IS THER SOME ONE ELSE IM NOT CUZ I WANNA KEEP YOU LCOSE I DON'T WANNA LOSE MY SPOT CAUSE I NEED TO KNOW IF YOUR HURTING HIM OR YOUR HURTING ME IF I AIN"T WIRTH YOU I DON"T WNNA BE)
+        //ok wait i just saw the spec and maybe it wont take that long (https://registry.khronos.org/webgl/specs/latest/1.0/#5.14)
+        //V8GLFUNC("uniform" #ext) //vs doesnt like the macro recursion type shit (oh shit wait i think my comment was messing it up) //ok bruh why does this -> ("among" "us") combine the strings to this -> ("amongus") (i mean i get it's really helpful for this case but why is that actually a thing)
+#define V8UNIFORMFUNC(ext, ...) context->Set(isolate, "uniform" #ext, FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) { \
+            Isolate* isolate = info.GetIsolate(); \
+            glUniform##ext(IntegerFI(info[0]), __VA_ARGS__); \
+        }))
+
+        V8UNIFORMFUNC(1f, FloatFI(info[1]));
+        V8UNIFORMFUNC(2f, FloatFI(info[1]), FloatFI(info[2]));
+        V8UNIFORMFUNC(3f, FloatFI(info[1]), FloatFI(info[2]), FloatFI(info[3]));
+        V8UNIFORMFUNC(4f, FloatFI(info[1]), FloatFI(info[2]), FloatFI(info[3]), FloatFI(info[4]));
+
+        V8UNIFORMFUNC(1i, IntegerFI(info[1]));
+        V8UNIFORMFUNC(2i, IntegerFI(info[1]), IntegerFI(info[2]));
+        V8UNIFORMFUNC(3i, IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]));
+        V8UNIFORMFUNC(4i, IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]), IntegerFI(info[4]));
+
+        MessageBoxA(NULL, "watch out with these uniformxxv functions because idk how they work a lil bit", "chumbucket's a place that i'll never go", MB_OK | MB_ICONINFORMATION);
+
+#define V8UNIFORMVFUNC(ext, type, typeagain) context->Set(isolate, "uniform" #ext, FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) { \
+            Isolate* isolate = info.GetIsolate(); \
+            Local<type##32Array> jsData = info[1].As<type##32Array>(); \
+            GL##typeagain* value = new GL##typeagain[jsData->Length()]; jsData->CopyContents(value, jsData->ByteLength()); \
+            glUniform##ext(IntegerFI(info[0]), 1, value); \
+            delete[] value; \
+        }))
+        //V8GLFUNC("uniform1fv")
+        //    Local<Float32Array> jsData = info[1].As<Float32Array>();
+        //    GLfloat* value = new GLfloat[jsData->Length()]; jsData->CopyContents(value, jsData->ByteLength());
+        //
+        //    glUniform1fv(IntegerFI(info[0]), 1, value);
+        //    delete[] value;
+        //}));
+
+        V8UNIFORMVFUNC(1fv, Float, float);
+        V8UNIFORMVFUNC(2fv, Float, float);
+        V8UNIFORMVFUNC(3fv, Float, float);
+        V8UNIFORMVFUNC(4fv, Float, float);
+
+        V8UNIFORMVFUNC(1iv, Int, int);
+        V8UNIFORMVFUNC(2iv, Int, int);
+        V8UNIFORMVFUNC(3iv, Int, int);
+        V8UNIFORMVFUNC(4iv, Int, int);
+
+#define V8MATRIXUNIFORM(ext) context->Set(isolate, "uniformMatrix" #ext, FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) { \
+            Isolate* isolate = info.GetIsolate(); \
+            Local<Float32Array> jsData = info[2].As<Float32Array>(); \
+            GLfloat* value = new GLfloat[jsData->Length()]; jsData->CopyContents(value, jsData->ByteLength()); \
+            glUniformMatrix##ext(IntegerFI(info[0]), 1, IntegerFI(info[1]), value); \
+            delete[] value; \
+        }))
+
+        V8MATRIXUNIFORM(2fv);
+        V8MATRIXUNIFORM(3fv);
+        V8MATRIXUNIFORM(4fv);
+
+#undef V8MATRIXUNIFORM
+#undef V8UNIFORMVFUNC
+#undef V8UNIFORMFUNC
+
+        //we almost done bro
+        V8GLFUNC("drawArrays")
+            glDrawArrays(IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]));
+            HDC hdc = (HDC)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("HDC")).ToLocalChecked());
+            if (!info[3]->BooleanValue(isolate)) {
+                print("SWAP");
+                info.GetReturnValue().Set(SwapBuffers(hdc));//wglSwapLayerBuffers(hdc, WGL_SWAP_MAIN_PLANE));
+            }
+        }));
+        V8GLFUNC("swapBuffers")
+            HDC hdc = (HDC)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("HDC")).ToLocalChecked());
+            info.GetReturnValue().Set(SwapBuffers(hdc)); //ok in glfw they use this function to swapbuffers for win32 https://github.com/glfw/glfw/blob/master/src/wgl_context.c#L344
+            //info.GetReturnValue().Set(wglSwapLayerBuffers(hdc, WGL_SWAP_MAIN_PLANE));
+        }));
+
+        V8GLFUNC("deleteProgram")
+            glDeleteProgram(IntegerFI(info[0]));
+        }));
+
+        V8GLFUNC("GetString")
+            const unsigned char* str = glGetString(IntegerFI(info[0])); //wtf do i do with an unsigned char string (how do i smuggle this into js)
+            printf("GetString: %s\n", str); //testing
+            info.GetReturnValue().Set(String::NewFromUtf8(isolate, (char*)str).ToLocalChecked()); //lets just do a simple cast (but wait wont some info get cut off (yeah probnably lets see))
+        }));
+
+        V8GLFUNC("Release")
+            HDC hdc = (HDC)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("HDC")).ToLocalChecked());
+            HGLRC hglrc = (HGLRC)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("HGLRC")).ToLocalChecked());
+            ReleaseDC(WindowFromDC(hdc), hdc); //LO!
+            wglMakeCurrent(NULL, NULL);
+            wglDeleteContext(hglrc);
+        }));
+
+#define setGlConst(const) context->Set(isolate, #const, Number::New(isolate, GL_##const))
+
+        //bruh not only are there so many of these GL_ macros but they are scattered within glew.h (so im just gonna add them when i need them)
+        //wait i have an idea! the specs have a list of all the GLenums they use (https://registry.khronos.org/webgl/specs/latest/1.0/#5.14)
+        //setGlConst(ZERO);setGlConst(FALSE);setGlConst(LOGIC_OP);setGlConst(NONE);setGlConst(TEXTURE_COMPONENTS);setGlConst(NO_ERROR);setGlConst(POINTS);setGlConst(CURRENT_BIT);setGlConst(TRUE);setGlConst(ONE);setGlConst(CLIENT_PIXEL_STORE_BIT);setGlConst(LINES);setGlConst(LINE_LOOP);setGlConst(POINT_BIT);setGlConst(CLIENT_VERTEX_ARRAY_BIT);setGlConst(LINE_STRIP);setGlConst(LINE_BIT);setGlConst(TRIANGLES);setGlConst(TRIANGLE_STRIP);setGlConst(TRIANGLE_FAN);setGlConst(QUADS);setGlConst(QUAD_STRIP);setGlConst(POLYGON_BIT);setGlConst(POLYGON);setGlConst(POLYGON_STIPPLE_BIT);setGlConst(PIXEL_MODE_BIT);setGlConst(LIGHTING_BIT);setGlConst(FOG_BIT);setGlConst(DEPTH_BUFFER_BIT);setGlConst(ACCUM);setGlConst(LOAD);setGlConst(RETURN);setGlConst(MULT);setGlConst(ADD);setGlConst(NEVER);setGlConst(ACCUM_BUFFER_BIT);setGlConst(LESS);setGlConst(EQUAL);setGlConst(LEQUAL);setGlConst(GREATER);setGlConst(NOTEQUAL);setGlConst(GEQUAL);setGlConst(ALWAYS);setGlConst(SRC_COLOR);setGlConst(ONE_MINUS_SRC_COLOR);setGlConst(SRC_ALPHA);setGlConst(ONE_MINUS_SRC_ALPHA);setGlConst(DST_ALPHA);setGlConst(ONE_MINUS_DST_ALPHA);setGlConst(DST_COLOR);setGlConst(ONE_MINUS_DST_COLOR);setGlConst(SRC_ALPHA_SATURATE);setGlConst(STENCIL_BUFFER_BIT);setGlConst(FRONT_LEFT);setGlConst(FRONT_RIGHT);setGlConst(BACK_LEFT);setGlConst(BACK_RIGHT);setGlConst(FRONT);setGlConst(BACK);setGlConst(LEFT);setGlConst(RIGHT);setGlConst(FRONT_AND_BACK);setGlConst(AUX0);setGlConst(AUX1);setGlConst(AUX2);setGlConst(AUX3);setGlConst(INVALID_ENUM);setGlConst(INVALID_VALUE);setGlConst(INVALID_OPERATION);setGlConst(STACK_OVERFLOW);setGlConst(STACK_UNDERFLOW);setGlConst(OUT_OF_MEMORY);setGlConst(2D);setGlConst(3D);setGlConst(3D_COLOR);setGlConst(3D_COLOR_TEXTURE);setGlConst(4D_COLOR_TEXTURE);setGlConst(PASS_THROUGH_TOKEN);setGlConst(POINT_TOKEN);setGlConst(LINE_TOKEN);setGlConst(POLYGON_TOKEN);setGlConst(BITMAP_TOKEN);setGlConst(DRAW_PIXEL_TOKEN);setGlConst(COPY_PIXEL_TOKEN);setGlConst(LINE_RESET_TOKEN);setGlConst(EXP);setGlConst(VIEWPORT_BIT);setGlConst(EXP2);setGlConst(CW);setGlConst(CCW);setGlConst(COEFF);setGlConst(ORDER);setGlConst(DOMAIN);setGlConst(CURRENT_COLOR);setGlConst(CURRENT_INDEX);setGlConst(CURRENT_NORMAL);setGlConst(CURRENT_TEXTURE_COORDS);setGlConst(CURRENT_RASTER_COLOR);setGlConst(CURRENT_RASTER_INDEX);setGlConst(CURRENT_RASTER_TEXTURE_COORDS);setGlConst(CURRENT_RASTER_POSITION);setGlConst(CURRENT_RASTER_POSITION_VALID);setGlConst(CURRENT_RASTER_DISTANCE);setGlConst(POINT_SMOOTH);setGlConst(POINT_SIZE);setGlConst(POINT_SIZE_RANGE);setGlConst(POINT_SIZE_GRANULARITY);setGlConst(LINE_SMOOTH);setGlConst(LINE_WIDTH);setGlConst(LINE_WIDTH_RANGE);setGlConst(LINE_WIDTH_GRANULARITY);setGlConst(LINE_STIPPLE);setGlConst(LINE_STIPPLE_PATTERN);setGlConst(LINE_STIPPLE_REPEAT);setGlConst(LIST_MODE);setGlConst(MAX_LIST_NESTING);setGlConst(LIST_BASE);setGlConst(LIST_INDEX);setGlConst(POLYGON_MODE);setGlConst(POLYGON_SMOOTH);setGlConst(POLYGON_STIPPLE);setGlConst(EDGE_FLAG);setGlConst(CULL_FACE);setGlConst(CULL_FACE_MODE);setGlConst(FRONT_FACE);setGlConst(LIGHTING);setGlConst(LIGHT_MODEL_LOCAL_VIEWER);setGlConst(LIGHT_MODEL_TWO_SIDE);setGlConst(LIGHT_MODEL_AMBIENT);setGlConst(SHADE_MODEL);setGlConst(COLOR_MATERIAL_FACE);setGlConst(COLOR_MATERIAL_PARAMETER);setGlConst(COLOR_MATERIAL);setGlConst(FOG);setGlConst(FOG_INDEX);setGlConst(FOG_DENSITY);setGlConst(FOG_START);setGlConst(FOG_END);setGlConst(FOG_MODE);setGlConst(FOG_COLOR);setGlConst(DEPTH_RANGE);setGlConst(DEPTH_TEST);setGlConst(DEPTH_WRITEMASK);setGlConst(DEPTH_CLEAR_VALUE);setGlConst(DEPTH_FUNC);setGlConst(ACCUM_CLEAR_VALUE);setGlConst(STENCIL_TEST);setGlConst(STENCIL_CLEAR_VALUE);setGlConst(STENCIL_FUNC);setGlConst(STENCIL_VALUE_MASK);setGlConst(STENCIL_FAIL);setGlConst(STENCIL_PASS_DEPTH_FAIL);setGlConst(STENCIL_PASS_DEPTH_PASS);setGlConst(STENCIL_REF);setGlConst(STENCIL_WRITEMASK);setGlConst(MATRIX_MODE);setGlConst(NORMALIZE);setGlConst(VIEWPORT);setGlConst(MODELVIEW_STACK_DEPTH);setGlConst(PROJECTION_STACK_DEPTH);setGlConst(TEXTURE_STACK_DEPTH);setGlConst(MODELVIEW_MATRIX);setGlConst(PROJECTION_MATRIX);setGlConst(TEXTURE_MATRIX);setGlConst(ATTRIB_STACK_DEPTH);setGlConst(CLIENT_ATTRIB_STACK_DEPTH);setGlConst(ALPHA_TEST);setGlConst(ALPHA_TEST_FUNC);setGlConst(ALPHA_TEST_REF);setGlConst(DITHER);setGlConst(BLEND_DST);setGlConst(BLEND_SRC);setGlConst(BLEND);setGlConst(LOGIC_OP_MODE);setGlConst(INDEX_LOGIC_OP);setGlConst(COLOR_LOGIC_OP);setGlConst(AUX_BUFFERS);setGlConst(DRAW_BUFFER);setGlConst(READ_BUFFER);setGlConst(SCISSOR_BOX);setGlConst(SCISSOR_TEST);setGlConst(INDEX_CLEAR_VALUE);setGlConst(INDEX_WRITEMASK);setGlConst(COLOR_CLEAR_VALUE);setGlConst(COLOR_WRITEMASK);setGlConst(INDEX_MODE);setGlConst(RGBA_MODE);setGlConst(DOUBLEBUFFER);setGlConst(STEREO);setGlConst(RENDER_MODE);setGlConst(PERSPECTIVE_CORRECTION_HINT);setGlConst(POINT_SMOOTH_HINT);setGlConst(LINE_SMOOTH_HINT);setGlConst(POLYGON_SMOOTH_HINT);setGlConst(FOG_HINT);setGlConst(TEXTURE_GEN_S);setGlConst(TEXTURE_GEN_T);setGlConst(TEXTURE_GEN_R);setGlConst(TEXTURE_GEN_Q);setGlConst(PIXEL_MAP_I_TO_I);setGlConst(PIXEL_MAP_S_TO_S);setGlConst(PIXEL_MAP_I_TO_R);setGlConst(PIXEL_MAP_I_TO_G);setGlConst(PIXEL_MAP_I_TO_B);setGlConst(PIXEL_MAP_I_TO_A);setGlConst(PIXEL_MAP_R_TO_R);setGlConst(PIXEL_MAP_G_TO_G);setGlConst(PIXEL_MAP_B_TO_B);setGlConst(PIXEL_MAP_A_TO_A);setGlConst(PIXEL_MAP_I_TO_I_SIZE);setGlConst(PIXEL_MAP_S_TO_S_SIZE);setGlConst(PIXEL_MAP_I_TO_R_SIZE);setGlConst(PIXEL_MAP_I_TO_G_SIZE);setGlConst(PIXEL_MAP_I_TO_B_SIZE);setGlConst(PIXEL_MAP_I_TO_A_SIZE);setGlConst(PIXEL_MAP_R_TO_R_SIZE);setGlConst(PIXEL_MAP_G_TO_G_SIZE);setGlConst(PIXEL_MAP_B_TO_B_SIZE);setGlConst(PIXEL_MAP_A_TO_A_SIZE);setGlConst(UNPACK_SWAP_BYTES);setGlConst(UNPACK_LSB_FIRST);setGlConst(UNPACK_ROW_LENGTH);setGlConst(UNPACK_SKIP_ROWS);setGlConst(UNPACK_SKIP_PIXELS);setGlConst(UNPACK_ALIGNMENT);setGlConst(PACK_SWAP_BYTES);setGlConst(PACK_LSB_FIRST);setGlConst(PACK_ROW_LENGTH);setGlConst(PACK_SKIP_ROWS);setGlConst(PACK_SKIP_PIXELS);setGlConst(PACK_ALIGNMENT);setGlConst(MAP_COLOR);setGlConst(MAP_STENCIL);setGlConst(INDEX_SHIFT);setGlConst(INDEX_OFFSET);setGlConst(RED_SCALE);setGlConst(RED_BIAS);setGlConst(ZOOM_X);setGlConst(ZOOM_Y);setGlConst(GREEN_SCALE);setGlConst(GREEN_BIAS);setGlConst(BLUE_SCALE);setGlConst(BLUE_BIAS);setGlConst(ALPHA_SCALE);setGlConst(ALPHA_BIAS);setGlConst(DEPTH_SCALE);setGlConst(DEPTH_BIAS);setGlConst(MAX_EVAL_ORDER);setGlConst(MAX_LIGHTS);setGlConst(MAX_CLIP_PLANES);setGlConst(MAX_TEXTURE_SIZE);setGlConst(MAX_PIXEL_MAP_TABLE);setGlConst(MAX_ATTRIB_STACK_DEPTH);setGlConst(MAX_MODELVIEW_STACK_DEPTH);setGlConst(MAX_NAME_STACK_DEPTH);setGlConst(MAX_PROJECTION_STACK_DEPTH);setGlConst(MAX_TEXTURE_STACK_DEPTH);setGlConst(MAX_VIEWPORT_DIMS);setGlConst(MAX_CLIENT_ATTRIB_STACK_DEPTH);setGlConst(SUBPIXEL_BITS);setGlConst(INDEX_BITS);setGlConst(RED_BITS);setGlConst(GREEN_BITS);setGlConst(BLUE_BITS);setGlConst(ALPHA_BITS);setGlConst(DEPTH_BITS);setGlConst(STENCIL_BITS);setGlConst(ACCUM_RED_BITS);setGlConst(ACCUM_GREEN_BITS);setGlConst(ACCUM_BLUE_BITS);setGlConst(ACCUM_ALPHA_BITS);setGlConst(NAME_STACK_DEPTH);setGlConst(AUTO_NORMAL);setGlConst(MAP1_COLOR_4);setGlConst(MAP1_INDEX);setGlConst(MAP1_NORMAL);setGlConst(MAP1_TEXTURE_COORD_1);setGlConst(MAP1_TEXTURE_COORD_2);setGlConst(MAP1_TEXTURE_COORD_3);setGlConst(MAP1_TEXTURE_COORD_4);setGlConst(MAP1_VERTEX_3);setGlConst(MAP1_VERTEX_4);setGlConst(MAP2_COLOR_4);setGlConst(MAP2_INDEX);setGlConst(MAP2_NORMAL);setGlConst(MAP2_TEXTURE_COORD_1);setGlConst(MAP2_TEXTURE_COORD_2);setGlConst(MAP2_TEXTURE_COORD_3);setGlConst(MAP2_TEXTURE_COORD_4);setGlConst(MAP2_VERTEX_3);setGlConst(MAP2_VERTEX_4);setGlConst(MAP1_GRID_DOMAIN);setGlConst(MAP1_GRID_SEGMENTS);setGlConst(MAP2_GRID_DOMAIN);setGlConst(MAP2_GRID_SEGMENTS);setGlConst(TEXTURE_1D);setGlConst(TEXTURE_2D);setGlConst(FEEDBACK_BUFFER_POINTER);setGlConst(FEEDBACK_BUFFER_SIZE);setGlConst(FEEDBACK_BUFFER_TYPE);setGlConst(SELECTION_BUFFER_POINTER);setGlConst(SELECTION_BUFFER_SIZE);setGlConst(TEXTURE_WIDTH);setGlConst(TRANSFORM_BIT);setGlConst(TEXTURE_HEIGHT);setGlConst(TEXTURE_INTERNAL_FORMAT);setGlConst(TEXTURE_BORDER_COLOR);setGlConst(TEXTURE_BORDER);setGlConst(DONT_CARE);setGlConst(FASTEST);setGlConst(NICEST);setGlConst(AMBIENT);setGlConst(DIFFUSE);setGlConst(SPECULAR);setGlConst(POSITION);setGlConst(SPOT_DIRECTION);setGlConst(SPOT_EXPONENT);setGlConst(SPOT_CUTOFF);setGlConst(CONSTANT_ATTENUATION);setGlConst(LINEAR_ATTENUATION);setGlConst(QUADRATIC_ATTENUATION);setGlConst(COMPILE);setGlConst(COMPILE_AND_EXECUTE);setGlConst(BYTE);setGlConst(UNSIGNED_BYTE);setGlConst(SHORT);setGlConst(UNSIGNED_SHORT);setGlConst(INT);setGlConst(UNSIGNED_INT);setGlConst(FLOAT);setGlConst(2_BYTES);setGlConst(3_BYTES);setGlConst(4_BYTES);setGlConst(DOUBLE);setGlConst(CLEAR);setGlConst(AND);setGlConst(AND_REVERSE);setGlConst(COPY);setGlConst(AND_INVERTED);setGlConst(NOOP);setGlConst(XOR);setGlConst(OR);setGlConst(NOR);setGlConst(EQUIV);setGlConst(INVERT);setGlConst(OR_REVERSE);setGlConst(COPY_INVERTED);setGlConst(OR_INVERTED);setGlConst(NAND);setGlConst(SET);setGlConst(EMISSION);setGlConst(SHININESS);setGlConst(AMBIENT_AND_DIFFUSE);setGlConst(COLOR_INDEXES);setGlConst(MODELVIEW);setGlConst(PROJECTION);setGlConst(TEXTURE);setGlConst(COLOR);setGlConst(DEPTH);setGlConst(STENCIL);setGlConst(COLOR_INDEX);setGlConst(STENCIL_INDEX);setGlConst(DEPTH_COMPONENT);setGlConst(RED);setGlConst(GREEN);setGlConst(BLUE);setGlConst(ALPHA);setGlConst(RGB);setGlConst(RGBA);setGlConst(LUMINANCE);setGlConst(LUMINANCE_ALPHA);setGlConst(BITMAP);setGlConst(POINT);setGlConst(LINE);setGlConst(FILL);setGlConst(RENDER);setGlConst(FEEDBACK);setGlConst(SELECT);setGlConst(FLAT);setGlConst(SMOOTH);setGlConst(KEEP);setGlConst(REPLACE);setGlConst(INCR);setGlConst(DECR);setGlConst(VENDOR);setGlConst(RENDERER);setGlConst(VERSION);setGlConst(EXTENSIONS);setGlConst(S);setGlConst(ENABLE_BIT);setGlConst(T);setGlConst(R);setGlConst(Q);setGlConst(MODULATE);setGlConst(DECAL);setGlConst(TEXTURE_ENV_MODE);setGlConst(TEXTURE_ENV_COLOR);setGlConst(TEXTURE_ENV);setGlConst(EYE_LINEAR);setGlConst(OBJECT_LINEAR);setGlConst(SPHERE_MAP);setGlConst(TEXTURE_GEN_MODE);setGlConst(OBJECT_PLANE);setGlConst(EYE_PLANE);setGlConst(NEAREST);setGlConst(LINEAR);setGlConst(NEAREST_MIPMAP_NEAREST);setGlConst(LINEAR_MIPMAP_NEAREST);setGlConst(NEAREST_MIPMAP_LINEAR);setGlConst(LINEAR_MIPMAP_LINEAR);setGlConst(TEXTURE_MAG_FILTER);setGlConst(TEXTURE_MIN_FILTER);setGlConst(TEXTURE_WRAP_S);setGlConst(TEXTURE_WRAP_T);setGlConst(CLAMP);setGlConst(REPEAT);setGlConst(POLYGON_OFFSET_UNITS);setGlConst(POLYGON_OFFSET_POINT);setGlConst(POLYGON_OFFSET_LINE);setGlConst(R3_G3_B2);setGlConst(V2F);setGlConst(V3F);setGlConst(C4UB_V2F);setGlConst(C4UB_V3F);setGlConst(C3F_V3F);setGlConst(N3F_V3F);setGlConst(C4F_N3F_V3F);setGlConst(T2F_V3F);setGlConst(T4F_V4F);setGlConst(T2F_C4UB_V3F);setGlConst(T2F_C3F_V3F);setGlConst(T2F_N3F_V3F);setGlConst(T2F_C4F_N3F_V3F);setGlConst(T4F_C4F_N3F_V4F);setGlConst(CLIP_PLANE0);setGlConst(CLIP_PLANE1);setGlConst(CLIP_PLANE2);setGlConst(CLIP_PLANE3);setGlConst(CLIP_PLANE4);setGlConst(CLIP_PLANE5);setGlConst(LIGHT0);setGlConst(COLOR_BUFFER_BIT);setGlConst(LIGHT1);setGlConst(LIGHT2);setGlConst(LIGHT3);setGlConst(LIGHT4);setGlConst(LIGHT5);setGlConst(LIGHT6);setGlConst(LIGHT7);setGlConst(HINT_BIT);setGlConst(POLYGON_OFFSET_FILL);setGlConst(POLYGON_OFFSET_FACTOR);setGlConst(ALPHA4);setGlConst(ALPHA8);setGlConst(ALPHA12);setGlConst(ALPHA16);setGlConst(LUMINANCE4);setGlConst(LUMINANCE8);setGlConst(LUMINANCE12);setGlConst(LUMINANCE16);setGlConst(LUMINANCE4_ALPHA4);setGlConst(LUMINANCE6_ALPHA2);setGlConst(LUMINANCE8_ALPHA8);setGlConst(LUMINANCE12_ALPHA4);setGlConst(LUMINANCE12_ALPHA12);setGlConst(LUMINANCE16_ALPHA16);setGlConst(INTENSITY);setGlConst(INTENSITY4);setGlConst(INTENSITY8);setGlConst(INTENSITY12);setGlConst(INTENSITY16);setGlConst(RGB4);setGlConst(RGB5);setGlConst(RGB8);setGlConst(RGB10);setGlConst(RGB12);setGlConst(RGB16);setGlConst(RGBA2);setGlConst(RGBA4);setGlConst(RGB5_A1);setGlConst(RGBA8);setGlConst(RGB10_A2);setGlConst(RGBA12);setGlConst(RGBA16);setGlConst(TEXTURE_RED_SIZE);setGlConst(TEXTURE_GREEN_SIZE);setGlConst(TEXTURE_BLUE_SIZE);setGlConst(TEXTURE_ALPHA_SIZE);setGlConst(TEXTURE_LUMINANCE_SIZE);setGlConst(TEXTURE_INTENSITY_SIZE);setGlConst(PROXY_TEXTURE_1D);setGlConst(PROXY_TEXTURE_2D);setGlConst(TEXTURE_PRIORITY);setGlConst(TEXTURE_RESIDENT);setGlConst(TEXTURE_BINDING_1D);setGlConst(TEXTURE_BINDING_2D);setGlConst(VERTEX_ARRAY);setGlConst(NORMAL_ARRAY);setGlConst(COLOR_ARRAY);setGlConst(INDEX_ARRAY);setGlConst(TEXTURE_COORD_ARRAY);setGlConst(EDGE_FLAG_ARRAY);setGlConst(VERTEX_ARRAY_SIZE);setGlConst(VERTEX_ARRAY_TYPE);setGlConst(VERTEX_ARRAY_STRIDE);setGlConst(NORMAL_ARRAY_TYPE);setGlConst(NORMAL_ARRAY_STRIDE);setGlConst(COLOR_ARRAY_SIZE);setGlConst(COLOR_ARRAY_TYPE);setGlConst(COLOR_ARRAY_STRIDE);setGlConst(INDEX_ARRAY_TYPE);setGlConst(INDEX_ARRAY_STRIDE);setGlConst(TEXTURE_COORD_ARRAY_SIZE);setGlConst(TEXTURE_COORD_ARRAY_TYPE);setGlConst(TEXTURE_COORD_ARRAY_STRIDE);setGlConst(EDGE_FLAG_ARRAY_STRIDE);setGlConst(VERTEX_ARRAY_POINTER);setGlConst(NORMAL_ARRAY_POINTER);setGlConst(COLOR_ARRAY_POINTER);setGlConst(INDEX_ARRAY_POINTER);setGlConst(TEXTURE_COORD_ARRAY_POINTER);setGlConst(EDGE_FLAG_ARRAY_POINTER);setGlConst(COLOR_INDEX1_EXT);setGlConst(COLOR_INDEX2_EXT);setGlConst(COLOR_INDEX4_EXT);setGlConst(COLOR_INDEX8_EXT);setGlConst(COLOR_INDEX12_EXT);setGlConst(COLOR_INDEX16_EXT);setGlConst(EVAL_BIT);setGlConst(LIST_BIT);setGlConst(TEXTURE_BIT);setGlConst(SCISSOR_BIT);setGlConst(ALL_ATTRIB_BITS);setGlConst(CLIENT_ALL_ATTRIB_BITS);
+        //setGlConst(BLEND_EQUATION_RGB); setGlConst(VERTEX_ATTRIB_ARRAY_ENABLED); setGlConst(VERTEX_ATTRIB_ARRAY_SIZE); setGlConst(VERTEX_ATTRIB_ARRAY_STRIDE); setGlConst(VERTEX_ATTRIB_ARRAY_TYPE); setGlConst(CURRENT_VERTEX_ATTRIB); setGlConst(VERTEX_PROGRAM_POINT_SIZE); setGlConst(VERTEX_PROGRAM_TWO_SIDE); setGlConst(VERTEX_ATTRIB_ARRAY_POINTER); setGlConst(STENCIL_BACK_FUNC); setGlConst(STENCIL_BACK_FAIL); setGlConst(STENCIL_BACK_PASS_DEPTH_FAIL); setGlConst(STENCIL_BACK_PASS_DEPTH_PASS); setGlConst(MAX_DRAW_BUFFERS); setGlConst(DRAW_BUFFER0); setGlConst(DRAW_BUFFER1); setGlConst(DRAW_BUFFER2); setGlConst(DRAW_BUFFER3); setGlConst(DRAW_BUFFER4); setGlConst(DRAW_BUFFER5); setGlConst(DRAW_BUFFER6); setGlConst(DRAW_BUFFER7); setGlConst(DRAW_BUFFER8); setGlConst(DRAW_BUFFER9); setGlConst(DRAW_BUFFER10); setGlConst(DRAW_BUFFER11); setGlConst(DRAW_BUFFER12); setGlConst(DRAW_BUFFER13); setGlConst(DRAW_BUFFER14); setGlConst(DRAW_BUFFER15); setGlConst(BLEND_EQUATION_ALPHA); setGlConst(POINT_SPRITE); setGlConst(COORD_REPLACE); setGlConst(MAX_VERTEX_ATTRIBS); setGlConst(VERTEX_ATTRIB_ARRAY_NORMALIZED); setGlConst(MAX_TEXTURE_COORDS); setGlConst(MAX_TEXTURE_IMAGE_UNITS); setGlConst(FRAGMENT_SHADER); setGlConst(VERTEX_SHADER); setGlConst(MAX_FRAGMENT_UNIFORM_COMPONENTS); setGlConst(MAX_VERTEX_UNIFORM_COMPONENTS); setGlConst(MAX_VARYING_FLOATS); setGlConst(MAX_VERTEX_TEXTURE_IMAGE_UNITS); setGlConst(MAX_COMBINED_TEXTURE_IMAGE_UNITS); setGlConst(SHADER_TYPE); setGlConst(FLOAT_VEC2); setGlConst(FLOAT_VEC3); setGlConst(FLOAT_VEC4); setGlConst(INT_VEC2); setGlConst(INT_VEC3); setGlConst(INT_VEC4); setGlConst(BOOL); setGlConst(BOOL_VEC2); setGlConst(BOOL_VEC3); setGlConst(BOOL_VEC4); setGlConst(FLOAT_MAT2); setGlConst(FLOAT_MAT3); setGlConst(FLOAT_MAT4); setGlConst(SAMPLER_1D); setGlConst(SAMPLER_2D); setGlConst(SAMPLER_3D); setGlConst(SAMPLER_CUBE); setGlConst(SAMPLER_1D_SHADOW); setGlConst(SAMPLER_2D_SHADOW); setGlConst(DELETE_STATUS); setGlConst(COMPILE_STATUS); setGlConst(LINK_STATUS); setGlConst(VALIDATE_STATUS); setGlConst(INFO_LOG_LENGTH); setGlConst(ATTACHED_SHADERS); setGlConst(ACTIVE_UNIFORMS); setGlConst(ACTIVE_UNIFORM_MAX_LENGTH); setGlConst(SHADER_SOURCE_LENGTH); setGlConst(ACTIVE_ATTRIBUTES); setGlConst(ACTIVE_ATTRIBUTE_MAX_LENGTH); setGlConst(FRAGMENT_SHADER_DERIVATIVE_HINT); setGlConst(SHADING_LANGUAGE_VERSION); setGlConst(CURRENT_PROGRAM); setGlConst(POINT_SPRITE_COORD_ORIGIN); setGlConst(LOWER_LEFT); setGlConst(UPPER_LEFT); setGlConst(STENCIL_BACK_REF); setGlConst(STENCIL_BACK_VALUE_MASK); setGlConst(STENCIL_BACK_WRITEMASK);
+        setGlConst(DEPTH_BUFFER_BIT); setGlConst(STENCIL_BUFFER_BIT); setGlConst(COLOR_BUFFER_BIT); setGlConst(POINTS); setGlConst(LINES); setGlConst(LINE_LOOP); setGlConst(LINE_STRIP); setGlConst(TRIANGLES); setGlConst(TRIANGLE_STRIP); setGlConst(TRIANGLE_FAN); setGlConst(ZERO); setGlConst(ONE); setGlConst(SRC_COLOR); setGlConst(ONE_MINUS_SRC_COLOR); setGlConst(SRC_ALPHA); setGlConst(ONE_MINUS_SRC_ALPHA); setGlConst(DST_ALPHA); setGlConst(ONE_MINUS_DST_ALPHA); setGlConst(DST_COLOR); setGlConst(ONE_MINUS_DST_COLOR); setGlConst(SRC_ALPHA_SATURATE); setGlConst(FUNC_ADD); setGlConst(BLEND_EQUATION); setGlConst(BLEND_EQUATION_RGB); setGlConst(BLEND_EQUATION_ALPHA); setGlConst(FUNC_SUBTRACT); setGlConst(FUNC_REVERSE_SUBTRACT); setGlConst(BLEND_DST_RGB); setGlConst(BLEND_SRC_RGB); setGlConst(BLEND_DST_ALPHA); setGlConst(BLEND_SRC_ALPHA); setGlConst(CONSTANT_COLOR); setGlConst(ONE_MINUS_CONSTANT_COLOR); setGlConst(CONSTANT_ALPHA); setGlConst(ONE_MINUS_CONSTANT_ALPHA); setGlConst(BLEND_COLOR); setGlConst(ARRAY_BUFFER); setGlConst(ELEMENT_ARRAY_BUFFER); setGlConst(ARRAY_BUFFER_BINDING); setGlConst(ELEMENT_ARRAY_BUFFER_BINDING); setGlConst(STREAM_DRAW); setGlConst(STATIC_DRAW); setGlConst(DYNAMIC_DRAW); setGlConst(BUFFER_SIZE); setGlConst(BUFFER_USAGE); setGlConst(CURRENT_VERTEX_ATTRIB); setGlConst(FRONT); setGlConst(BACK); setGlConst(FRONT_AND_BACK); setGlConst(CULL_FACE); setGlConst(BLEND); setGlConst(DITHER); setGlConst(STENCIL_TEST); setGlConst(DEPTH_TEST); setGlConst(SCISSOR_TEST); setGlConst(POLYGON_OFFSET_FILL); setGlConst(SAMPLE_ALPHA_TO_COVERAGE); setGlConst(SAMPLE_COVERAGE); setGlConst(NO_ERROR); setGlConst(INVALID_ENUM); setGlConst(INVALID_VALUE); setGlConst(INVALID_OPERATION); setGlConst(OUT_OF_MEMORY); setGlConst(CW); setGlConst(CCW); setGlConst(LINE_WIDTH); setGlConst(ALIASED_POINT_SIZE_RANGE); setGlConst(ALIASED_LINE_WIDTH_RANGE); setGlConst(CULL_FACE_MODE); setGlConst(FRONT_FACE); setGlConst(DEPTH_RANGE); setGlConst(DEPTH_WRITEMASK); setGlConst(DEPTH_CLEAR_VALUE); setGlConst(DEPTH_FUNC); setGlConst(STENCIL_CLEAR_VALUE); setGlConst(STENCIL_FUNC); setGlConst(STENCIL_FAIL); setGlConst(STENCIL_PASS_DEPTH_FAIL); setGlConst(STENCIL_PASS_DEPTH_PASS); setGlConst(STENCIL_REF); setGlConst(STENCIL_VALUE_MASK); setGlConst(STENCIL_WRITEMASK); setGlConst(STENCIL_BACK_FUNC); setGlConst(STENCIL_BACK_FAIL); setGlConst(STENCIL_BACK_PASS_DEPTH_FAIL); setGlConst(STENCIL_BACK_PASS_DEPTH_PASS); setGlConst(STENCIL_BACK_REF); setGlConst(STENCIL_BACK_VALUE_MASK); setGlConst(STENCIL_BACK_WRITEMASK); setGlConst(VIEWPORT); setGlConst(SCISSOR_BOX); setGlConst(COLOR_CLEAR_VALUE); setGlConst(COLOR_WRITEMASK); setGlConst(UNPACK_ALIGNMENT); setGlConst(PACK_ALIGNMENT); setGlConst(MAX_TEXTURE_SIZE); setGlConst(MAX_VIEWPORT_DIMS); setGlConst(SUBPIXEL_BITS); setGlConst(RED_BITS); setGlConst(GREEN_BITS); setGlConst(BLUE_BITS); setGlConst(ALPHA_BITS); setGlConst(DEPTH_BITS); setGlConst(STENCIL_BITS); setGlConst(POLYGON_OFFSET_UNITS); setGlConst(POLYGON_OFFSET_FACTOR); setGlConst(TEXTURE_BINDING_2D); setGlConst(SAMPLE_BUFFERS); setGlConst(SAMPLES); setGlConst(SAMPLE_COVERAGE_VALUE); setGlConst(SAMPLE_COVERAGE_INVERT); setGlConst(COMPRESSED_TEXTURE_FORMATS); setGlConst(DONT_CARE); setGlConst(FASTEST); setGlConst(NICEST); setGlConst(GENERATE_MIPMAP_HINT); setGlConst(BYTE); setGlConst(UNSIGNED_BYTE); setGlConst(SHORT); setGlConst(UNSIGNED_SHORT); setGlConst(INT); setGlConst(UNSIGNED_INT); setGlConst(FLOAT); setGlConst(DEPTH_COMPONENT); setGlConst(ALPHA); setGlConst(RGB); setGlConst(RGBA); setGlConst(LUMINANCE); setGlConst(LUMINANCE_ALPHA); setGlConst(UNSIGNED_SHORT_4_4_4_4); setGlConst(UNSIGNED_SHORT_5_5_5_1); setGlConst(UNSIGNED_SHORT_5_6_5); setGlConst(FRAGMENT_SHADER); setGlConst(VERTEX_SHADER); setGlConst(MAX_VERTEX_ATTRIBS); setGlConst(MAX_VERTEX_UNIFORM_VECTORS); setGlConst(MAX_VARYING_VECTORS); setGlConst(MAX_COMBINED_TEXTURE_IMAGE_UNITS); setGlConst(MAX_VERTEX_TEXTURE_IMAGE_UNITS); setGlConst(MAX_TEXTURE_IMAGE_UNITS); setGlConst(MAX_FRAGMENT_UNIFORM_VECTORS); setGlConst(SHADER_TYPE); setGlConst(DELETE_STATUS); setGlConst(LINK_STATUS); setGlConst(VALIDATE_STATUS); setGlConst(ATTACHED_SHADERS); setGlConst(ACTIVE_UNIFORMS); setGlConst(ACTIVE_ATTRIBUTES); setGlConst(SHADING_LANGUAGE_VERSION); setGlConst(CURRENT_PROGRAM); setGlConst(NEVER); setGlConst(LESS); setGlConst(EQUAL); setGlConst(LEQUAL); setGlConst(GREATER); setGlConst(NOTEQUAL); setGlConst(GEQUAL); setGlConst(ALWAYS); setGlConst(KEEP); setGlConst(REPLACE); setGlConst(INCR); setGlConst(DECR); setGlConst(INVERT); setGlConst(INCR_WRAP); setGlConst(DECR_WRAP); setGlConst(VENDOR); setGlConst(RENDERER); setGlConst(VERSION); setGlConst(NEAREST); setGlConst(LINEAR); setGlConst(NEAREST_MIPMAP_NEAREST); setGlConst(LINEAR_MIPMAP_NEAREST); setGlConst(NEAREST_MIPMAP_LINEAR); setGlConst(LINEAR_MIPMAP_LINEAR); setGlConst(TEXTURE_MAG_FILTER); setGlConst(TEXTURE_MIN_FILTER); setGlConst(TEXTURE_WRAP_S); setGlConst(TEXTURE_WRAP_T); setGlConst(TEXTURE_2D); setGlConst(TEXTURE); setGlConst(TEXTURE_CUBE_MAP); setGlConst(TEXTURE_BINDING_CUBE_MAP); setGlConst(TEXTURE_CUBE_MAP_POSITIVE_X); setGlConst(TEXTURE_CUBE_MAP_NEGATIVE_X); setGlConst(TEXTURE_CUBE_MAP_POSITIVE_Y); setGlConst(TEXTURE_CUBE_MAP_NEGATIVE_Y); setGlConst(TEXTURE_CUBE_MAP_POSITIVE_Z); setGlConst(TEXTURE_CUBE_MAP_NEGATIVE_Z); setGlConst(MAX_CUBE_MAP_TEXTURE_SIZE); setGlConst(TEXTURE0); setGlConst(TEXTURE1); setGlConst(TEXTURE2); setGlConst(TEXTURE3); setGlConst(TEXTURE4); setGlConst(TEXTURE5); setGlConst(TEXTURE6); setGlConst(TEXTURE7); setGlConst(TEXTURE8); setGlConst(TEXTURE9); setGlConst(TEXTURE10); setGlConst(TEXTURE11); setGlConst(TEXTURE12); setGlConst(TEXTURE13); setGlConst(TEXTURE14); setGlConst(TEXTURE15); setGlConst(TEXTURE16); setGlConst(TEXTURE17); setGlConst(TEXTURE18); setGlConst(TEXTURE19); setGlConst(TEXTURE20); setGlConst(TEXTURE21); setGlConst(TEXTURE22); setGlConst(TEXTURE23); setGlConst(TEXTURE24); setGlConst(TEXTURE25); setGlConst(TEXTURE26); setGlConst(TEXTURE27); setGlConst(TEXTURE28); setGlConst(TEXTURE29); setGlConst(TEXTURE30); setGlConst(TEXTURE31); setGlConst(ACTIVE_TEXTURE); setGlConst(REPEAT); setGlConst(CLAMP_TO_EDGE); setGlConst(MIRRORED_REPEAT); setGlConst(FLOAT_VEC2); setGlConst(FLOAT_VEC3); setGlConst(FLOAT_VEC4); setGlConst(INT_VEC2); setGlConst(INT_VEC3); setGlConst(INT_VEC4); setGlConst(BOOL); setGlConst(BOOL_VEC2); setGlConst(BOOL_VEC3); setGlConst(BOOL_VEC4); setGlConst(FLOAT_MAT2); setGlConst(FLOAT_MAT3); setGlConst(FLOAT_MAT4); setGlConst(SAMPLER_2D); setGlConst(SAMPLER_CUBE); setGlConst(VERTEX_ATTRIB_ARRAY_ENABLED); setGlConst(VERTEX_ATTRIB_ARRAY_SIZE); setGlConst(VERTEX_ATTRIB_ARRAY_STRIDE); setGlConst(VERTEX_ATTRIB_ARRAY_TYPE); setGlConst(VERTEX_ATTRIB_ARRAY_NORMALIZED); setGlConst(VERTEX_ATTRIB_ARRAY_POINTER); setGlConst(VERTEX_ATTRIB_ARRAY_BUFFER_BINDING); setGlConst(IMPLEMENTATION_COLOR_READ_TYPE); setGlConst(IMPLEMENTATION_COLOR_READ_FORMAT); setGlConst(COMPILE_STATUS); setGlConst(LOW_FLOAT); setGlConst(MEDIUM_FLOAT); setGlConst(HIGH_FLOAT); setGlConst(LOW_INT); setGlConst(MEDIUM_INT); setGlConst(HIGH_INT); setGlConst(FRAMEBUFFER); setGlConst(RENDERBUFFER); setGlConst(RGBA4); setGlConst(RGB5_A1); setGlConst(RGBA8); setGlConst(RGB565); setGlConst(DEPTH_COMPONENT16); setGlConst(STENCIL_INDEX8); setGlConst(DEPTH_STENCIL); setGlConst(RENDERBUFFER_WIDTH); setGlConst(RENDERBUFFER_HEIGHT); setGlConst(RENDERBUFFER_INTERNAL_FORMAT); setGlConst(RENDERBUFFER_RED_SIZE); setGlConst(RENDERBUFFER_GREEN_SIZE); setGlConst(RENDERBUFFER_BLUE_SIZE); setGlConst(RENDERBUFFER_ALPHA_SIZE); setGlConst(RENDERBUFFER_DEPTH_SIZE); setGlConst(RENDERBUFFER_STENCIL_SIZE); setGlConst(FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE); setGlConst(FRAMEBUFFER_ATTACHMENT_OBJECT_NAME); setGlConst(FRAMEBUFFER_ATTACHMENT_TEXTURE_LEVEL); setGlConst(FRAMEBUFFER_ATTACHMENT_TEXTURE_CUBE_MAP_FACE); setGlConst(COLOR_ATTACHMENT0); setGlConst(DEPTH_ATTACHMENT); setGlConst(STENCIL_ATTACHMENT); setGlConst(DEPTH_STENCIL_ATTACHMENT); setGlConst(NONE); setGlConst(FRAMEBUFFER_COMPLETE); setGlConst(FRAMEBUFFER_INCOMPLETE_ATTACHMENT); setGlConst(FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT);
+        setGlConst(FRAMEBUFFER_UNSUPPORTED); setGlConst(FRAMEBUFFER_BINDING); setGlConst(RENDERBUFFER_BINDING); setGlConst(MAX_RENDERBUFFER_SIZE); setGlConst(INVALID_FRAMEBUFFER_OPERATION);
+        //idk if these links stay valid like desmos but here -> regexr.com/80n5s
+        //unfortunately these don't work and double unfortunate is that UNPACK_FLIP_Y_WEBGL is important (and has no native gl equivalent (so i guess i'll just flip the images when i load them (some how)))
+        //actually wait they're defined in the spec too
+#define GL_FRAMEBUFFER_INCOMPLETE_DIMENSIONS 0x8CD9
+#define GL_UNPACK_FLIP_Y_WEBGL 0x9240
+#define GL_UNPACK_PREMULTIPLY_ALPHA_WEBGL 0x9241
+#define GL_CONTEXT_LOST_WEBGL 0x9242
+#define GL_UNPACK_COLORSPACE_CONVERSION_WEBGL 0x9243
+#define GL_BROWSER_DEFAULT_WEBGL 0x9244
+
+        setGlConst(FRAMEBUFFER_INCOMPLETE_DIMENSIONS);
+        setGlConst(UNPACK_FLIP_Y_WEBGL);
+        setGlConst(UNPACK_PREMULTIPLY_ALPHA_WEBGL);
+        setGlConst(CONTEXT_LOST_WEBGL);
+        setGlConst(UNPACK_COLORSPACE_CONVERSION_WEBGL);
+        setGlConst(BROWSER_DEFAULT_WEBGL);
+#undef V8GLFUNC
+#undef INFOLOG_LEN
+    }
     //Local<Object> result = wndclass->NewInstance(isolate->GetCurrentContext()).ToLocalChecked();
 
     info.GetReturnValue().Set(context->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
@@ -3442,6 +3832,12 @@ V8FUNC(MAKEPOINTSWrapper) {
     LPARAM lp = IntegerFI(info[0]);
     POINTS p = MAKEPOINTS(lp);
     info.GetReturnValue().Set(jsImpl::createWinPoint<POINTS>(isolate, p));
+}
+
+V8FUNC(GET_WHEEL_DELTA_WPARAMWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    info.GetReturnValue().Set(GET_WHEEL_DELTA_WPARAM(IntegerFI(info[0])));
 }
 
 V8FUNC(CreateWindowClass) {
@@ -4161,7 +4557,7 @@ V8FUNC(CreateDIBSectionWrapper) {
         //}
         //DWORD* temp = new DWORD[bmi.bmiHeader.biWidth*bmi.bmiHeader.biHeight];
         //DWORD** bits = &temp;
-        DWORD* bits = NULL; //https://learn.microsoft.com/en-us/shows/pdc-pdc08/pc43 (40:26) raymond uses DWORD instead of byte
+        DWORD* bits = NULL; //https://learn.microsoft.com/en-us/shows/pdc-pdc08/pc43 (40:26) raymond uses DWORD instead of byte (for 32 bit)
         //SMS* bparent = new SMS;
 
         Local<ObjectTemplate> interf = ObjectTemplate::New(isolate);
@@ -5755,6 +6151,64 @@ V8FUNC(InitializeWIC) {
 
             info.GetReturnValue().Set(DIRECT2D::getWICBitmapImpl(isolate, dst, shit));
         }));
+        //moved into getWICBitmapImpl
+        //wic->Set(isolate, "ResizeBitmap", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+        //    Isolate* isolate = info.GetIsolate();
+        //    WICHelper* WICObj = (WICHelper*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+        //    IWICBitmapScaler* pIScaler = NULL;
+        //
+        //    RetIfFailed(WICObj->wicFactory->CreateBitmapScaler(&pIScaler), "CreateBitmapScaler (ResizeBitmap)");
+        //    RetIfFailed(pIScaler->Initialize(
+        //        pIDecoderFrame,                    // Bitmap source to scale.
+        //        uiWidth / 2,                         // Scale width to half of original.
+        //        uiHeight / 2,                        // Scale height to half of original.
+        //        WICBitmapInterpolationModeFant));   // Use Fant mode interpolation.
+        //}));
+        wic->Set(isolate, "CreateBitmapFromHBITMAP", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            Local<Context> context = isolate->GetCurrentContext();
+            WICHelper* WICObj = (WICHelper*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            IWICBitmap* wicBitmap;
+
+            RetIfFailed(WICObj->wicFactory->CreateBitmapFromHBITMAP((HBITMAP)IntegerFI(info[0]), (HPALETTE)IntegerFI(info[1]), (WICBitmapAlphaChannelOption)IntegerFI(info[2]), &wicBitmap), "wicFactory->CreateBitmapFromHBITMAP failed");
+            Local<Array> id = info[3].As<Array>();
+            GUID shit = { IntegerFI(id->Get(context, 0).ToLocalChecked()),
+                IntegerFI(id->Get(context, 1).ToLocalChecked()),
+                IntegerFI(id->Get(context, 2).ToLocalChecked()),
+                IntegerFI(id->Get(context, 3).ToLocalChecked()),
+                IntegerFI(id->Get(context, 4).ToLocalChecked()),
+                IntegerFI(id->Get(context, 5).ToLocalChecked()),
+                IntegerFI(id->Get(context, 6).ToLocalChecked()),
+                IntegerFI(id->Get(context, 7).ToLocalChecked()),
+                IntegerFI(id->Get(context, 8).ToLocalChecked()),
+                IntegerFI(id->Get(context, 9).ToLocalChecked()),
+                IntegerFI(id->Get(context, 10).ToLocalChecked()) };
+
+            info.GetReturnValue().Set(DIRECT2D::getWICBitmapImpl(isolate, wicBitmap, shit));
+        }));
+
+        wic->Set(isolate, "CreateBitmapFromHICON", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            Local<Context> context = isolate->GetCurrentContext();
+            WICHelper* WICObj = (WICHelper*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            IWICBitmap* wicBitmap;
+
+            RetIfFailed(WICObj->wicFactory->CreateBitmapFromHICON((HICON)IntegerFI(info[0]), &wicBitmap), "wicFactory->CreateBitmapFromHICON failed");
+            Local<Array> id = info[1].As<Array>();
+            GUID shit = { IntegerFI(id->Get(context, 0).ToLocalChecked()),
+                IntegerFI(id->Get(context, 1).ToLocalChecked()),
+                IntegerFI(id->Get(context, 2).ToLocalChecked()),
+                IntegerFI(id->Get(context, 3).ToLocalChecked()),
+                IntegerFI(id->Get(context, 4).ToLocalChecked()),
+                IntegerFI(id->Get(context, 5).ToLocalChecked()),
+                IntegerFI(id->Get(context, 6).ToLocalChecked()),
+                IntegerFI(id->Get(context, 7).ToLocalChecked()),
+                IntegerFI(id->Get(context, 8).ToLocalChecked()),
+                IntegerFI(id->Get(context, 9).ToLocalChecked()),
+                IntegerFI(id->Get(context, 10).ToLocalChecked()) };
+
+            info.GetReturnValue().Set(DIRECT2D::getWICBitmapImpl(isolate, wicBitmap, shit));
+        }));
         wic->Set(isolate, "Release", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
             Isolate* isolate = info.GetIsolate();
             WICHelper* WICObj = (WICHelper*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
@@ -5993,6 +6447,26 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     //setGlobalGUID(GUID_WICPixelFormat32bppPBGRA);
     setGlobal(ScopeGUIDs);
     setGlobal(InitializeWIC);
+
+    setGlobalConst(WICBitmapTransformRotate0);
+    setGlobalConst(WICBitmapTransformRotate90);
+    setGlobalConst(WICBitmapTransformRotate180);
+    setGlobalConst(WICBitmapTransformRotate270);
+    setGlobalConst(WICBitmapTransformFlipHorizontal);
+    setGlobalConst(WICBitmapTransformFlipVertical);
+    setGlobalConst(WICBITMAPTRANSFORMOPTIONS_FORCE_DWORD);
+
+    setGlobalConst(WICBitmapInterpolationModeNearestNeighbor);
+    setGlobalConst(WICBitmapInterpolationModeLinear);
+    setGlobalConst(WICBitmapInterpolationModeCubic);
+    setGlobalConst(WICBitmapInterpolationModeFant);
+    setGlobalConst(WICBitmapInterpolationModeHighQualityCubic);
+    setGlobalConst(WICBITMAPINTERPOLATIONMODE_FORCE_DWORD);
+
+    setGlobalConst(WICBitmapUseAlpha);
+    setGlobalConst(WICBitmapUsePremultipliedAlpha);
+    setGlobalConst(WICBitmapIgnoreAlpha);
+    setGlobalConst(WICBITMAPALPHACHANNELOPTIONS_FORCE_DWORD);
 
     Local<ObjectTemplate> matrixhelper = ObjectTemplate::New(isolate);
     matrixhelper->Set(isolate, "Identity", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
@@ -6865,6 +7339,7 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
     setGlobalWrapper(ReleaseCapture);
     setGlobalWrapper(ClipCursor);
     setGlobalWrapper(MAKEPOINTS);
+    setGlobalWrapper(GET_WHEEL_DELTA_WPARAM);
 
     setGlobalWrapper(IsIconic);
     setGlobalWrapper(IsChild);
@@ -6982,7 +7457,8 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInstance, char* nCmdList, int
     //1.4.7 because i added loads of Dwm functions aswell as SetWindowCompositionAttribute
     //1.4.99 finally figured out UpdateLayeredWindow
     //1.5.99 because i totally changed how WIC works (and had to update like half the scripts) and we are SO close to getting DXGI, DIRECT3D, AND OPENGL (it's about to be brazy)
-    print("JBS3 -> Version 1.5.99"); //so idk how normal version things work so the first number will probably stay one --- i will increment the second number if i change an existing function like when i remade the CreateWindowClass and CreateWindow functions --- i might random increment the third number if i feel like it
+    //1.5.33 because i realized 1.6.0 should be when i add all of them (i've only added OPENGL)
+    print("JBS3 -> Version 1.5.33"); //so idk how normal version things work so the first number will probably stay one --- i will increment the second number if i change an existing function like when i remade the CreateWindowClass and CreateWindow functions --- i might random increment the third number if i feel like it
     print(screenWidth << "x" << screenHeight);
     
 

@@ -13,6 +13,12 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="Header Files\GL">
+      <UniqueIdentifier>{993c9c8a-e2d1-42f6-9c25-f76ca1aaac01}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\GL">
+      <UniqueIdentifier>{6782fb05-3faa-480c-a185-9e813a67a045}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="JBS3.cpp">
@@ -32,6 +38,9 @@
     </ClCompile>
     <ClCompile Include="goodmacrosfordirect2dandwichelper.h">
       <Filter>Header Files</Filter>
+    </ClCompile>
+    <ClCompile Include="GL\glew.c">
+      <Filter>Source Files\GL</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -63,6 +72,18 @@
     </ClInclude>
     <ClInclude Include="WICHelper.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="GL\glew.h">
+      <Filter>Header Files\GL</Filter>
+    </ClInclude>
+    <ClInclude Include="GL\glxew.h">
+      <Filter>Header Files\GL</Filter>
+    </ClInclude>
+    <ClInclude Include="GL\wglew.h">
+      <Filter>Header Files\GL</Filter>
+    </ClInclude>
+    <ClInclude Include="GL\eglew.h">
+      <Filter>Header Files\GL</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

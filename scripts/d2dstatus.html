@@ -8,8 +8,11 @@
         li::after {
             content: " ✅";
         }
-        li.NO::after, li.NOPE::after {
+        li.NO::after {
             content: " ❌";
+        }
+        li.NOPE::after {
+            content: " ☠️"
         }
         li.NOPE {
             text-decoration: line-through;
@@ -208,6 +211,35 @@
     </ul>
     <p>WIC</p>
     <ul>
+        <li>IWICImagingFactory2</li>
+        <ul>
+            <li class="NO">CreateBitmap</li>
+            <li class="NOPE">CreateBitmapClipper</li>
+            <li>CreateBitmapFlipRotator</li>
+            <li>CreateBitmapFromHBITMAP</li>
+            <li>CreateBitmapFromHICON</li>
+            <li class="NOPE">CreateBitmapFromMemory</li>
+            <li class="NO">CreateBitmapFromSource</li>
+            <li class="NOPE">CreateBitmapFromSourceRect</li>
+            <li>CreateBitmapScaler</li>
+            <li class="NOPE">CreateColorContext</li>
+            <li class="NOPE">CreateColorTransformer</li>
+            <li class="NOPE">CreateComponentEnumerator</li>
+            <li class="NOPE">CreateComponentInfo</li>
+            <li class="NOPE">CreateDecoder</li>
+            <li class="NOPE">CreateDecoderFromFileHandle</li>
+            <li>CreateDecoderFromFilename</li>
+            <li class="NOPE">CreateDecoderFromStream</li>
+            <li class="NOPE">CreateEncoder</li>
+            <li class="NOPE">CreateFastMetadataEncoderFromDecoder</li>
+            <li class="NOPE">CreateFastMetadataEncoderFromFrameDecode</li>
+            <li>CreateFormatConverter</li>
+            <li class="NOPE">CreatePalette</li>
+            <li class="NOPE">CreateQueryWriter</li>
+            <li class="NOPE">CreateQueryWriterFromReader</li>
+            <li class="NOPE">CreateStream</li>
+            <li class="NOPE">CreateImageEncoder</li>
+        </ul>
         <li>IWICBitmapSource</li>
         <ul>
             <li class="NOPE">CopyPalette</li>
