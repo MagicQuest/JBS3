@@ -2900,6 +2900,8 @@ V8FUNC(createCanvas) {
         glewExperimental = GL_TRUE;
         glewInit();
 
+        //https://gist.github.com/nickrolfe/1127313ed1dbf80254b614a721b3ee9c
+
         typedef HGLRC WINAPI wglCreateContextAttribsARB_type(HDC hdc, HGLRC hShareContext,
             const int* attribList);
         wglCreateContextAttribsARB_type* wglCreateContextAttribsARB;
