@@ -2918,7 +2918,7 @@ V8FUNC(createCanvas) {
         print(wglCreateContextAttribsARB);
         HGLRC hglrc = wglCreateContextAttribsARB(hdc, 0, gl33_attribs);//wglCreateContext(hdc);
         if (hglrc == NULL) {
-            MessageBoxA(NULL, "KILLING MYSELF", "HELP BRO IM PLAYING FORTNITE", MB_CANCELTRYCONTINUE);
+            MessageBoxA(NULL, "KILLING MYSELF", "HELP BRO IM PLAYING FORTNITE", MB_CANCELTRYCONTINUE); //oh yeah i had to make an opengl 3.2+ context for RenderDoc to work (because i was about to end it)
         }
         wglMakeCurrent(NULL, NULL);
         wglDeleteContext(tempRC);
@@ -2944,6 +2944,15 @@ V8FUNC(createCanvas) {
         }));
         V8GLFUNC("clear")
             glClear(IntegerFI(info[0]));
+        }));
+        V8GLFUNC("clearDepth")
+            glClearDepth(FloatFI(info[0]));
+        }));
+        V8GLFUNC("clearStencil")
+            glClearStencil(IntegerFI(info[0]));
+        }));
+        V8GLFUNC("colorMask")
+            glColorMask(IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]));
         }));
         V8GLFUNC("createShader")
             info.GetReturnValue().Set(glCreateShader(IntegerFI(info[0])));
@@ -3008,6 +3017,21 @@ V8FUNC(createCanvas) {
             //oops i forgot to delete data
             delete[] data;
         }));
+        V8GLFUNC("blendColor")
+            glBlendColor(FloatFI(info[0]), FloatFI(info[1]), FloatFI(info[2]), FloatFI(info[3]));
+        }));
+        V8GLFUNC("blendEquation")
+            glBlendEquation(IntegerFI(info[0]));
+        }));
+        V8GLFUNC("blendEquationSeparate")
+            glBlendEquationSeparate(IntegerFI(info[0]), IntegerFI(info[1]));
+        }));
+        V8GLFUNC("blendFunc")
+            glBlendFunc(IntegerFI(info[0]), IntegerFI(info[1]));
+        }));
+        V8GLFUNC("blendFuncSeparate")
+            glBlendFuncSeparate(IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]));
+        }));
         V8GLFUNC("getAttribLocation")
             info.GetReturnValue().Set(glGetAttribLocation(IntegerFI(info[0]), CStringFI(info[1])));
         }));
@@ -3026,6 +3050,9 @@ V8FUNC(createCanvas) {
         V8GLFUNC("getUniformLocation")
             info.GetReturnValue().Set(glGetUniformLocation(IntegerFI(info[0]), CStringFI(info[1])));
         }));
+        V8GLFUNC("checkFramebufferStatus")
+            info.GetReturnValue().Set(glCheckFramebufferStatus(IntegerFI(info[0])));
+        }));
         V8GLFUNC("createTexture")
             GLuint iChannel0;
             glCreateTextures(GL_TEXTURE_2D, 1, &iChannel0);//textures);
@@ -3033,6 +3060,22 @@ V8FUNC(createCanvas) {
             //GLuint iChannel0 = textures[0];
             //glActiveTexture(GL_TEXTURE0);
             //glBindTexture(GL_TEXTURE_2D, iChannel0);
+        }));
+        V8GLFUNC("createFramebuffer")
+            GLuint framebuffer;
+            glCreateFramebuffers(1, &framebuffer);
+            info.GetReturnValue().Set(framebuffer);
+        }));
+        V8GLFUNC("createRenderbuffer")
+            GLuint renderbuffer;
+            glCreateRenderbuffers(1, &renderbuffer);
+            info.GetReturnValue().Set(renderbuffer);
+        }));
+        V8GLFUNC("bindFramebuffer")
+            glBindFramebuffer(IntegerFI(info[0]), IntegerFI(info[1]));
+        }));
+        V8GLFUNC("bindRenderbuffer")
+            glBindRenderbuffer(IntegerFI(info[0]), IntegerFI(info[1]));
         }));
         V8GLFUNC("bindTexture")
             glBindTexture(IntegerFI(info[0]), IntegerFI(info[1]));
@@ -3050,12 +3093,117 @@ V8FUNC(createCanvas) {
             glTexImage2D(IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]), IntegerFI(info[4]), IntegerFI(info[5]), IntegerFI(info[6]), IntegerFI(info[7]), data);
             delete[] data;
         }));
+        V8GLFUNC("texSubImage2D")
+            void* data = nullptr;
+            if (info[8]->BooleanValue(isolate)) {
+                Local<Float32Array> jsData = info[8].As<Float32Array>();
+                data = new void*[jsData->Length()]; //i swear earlier it told me that you couldn't do this
+                jsData->CopyContents(data, jsData->ByteLength());
+            }
+            glTexSubImage2D(IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]), IntegerFI(info[4]), IntegerFI(info[5]), IntegerFI(info[6]), IntegerFI(info[7]), data);
+            delete[] data;
+        }));
+        V8GLFUNC("readPixels")
+            GLsizei width = IntegerFI(info[2]);
+            GLsizei height = IntegerFI(info[3]);
+            void* bits = new void*[width*height];
+            GLenum type = IntegerFI(info[5]);
+            glReadPixels(IntegerFI(info[0]), IntegerFI(info[1]), width, height, IntegerFI(info[4]), type, bits);
+            int bitCount;
+            if (type == GL_UNSIGNED_BYTE) {
+                bitCount = 32; //?
+            }
+            else {
+                MessageBoxA(NULL, "imma be real idk how to handle anything other than unsigned byte for this one chief", "gl.readPixels", MB_ABORTRETRYIGNORE);
+            }
+            auto stride = ((((width * bitCount) + 31) & ~31) >> 3);
+            Local<ArrayBuffer> ab = ArrayBuffer::New(isolate, height * stride); //honestly this math is a guess especially the sizeof part
+            memcpy(ab->Data(), bits, height* stride); //GULP
+            delete[] bits;
+            Local<Uint32Array> arr = Uint32Array::New(ab, 0, width * height); //weird if i multiply this one by sizeof(DWORD) v8 spits out garbage and crashes bad
+            info.GetReturnValue().Set(arr);
+        }));
         V8GLFUNC("readBuffer")
             glReadBuffer(IntegerFI(info[0]));
         }));
         V8GLFUNC("copyTexImage2D")
             //glReadBuffer(GL_FRONT);
             glCopyTexImage2D(IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]), IntegerFI(info[4]), IntegerFI(info[5]), IntegerFI(info[6]), IntegerFI(info[7]));
+        }));
+        //oh i just learned the TexSub functions are for updating textures
+        V8GLFUNC("copyTexSubImage2D")
+            //glReadBuffer(GL_FRONT);
+            glCopyTexSubImage2D(IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]), IntegerFI(info[4]), IntegerFI(info[5]), IntegerFI(info[6]), IntegerFI(info[7]));
+        }));
+        V8GLFUNC("cullFace")
+            glCullFace(IntegerFI(info[0]));
+        }));
+        V8GLFUNC("deleteBuffer")
+            GLuint buffer = IntegerFI(info[0]);
+            glDeleteBuffers(1, &buffer);
+        }));
+        V8GLFUNC("deleteFramebuffer")
+            GLuint framebuffer = IntegerFI(info[0]);
+            glDeleteFramebuffers(1, &framebuffer);
+        }));
+        V8GLFUNC("deleteRenderbuffer")
+            GLuint renderbuffer = IntegerFI(info[0]);
+            glDeleteRenderbuffers(1, &renderbuffer);
+        }));
+        V8GLFUNC("deleteTexture")
+            GLuint texture = IntegerFI(info[0]);
+            glDeleteTextures(1, &texture);
+        }));
+        V8GLFUNC("depthFunc")
+            glDepthFunc(IntegerFI(info[0]));
+        }));
+        V8GLFUNC("depthMask")
+            glDepthMask(IntegerFI(info[0]));
+        }));
+        V8GLFUNC("depthRange")
+            glDepthRange(FloatFI(info[0]), FloatFI(info[1]));
+        }));
+        V8GLFUNC("disable")
+            glDisable(IntegerFI(info[0]));
+        }));
+        V8GLFUNC("enable")
+            glEnable(IntegerFI(info[0]));
+        }));
+        V8GLFUNC("finish")
+            glFinish();
+        }));
+        V8GLFUNC("flush")
+            glFlush();
+        }));
+        V8GLFUNC("framebufferRenderbuffer")
+            glFramebufferRenderbuffer(IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]));
+        }));
+        V8GLFUNC("framebufferTexture2D")
+            glFramebufferTexture2D(IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]), IntegerFI(info[4]));
+        }));
+        V8GLFUNC("frontFace")
+            glFrontFace(IntegerFI(info[0]));
+        }));
+        V8GLFUNC("stencilFunc")
+            glStencilFunc(IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]));
+        }));
+        V8GLFUNC("stencilFuncSeparate")
+            glStencilFuncSeparate(IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]));
+        }));
+        V8GLFUNC("stencilMask")
+            glStencilMask(IntegerFI(info[0]));
+        }));
+        V8GLFUNC("stencilMaskSeparate")
+            glStencilMaskSeparate(IntegerFI(info[0]), IntegerFI(info[1]));
+        }));
+        V8GLFUNC("stencilOp")
+            glStencilOp(IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]));
+        }));
+        V8GLFUNC("stencilOpSeparate")
+            glStencilOpSeparate(IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]));
+        }));
+        V8GLFUNC("disableVertexAttribArray")
+            glDisableVertexAttribArray(IntegerFI(info[0]));
         }));
         V8GLFUNC("generateMipmap")
             glGenerateMipmap(IntegerFI(info[0]));
@@ -3072,6 +3220,25 @@ V8FUNC(createCanvas) {
         V8GLFUNC("pixelStoref")
             glPixelStoref(IntegerFI(info[0]), FloatFI(info[1]));
         }));
+#define ISWHATEVER(what) V8GLFUNC("is" #what) \
+            info.GetReturnValue().Set(glIs##what(IntegerFI(info[0]))); \
+        }))
+        ISWHATEVER(Buffer);
+        ISWHATEVER(Enabled);
+        ISWHATEVER(Framebuffer);
+        ISWHATEVER(Program);
+        ISWHATEVER(Renderbuffer);
+        ISWHATEVER(Shader);
+        ISWHATEVER(Texture);
+#undef ISWHATEVER
+
+        V8GLFUNC("hint")
+            glHint(IntegerFI(info[0]), IntegerFI(info[1]));
+        }));
+        //V8GLFUNC("getUniform") //lil complicated
+        //    glGetUniformfv(IntegerFI(info[0]), IntegerFI(info[1]), )
+        //}));
+
 
         //uhoh how tf am i gonna add all the uniformxxx functions bruh this is gonna take ->|forever (OHHHHHH IS THER SOME ONE ELSE IM NOT CUZ I WANNA KEEP YOU LCOSE I DON'T WANNA LOSE MY SPOT CAUSE I NEED TO KNOW IF YOUR HURTING HIM OR YOUR HURTING ME IF I AIN"T WIRTH YOU I DON"T WNNA BE)
         //ok wait i just saw the spec and maybe it wont take that long (https://registry.khronos.org/webgl/specs/latest/1.0/#5.14)
@@ -3143,6 +3310,9 @@ V8FUNC(createCanvas) {
                 info.GetReturnValue().Set(SwapBuffers(hdc));//wglSwapLayerBuffers(hdc, WGL_SWAP_MAIN_PLANE));
             }
         }));
+        //V8GLFUNC("drawElements")
+        //    glDrawElements(IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), );
+        //}));
         V8GLFUNC("swapBuffers")
             HDC hdc = (HDC)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("HDC")).ToLocalChecked());
             info.GetReturnValue().Set(SwapBuffers(hdc)); //ok in glfw they use this function to swapbuffers for win32 https://github.com/glfw/glfw/blob/master/src/wgl_context.c#L344

@@ -258,8 +258,14 @@ function windowProc(hwnd, msg, wp, lp) {
         time = Date.now();
         SetTimer(hwnd, 0, 8);
     }else if(msg == WM_RBUTTONDOWN) {
-        gl.viewport(0, 0, canvas.right, canvas.bottom);
-        gl.drawArrays(gl.TRIANGLE_FAN, 0, 4); //4 verts
+        //gl.viewport(0, 0, canvas.right, canvas.bottom);
+        //gl.drawArrays(gl.TRIANGLE_FAN, 0, 4); //4 verts
+        //print(gl.readPixels(0, 0, canvas.right, canvas.bottom, gl.RGBA, gl.UNSIGNED_BYTE));
+        const pixels = gl.readPixels(0, 0, canvas.right, canvas.bottom, gl.RGBA, gl.UNSIGNED_BYTE);
+        
+        const dc = GetDC(NULL);                                                             //use negative height here to flip image with StretchDIBits
+        StretchDIBits(dc, 0, 0, canvas.right, canvas.bottom, 0, 0, canvas.right, canvas.bottom, pixels, canvas.right, -canvas.bottom, 32, BI_RGB, SRCCOPY); //long ahh function
+        ReleaseDC(NULL, dc);
     }else if(msg == WM_LBUTTONDOWN || msg == WM_MOUSEMOVE) {
         if((wp & MK_LBUTTON) == MK_LBUTTON) {
             let mouse = MAKEPOINTS(lp);
