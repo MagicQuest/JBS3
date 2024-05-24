@@ -68,7 +68,7 @@ const FS = `#version 300 es
         }
 
         if(distance(vMouse.xy, uv) < .05) {
-            color = 1.0;
+            color = 1-color;
         }
 
         fragColor = vec4(color, color, 0.0, 1.0);
@@ -263,7 +263,7 @@ function windowProc(hwnd, msg, wp, lp) {
         //print(gl.readPixels(0, 0, canvas.right, canvas.bottom, gl.RGBA, gl.UNSIGNED_BYTE));
         const pixels = gl.readPixels(0, 0, canvas.right, canvas.bottom, gl.RGBA, gl.UNSIGNED_BYTE);
         
-        const dc = GetDC(NULL);                                                             //use negative height here to flip image with StretchDIBits
+        const dc = GetDC(NULL);                                                             //use negative height here to flip image with StretchDIBits (idk why the color is messed up )
         StretchDIBits(dc, 0, 0, canvas.right, canvas.bottom, 0, 0, canvas.right, canvas.bottom, pixels, canvas.right, -canvas.bottom, 32, BI_RGB, SRCCOPY); //long ahh function
         ReleaseDC(NULL, dc);
     }else if(msg == WM_LBUTTONDOWN || msg == WM_MOUSEMOVE) {

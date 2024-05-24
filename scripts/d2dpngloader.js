@@ -26,7 +26,7 @@ function init(hwnd) {
 
 function loadPng(hwnd, dc, filename) {
     const d2d = createCanvas("d2d", ID2D1DCRenderTarget, hwnd, wic); //this also works with ID2D1RenderTarget instead
-    d2d.BindDC(hwnd, dc); //oh shoot i was wondering why this wouldn't work but the dc that's passed in this function is not one from GetDC(hwnd)
+    d2d.BindDC(hwnd, dc); //oh shoot i was wondering why this (ID2D1DCRenderTarget) wouldn't work but the dc that's passed in this function is not one from GetDC(hwnd) (createCanvas internally calls BindDC on window's dc)
     print(filename);
     const png = d2d.CreateBitmapFromFilename(filename);
     const size = png.GetPixelSize();

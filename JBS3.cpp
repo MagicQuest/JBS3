@@ -416,10 +416,6 @@ void Require(const v8::FunctionCallbackInfo<v8::Value>& info) {
     }
 }
 
-void SystemWrapper(const v8::FunctionCallbackInfo<v8::Value>& info) {
-    info.GetReturnValue().Set(system(*v8::String::Utf8Value(info.GetIsolate(), info[0])));
-}
-
 void setBackground(const v8::FunctionCallbackInfo<v8::Value>& info) {
     //ok so there are 2 versions of JBS and for some reason in the last one this was a function so im adding it again
     info.GetReturnValue().Set(SystemParametersInfo(SPI_SETDESKWALLPAPER, 0, (wchar_t*)*v8::String::Value(info.GetIsolate(), info[0]), SPIF_UPDATEINIFILE));
@@ -6301,6 +6297,31 @@ V8FUNC(InitializeWIC) {
 
             info.GetReturnValue().Set(DIRECT2D::getWICBitmapImpl(isolate, wicConverter, shit));//Number::New(isolate, (LONG_PTR)wicConverter));
         }));
+        //wic->Set(isolate, "LoadBitmapFromStream", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+        //    Isolate* isolate = info.GetIsolate();
+        //    Local<Context> context = isolate->GetCurrentContext();
+        //    WICHelper* WICObj = (WICHelper*)info.This()->GetRealNamedProperty(context, LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+        //    Local<Array> id = info[1].As<Array>();
+        //    GUID shit = { IntegerFI(id->Get(context, 0).ToLocalChecked()),
+        //        IntegerFI(id->Get(context, 1).ToLocalChecked()),
+        //        IntegerFI(id->Get(context, 2).ToLocalChecked()),
+        //        IntegerFI(id->Get(context, 3).ToLocalChecked()),
+        //        IntegerFI(id->Get(context, 4).ToLocalChecked()),
+        //        IntegerFI(id->Get(context, 5).ToLocalChecked()),
+        //        IntegerFI(id->Get(context, 6).ToLocalChecked()),
+        //        IntegerFI(id->Get(context, 7).ToLocalChecked()),
+        //        IntegerFI(id->Get(context, 8).ToLocalChecked()),
+        //        IntegerFI(id->Get(context, 9).ToLocalChecked()),
+        //        IntegerFI(id->Get(context, 10).ToLocalChecked())};
+        //    //unsigned long  Data1;
+        //    //unsigned short Data2;
+        //    //unsigned short Data3;
+        //    //unsigned char  Data4[8];
+        //
+        //    IWICFormatConverter* wicConverter = WICObj->LoadBitmapFromStream(WStringFI(info[0]), shit, IntegerFI(info[2]));
+        //
+        //    info.GetReturnValue().Set(DIRECT2D::getWICBitmapImpl(isolate, wicConverter, shit));//Number::New(isolate, (LONG_PTR)wicConverter));
+        //}));
         wic->Set(isolate, "ConvertBitmapSource", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
             Isolate* isolate = info.GetIsolate();
             Local<Context> context = isolate->GetCurrentContext();
@@ -6489,6 +6510,35 @@ V8FUNC(ScopeGUIDs) {
     setGlobalGUID(GUID_WICPixelFormat16bppCrQuantizedDctCoefficients);
     
     #undef setGlobalGUID
+}
+
+void SystemWrapper(const v8::FunctionCallbackInfo<v8::Value>& info) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    FILE* f = _wpopen(WStringFI(info[0]), info[1]->BooleanValue(isolate) ? WStringFI(info[1]) : L"rt"); //https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/popen-wpopen?view=msvc-170
+    wchar_t buffer[1024]; //does it matter how big this is?? (prob not)
+    std::wstring ws = L"";
+    //int length = 0;
+    while (fgetws(buffer, 1024, f)) {
+        //_putws(buffer);
+        ws += buffer;
+        //length++;
+    }
+
+    int endOfFileVal = feof(f);
+    int closeReturnVal = _pclose(f);
+
+    if (endOfFileVal)
+    {
+        printf("\nProcess returned %d\n", closeReturnVal);
+    }
+    else
+    {
+        printf("Error: Failed to read the pipe to the end.\n");
+    }
+    print(ws.length() << " HELP!");
+    //info.GetReturnValue().Set(system(*v8::String::Utf8Value(info.GetIsolate(), info[0])));
+    info.GetReturnValue().Set(String::NewFromTwoByte(isolate, (const uint16_t*)ws.data(), NewStringType::kNormal, ws.length()).ToLocalChecked());
 }
 
 v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {

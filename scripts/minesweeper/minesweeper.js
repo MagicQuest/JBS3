@@ -120,7 +120,7 @@ for(let i = 0; i < res; i++) {
 const gdiFonts = [];
 
 function init(hwnd) {
-    wic = InitializeWIC();
+    wic = InitializeWIC(); ScopeGUIDs(wic);
                     //for some reason using ID2D1DCRenderTarget started glitching out (it wouldn't show minesweeper it would just copy a frame of the desktop? (windows 11))
     d2d = createCanvas("d2d", ID2D1RenderTarget, hwnd, wic); //with ID2D1DCRenderTarget you are allowed to draw to the desktop by setting hwnd to null!
     //d2d.BindDC(hwnd, dc = GetDC(hwnd)); ReleaseDC(hwnd, dc);                
@@ -213,6 +213,22 @@ function windowProc(hwnd, msg, wp, lp) {
                 }
                 backgroundImg = d2d.CreateBitmapFromFilename(img);
             }
+        }else if(wp == "V".charCodeAt(0) && GetKey(VK_CONTROL)) {
+            //i had to upgrade the system function for this one
+            const clipboard = system("powershell -command \"Get-Clipboard\"", "rt"); //rt for read text (rt is implied)
+            print(`curl "${clipboard.replaceAll("\n", "")}" -o "${__dirname}/gyatt"`);
+                                    //idk how but there must have been a newline right at the end causing this to not work
+            /*const image = */system(`curl "${clipboard.replaceAll("\n", "")}" -o "${__dirname}/gyatt"`, "rt"); //rb for read binary (--output - for curl to output to console anyways)
+            //print(clipboard, "CLIPBOARD");
+            //print(image, "IMAGE");
+            //aw shit no way i need to add LoadBitmapFromFilestream im MAD (DAMN it does NOT work the way i thought it did (i have to save the file with curl :( )))
+            //const wicBitmap = wic.LoadBitmapFromStream(image, wic.GUID_WICPixelFormat32bppPBGRA, 0);
+            const wicBitmap = wic.LoadBitmapFromFilename(__dirname+"/gyatt", wic.GUID_WICPixelFormat32bppPBGRA, 0);
+            if(backgroundImg) {
+                backgroundImg.Release();
+            }
+            backgroundImg = d2d.CreateBitmapFromWicBitmap(wicBitmap, true);
+            //wicBitmap.Release();
         }
     }else if(msg == WM_DESTROY) {
         PostQuitMessage(0);
