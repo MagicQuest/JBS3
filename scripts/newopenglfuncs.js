@@ -286,7 +286,8 @@ function windowProc(hwnd, msg, wp, lp) {
         //print((Date.now()-t)/1000, "draw");
         //t = Date.now();
         //gl.readBuffer(!buffer ? gl.FRONT : gl.BACK);
-        gl.copyTexImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 0, 0, texture.width, texture.height, NULL);//canvas.right, canvas.bottom, NULL);
+        //gl.copyTexImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 0, 0, texture.width, texture.height, NULL);//canvas.right, canvas.bottom, NULL);
+        gl.copyTexSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 0, 0, texture.width, texture.height);
         //print((Date.now()-t)/1000, "copy");
         //t = Date.now();
         /*print(*/gl.swapBuffers();//==1); //unfortunately for some reason you need to swapBuffers after

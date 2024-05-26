@@ -4392,7 +4392,7 @@ V8FUNC(CreateBitmapWrapper) {
     Isolate* isolate = info.GetIsolate();
 
     DWORD* data = nullptr;//new DWORD[jsBits->Length()];
-    if (!info[3]->IsNullOrUndefined()) {
+    if (info[3]->BooleanValue(isolate)) {
         Local<Uint32Array> jsBits = info[3].As<Uint32Array>();
         data = new DWORD[jsBits->Length()]; //genius code stolen from my StretchDIBits func
         jsBits->CopyContents(data, jsBits->ByteLength()); //hell yeah (i was using jsBits->Length() instead of ByteLength)

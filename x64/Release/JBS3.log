@@ -3595,7 +3595,6 @@ E:\Users\megal\source\repos\JBS3\JBS3.cpp(7699,1): warning C4102: 'https': unref
 E:\Users\megal\source\repos\JBS3\JBS3.cpp(7963,64): warning C4244: 'argument': conversion from 'LONG_PTR' to 'double', possible loss of data
 E:\Users\megal\source\repos\JBS3\JBS3.cpp(7963,120): warning C4244: 'argument': conversion from 'WPARAM' to 'double', possible loss of data
 E:\Users\megal\source\repos\JBS3\JBS3.cpp(7963,146): warning C4244: 'argument': conversion from 'LPARAM' to 'double', possible loss of data
-  WICHelper.cpp
      Creating library E:\Users\megal\source\repos\JBS3\x64\Release\JBS3.lib and object E:\Users\megal\source\repos\JBS3\x64\Release\JBS3.exp
   Generating code
   Previous IPDB and IOBJ mismatch, fall back to full compilation.
