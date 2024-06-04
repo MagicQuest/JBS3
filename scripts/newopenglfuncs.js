@@ -148,7 +148,7 @@ function windowProc(hwnd, msg, wp, lp) {
         gl.clear(gl.COLOR_BUFFER_BIT);
         print(gl.VERTEX_SHADER, "VERTEX_SHADER");
         print(gl.FRAGMENT_SHADER, "FRAGMENT_SHADER");
-        const vertexShader = gl.createShader(gl.VERTEX_SHADER); //im using a hello world example from https://github.com/sessamekesh/IndigoCS-webgl-tutorials/blob/master/01%20-%20Simple%20Triangle/app.js
+        const vertexShader = gl.createShader(gl.VERTEX_SHADER);
         const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
 
         gl.shaderSource(vertexShader, VS);

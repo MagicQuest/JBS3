@@ -42,6 +42,9 @@
     <ClCompile Include="GL\glew.c">
       <Filter>Source Files\GL</Filter>
     </ClCompile>
+    <ClCompile Include="hidapi\hid.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="bababooey.rc">
@@ -84,6 +87,15 @@
     </ClInclude>
     <ClInclude Include="GL\eglew.h">
       <Filter>Header Files\GL</Filter>
+    </ClInclude>
+    <ClInclude Include="hidapi\hidapi.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="hidapi\hidapi_winapi.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="hidapi\hidapi_cfgmgr32.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

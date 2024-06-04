@@ -58,38 +58,37 @@ IWICFormatConverter* WICHelper::LoadBitmapFromFilename(const wchar_t* filenamews
     return this->LoadBitmapFromFrame(wicDecoder, wicFrame, format, true);
 }
 
-//shit CreateDecoderFromStream doesn't work the way i thought it would :(
-//IWICFormatConverter* WICHelper::LoadBitmapFromStream(const wchar_t* stream, GUID format, int frame = 0) {
-//    IWICBitmapDecoder* wicDecoder = NULL;
-//
-//    std::wistringstream stringstream(stream);
-//
-//    //HRESULT shit = this->wicFactory->CreateDecoderFromStream((IStream*) & stringstream, NULL, WICDecodeMetadataCacheOnLoad, &wicDecoder); //oh nah it don't work like that (https://learn.microsoft.com/en-us/windows/win32/wic/-wic-decoder-howto-createusingstream)
-//    IWICStream *pIWICStream = NULL;
-//    HRESULT shit = this->wicFactory->CreateStream(&pIWICStream);
-//    if (shit != S_OK) {
-//        ERRORMB(shit, "CreateStream (LoadBitmapFromStream)");
-//        return nullptr;
-//    }
-//    
-//    pIWICStream->InitializeFromIStream((IStream*) & stringstream);
-//    shit = this->wicFactory->CreateDecoderFromStream(pIWICStream, NULL, WICDecodeMetadataCacheOnLoad, &wicDecoder); //oh nah it don't work like that (https://learn.microsoft.com/en-us/windows/win32/wic/-wic-decoder-howto-createusingstream)
-//
-//    if (shit != S_OK) {
-//        ERRORMB(shit, "yeah we failed that hoe (CreateDecoderFromStream)");
-//        //MessageBoxA(NULL, "NewWICBitmap likely failed because the file was not found", "yeah we failed that hoe (CreateDecoderFromFilename)", MB_OK | MB_ICONERROR);
-//        return nullptr;
-//    }
-//
-//    IWICBitmapFrameDecode* wicFrame = NULL;
-//    shit = wicDecoder->GetFrame(frame, &wicFrame);
-//
-//    if (shit != S_OK) {
-//        //MessageBoxA(NULL, "GetFirstFrameWiC", "yeah we failed the hoe (wicDecoder->GetFrame(0, &wicFrame))", MB_OK | MB_ICONERROR);
-//        ERRORMB(shit, "yeah we failed the hoe (wicDecoder->GetFrame(frame, &wicFrame))");
-//        wicDecoder->Release();
-//        return nullptr;
-//    }
-//
-//    return this->LoadBitmapFromFrame(wicDecoder, wicFrame, format, true);
-//}
+//shit CreateDecoderFromStream doesn't work the way i thought it would :( (WAIT NOW HOLD ON CHATGPT MIGHT HAVE JUST PUT ME ON)
+IWICFormatConverter* WICHelper::LoadBitmapFromBinaryData(std::vector<BYTE>& stream, GUID format, GUID container, int frame = 0) {
+    IWICBitmapDecoder* wicDecoder = NULL;
+
+    //HRESULT shit = this->wicFactory->CreateDecoderFromStream((IStream*) & stringstream, NULL, WICDecodeMetadataCacheOnLoad, &wicDecoder); //oh nah it don't work like that (https://learn.microsoft.com/en-us/windows/win32/wic/-wic-decoder-howto-createusingstream)
+    IWICStream *pIWICStream = NULL;
+    HRESULT shit = this->wicFactory->CreateStream(&pIWICStream);
+    if (shit != S_OK) {
+        ERRORMB(shit, "CreateStream (LoadBitmapFromBinaryData)");
+        return nullptr;
+    }
+    
+    pIWICStream->InitializeFromMemory(stream.data(), stream.size()); //BYTE*
+    //pIWICStream->InitializeFromIStream((IStream*) & stringstream);
+    shit = this->wicFactory->CreateDecoderFromStream(pIWICStream, &container, WICDecodeMetadataCacheOnLoad, &wicDecoder); //oh nah it don't work like that (https://learn.microsoft.com/en-us/windows/win32/wic/-wic-decoder-howto-createusingstream)
+
+    if (shit != S_OK) {
+        ERRORMB(shit, "yeah we failed that hoe (CreateDecoderFromStream)");
+        //MessageBoxA(NULL, "NewWICBitmap likely failed because the file was not found", "yeah we failed that hoe (CreateDecoderFromFilename)", MB_OK | MB_ICONERROR);
+        return nullptr;
+    }
+
+    IWICBitmapFrameDecode* wicFrame = NULL;
+    shit = wicDecoder->GetFrame(frame, &wicFrame);
+
+    if (shit != S_OK) {
+        //MessageBoxA(NULL, "GetFirstFrameWiC", "yeah we failed the hoe (wicDecoder->GetFrame(0, &wicFrame))", MB_OK | MB_ICONERROR);
+        ERRORMB(shit, "yeah we failed the hoe (wicDecoder->GetFrame(frame, &wicFrame))");
+        wicDecoder->Release();
+        return nullptr;
+    }
+
+    return this->LoadBitmapFromFrame(wicDecoder, wicFrame, format, true);
+}

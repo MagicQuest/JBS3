@@ -3302,7 +3302,7 @@ V8FUNC(createCanvas) {
             glDrawArrays(IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]));
             HDC hdc = (HDC)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("HDC")).ToLocalChecked());
             if (!info[3]->BooleanValue(isolate)) {
-                print("SWAP");
+                //print("SWAP"); //oops i was fr printing swap every time
                 info.GetReturnValue().Set(SwapBuffers(hdc));//wglSwapLayerBuffers(hdc, WGL_SWAP_MAIN_PLANE));
             }
         }));
@@ -3450,8 +3450,68 @@ V8FUNC(GetWindowTextWrapper) {
 V8FUNC(SetWindowTextWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
-    
+
     info.GetReturnValue().Set(SetWindowText((HWND)IntegerFI(info[0]), WStringFI(info[1])));
+}
+
+V8FUNC(GetScrollRangeWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    Local<Context> context = isolate->GetCurrentContext();
+
+    int min = 0;
+    int max = 0;
+
+    GetScrollRange((HWND)IntegerFI(info[0]), IntegerFI(info[1]), &min, &max);
+    
+    Local<Object> minmax = Object::New(isolate);
+    minmax->Set(context, LITERAL("min"), Number::New(isolate, min));
+    minmax->Set(context, LITERAL("max"), Number::New(isolate, max));
+
+    info.GetReturnValue().Set(minmax);
+}
+
+V8FUNC(GetScrollInfoWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    Local<Context> context = isolate->GetCurrentContext();
+
+    SCROLLINFO scrollinfo{ 0 };
+    scrollinfo.cbSize = sizeof(SCROLLINFO);
+
+    if (!GetScrollInfo((HWND)IntegerFI(info[0]), IntegerFI(info[1]), &scrollinfo)) {
+        //print("failed to get scroll info");
+    }
+
+    Local<Object> jsScrollInfo = Object::New(isolate);
+
+    jsScrollInfo->Set(context, LITERAL("fMask"), Number::New(isolate, scrollinfo.fMask));
+    jsScrollInfo->Set(context, LITERAL("nMin"), Number::New(isolate, scrollinfo.nMin));
+    jsScrollInfo->Set(context, LITERAL("nMax"), Number::New(isolate, scrollinfo.nMax));
+    jsScrollInfo->Set(context, LITERAL("nPage"), Number::New(isolate, scrollinfo.nPage));
+    jsScrollInfo->Set(context, LITERAL("nPos"), Number::New(isolate, scrollinfo.nPos));
+    jsScrollInfo->Set(context, LITERAL("nTrackPos"), Number::New(isolate, scrollinfo.nTrackPos));
+
+    info.GetReturnValue().Set(jsScrollInfo);
+}
+
+V8FUNC(SetScrollInfoWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    Local<Context> context = isolate->GetCurrentContext();
+
+    SCROLLINFO scrollinfo{ 0 };
+    scrollinfo.cbSize = sizeof(SCROLLINFO);
+
+    Local<Object> jsScrollInfo = info[2].As<Object>();
+    scrollinfo.fMask = IntegerFI(jsScrollInfo->Get(context, LITERAL("fMask")).ToLocalChecked());
+    scrollinfo.nMin = IntegerFI(jsScrollInfo->Get(context, LITERAL("nMin")).ToLocalChecked());
+    scrollinfo.nMax = IntegerFI(jsScrollInfo->Get(context, LITERAL("nMax")).ToLocalChecked());
+    scrollinfo.nPage = IntegerFI(jsScrollInfo->Get(context, LITERAL("nPage")).ToLocalChecked());
+    scrollinfo.nPos = IntegerFI(jsScrollInfo->Get(context, LITERAL("nPos")).ToLocalChecked());
+    scrollinfo.nTrackPos = IntegerFI(jsScrollInfo->Get(context, LITERAL("nTrackPos")).ToLocalChecked());
+
+    info.GetReturnValue().Set(SetScrollInfo((HWND)IntegerFI(info[0]), IntegerFI(info[1]), &scrollinfo, IntegerFI(info[3])));
 }
 
 V8FUNC(TransparentBltWrapper) {
@@ -3611,7 +3671,7 @@ V8FUNC(keybd_eventWrapper) {
     if (info[0]->IsString()) {
         key = toupper((CStringFI(info[0]))[0]);
     }
-
+    
     keybd_event(key, NULL, IntegerFI(info[1]), NULL);
 }
 
@@ -4278,7 +4338,27 @@ V8FUNC(SendMessageWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
 
-    info.GetReturnValue().Set(Number::New(isolate, SendMessage((HWND)IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]))));
+    LPARAM shit = 0;
+
+    if (info[3]->IsString()) {
+        shit = LPARAM(WStringFI(info[3])); //haha i forgot you could cast like this (and it looks really weird)
+    }
+    else {
+        shit = IntegerFI(info[3]);
+    }
+
+    info.GetReturnValue().Set(Number::New(isolate, SendMessage((HWND)IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), shit)));
+}
+
+V8FUNC(SendMessageStr) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    wchar_t type[255]{0};
+    
+    SendMessage((HWND)IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), (LPARAM)type);
+
+    info.GetReturnValue().Set(String::NewFromTwoByte(isolate, (const uint16_t*)type).ToLocalChecked());
 }
 
 V8FUNC(ClientToScreenWrapper) {
@@ -6297,31 +6377,50 @@ V8FUNC(InitializeWIC) {
 
             info.GetReturnValue().Set(DIRECT2D::getWICBitmapImpl(isolate, wicConverter, shit));//Number::New(isolate, (LONG_PTR)wicConverter));
         }));
-        //wic->Set(isolate, "LoadBitmapFromStream", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-        //    Isolate* isolate = info.GetIsolate();
-        //    Local<Context> context = isolate->GetCurrentContext();
-        //    WICHelper* WICObj = (WICHelper*)info.This()->GetRealNamedProperty(context, LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-        //    Local<Array> id = info[1].As<Array>();
-        //    GUID shit = { IntegerFI(id->Get(context, 0).ToLocalChecked()),
-        //        IntegerFI(id->Get(context, 1).ToLocalChecked()),
-        //        IntegerFI(id->Get(context, 2).ToLocalChecked()),
-        //        IntegerFI(id->Get(context, 3).ToLocalChecked()),
-        //        IntegerFI(id->Get(context, 4).ToLocalChecked()),
-        //        IntegerFI(id->Get(context, 5).ToLocalChecked()),
-        //        IntegerFI(id->Get(context, 6).ToLocalChecked()),
-        //        IntegerFI(id->Get(context, 7).ToLocalChecked()),
-        //        IntegerFI(id->Get(context, 8).ToLocalChecked()),
-        //        IntegerFI(id->Get(context, 9).ToLocalChecked()),
-        //        IntegerFI(id->Get(context, 10).ToLocalChecked())};
-        //    //unsigned long  Data1;
-        //    //unsigned short Data2;
-        //    //unsigned short Data3;
-        //    //unsigned char  Data4[8];
-        //
-        //    IWICFormatConverter* wicConverter = WICObj->LoadBitmapFromStream(WStringFI(info[0]), shit, IntegerFI(info[2]));
-        //
-        //    info.GetReturnValue().Set(DIRECT2D::getWICBitmapImpl(isolate, wicConverter, shit));//Number::New(isolate, (LONG_PTR)wicConverter));
-        //}));
+        wic->Set(isolate, "LoadBitmapFromBinaryData", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            Local<Context> context = isolate->GetCurrentContext();
+            WICHelper* WICObj = (WICHelper*)info.This()->GetRealNamedProperty(context, LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            Local<Array> id = info[1].As<Array>();
+            GUID shit = { IntegerFI(id->Get(context, 0).ToLocalChecked()),
+                IntegerFI(id->Get(context, 1).ToLocalChecked()),
+                IntegerFI(id->Get(context, 2).ToLocalChecked()),
+                IntegerFI(id->Get(context, 3).ToLocalChecked()),
+                IntegerFI(id->Get(context, 4).ToLocalChecked()),
+                IntegerFI(id->Get(context, 5).ToLocalChecked()),
+                IntegerFI(id->Get(context, 6).ToLocalChecked()),
+                IntegerFI(id->Get(context, 7).ToLocalChecked()),
+                IntegerFI(id->Get(context, 8).ToLocalChecked()),
+                IntegerFI(id->Get(context, 9).ToLocalChecked()),
+                IntegerFI(id->Get(context, 10).ToLocalChecked())};
+
+            Local<Array> id2 = info[3].As<Array>();
+            GUID shit2 = { IntegerFI(id2->Get(context, 0).ToLocalChecked()),
+                IntegerFI(id2->Get(context, 1).ToLocalChecked()),
+                IntegerFI(id2->Get(context, 2).ToLocalChecked()),
+                IntegerFI(id2->Get(context, 3).ToLocalChecked()),
+                IntegerFI(id2->Get(context, 4).ToLocalChecked()),
+                IntegerFI(id2->Get(context, 5).ToLocalChecked()),
+                IntegerFI(id2->Get(context, 6).ToLocalChecked()),
+                IntegerFI(id2->Get(context, 7).ToLocalChecked()),
+                IntegerFI(id2->Get(context, 8).ToLocalChecked()),
+                IntegerFI(id2->Get(context, 9).ToLocalChecked()),
+                IntegerFI(id2->Get(context, 10).ToLocalChecked()) };
+
+            //unsigned long  Data1;
+            //unsigned short Data2;
+            //unsigned short Data3;
+            //unsigned char  Data4[8];
+
+            std::vector<BYTE> shits;
+            Local<ArrayBuffer> binary = info[0].As<ArrayBuffer>();
+            for (int i = 0; i < (binary->ByteLength()) / sizeof(unsigned char); i++) {
+                shits.push_back((BYTE)IntegerFI(binary->Get(context, i).ToLocalChecked()));
+            }
+            IWICFormatConverter* wicConverter = WICObj->LoadBitmapFromBinaryData(shits, shit, shit2, IntegerFI(info[2])); //good god the names of my variables
+        
+            info.GetReturnValue().Set(DIRECT2D::getWICBitmapImpl(isolate, wicConverter, shit));//Number::New(isolate, (LONG_PTR)wicConverter));
+        }));
         wic->Set(isolate, "ConvertBitmapSource", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
             Isolate* isolate = info.GetIsolate();
             Local<Context> context = isolate->GetCurrentContext();
@@ -6508,7 +6607,13 @@ V8FUNC(ScopeGUIDs) {
     setGlobalGUID(GUID_WICPixelFormat16bppYQuantizedDctCoefficients);
     setGlobalGUID(GUID_WICPixelFormat16bppCbQuantizedDctCoefficients);
     setGlobalGUID(GUID_WICPixelFormat16bppCrQuantizedDctCoefficients);
-    
+    setGlobalGUID(GUID_ContainerFormatBmp);
+    setGlobalGUID(GUID_ContainerFormatPng);
+    setGlobalGUID(GUID_ContainerFormatIco);
+    setGlobalGUID(GUID_ContainerFormatJpeg);
+    setGlobalGUID(GUID_ContainerFormatTiff);
+    setGlobalGUID(GUID_ContainerFormatGif);
+    setGlobalGUID(GUID_ContainerFormatWmp);
     #undef setGlobalGUID
 }
 
@@ -6538,7 +6643,401 @@ void SystemWrapper(const v8::FunctionCallbackInfo<v8::Value>& info) {
     }
     print(ws.length() << " HELP!");
     //info.GetReturnValue().Set(system(*v8::String::Utf8Value(info.GetIsolate(), info[0])));
+    if (wcscmp(WStringFI(info[1]), L"rb") == 0) {
+        Local<ArrayBuffer> jsArrayBuffer = ArrayBuffer::New(isolate, ws.size());
+
+        //Local<Array> jsArray = Array::New(isolate, shit.size());
+        for (int i = 0; i < ws.size(); i++) {
+            jsArrayBuffer->Set(isolate->GetCurrentContext(), i, Number::New(isolate, ws[i])); //shoot there's a faster way to do this (and i've done it in GetDIBits and shit like that but it's weird so idgaf)
+        }
+
+        info.GetReturnValue().Set(jsArrayBuffer);
+
+        return;
+    }
     info.GetReturnValue().Set(String::NewFromTwoByte(isolate, (const uint16_t*)ws.data(), NewStringType::kNormal, ws.length()).ToLocalChecked());
+}
+
+
+#include <xinput.h>
+#pragma comment(lib, "Xinput.lib")
+void GetControllers(const v8::FunctionCallbackInfo<v8::Value>& info) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    HandleScope handle_scope(isolate);
+
+    std::vector<Local<Value>> controllers;
+    for (DWORD i = 0; i < XUSER_MAX_COUNT; i++)
+    {
+        XINPUT_STATE state{0};
+        //ZeroMemory(&state, sizeof(XINPUT_STATE));
+
+        // Simply get the state of the controller from XInput.
+        DWORD dwResult = XInputGetState(i, &state);
+
+        if (dwResult == ERROR_SUCCESS)
+        {
+            controllers.push_back(Number::New(isolate,i));
+        }
+    }
+
+    Local<Array> jsArr = Array::New(isolate, &controllers[0], controllers.size()); //there are so many great ways to get the address of the first element
+
+    info.GetReturnValue().Set(jsArr);
+
+    controllers.clear();
+}
+
+void XInputGetStateWrapper(const v8::FunctionCallbackInfo<v8::Value>& info) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    Local<Context> context = isolate->GetCurrentContext();
+    HandleScope handle_scope(isolate);
+
+    XINPUT_STATE state{0};
+    //ZeroMemory(&state, sizeof(XINPUT_STATE));
+
+    // Simply get the state of the controller from XInput.
+    DWORD dwResult = XInputGetState(IntegerFI(info[0]), &state);
+    if (dwResult != ERROR_SUCCESS) {
+        std::string str = "XInputGetState failed with code: " + std::to_string(dwResult);
+        Local<Value> shit = Exception::Error(String::NewFromUtf8(isolate, str.c_str()).ToLocalChecked());
+        info.GetReturnValue().Set(shit);
+        return;
+    }
+
+    Local<Object> jsState = Object::New(isolate);
+    jsState->Set(context, LITERAL("dwPacketNumber"), Number::New(isolate, state.dwPacketNumber));
+    Local<Object> jsGamepad = Object::New(isolate);
+    jsGamepad->Set(context, LITERAL("wButtons"), Number::New(isolate, state.Gamepad.wButtons));
+    jsGamepad->Set(context, LITERAL("bLeftTrigger"), Number::New(isolate, state.Gamepad.bLeftTrigger));
+    jsGamepad->Set(context, LITERAL("bRightTrigger"), Number::New(isolate, state.Gamepad.bRightTrigger));
+    jsGamepad->Set(context, LITERAL("sThumbLX"), Number::New(isolate, state.Gamepad.sThumbLX));
+    jsGamepad->Set(context, LITERAL("sThumbLY"), Number::New(isolate, state.Gamepad.sThumbLY));
+    jsGamepad->Set(context, LITERAL("sThumbRX"), Number::New(isolate, state.Gamepad.sThumbRX));
+    jsGamepad->Set(context, LITERAL("sThumbRY"), Number::New(isolate, state.Gamepad.sThumbRY));
+    jsState->Set(context, LITERAL("Gamepad"), jsGamepad);
+
+    info.GetReturnValue().Set(jsState);
+}
+
+void XInputSetStateWrapper(const v8::FunctionCallbackInfo<v8::Value>& info) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    Local<Context> context = isolate->GetCurrentContext();
+    HandleScope handle_scope(isolate);
+
+    XINPUT_VIBRATION vib{IntegerFI(info[1]), IntegerFI(info[2])}; //oh yeah i forgor i could do that
+
+    DWORD dwResult = XInputSetState(IntegerFI(info[0]), &vib);
+
+    info.GetReturnValue().Set(Number::New(isolate, dwResult));
+}
+
+#include "hidapi/hidapi.h"
+//#pragma comment(lib, "hidapi/hidapi.lib")
+#pragma comment(lib, "Setupapi.lib")
+
+#define HID_BUFFER_SIZE 512
+void hid_initWrapper(const v8::FunctionCallbackInfo<v8::Value>& info) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(hid_init());
+}
+
+void hid_enumerateWrapper(const v8::FunctionCallbackInfo<v8::Value>& info) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    Local<Context> context = isolate->GetCurrentContext();
+    Local<Function> func = info[2].As<Function>();
+    hid_device_info *devs, *cur_dev; //most shit stolen from hidtest.cpp (https://github.com/signal11/hidapi/blob/master/hidtest/hidtest.cpp)
+
+    devs = hid_enumerate(IntegerFI(info[0]), IntegerFI(info[1]));
+    cur_dev = devs;
+
+    while (cur_dev) {
+        v8::TryCatch shit(isolate);
+
+        Local<Object> device = Object::New(isolate);
+        //regex and the javascript replace shits are actually crayzie /.(\w+);/g   and   device->Set(context, LITERAL("$1"), String::NewFromTwoByte(isolate, (const uint16_t*)cur_dev->$1).ToLocalChecked());\n
+        device->Set(context, LITERAL("path"), String::NewFromUtf8(isolate, cur_dev->path ? cur_dev->path : "(null)").ToLocalChecked());
+        device->Set(context, LITERAL("vendor_id"), Number::New(isolate, cur_dev->vendor_id));
+        device->Set(context, LITERAL("product_id"), Number::New(isolate, cur_dev->product_id));
+        //if (cur_dev->serial_number) {
+        //    std::wcout.clear();
+        //    wprint(cur_dev->serial_number);
+        //    wprint(L"OK!");
+        //    print(wcslen(cur_dev->serial_number));
+        //    print((LONG_PTR)cur_dev->serial_number); //wtf i just saw something that said don't mix wcout and cout???
+        //}
+        //wprint((cur_dev->serial_number ? cur_dev->serial_number : L"NULL? (NIGGA HELP)"));
+                                                                                        //ok something weird is happening here and it doesn't happen with hidtest
+        device->Set(context, LITERAL("serial_number"), String::NewFromTwoByte(isolate, (const uint16_t*)(cur_dev->serial_number ? cur_dev->serial_number : L"(null)")).ToLocalChecked()); //sometimes NULL?
+        device->Set(context, LITERAL("release_number"), Number::New(isolate, cur_dev->release_number));
+        device->Set(context, LITERAL("manufacturer_string"), String::NewFromTwoByte(isolate, (const uint16_t*)(cur_dev->manufacturer_string ? cur_dev->manufacturer_string : L"(null)")).ToLocalChecked());
+        device->Set(context, LITERAL("product_string"), String::NewFromTwoByte(isolate, (const uint16_t*)(cur_dev->product_string ? cur_dev->product_string : L"(null)")).ToLocalChecked());
+        device->Set(context, LITERAL("usage_page"), Number::New(isolate, cur_dev->usage_page));
+        device->Set(context, LITERAL("usage"), Number::New(isolate, cur_dev->usage));
+        device->Set(context, LITERAL("interface_number"), Number::New(isolate, cur_dev->interface_number));
+        device->Set(context, LITERAL("_ptr"), Number::New(isolate, (LONG_PTR)cur_dev));
+
+        Local<Value> arg[] = {device};
+        MaybeLocal<Value> returnedValue = func->Call(context, isolate->GetCurrentContext()->Global(), 1, arg);
+
+        CHECKEXCEPTIONS(shit);
+
+        cur_dev = cur_dev->next;
+    }
+
+    hid_free_enumeration(devs);
+}
+
+
+void hid_open_pathWrapper(const v8::FunctionCallbackInfo<v8::Value>& info) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    HandleScope handle_scope(isolate); //including a handle scope because storing values returned from WStringFI and CStringFI are fucky
+
+    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)hid_open_path(CStringFI(info[0]))));
+}
+
+void hid_get_handle_from_info(const v8::FunctionCallbackInfo<v8::Value>& info) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    HandleScope handle_scope(isolate); //including a handle scope because storing values returned from WStringFI and CStringFI are fucky
+
+    Local<Object> js_device_info = info[0].As<Object>();
+    hid_device_info *device_info = (hid_device_info*)IntegerFI(js_device_info->Get(isolate->GetCurrentContext(), LITERAL("_ptr")).ToLocalChecked()); //im doing this because i don't trust what i put into the js object's path because v8 and hidapi
+
+    hid_device* device = hid_open_path(device_info->path);
+    
+    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)device));
+}
+
+void hid_openWrapper(const v8::FunctionCallbackInfo<v8::Value>& info) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    HandleScope handle_scope(isolate); //including a handle scope because storing values returned from WStringFI and CStringFI are fucky
+
+    wchar_t* wstr = NULL;
+    if (info[2]->BooleanValue(isolate)) {
+        wstr = (wchar_t*)WStringFI(info[2]);
+    }
+
+    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)hid_open(IntegerFI(info[0]), IntegerFI(info[1]), wstr)));
+}
+
+void hid_get_manufacturer_stringWrapper(const v8::FunctionCallbackInfo<v8::Value>& info) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    wchar_t wstr[255]{ 0 };
+    int result = hid_get_manufacturer_string((hid_device*)IntegerFI(info[0]), wstr, 255);
+
+    if (result == -1) {
+        //wcscpy(wstr, L"Unable to read manufacturer string (hid_get_manufacturer_string)");
+        info.GetReturnValue().Set(result);
+        return;
+    }
+
+    info.GetReturnValue().Set(String::NewFromTwoByte(isolate, (const uint16_t*)wstr).ToLocalChecked());
+}
+
+void hid_get_product_stringWrapper(const v8::FunctionCallbackInfo<v8::Value>& info) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    wchar_t wstr[255]{ 0 };
+    int result = hid_get_product_string((hid_device*)IntegerFI(info[0]), wstr, 255);
+
+    if (result == -1) {
+        //wcscpy(wstr, L"Unable to read product string (hid_get_product_string)");
+        info.GetReturnValue().Set(result);
+        return;
+    }
+
+    info.GetReturnValue().Set(String::NewFromTwoByte(isolate, (const uint16_t*)wstr).ToLocalChecked());
+}
+
+void hid_get_serial_number_stringWrapper(const v8::FunctionCallbackInfo<v8::Value>& info) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    wchar_t wstr[255]{ 0 };
+    int result = hid_get_serial_number_string((hid_device*)IntegerFI(info[0]), wstr, 255);
+
+    if (result == -1) {
+        //wcscpy(wstr, L"Unable to read serial number string (hid_get_serial_number_string)");
+        info.GetReturnValue().Set(result);
+        return;
+    }
+
+    info.GetReturnValue().Set(String::NewFromTwoByte(isolate, (const uint16_t*)wstr).ToLocalChecked());
+}
+
+void hid_get_indexed_stringWrapper(const v8::FunctionCallbackInfo<v8::Value>& info) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    wchar_t wstr[255]{ 0 };
+    int result = hid_get_indexed_string((hid_device*)IntegerFI(info[0]), IntegerFI(info[1]), wstr, 255);
+
+    if (result == -1) {
+        //wcscpy(wstr, L"Unable to read indexed string (hid_get_indexed_string)");
+        info.GetReturnValue().Set(result);
+        return;
+    }
+
+    info.GetReturnValue().Set(String::NewFromTwoByte(isolate, (const uint16_t*)wstr).ToLocalChecked());
+}
+
+void hid_set_nonblockingWrapper(const v8::FunctionCallbackInfo<v8::Value>& info) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(hid_set_nonblocking((hid_device*)IntegerFI(info[0]), IntegerFI(info[1])));
+}
+
+void hid_readWrapper(const v8::FunctionCallbackInfo<v8::Value>& info) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    unsigned char buf[HID_BUFFER_SIZE]{ 0 };
+    int bytes_wrote = hid_read((hid_device*)IntegerFI(info[0]), buf, HID_BUFFER_SIZE);
+
+    if (bytes_wrote == -1 || bytes_wrote == 0) {
+        info.GetReturnValue().Set(bytes_wrote);
+        return;
+    }
+
+    //print(sizeof(buf) << " " << sizeof(unsigned char) * bytes_wrote << " " << bytes_wrote);
+    Local<ArrayBuffer> ab = ArrayBuffer::New(isolate, sizeof(buf));
+    memcpy(ab->Data(), buf, sizeof(buf)); //GULP
+    Local<Uint32Array> arr = Uint32Array::New(ab, 0, bytes_wrote);
+    info.GetReturnValue().Set(arr);
+}
+
+void hid_read_timeoutWrapper(const v8::FunctionCallbackInfo<v8::Value>& info) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    unsigned char buf[HID_BUFFER_SIZE]{ 0 };
+    int bytes_wrote = hid_read_timeout((hid_device*)IntegerFI(info[0]), buf, HID_BUFFER_SIZE, IntegerFI(info[1]));
+
+    if (bytes_wrote == -1 || bytes_wrote == 0) {
+        info.GetReturnValue().Set(bytes_wrote);
+        return;
+    }
+
+    //print(sizeof(buf) << " " << sizeof(unsigned char) * bytes_wrote << " " << bytes_wrote);
+    Local<ArrayBuffer> ab = ArrayBuffer::New(isolate, sizeof(buf));
+    memcpy(ab->Data(), buf, sizeof(buf)); //GULP
+    Local<Uint32Array> arr = Uint32Array::New(ab, 0, bytes_wrote);
+    info.GetReturnValue().Set(arr);
+}
+
+
+void hid_send_feature_reportWrapper(const v8::FunctionCallbackInfo<v8::Value>& info) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    unsigned char buf[HID_BUFFER_SIZE]{0};
+    size_t length = IntegerFI(info[2]); //i've been a size_t hater ever since i was using it with a for loop and didn't realize it was unsigned so when the range was -1 to 1, size_t spat out garbage and i was geeking (plus i already thought it was stupid and didn't know why i should use it)
+    Local<Uint32Array> jsArr = info[1].As<Uint32Array>();
+    memcpy(buf, jsArr->Buffer()->Data(), length-1);
+    int bytes_wrote = hid_send_feature_report((hid_device*)IntegerFI(info[0]), buf, length);
+
+    //memcpy(jsArr->Buffer()->Data(), buf, sizeof(buf));
+
+    if (bytes_wrote < 0) {
+        info.GetReturnValue().Set(bytes_wrote);
+        return;
+    }
+
+    Local<ArrayBuffer> ab = ArrayBuffer::New(isolate, sizeof(buf));
+    memcpy(ab->Data(), buf, sizeof(buf)); //GULP
+    Local<Uint32Array> arr = Uint32Array::New(ab, 0, bytes_wrote);
+    info.GetReturnValue().Set(arr);
+}
+
+void hid_get_feature_reportWrapper(const v8::FunctionCallbackInfo<v8::Value>& info) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    unsigned char buf[HID_BUFFER_SIZE]{ 0 };
+    Local<Uint32Array> jsArr = info[1].As<Uint32Array>();
+    memcpy(buf, jsArr->Buffer()->Data(), jsArr->Length());//jsArr->ByteLength());
+
+    int bytes_wrote = hid_get_feature_report((hid_device*)IntegerFI(info[0]), buf, sizeof(buf));
+
+    if (bytes_wrote < 0) {
+        info.GetReturnValue().Set(bytes_wrote);
+        return;
+    }
+
+    Local<ArrayBuffer> ab = ArrayBuffer::New(isolate, sizeof(buf));
+    memcpy(ab->Data(), buf, sizeof(buf)); //GULP
+    Local<Uint32Array> arr = Uint32Array::New(ab, 0, bytes_wrote);
+    info.GetReturnValue().Set(arr);
+}
+
+void hid_writeWrapper(const v8::FunctionCallbackInfo<v8::Value>& info) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    unsigned char buf[HID_BUFFER_SIZE]{ 0 };
+    size_t length = IntegerFI(info[2]); //i've been a size_t hater ever since i was using it with a for loop and didn't realize it was unsigned so when the range was -1 to 1, size_t spat out garbage and i was geeking (plus i already thought it was stupid and didn't know why i should use it)
+    Local<Uint32Array> jsArr = info[1].As<Uint32Array>();
+    memcpy(buf, jsArr->Buffer()->Data(), length - 1);
+    int bytes_wrote = hid_write((hid_device*)IntegerFI(info[0]), buf, length);
+
+    //memcpy(jsArr->Buffer()->Data(), buf, sizeof(buf));
+
+    if (bytes_wrote < 0) {
+        info.GetReturnValue().Set(bytes_wrote);
+        return;
+    }
+
+    Local<ArrayBuffer> ab = ArrayBuffer::New(isolate, sizeof(buf));
+    memcpy(ab->Data(), buf, sizeof(buf)); //GULP
+    Local<Uint32Array> arr = Uint32Array::New(ab, 0, bytes_wrote);
+    info.GetReturnValue().Set(arr);
+}
+
+void hid_errorWrapper(const v8::FunctionCallbackInfo<v8::Value>& info) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(String::NewFromTwoByte(isolate, (const uint16_t*)hid_error((hid_device*)IntegerFI(info[0]))).ToLocalChecked());
+}
+
+void hid_closeWrapper(const v8::FunctionCallbackInfo<v8::Value>& info) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    hid_close((hid_device*)IntegerFI(info[0]));
+}
+
+void hid_exitWrapper(const v8::FunctionCallbackInfo<v8::Value>& info) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(hid_exit());
+}
+
+void StringFromPointer(const v8::FunctionCallbackInfo<v8::Value>& info) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(String::NewFromUtf8(isolate, (const char*)IntegerFI(info[0])).ToLocalChecked());
+}
+
+void WStringFromPointer(const v8::FunctionCallbackInfo<v8::Value>& info) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(String::NewFromTwoByte(isolate, (const uint16_t*)IntegerFI(info[0])).ToLocalChecked());
 }
 
 v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
@@ -6669,6 +7168,47 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     //setGlobalGUID(GUID_WICPixelFormat32bppPBGRA);
     setGlobal(ScopeGUIDs);
     setGlobal(InitializeWIC);
+
+    setGlobal(GetControllers);
+    setGlobalWrapper(XInputGetState);
+    setGlobalConst(XINPUT_GAMEPAD_DPAD_UP);
+    setGlobalConst(XINPUT_GAMEPAD_DPAD_DOWN);
+    setGlobalConst(XINPUT_GAMEPAD_DPAD_LEFT);
+    setGlobalConst(XINPUT_GAMEPAD_DPAD_RIGHT);
+    setGlobalConst(XINPUT_GAMEPAD_START);
+    setGlobalConst(XINPUT_GAMEPAD_BACK);
+    setGlobalConst(XINPUT_GAMEPAD_LEFT_THUMB);
+    setGlobalConst(XINPUT_GAMEPAD_RIGHT_THUMB);
+    setGlobalConst(XINPUT_GAMEPAD_LEFT_SHOULDER);
+    setGlobalConst(XINPUT_GAMEPAD_RIGHT_SHOULDER);
+    setGlobalConst(XINPUT_GAMEPAD_A);
+    setGlobalConst(XINPUT_GAMEPAD_B);
+    setGlobalConst(XINPUT_GAMEPAD_X);
+    setGlobalConst(XINPUT_GAMEPAD_Y);
+    setGlobalWrapper(XInputSetState);
+
+    setGlobalWrapper(hid_init);
+    setGlobalWrapper(hid_enumerate);
+    setGlobalWrapper(hid_open);
+    setGlobalWrapper(hid_open_path);
+    setGlobal(hid_get_handle_from_info);
+    setGlobalWrapper(hid_get_manufacturer_string);
+    setGlobalWrapper(hid_get_product_string);
+    setGlobalWrapper(hid_get_serial_number_string);
+    setGlobalWrapper(hid_get_indexed_string);
+    setGlobalWrapper(hid_set_nonblocking);
+    setGlobalWrapper(hid_read);
+    setGlobalWrapper(hid_read_timeout);
+    setGlobalWrapper(hid_write);
+    setGlobalWrapper(hid_error);
+    setGlobalWrapper(hid_send_feature_report);
+    setGlobalWrapper(hid_get_feature_report);
+    setGlobalConst(HID_BUFFER_SIZE);
+    setGlobalWrapper(hid_close);
+    setGlobalWrapper(hid_exit);
+
+    setGlobal(StringFromPointer);
+    setGlobal(WStringFromPointer);
 
     setGlobalConst(WICBitmapTransformRotate0);
     setGlobalConst(WICBitmapTransformRotate90);
@@ -7015,7 +7555,207 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     setGlobalConst(MB_SYSTEMMODAL);
     setGlobalConst(MB_TASKMODAL);
 
+    setGlobalConst(SS_LEFT);
+    setGlobalConst(SS_CENTER);
+    setGlobalConst(SS_RIGHT);
+    setGlobalConst(SS_ICON);
+    setGlobalConst(SS_BLACKRECT);
+    setGlobalConst(SS_GRAYRECT);
+    setGlobalConst(SS_WHITERECT);
+    setGlobalConst(SS_BLACKFRAME);
+    setGlobalConst(SS_GRAYFRAME);
+    setGlobalConst(SS_WHITEFRAME);
+    setGlobalConst(SS_USERITEM);
+    setGlobalConst(SS_SIMPLE);
+    setGlobalConst(SS_LEFTNOWORDWRAP);
+    setGlobalConst(SS_OWNERDRAW);
+    setGlobalConst(SS_BITMAP);
+    setGlobalConst(SS_ENHMETAFILE);
+    setGlobalConst(SS_ETCHEDHORZ);
+    setGlobalConst(SS_ETCHEDVERT);
+    setGlobalConst(SS_ETCHEDFRAME);
+    setGlobalConst(SS_TYPEMASK);
+    setGlobalConst(SS_REALSIZECONTROL);
+    setGlobalConst(SS_NOPREFIX);
+    setGlobalConst(SS_NOTIFY);
+    setGlobalConst(SS_CENTERIMAGE);
+    setGlobalConst(SS_RIGHTJUST);
+    setGlobalConst(SS_REALSIZEIMAGE);
+    setGlobalConst(SS_SUNKEN);
+    setGlobalConst(SS_EDITCONTROL);
+    setGlobalConst(SS_ENDELLIPSIS);
+    setGlobalConst(SS_PATHELLIPSIS);
+    setGlobalConst(SS_WORDELLIPSIS);
+    setGlobalConst(SS_ELLIPSISMASK);
+    setGlobalConst(STM_SETICON);
+    setGlobalConst(STM_GETICON);
+    setGlobalConst(STM_SETIMAGE);
+    setGlobalConst(STM_GETIMAGE);
+    setGlobalConst(STN_CLICKED);
+    setGlobalConst(STN_DBLCLK);
+    setGlobalConst(STN_ENABLE);
+    setGlobalConst(STN_DISABLE);
+    setGlobalConst(STM_MSGMAX);
+
+    setGlobalConst(LB_OKAY);
+    setGlobalConst(LB_ERR);
+    setGlobalConst(LB_ERRSPACE);
+    setGlobalConst(LBN_ERRSPACE);
+    setGlobalConst(LBN_SELCHANGE);
+    setGlobalConst(LBN_DBLCLK);
+    setGlobalConst(LBN_SELCANCEL);
+    setGlobalConst(LBN_SETFOCUS);
+    setGlobalConst(LBN_KILLFOCUS);
+    setGlobalConst(LB_ADDSTRING);
+    setGlobalConst(LB_INSERTSTRING);
+    setGlobalConst(LB_DELETESTRING);
+    setGlobalConst(LB_SELITEMRANGEEX);
+    setGlobalConst(LB_RESETCONTENT);
+    setGlobalConst(LB_SETSEL);
+    setGlobalConst(LB_SETCURSEL);
+    setGlobalConst(LB_GETSEL);
+    setGlobalConst(LB_GETCURSEL);
+    setGlobalConst(LB_GETTEXT);
+    setGlobalConst(LB_GETTEXTLEN);
+    setGlobalConst(LB_GETCOUNT);
+    setGlobalConst(LB_SELECTSTRING);
+    setGlobalConst(LB_DIR);
+    setGlobalConst(LB_GETTOPINDEX);
+    setGlobalConst(LB_FINDSTRING);
+    setGlobalConst(LB_GETSELCOUNT);
+    setGlobalConst(LB_GETSELITEMS);
+    setGlobalConst(LB_SETTABSTOPS);
+    setGlobalConst(LB_GETHORIZONTALEXTENT);
+    setGlobalConst(LB_SETHORIZONTALEXTENT);
+    setGlobalConst(LB_SETCOLUMNWIDTH);
+    setGlobalConst(LB_ADDFILE);
+    setGlobalConst(LB_SETTOPINDEX);
+    setGlobalConst(LB_GETITEMRECT);
+    setGlobalConst(LB_GETITEMDATA);
+    setGlobalConst(LB_SETITEMDATA);
+    setGlobalConst(LB_SELITEMRANGE);
+    setGlobalConst(LB_SETANCHORINDEX);
+    setGlobalConst(LB_GETANCHORINDEX);
+    setGlobalConst(LB_SETCARETINDEX);
+    setGlobalConst(LB_GETCARETINDEX);
+    setGlobalConst(LB_SETITEMHEIGHT);
+    setGlobalConst(LB_GETITEMHEIGHT);
+    setGlobalConst(LB_FINDSTRINGEXACT);
+    setGlobalConst(LB_SETLOCALE);
+    setGlobalConst(LB_GETLOCALE);
+    setGlobalConst(LB_SETCOUNT);
+    setGlobalConst(LB_INITSTORAGE);
+    setGlobalConst(LB_ITEMFROMPOINT);
+    setGlobalConst(LB_GETLISTBOXINFO);
+    setGlobalConst(LB_MSGMAX);
+    setGlobalConst(LBS_NOTIFY);
+    setGlobalConst(LBS_SORT);
+    setGlobalConst(LBS_NOREDRAW);
+    setGlobalConst(LBS_MULTIPLESEL);
+    setGlobalConst(LBS_OWNERDRAWFIXED);
+    setGlobalConst(LBS_OWNERDRAWVARIABLE);
+    setGlobalConst(LBS_HASSTRINGS);
+    setGlobalConst(LBS_USETABSTOPS);
+    setGlobalConst(LBS_NOINTEGRALHEIGHT);
+    setGlobalConst(LBS_MULTICOLUMN);
+    setGlobalConst(LBS_WANTKEYBOARDINPUT);
+    setGlobalConst(LBS_EXTENDEDSEL);
+    setGlobalConst(LBS_DISABLENOSCROLL);
+    setGlobalConst(LBS_NODATA);
+    setGlobalConst(LBS_NOSEL);
+    setGlobalConst(LBS_COMBOBOX);
+    setGlobalConst(LBS_STANDARD);
+
     setGlobalConst(WM_NULL); setGlobalConst(WM_CREATE); setGlobalConst(WM_DESTROY); setGlobalConst(WM_MOVE); setGlobalConst(WM_SIZE); setGlobalConst(WM_ACTIVATE); setGlobalConst(WM_SETFOCUS); setGlobalConst(WM_KILLFOCUS); setGlobalConst(WM_ENABLE); setGlobalConst(WM_SETREDRAW); setGlobalConst(WM_SETTEXT); setGlobalConst(WM_GETTEXT); setGlobalConst(WM_GETTEXTLENGTH); setGlobalConst(WM_PAINT); setGlobalConst(WM_CLOSE); setGlobalConst(WM_QUERYENDSESSION); setGlobalConst(WM_QUIT); setGlobalConst(WM_QUERYOPEN); setGlobalConst(WM_ERASEBKGND); setGlobalConst(WM_SYSCOLORCHANGE); setGlobalConst(WM_ENDSESSION); setGlobalConst(WM_SHOWWINDOW); setGlobalConst(WM_WININICHANGE); setGlobalConst(WM_DEVMODECHANGE); setGlobalConst(WM_ACTIVATEAPP); setGlobalConst(WM_FONTCHANGE); setGlobalConst(WM_TIMECHANGE); setGlobalConst(WM_CANCELMODE); setGlobalConst(WM_SETCURSOR); setGlobalConst(WM_MOUSEACTIVATE); setGlobalConst(WM_CHILDACTIVATE); setGlobalConst(WM_QUEUESYNC); setGlobalConst(WM_GETMINMAXINFO); setGlobalConst(WM_PAINTICON); setGlobalConst(WM_ICONERASEBKGND); setGlobalConst(WM_NEXTDLGCTL); setGlobalConst(WM_SPOOLERSTATUS); setGlobalConst(WM_DRAWITEM); setGlobalConst(WM_MEASUREITEM); setGlobalConst(WM_DELETEITEM); setGlobalConst(WM_VKEYTOITEM); setGlobalConst(WM_CHARTOITEM); setGlobalConst(WM_SETFONT); setGlobalConst(WM_GETFONT); setGlobalConst(WM_SETHOTKEY); setGlobalConst(WM_GETHOTKEY); setGlobalConst(WM_QUERYDRAGICON); setGlobalConst(WM_COMPAREITEM); setGlobalConst(WM_GETOBJECT); setGlobalConst(WM_COMPACTING); setGlobalConst(WM_COMMNOTIFY); setGlobalConst(WM_WINDOWPOSCHANGING); setGlobalConst(WM_WINDOWPOSCHANGED); setGlobalConst(WM_POWER); setGlobalConst(WM_COPYDATA); setGlobalConst(WM_CANCELJOURNAL); setGlobalConst(WM_NOTIFY); setGlobalConst(WM_INPUTLANGCHANGEREQUEST); setGlobalConst(WM_INPUTLANGCHANGE); setGlobalConst(WM_TCARD); setGlobalConst(WM_HELP); setGlobalConst(WM_USERCHANGED); setGlobalConst(WM_NOTIFYFORMAT); setGlobalConst(WM_CONTEXTMENU); setGlobalConst(WM_STYLECHANGING); setGlobalConst(WM_STYLECHANGED); setGlobalConst(WM_DISPLAYCHANGE); setGlobalConst(WM_GETICON); setGlobalConst(WM_SETICON); setGlobalConst(WM_NCCREATE); setGlobalConst(WM_NCDESTROY); setGlobalConst(WM_NCCALCSIZE); setGlobalConst(WM_NCHITTEST); setGlobalConst(WM_NCPAINT); setGlobalConst(WM_NCACTIVATE); setGlobalConst(WM_GETDLGCODE); setGlobalConst(WM_SYNCPAINT); setGlobalConst(WM_NCMOUSEMOVE); setGlobalConst(WM_NCLBUTTONDOWN); setGlobalConst(WM_NCLBUTTONUP); setGlobalConst(WM_NCLBUTTONDBLCLK); setGlobalConst(WM_NCRBUTTONDOWN); setGlobalConst(WM_NCRBUTTONUP); setGlobalConst(WM_NCRBUTTONDBLCLK); setGlobalConst(WM_NCMBUTTONDOWN); setGlobalConst(WM_NCMBUTTONUP); setGlobalConst(WM_NCMBUTTONDBLCLK); setGlobalConst(WM_NCXBUTTONDOWN); setGlobalConst(WM_NCXBUTTONUP); setGlobalConst(WM_NCXBUTTONDBLCLK); setGlobalConst(WM_INPUT); setGlobalConst(WM_KEYDOWN); setGlobalConst(WM_KEYFIRST); setGlobalConst(WM_KEYUP); setGlobalConst(WM_CHAR); setGlobalConst(WM_DEADCHAR); setGlobalConst(WM_SYSKEYDOWN); setGlobalConst(WM_SYSKEYUP); setGlobalConst(WM_SYSCHAR); setGlobalConst(WM_SYSDEADCHAR); setGlobalConst(WM_UNICHAR / WM_KEYLAST); setGlobalConst(WM_IME_STARTCOMPOSITION); setGlobalConst(WM_IME_ENDCOMPOSITION); setGlobalConst(WM_IME_COMPOSITION); setGlobalConst(WM_IME_KEYLAST); setGlobalConst(WM_INITDIALOG); setGlobalConst(WM_COMMAND); setGlobalConst(WM_SYSCOMMAND); setGlobalConst(WM_TIMER); setGlobalConst(WM_HSCROLL); setGlobalConst(WM_VSCROLL); setGlobalConst(WM_INITMENU); setGlobalConst(WM_INITMENUPOPUP); setGlobalConst(WM_MENUSELECT); setGlobalConst(WM_MENUCHAR); setGlobalConst(WM_ENTERIDLE); setGlobalConst(WM_MENURBUTTONUP); setGlobalConst(WM_MENUDRAG); setGlobalConst(WM_MENUGETOBJECT); setGlobalConst(WM_UNINITMENUPOPUP); setGlobalConst(WM_MENUCOMMAND); setGlobalConst(WM_CHANGEUISTATE); setGlobalConst(WM_UPDATEUISTATE); setGlobalConst(WM_QUERYUISTATE); setGlobalConst(WM_CTLCOLORMSGBOX); setGlobalConst(WM_CTLCOLOREDIT); setGlobalConst(WM_CTLCOLORLISTBOX); setGlobalConst(WM_CTLCOLORBTN); setGlobalConst(WM_CTLCOLORDLG); setGlobalConst(WM_CTLCOLORSCROLLBAR); setGlobalConst(WM_CTLCOLORSTATIC); setGlobalConst(WM_MOUSEFIRST); setGlobalConst(WM_MOUSEMOVE); setGlobalConst(WM_LBUTTONDOWN); setGlobalConst(WM_LBUTTONUP); setGlobalConst(WM_LBUTTONDBLCLK); setGlobalConst(WM_RBUTTONDOWN); setGlobalConst(WM_RBUTTONUP); setGlobalConst(WM_RBUTTONDBLCLK); setGlobalConst(WM_MBUTTONDOWN); setGlobalConst(WM_MBUTTONUP); setGlobalConst(WM_MBUTTONDBLCLK); setGlobalConst(WM_MOUSELAST); setGlobalConst(WM_MOUSEWHEEL); setGlobalConst(WM_XBUTTONDOWN); setGlobalConst(WM_XBUTTONUP); setGlobalConst(WM_XBUTTONDBLCLK); setGlobalConst(WM_MOUSEHWHEEL); setGlobalConst(WM_PARENTNOTIFY); setGlobalConst(WM_ENTERMENULOOP); setGlobalConst(WM_EXITMENULOOP); setGlobalConst(WM_NEXTMENU); setGlobalConst(WM_SIZING); setGlobalConst(WM_CAPTURECHANGED); setGlobalConst(WM_MOVING); setGlobalConst(WM_POWERBROADCAST); setGlobalConst(WM_DEVICECHANGE); setGlobalConst(WM_MDICREATE); setGlobalConst(WM_MDIDESTROY); setGlobalConst(WM_MDIACTIVATE); setGlobalConst(WM_MDIRESTORE); setGlobalConst(WM_MDINEXT); setGlobalConst(WM_MDIMAXIMIZE); setGlobalConst(WM_MDITILE); setGlobalConst(WM_MDICASCADE); setGlobalConst(WM_MDIICONARRANGE); setGlobalConst(WM_MDIGETACTIVE); setGlobalConst(WM_MDISETMENU); setGlobalConst(WM_ENTERSIZEMOVE); setGlobalConst(WM_EXITSIZEMOVE); setGlobalConst(WM_DROPFILES); setGlobalConst(WM_MDIREFRESHMENU); setGlobalConst(WM_IME_SETCONTEXT); setGlobalConst(WM_IME_NOTIFY); setGlobalConst(WM_IME_CONTROL); setGlobalConst(WM_IME_COMPOSITIONFULL); setGlobalConst(WM_IME_SELECT); setGlobalConst(WM_IME_CHAR); setGlobalConst(WM_IME_REQUEST); setGlobalConst(WM_IME_KEYDOWN); setGlobalConst(WM_IME_KEYUP); setGlobalConst(WM_NCMOUSEHOVER); setGlobalConst(WM_MOUSEHOVER); setGlobalConst(WM_NCMOUSELEAVE); setGlobalConst(WM_MOUSELEAVE); setGlobalConst(WM_CUT); setGlobalConst(WM_COPY); setGlobalConst(WM_PASTE); setGlobalConst(WM_CLEAR); setGlobalConst(WM_UNDO); setGlobalConst(WM_RENDERFORMAT); setGlobalConst(WM_RENDERALLFORMATS); setGlobalConst(WM_DESTROYCLIPBOARD); setGlobalConst(WM_DRAWCLIPBOARD); setGlobalConst(WM_PAINTCLIPBOARD); setGlobalConst(WM_VSCROLLCLIPBOARD); setGlobalConst(WM_SIZECLIPBOARD); setGlobalConst(WM_ASKCBFORMATNAME); setGlobalConst(WM_CHANGECBCHAIN); setGlobalConst(WM_HSCROLLCLIPBOARD); setGlobalConst(WM_QUERYNEWPALETTE); setGlobalConst(WM_PALETTEISCHANGING); setGlobalConst(WM_PALETTECHANGED); setGlobalConst(WM_HOTKEY); setGlobalConst(WM_PRINT); setGlobalConst(WM_PRINTCLIENT); setGlobalConst(WM_APPCOMMAND); setGlobalConst(WM_HANDHELDFIRST); setGlobalConst(WM_HANDHELDLAST); setGlobalConst(WM_AFXFIRST); setGlobalConst(WM_AFXLAST); setGlobalConst(WM_PENWINFIRST); setGlobalConst(WM_PENWINLAST); setGlobalConst(WM_PSD_PAGESETUPDLG); setGlobalConst(WM_USER); setGlobalConst(WM_CHOOSEFONT_GETLOGFONT); setGlobalConst(WM_PSD_FULLPAGERECT); setGlobalConst(WM_PSD_MINMARGINRECT); setGlobalConst(WM_PSD_MARGINRECT); setGlobalConst(WM_PSD_GREEKTEXTRECT); setGlobalConst(WM_PSD_ENVSTAMPRECT); setGlobalConst(WM_PSD_YAFULLPAGERECT); setGlobalConst(WM_CHOOSEFONT_SETLOGFONT); setGlobalConst(WM_CHOOSEFONT_SETFLAGS);
+    setGlobalConst(CB_OKAY);
+    setGlobalConst(CB_ERR);
+    setGlobalConst(CB_ERRSPACE);
+    setGlobalConst(CBN_ERRSPACE);
+    setGlobalConst(CBN_SELCHANGE);
+    setGlobalConst(CBN_DBLCLK);
+    setGlobalConst(CBN_SETFOCUS);
+    setGlobalConst(CBN_KILLFOCUS);
+    setGlobalConst(CBN_EDITCHANGE);
+    setGlobalConst(CBN_EDITUPDATE);
+    setGlobalConst(CBN_DROPDOWN);
+    setGlobalConst(CBN_CLOSEUP);
+    setGlobalConst(CBN_SELENDOK);
+    setGlobalConst(CBN_SELENDCANCEL);
+    setGlobalConst(CBS_SIMPLE);
+    setGlobalConst(CBS_DROPDOWN);
+    setGlobalConst(CBS_DROPDOWNLIST);
+    setGlobalConst(CBS_OWNERDRAWFIXED);
+    setGlobalConst(CBS_OWNERDRAWVARIABLE);
+    setGlobalConst(CBS_AUTOHSCROLL);
+    setGlobalConst(CBS_OEMCONVERT);
+    setGlobalConst(CBS_SORT);
+    setGlobalConst(CBS_HASSTRINGS);
+    setGlobalConst(CBS_NOINTEGRALHEIGHT);
+    setGlobalConst(CBS_DISABLENOSCROLL);
+    setGlobalConst(CBS_UPPERCASE);
+    setGlobalConst(CBS_LOWERCASE);
+    setGlobalConst(CB_GETEDITSEL);
+    setGlobalConst(CB_LIMITTEXT);
+    setGlobalConst(CB_SETEDITSEL);
+    setGlobalConst(CB_ADDSTRING);
+    setGlobalConst(CB_DELETESTRING);
+    setGlobalConst(CB_DIR);
+    setGlobalConst(CB_GETCOUNT);
+    setGlobalConst(CB_GETCURSEL);
+    setGlobalConst(CB_GETLBTEXT);
+    setGlobalConst(CB_GETLBTEXTLEN);
+    setGlobalConst(CB_INSERTSTRING);
+    setGlobalConst(CB_RESETCONTENT);
+    setGlobalConst(CB_FINDSTRING);
+    setGlobalConst(CB_SELECTSTRING);
+    setGlobalConst(CB_SETCURSEL);
+    setGlobalConst(CB_SHOWDROPDOWN);
+    setGlobalConst(CB_GETITEMDATA);
+    setGlobalConst(CB_SETITEMDATA);
+    setGlobalConst(CB_GETDROPPEDCONTROLRECT);
+    setGlobalConst(CB_SETITEMHEIGHT);
+    setGlobalConst(CB_GETITEMHEIGHT);
+    setGlobalConst(CB_SETEXTENDEDUI);
+    setGlobalConst(CB_GETEXTENDEDUI);
+    setGlobalConst(CB_GETDROPPEDSTATE);
+    setGlobalConst(CB_FINDSTRINGEXACT);
+    setGlobalConst(CB_SETLOCALE);
+    setGlobalConst(CB_GETLOCALE);
+    setGlobalConst(CB_GETTOPINDEX);
+    setGlobalConst(CB_SETTOPINDEX);
+    setGlobalConst(CB_GETHORIZONTALEXTENT);
+    setGlobalConst(CB_SETHORIZONTALEXTENT);
+    setGlobalConst(CB_GETDROPPEDWIDTH);
+    setGlobalConst(CB_SETDROPPEDWIDTH);
+    setGlobalConst(CB_INITSTORAGE);
+    //setGlobalConst(CB_MULTIPLEADDSTRING);
+    setGlobalConst(CB_GETCOMBOBOXINFO);
+    setGlobalConst(CB_MSGMAX);
+    setGlobalConst(SBS_HORZ);
+    setGlobalConst(SBS_VERT);
+    setGlobalConst(SBS_TOPALIGN);
+    setGlobalConst(SBS_LEFTALIGN);
+    setGlobalConst(SBS_BOTTOMALIGN);
+    setGlobalConst(SBS_RIGHTALIGN);
+    setGlobalConst(SBS_SIZEBOXTOPLEFTALIGN);
+    setGlobalConst(SBS_SIZEBOXBOTTOMRIGHTALIGN);
+    setGlobalConst(SBS_SIZEBOX);
+    setGlobalConst(SBS_SIZEGRIP);
+    setGlobalConst(SBM_SETPOS);
+    setGlobalConst(SBM_GETPOS);
+    setGlobalConst(SBM_SETRANGE);
+    setGlobalConst(SBM_SETRANGEREDRAW);
+    setGlobalConst(SBM_GETRANGE);
+    setGlobalConst(SBM_ENABLE_ARROWS);
+    setGlobalConst(SBM_SETSCROLLINFO);
+    setGlobalConst(SBM_GETSCROLLINFO);
+    setGlobalConst(SBM_GETSCROLLBARINFO);
+    setGlobalConst(SIF_RANGE);
+    setGlobalConst(SIF_PAGE);
+    setGlobalConst(SIF_POS);
+    setGlobalConst(SIF_DISABLENOSCROLL);
+    setGlobalConst(SIF_TRACKPOS);
+    setGlobalConst(SIF_ALL);
 
     setGlobalConst(SRCAND);
     setGlobalConst(SRCCOPY);
@@ -7490,6 +8230,28 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
 
     setGlobalWrapper(GetWindowText);
     setGlobalWrapper(SetWindowText);
+    setGlobalWrapper(SetScrollInfo);
+    setGlobalWrapper(GetScrollInfo);
+    setGlobalWrapper(GetScrollRange);
+    setGlobalConst(SB_HORZ);
+    setGlobalConst(SB_VERT);
+    setGlobalConst(SB_CTL);
+    setGlobalConst(SB_BOTH);
+    setGlobalConst(SB_LINEUP);
+    setGlobalConst(SB_LINELEFT);
+    setGlobalConst(SB_LINEDOWN);
+    setGlobalConst(SB_LINERIGHT);
+    setGlobalConst(SB_PAGEUP);
+    setGlobalConst(SB_PAGELEFT);
+    setGlobalConst(SB_PAGEDOWN);
+    setGlobalConst(SB_PAGERIGHT);
+    setGlobalConst(SB_THUMBPOSITION);
+    setGlobalConst(SB_THUMBTRACK);
+    setGlobalConst(SB_TOP);
+    setGlobalConst(SB_LEFT);
+    setGlobalConst(SB_BOTTOM);
+    setGlobalConst(SB_RIGHT);
+    setGlobalConst(SB_ENDSCROLL);
     setGlobalWrapper(TransparentBlt);
     setGlobalWrapper(AlphaBlend);
     setGlobalWrapper(GetPixel);
@@ -7498,6 +8260,7 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
     setGlobalWrapper(GetStretchBltMode);
     setGlobalWrapper(SetStretchBltMode);
     setGlobalWrapper(SendMessage);
+    setGlobal(SendMessageStr);
 
     setGlobalConst(ICON_BIG);
     setGlobalConst(ICON_SMALL);
@@ -7680,7 +8443,8 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInstance, char* nCmdList, int
     //1.4.99 finally figured out UpdateLayeredWindow
     //1.5.99 because i totally changed how WIC works (and had to update like half the scripts) and we are SO close to getting DXGI, DIRECT3D, AND OPENGL (it's about to be brazy)
     //1.5.33 because i realized 1.6.0 should be when i add all of them (i've only added OPENGL)
-    print("JBS3 -> Version 1.5.33"); //so idk how normal version things work so the first number will probably stay one --- i will increment the second number if i change an existing function like when i remade the CreateWindowClass and CreateWindow functions --- i might random increment the third number if i feel like it
+    //1.5.40 because i added screenshaders but more importantly libusb/hidapi
+    print("JBS3 -> Version 1.5.40"); //so idk how normal version things work so the first number will probably stay one --- i will increment the second number if i change an existing function like when i remade the CreateWindowClass and CreateWindow functions --- i might random increment the third number if i feel like it
     print(screenWidth << "x" << screenHeight);
     
 

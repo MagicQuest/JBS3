@@ -139,6 +139,7 @@
     <ClCompile Include="GL\glew.c" />
     <ClCompile Include="goodmacrosfordirect2dandwichelper.h" />
     <ClCompile Include="guicon.cpp" />
+    <ClCompile Include="hidapi\hid.c" />
     <ClCompile Include="JBS3.cpp" />
     <ClCompile Include="WICHelper.cpp" />
   </ItemGroup>
@@ -154,6 +155,9 @@
     <ClInclude Include="GL\glxew.h" />
     <ClInclude Include="GL\wglew.h" />
     <ClInclude Include="guicon.h" />
+    <ClInclude Include="hidapi\hidapi.h" />
+    <ClInclude Include="hidapi\hidapi_cfgmgr32.h" />
+    <ClInclude Include="hidapi\hidapi_winapi.h" />
     <ClInclude Include="JSTimer.h" />
     <ClInclude Include="JSWindow.h" />
     <ClInclude Include="resource.h" />

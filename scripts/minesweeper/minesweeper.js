@@ -223,7 +223,10 @@ function windowProc(hwnd, msg, wp, lp) {
             //print(image, "IMAGE");
             //aw shit no way i need to add LoadBitmapFromFilestream im MAD (DAMN it does NOT work the way i thought it did (i have to save the file with curl :( )))
             //const wicBitmap = wic.LoadBitmapFromStream(image, wic.GUID_WICPixelFormat32bppPBGRA, 0);
-            const wicBitmap = wic.LoadBitmapFromFilename(__dirname+"/gyatt", wic.GUID_WICPixelFormat32bppPBGRA, 0);
+            const fileinbinary = require("fs").readBinary(__dirname+"/gyatt");
+            //const wicBitmap = wic.LoadBitmapFromFilename(__dirname+"/gyatt", wic.GUID_WICPixelFormat32bppPBGRA, 0);
+            const wicBitmap = wic.LoadBitmapFromBinaryData(fileinbinary, wic.GUID_WICPixelFormat32bppPBGRA, 0, wic.GUID_ContainerFormatJpeg);
+            print(wicBitmap);
             if(backgroundImg) {
                 backgroundImg.Release();
             }

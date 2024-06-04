@@ -17,6 +17,8 @@ function windowProc(hwnd, msg, wp, lp) {
             bitmaps.push(d2d.CreateBitmapFromWicBitmap(wicBitmap, true)); //passing true as the second argument releases wicBitmap
         }
         wicDecoder.Release();
+        //const wicBitmap = wic.LoadBitmapFromBinaryData(require("fs").readBinary(__dirname+"/sponge.gif"), wic.GUID_WICPixelFormat32bppPBGRA, 0, wic.GUID_ContainerFormatGif);
+        //bitmaps.push(d2d.CreateBitmapFromWicBitmap(wicBitmap, true));
         //const wicBitmap = wic.LoadBitmapFromFilename(__dirname+"/faze/faze.gif", GUID_WICPixelFormat32bppPBGRA, 0); //third is optional if 0
         //bitmap = d2d.CreateBitmapFromWicBitmap(wicBitmap, true);
         wic.Release(); //after calling release any subsequent use of wic will result in error
