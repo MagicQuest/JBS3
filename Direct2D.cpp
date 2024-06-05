@@ -1,6 +1,6 @@
 #include "Direct2D.h"
 #include <string>
-#include <typeinfo>
+//#include <typeinfo>
 
 //#define err(shit, cstring) MessageBoxA(NULL, std::to_string(shit).c_str(), cstring, MB_OK | MB_ICONERROR);
 
@@ -98,4 +98,8 @@ bool Direct2D::Init(HWND window, int type) {
 
 	return true;
 	//err(21, typeid(T).name());
+}
+
+int Direct2D::EndDraw() {
+	return this->renderTarget->EndDraw();
 }

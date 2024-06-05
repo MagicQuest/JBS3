@@ -28,7 +28,7 @@ class D2D {
         this.white = this.direct2d.CreateSolidColorBrush(.5,.5,.5,.9);
     }
 
-    drawForMe(dt, i) {
+    drawForMe(dt, i) { //wtf is this function name dawg what was i on
         this.direct2d.BeginDraw();
         //this.direct2d.Clear(0,0,0);
         this.brush.SetColor((Math.sin(i/200)+1)/2, (Math.cos(i/200)+1)/2, 0);

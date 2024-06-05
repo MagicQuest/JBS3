@@ -12,12 +12,12 @@ hid_enumerate(0x0, 0x0, (device) => {
 let handle = hid_get_handle_from_info(wiimote);
 
 let lastKeycode = 0;
-let keycodes = {A: 0x80000, B: 0x40000, DPAD_UP: 0x800, DPAD_DOWN: 0x400, DPAD_LEFT: 0x100, DPAD_RIGHT: 0x200};
+let keycodes = {A: 0x80000, B: 0x40000, DPAD_UP: 0x800, DPAD_DOWN: 0x400, DPAD_LEFT: 0x100, DPAD_RIGHT: 0x200, "1": 0x20000, "2": 0x10000};
 
 let bools = {};
 for(let key of Object.keys(keycodes)) bools[key] = false;
 
-let keys = {A: /*VK_MEDIA_PLAY_PAUSE*/VK_SPACE, B: VK_LBUTTON, DPAD_UP: VK_UP, DPAD_DOWN: VK_DOWN, DPAD_LEFT: VK_LEFT, DPAD_RIGHT: VK_RIGHT};
+let keys = {A: VK_MEDIA_PLAY_PAUSE, B: VK_LBUTTON, DPAD_UP: VK_UP, DPAD_DOWN: VK_DOWN, DPAD_LEFT: VK_LEFT, DPAD_RIGHT: VK_RIGHT, "1": /*VK_SPACE*/"Z", "2": "X"};
 
 function checkBit(bit, mask) {
     return ((bit & mask) == mask)
@@ -36,7 +36,12 @@ while(true) {
                 //print("hit "+key);
                 if(!bools[key]) {
                     print("first hit "+key);
-                    SendInput(MakeKeyboardInput(keys[key], false)); //sendinput AND keybd_event don't work on roblox but apparently in AutoHotKey there's a ControlSend function that works (so i need to investigate that (even though i think i did a pretty long while ago)) https://www.reddit.com/r/AutoHotkey/comments/p72g7h/tutorial_how_to_use_autohotkey_in_roblox_how_to/
+                    //if(keys[key] != VK_LBUTTON) {
+                        SendInput(MakeKeyboardInput(keys[key], false)); //sendinput AND keybd_event don't work on roblox but apparently in AutoHotKey there's a ControlSend function that works (so i need to investigate that (even though i think i did a pretty long while ago)) https://www.reddit.com/r/AutoHotkey/comments/p72g7h/tutorial_how_to_use_autohotkey_in_roblox_how_to/
+                    //}else {
+                        //SendInput(MakeMouseInput(0,0,0,MOUSEEVENTF_LEFTDOWN));
+                    //    SendInput(MakeMouseInput(0,0,0,MOUSEEVENTF_LEFTDOWN | MOUSEEVENTF_ABSOLUTE)); //wtf this keeps putting me back to my lock screen and disconnecting me from the call in discord?
+                    //}
                     //keybd_event(keys[key], NULL);
                 }
                 bools[key] = true;
@@ -44,7 +49,11 @@ while(true) {
                 if(checkBit(lastKeycode, code)) {
                     bools[key] = false;
                     //keybd_event(keys[key], KEYEVENTF_KEYUP);
-                    SendInput(MakeKeyboardInput(keys[key], true));
+                    //if(keys[key] != VK_LBUTTON) {
+                        SendInput(MakeKeyboardInput(keys[key], true)); //sendinput AND keybd_event don't work on roblox but apparently in AutoHotKey there's a ControlSend function that works (so i need to investigate that (even though i think i did a pretty long while ago)) https://www.reddit.com/r/AutoHotkey/comments/p72g7h/tutorial_how_to_use_autohotkey_in_roblox_how_to/
+                    //}else {
+                    //    SendInput(MakeMouseInput(0,0,0,MOUSEEVENTF_LEFTUP));
+                    //}
                     print("released "+key);
                 }
             }

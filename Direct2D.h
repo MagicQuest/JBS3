@@ -1,6 +1,7 @@
 #pragma once
 
 #include <d2d1.h>
+#include <d2d1_3.h>
 #include <wincodec.h>
 #include <dwrite_3.h>
 #include "goodmacrosfordirect2dandwichelper.h"
@@ -19,13 +20,14 @@ public:
 // 
 	//T* renderTarget;
 	ID2D1RenderTarget* renderTarget;
-	ID2D1Factory* factory;
+	ID2D1Factory7* factory;
 	IDWriteFactory7* textfactory; //lol forgo to capitaliez f
 	ID2D1SolidColorBrush* clearBrush;
 	ID2D1DrawingStateBlock* drawingStateBlock;
 	IWICImagingFactory2* wicFactory;
 	int type;
 	HWND window;
+	HDC tempDC;
 	//IDWriteTextFormat* textFormat;
 	
 	Direct2D() {
@@ -35,6 +37,9 @@ public:
 		clearBrush = nullptr;
 		drawingStateBlock = nullptr;
 		wicFactory = nullptr;
+		tempDC = NULL;
+		window = NULL;
+		type = 0;
 		//textFormat = nullptr;
 	}
 
@@ -60,7 +65,25 @@ public:
 		//}
 	}
 
-	bool Init(HWND window, int type);
+	virtual bool Init(HWND window, int type);
+
+	virtual int Resize(UINT width, UINT height) {
+		if (this->type == 0) {
+			ID2D1HwndRenderTarget* renderTarget = (ID2D1HwndRenderTarget*)this->renderTarget;
+			//info.GetReturnValue().Set(Number::New(isolate, renderTarget->Resize(D2D1::SizeU(IntegerFI(info[0]), IntegerFI(info[1])))));
+			return renderTarget->Resize(D2D1::SizeU(width, height));
+		}
+		else if(this->type == 1) {
+			ID2D1DCRenderTarget* renderTarget = (ID2D1DCRenderTarget*)this->renderTarget;
+			//i almost recreated the entire d2d object
+			tempDC = GetDC(this->window);
+			RECT r{ 0, 0, width, height};
+			//info.GetReturnValue().Set(Number::New(isolate, renderTarget->BindDC(dc, &r)));
+			return renderTarget->BindDC(tempDC, &r);
+		}
+	}
+
+	virtual int EndDraw();
 
 	//void BeginDraw() {
 	//V8FUNC(BeginDraw) {

@@ -136,6 +136,7 @@
   <ItemGroup>
     <ClCompile Include="console2.cpp" />
     <ClCompile Include="Direct2D.cpp" />
+    <ClCompile Include="Direct2D11.cpp" />
     <ClCompile Include="GL\glew.c" />
     <ClCompile Include="goodmacrosfordirect2dandwichelper.h" />
     <ClCompile Include="guicon.cpp" />
@@ -149,6 +150,7 @@
   <ItemGroup>
     <ClInclude Include="console2.h" />
     <ClInclude Include="Direct2D.h" />
+    <ClInclude Include="Direct2D11.h" />
     <ClInclude Include="DllCall.h" />
     <ClInclude Include="GL\eglew.h" />
     <ClInclude Include="GL\glew.h" />

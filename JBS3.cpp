@@ -1184,10 +1184,14 @@ V8FUNC(BeepWrapper) {
 //weird how defining the macros in goodmacrosfordirect2dandwichelper.h right here caused visual studio to die
 
 #include "Direct2D.h"
+#include "Direct2D11.h"
 #include "WICHelper.h"
 
 #pragma comment(lib, "d2d1.lib")
 #pragma comment(lib, "dwrite.lib")
+#pragma comment(lib, "dcomp.lib")
+#pragma comment(lib, "D3D11.lib")
+
 
 //float lerp(float a, float b, float f)
 //{
@@ -1745,7 +1749,8 @@ V8FUNC(createCanvas) {
         //    print("d2d dc");
         //}
         //Direct2D<ID2D1RenderTarget>* d2d = new Direct2D<ID2D1RenderTarget>();
-        Direct2D* d2d = new Direct2D();
+        
+        Direct2D* d2d = IntegerFI(info[1]) > 1 ? (Direct2D*)new Direct2D11() : new Direct2D();
         d2d->Init((HWND)IntegerFI(info[2]), IntegerFI(info[1]));
         if (!info[3]->IsNullOrUndefined()) {
             d2d->wicFactory = ((WICHelper*)IntegerFI(info[3].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()))->wicFactory;
@@ -1764,27 +1769,33 @@ V8FUNC(createCanvas) {
             Isolate* isolate = info.GetIsolate();
             Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
             //print((LONG_PTR)d2d);
-            d2d->renderTarget->EndDraw();
+            //d2d->renderTarget->EndDraw();
+            info.GetReturnValue().Set(d2d->EndDraw());
         }));
         context->Set(isolate, "Resize", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
             Isolate* isolate = info.GetIsolate();
             Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
             
-            if (d2d->type == 0) {
-                ID2D1HwndRenderTarget* renderTarget = (ID2D1HwndRenderTarget*)d2d->renderTarget;
-                info.GetReturnValue().Set(Number::New(isolate, renderTarget->Resize(D2D1::SizeU(IntegerFI(info[0]), IntegerFI(info[1])))));
+            info.GetReturnValue().Set(Number::New(isolate, d2d->Resize(IntegerFI(info[0]), IntegerFI(info[1]))));
+            if (d2d->type == 1) {
+                ReleaseDC(d2d->window, d2d->tempDC);
+                d2d->tempDC = NULL;
             }
-            else if(d2d->type == 1) {
-                ID2D1DCRenderTarget* renderTarget = (ID2D1DCRenderTarget*)d2d->renderTarget;
-                //i almost recreated the entire d2d object
-                HDC dc = GetDC(d2d->window);
-                RECT r{ 0, 0, IntegerFI(info[0]), IntegerFI(info[1])};
-                info.GetReturnValue().Set(Number::New(isolate, renderTarget->BindDC(dc, &r)));
-                ReleaseDC(d2d->window, dc);
-            }
-            else if (d2d->type == 2) {  //possibly dxgi if i can be bothered!
-
-            }
+            //if (d2d->type == 0) {
+            //    ID2D1HwndRenderTarget* renderTarget = (ID2D1HwndRenderTarget*)d2d->renderTarget;
+            //    info.GetReturnValue().Set(Number::New(isolate, renderTarget->Resize(D2D1::SizeU(IntegerFI(info[0]), IntegerFI(info[1])))));
+            //}
+            //else if(d2d->type == 1) {
+            //    ID2D1DCRenderTarget* renderTarget = (ID2D1DCRenderTarget*)d2d->renderTarget;
+            //    //i almost recreated the entire d2d object
+            //    HDC dc = GetDC(d2d->window);
+            //    RECT r{ 0, 0, IntegerFI(info[0]), IntegerFI(info[1])};
+            //    info.GetReturnValue().Set(Number::New(isolate, renderTarget->BindDC(dc, &r)));
+            //    ReleaseDC(d2d->window, dc);
+            //}
+            //else if (d2d->type == 2) {  //possibly dxgi if i can be bothered!
+            //
+            //}
         }));
 	//#error BindDC!
         context->Set(isolate, "BindDC", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
@@ -2914,11 +2925,15 @@ V8FUNC(createCanvas) {
         print(wglCreateContextAttribsARB);
         HGLRC hglrc = wglCreateContextAttribsARB(hdc, 0, gl33_attribs);//wglCreateContext(hdc);
         if (hglrc == NULL) {
-            MessageBoxA(NULL, "KILLING MYSELF", "HELP BRO IM PLAYING FORTNITE", MB_CANCELTRYCONTINUE); //oh yeah i had to make an opengl 3.2+ context for RenderDoc to work (because i was about to end it)
+            //MessageBoxA(NULL, "KILLING MYSELF", "HELP BRO IM PLAYING FORTNITE", MB_CANCELTRYCONTINUE); //oh yeah i had to make an opengl 3.2+ context for RenderDoc to work (because i was about to end it)
+            MessageBoxA(NULL, "failed to create opengl 3.3 context", "reverting to default opengl context (whatever version that may be)", MB_OK | MB_SYSTEMMODAL);
+            hglrc = tempRC;
         }
-        wglMakeCurrent(NULL, NULL);
-        wglDeleteContext(tempRC);
-        wglMakeCurrent(hdc, hglrc);
+        else {
+            wglMakeCurrent(NULL, NULL);
+            wglDeleteContext(tempRC);
+            wglMakeCurrent(hdc, hglrc);
+        }
 
         context->Set(isolate, "HGLRC", Number::New(isolate, (LONG_PTR)hglrc));
         context->Set(isolate, "HDC", Number::New(isolate, (LONG_PTR)hdc));
@@ -8083,9 +8098,19 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
 
 #define ID2D1RenderTarget 0
 #define ID2D1DCRenderTarget 1
+#define ID2D1DeviceContext 2
+#define ID2D1DeviceContextDComposition 3
 
     setGlobalConst(ID2D1RenderTarget);
     setGlobalConst(ID2D1DCRenderTarget);
+    setGlobalConst(ID2D1DeviceContext);
+    setGlobalConst(ID2D1DeviceContextDComposition);
+
+#undef ID2D1RenderTarget
+#undef ID2D1DCRenderTarget
+#undef ID2D1DeviceContext
+#undef ID2D1DeviceContextDComposition
+
 
     setGlobalConst(MK_CONTROL);
     setGlobalConst(MK_LBUTTON);
@@ -8444,7 +8469,8 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInstance, char* nCmdList, int
     //1.5.99 because i totally changed how WIC works (and had to update like half the scripts) and we are SO close to getting DXGI, DIRECT3D, AND OPENGL (it's about to be brazy)
     //1.5.33 because i realized 1.6.0 should be when i add all of them (i've only added OPENGL)
     //1.5.40 because i added screenshaders but more importantly libusb/hidapi
-    print("JBS3 -> Version 1.5.40"); //so idk how normal version things work so the first number will probably stay one --- i will increment the second number if i change an existing function like when i remade the CreateWindowClass and CreateWindow functions --- i might random increment the third number if i feel like it
+    //1.5.56 because i added the minimum support for d2d11 (that's what im gonna call it) and because directcomposition works (i still need to add effects)
+    print("JBS3 -> Version 1.5.56"); //so idk how normal version things work so the first number will probably stay one --- i will increment the second number if i change an existing function like when i remade the CreateWindowClass and CreateWindow functions --- i might random increment the third number if i feel like it
     print(screenWidth << "x" << screenHeight);
     
 
