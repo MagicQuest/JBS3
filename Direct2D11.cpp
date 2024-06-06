@@ -1,10 +1,12 @@
 #include "Direct2D11.h"
 #include <string>
-#include <iostream>
+//#include <iostream>
 
 using namespace D2D1;
 
 bool Direct2D11::Init(HWND window, int type) {
+    this->type = type;
+
     RECT r{0}; GetClientRect(window, &r);
 
     SusIfFailed(D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, &factory), "Graphics Init Create Factory");
@@ -147,9 +149,9 @@ bool Direct2D11::Init(HWND window, int type) {
 
     SusIfFailed(DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory7), (IUnknown**)&textfactory), "Graphics Init Direct Write Instantiation");
 
-    //ContIfFailed(renderTarget->CreateSolidColorBrush(D2D1::ColorF(0, 0, 0, 0), &clearBrush), "Graphics Init Clear Brush (this isn't actually required so you can continue as normal (you cannot d2d.Clear with opacity anymore) )"); //idk if this is required because im pretty sure you can already clear with opacity?
+    ContIfFailed(renderTarget->CreateSolidColorBrush(D2D1::ColorF(0, 0, 0, 0), &clearBrush), "Graphics Init Clear Brush (this isn't actually required so you can continue as normal (you cannot d2d.Clear with opacity anymore) )"); //idk if this is required because im pretty sure you can already clear with opacity?
 
-    ContIfFailed(factory->CreateDrawingStateBlock(D2D1::DrawingStateDescription(), &drawingStateBlock), "HELP create drawing state block did NOT work (cannot Save/Restore DrawingState)");//D2D1::DrawingStateDescription();
+    ContIfFailed(factory->CreateDrawingStateBlock(D2D1::DrawingStateDescription(), &drawingStateBlock), "HELP! Create drawing state block did NOT work (cannot Save/Restore DrawingState)");//D2D1::DrawingStateDescription();
 
     CreateAndSetDrawingBitmaps();
 
@@ -162,25 +164,25 @@ bool Direct2D11::Init(HWND window, int type) {
             IID_PPV_ARGS(m_dcompDevice.ReleaseAndGetAddressOf())), "DCompositionCreateDevice");
 
         //m_dcompDevice.As(&m_dcompD1);
-        SusIfFailed(m_dcompDevice->QueryInterface(__uuidof(IDCompositionDevice3), (LPVOID*)&m_dcompD1), "QueryInterface");
+        SusIfFailed(m_dcompDevice->QueryInterface(__uuidof(IDCompositionDevice3), (LPVOID*)&m_dcompD1), "DComp QueryInterface");
 
         // (2) Create a DirectComposition target associated with the window (pass in hWnd here)
         SusIfFailed(m_dcompDevice->CreateTargetForHwnd(window,
             true,
-            m_dcompTarget.ReleaseAndGetAddressOf()), "CreateTargetForHwnd");
+            m_dcompTarget.ReleaseAndGetAddressOf()), "Dcomp CreateTargetForHwnd");
 
         // (3) Create a DirectComposition "visual"
-        SusIfFailed(m_dcompDevice->CreateVisual(m_dcompVisual.ReleaseAndGetAddressOf()), "CreateVisual");
+        SusIfFailed(m_dcompDevice->CreateVisual(m_dcompVisual.ReleaseAndGetAddressOf()), "Dcomp CreateVisual");
 
-        SusIfFailed(m_dcompVisual->SetContent(swapChain.Get()), "SetContent");
+        SusIfFailed(m_dcompVisual->SetContent(swapChain.Get()), "Dcomp SetContent");
 
-        SusIfFailed(m_dcompTarget->SetRoot(m_dcompVisual.Get()), "SetRoot");
-        SusIfFailed(m_dcompDevice->Commit(), "Commit");
+        SusIfFailed(m_dcompTarget->SetRoot(m_dcompVisual.Get()), "Dcomp SetRoot");
+        SusIfFailed(m_dcompDevice->Commit(), "Dcomp Commit");
     }
 }
 
 int Direct2D11::Resize(UINT width, UINT height) {
-    std::cout << ("inheritance call to resize idk if this gonna work but it should right") << std::endl;
+    //std::cout << ("inheritance call to resize idk if this gonna work but it should right") << std::endl;
 
     dxgiBackBuffer->Release();
     backBuffer->Release();

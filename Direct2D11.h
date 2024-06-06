@@ -2,7 +2,7 @@
 
 #include <d3d11_4.h>
 #include "Direct2D.h"
-#include "goodmacrosfordirect2dandwichelper.h"
+//#include "goodmacrosfordirect2dandwichelper.h"
 #include <dcomp.h>
 #include <wrl.h>
 

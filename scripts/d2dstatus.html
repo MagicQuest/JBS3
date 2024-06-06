@@ -58,7 +58,7 @@
             <li>DrawLine</li>
             <li>DrawRectangle</li>
             <li>DrawRoundedRectangle</li>
-            <li class="NO i">DrawTextLayout</li>
+            <li>DrawTextLayout</li>
             <li>DrawTextW</li>
             <li>EndDraw</li>
             <li>FillEllipse</li>
@@ -93,6 +93,39 @@
             <li>RestoreDrawingState</li>
             <li>SaveDrawingState</li>
             <li>SetAntialiasMode</li>
+        </ul>
+        <li>ID2D1DeviceContext</li>
+        <ul>
+            <li class="NO">CreateBitmapFromDxgiSurface</li>
+            <li class="NOPE">CreateColorContext</li>
+            <li class="NOPE">CreateColorContextFromFilename</li>
+            <li class="NOPE">CreateColorContextFromWicColorContext</li>
+            <li class="NOPE">CreateCommandList</li>
+            <li class="NO">CreateEffect</li>
+            <li class="NO">CreateImageBrush</li>
+            <li class="NO">DrawBitmap</li>
+            <li class="NOPE">DrawGdiMetafile</li>
+            <li class="NO">DrawGlyphRun</li>
+            <li class="NO">DrawImage</li>
+            <li class="NO">GetDevice</li>
+            <li class="NOPE">GetEffectInvalidRectangleCount</li>
+            <li class="NOPE">GetEffectInvalidRectangles</li>
+            <li class="NOPE">GetEffectRequiredInputRectangles</li>
+            <li class="NOPE">GetGlyphRunWorldBounds</li>
+            <li class="NO">GetImageLocalBounds</li>
+            <li class="NO">GetImageWorldBounds</li>
+            <li class="NO">GetPrimitiveBlend</li>
+            <li class="NO">GetRenderingControls</li>
+            <li class="NO">GetTarget</li>
+            <li class="NO">GetUnitMode</li>
+            <li class="NOPE">InvalidateEffectInputRectangle</li>
+            <li class="NO">IsBufferPrecisionSupported</li>
+            <li class="NO">IsDxgiFormatSupported</li>
+            <li class="NO">PushLayer</li>
+            <li class="NO">SetPrimitiveBlend</li>
+            <li class="NO">SetRenderingControls</li>
+            <li class="NO">SetTarget</li>
+            <li class="NO">SetUnitMode</li>
         </ul>
         <li>ID2D1SolidColorBrush</li>
         <ul>
@@ -130,8 +163,52 @@
             <li>SetTextAlignment</li>
             <li>SetTrimming</li>
             <li>SetWordWrapping</li>
-            <li class="NO">SetFontSize</li>
+            <li>SetFontSize</li>
             <li>Release</li>
+        </ul>
+        <li>
+            IDWriteTextLayout
+        </li>
+        <ul>
+            <li>DetermineMinWidth</li>
+            <li class="NOPE">Draw</li>
+            <li class="NOPE">GetClusterMetrics</li>
+            <li>GetDrawingEffect</li>
+            <li class="NO">GetFontCollection</li>
+            <li>GetFontFamilyName</li>
+            <li>GetFontFamilyNameLength</li>
+            <li>GetFontSize</li>
+            <li>GetFontStretch</li>
+            <li>GetFontStyle</li>
+            <li>GetFontWeight</li>
+            <li class="NOPE">GetInlineObject</li>
+            <li>GetLineMetrics</li>
+            <li class="NOPE">GetLocaleName</li>
+            <li class="NOPE">GetLocaleNameLength</li>
+            <li>GetMaxHeight</li>
+            <li>GetMaxWidth</li>
+            <li>GetMetrics</li>
+            <li>GetOverhangMetrics</li>
+            <li>GetStrikethrough</li>
+            <li class="NOPE">GetTypography</li>
+            <li>GetUnderline</li>
+            <li>HitTestPoint</li>
+            <li>HitTestTextPosition</li>
+            <li>HitTestTextRange</li>
+            <li>SetDrawingEffect</li>
+            <li class="NO">SetFontCollection</li>
+            <li>SetFontFamilyName</li>
+            <li>SetFontSize</li>
+            <li>SetFontStretch</li>
+            <li>SetFontStyle</li>
+            <li>SetFontWeight</li>
+            <li class="NOPE">SetInlineObject</li>
+            <li class="NOPE">SetLocaleName</li>
+            <li>SetMaxHeight</li>
+            <li>SetMaxWidth</li>
+            <li>SetStrikethrough</li>
+            <li class="NOPE">SetTypography</li>
+            <li>SetUnderline</li>
         </ul>
         <li>ID2D1Bitmap</li>
         <ul>

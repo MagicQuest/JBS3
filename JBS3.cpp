@@ -1191,7 +1191,7 @@ V8FUNC(BeepWrapper) {
 #pragma comment(lib, "dwrite.lib")
 #pragma comment(lib, "dcomp.lib")
 #pragma comment(lib, "D3D11.lib")
-
+#pragma comment(lib, "dxguid.lib")
 
 //float lerp(float a, float b, float f)
 //{
@@ -1201,9 +1201,34 @@ V8FUNC(BeepWrapper) {
 #include <v8-typed-array.h>  //wtf the one-argument version of static_asert is not enabled in this mode (DO I HAVE TO SWITCH TO C++ 17???)
 //nah what the fuckl one of the lines (Ln: 26) said #if V8_ENABLE_SANDBOX had a weird error so i changed it to #ifdef V8_ENABLE_SANDBOX and it compiled?????
 //yeah watch out my edit is NOT synced to github so if this is a problem you gotta change v8-typed-array.h yourself (also i think i changed another thing so that setTimeout would work)
+//wtf it's still like that https://github.com/v8/v8/blob/main/include/v8-typed-array.h
+
+#include <limits>
 
 namespace DIRECT2D {
     using namespace v8;
+
+    DWRITE_TEXT_RANGE genTextRange(Isolate* isolate, IDWriteTextLayout* layout, unsigned int start, const Local<Value>& length) {
+        DWRITE_TEXT_RANGE textRange{ 0 };
+        textRange.startPosition = start;
+        if (length->BooleanValue(isolate)) {
+            textRange.length = IntegerFI(length);
+        }
+        else {
+            //DWRITE_LINE_METRICS lineMetrics{ 0 };
+            //unsigned int alc;
+            //ContIfFailed(layout->GetLineMetrics(&lineMetrics, 1, &alc), "GetLineMetrics failed (genTextRange)");
+            //print("line metrics " << lineMetrics.length << " " << alc);
+            //textRange.length = lineMetrics.length;
+#undef max
+            //bruh i have to undefine max (which is defined all the way in minwindef.h)
+            textRange.length = std::numeric_limits<int>::max();
+#define max(a,b)            (((a) > (b)) ? (a) : (b))
+        }
+
+        return textRange;
+    }
+
     Local<Object> getMatrixFImpl(Isolate* isolate, D2D1_MATRIX_3X2_F matrix) {
         Local<Object> jsMatrix = Object::New(isolate);
 
@@ -1334,6 +1359,232 @@ namespace DIRECT2D {
         }));
 
         return jsGenericIU;
+    }
+
+    Local<ObjectTemplate> getTextFormatImpl(Isolate* isolate, Direct2D* d2d, IDWriteTextFormat* font, bool parent) {
+        Local<ObjectTemplate> jsFont = getIUnknownImpl(isolate, font);
+//        jsFont->Set(isolate, "internalPtr", Number::New(isolate, (LONG_PTR)font));
+        jsFont->Set(isolate, "internalDXPtr", Number::New(isolate, (LONG_PTR)d2d));
+        //jsFont->Set(isolate, "family", String::NewFromUtf8(isolate, fontFamily).ToLocalChecked());
+        jsFont->Set(isolate, "GetFontSize", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+            info.GetReturnValue().Set(font->GetFontSize());
+        }));
+        jsFont->Set(isolate, "GetFlowDirection", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+            info.GetReturnValue().Set(font->GetFlowDirection());
+        }));
+        //jsFont->Set(isolate, "GetFontCollection", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+        //    Isolate* isolate = info.GetIsolate();
+        //    IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+        //
+        //    info.GetReturnValue().Set(font->GetFontCollection());
+        //}));
+        //font->GetFontCollection;
+        jsFont->Set(isolate, "GetFontFamilyName", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            UINT32 length = font->GetFontFamilyNameLength() + 1;
+            //oh shoot yeah i guess i could use a string instead of a new wchar_t[length]
+            std::wstring fontfamily(length, '\0');
+            RetIfFailed(font->GetFontFamilyName(&fontfamily[0], length), "GetFontFamilyName failed");
+            info.GetReturnValue().Set(String::NewFromTwoByte(isolate, (const uint16_t*)fontfamily.data()).ToLocalChecked());
+            ///*wchar_t* wfontfamily;*/std::wstring wfontfamily(length, '#'); font->GetFontFamilyName(&wfontfamily[0], length);
+            ////char fontfamily;
+            //std::string fontfamily(length, '#');
+            //wcstombs(&fontfamily[0], wfontfamily.c_str(), length); //FUCK THIS SHIT DAWG
+            //info.GetReturnValue().Set(String::NewFromUtf8(isolate, fontfamily.c_str()).ToLocalChecked());
+        }));
+        jsFont->Set(isolate, "GetFontFamilyNameLength", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+            info.GetReturnValue().Set(font->GetFontFamilyNameLength());
+        }));
+        jsFont->Set(isolate, "GetFontStretch", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+            info.GetReturnValue().Set(font->GetFontStretch());
+        }));
+        jsFont->Set(isolate, "GetFontStyle", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+            info.GetReturnValue().Set(font->GetFontStyle());
+        }));
+        jsFont->Set(isolate, "GetFontWeight", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+            info.GetReturnValue().Set(font->GetFontWeight());
+        }));
+        jsFont->Set(isolate, "GetIncrementalTabStop", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+            info.GetReturnValue().Set(font->GetIncrementalTabStop());
+        }));
+        jsFont->Set(isolate, "GetLineSpacing", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            DWRITE_LINE_SPACING_METHOD lineSpacingMehtod; //keeping this mispelling LO!
+            FLOAT lineSpacing, baseline;
+
+            font->GetLineSpacing(&lineSpacingMehtod, &lineSpacing, &baseline);
+
+            Local<Object> jsLineSpacingInfo = Object::New(isolate);
+
+            jsLineSpacingInfo->Set(isolate->GetCurrentContext(), LITERAL("lineSpacingMethod"), Number::New(isolate, lineSpacingMehtod));
+            jsLineSpacingInfo->Set(isolate->GetCurrentContext(), LITERAL("lineSpacing"), Number::New(isolate, lineSpacing));
+            jsLineSpacingInfo->Set(isolate->GetCurrentContext(), LITERAL("baseline"), Number::New(isolate, baseline));
+
+            info.GetReturnValue().Set(jsLineSpacingInfo);
+        }));
+        jsFont->Set(isolate, "GetParagraphAlignment", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+            info.GetReturnValue().Set(font->GetParagraphAlignment());
+        }));
+        jsFont->Set(isolate, "GetReadingDirection", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+            info.GetReturnValue().Set(font->GetReadingDirection());
+        }));
+        jsFont->Set(isolate, "GetTextAlignment", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+            info.GetReturnValue().Set(font->GetTextAlignment());
+        }));
+        jsFont->Set(isolate, "GetWordWrapping", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+            info.GetReturnValue().Set(font->GetWordWrapping());
+        }));
+        //font->GetLocaleName;
+        //font->GetLocaleNameLength;
+        jsFont->Set(isolate, "GetTrimming", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            DWRITE_TRIMMING trimmingOptions;
+            font->GetTrimming(&trimmingOptions, NULL);
+
+            Local<Object> jsTrimmingOpt = Object::New(isolate);
+
+            jsTrimmingOpt->Set(isolate->GetCurrentContext(), LITERAL("granularity"), Number::New(isolate, trimmingOptions.granularity));
+            jsTrimmingOpt->Set(isolate->GetCurrentContext(), LITERAL("delimiter"), Number::New(isolate, trimmingOptions.delimiter));
+            jsTrimmingOpt->Set(isolate->GetCurrentContext(), LITERAL("delimiterCount"), Number::New(isolate, trimmingOptions.delimiterCount));
+
+            info.GetReturnValue().Set(jsTrimmingOpt);
+        }));
+
+        jsFont->Set(isolate, "SetFlowDirection", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+            font->SetFlowDirection((DWRITE_FLOW_DIRECTION)IntegerFI(info[0]));
+        }));
+        jsFont->Set(isolate, "SetIncrementalTabStop", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+            font->SetIncrementalTabStop(FloatFI(info[0]));
+        }));
+        jsFont->Set(isolate, "SetLineSpacing", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+            font->SetLineSpacing((DWRITE_LINE_SPACING_METHOD)IntegerFI(info[0]), FloatFI(info[1]), FloatFI(info[2]));
+        }));
+        jsFont->Set(isolate, "SetParagraphAlignment", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+            font->SetParagraphAlignment((DWRITE_PARAGRAPH_ALIGNMENT)IntegerFI(info[0]));
+        }));
+        jsFont->Set(isolate, "SetReadingDirection", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+            font->SetReadingDirection((DWRITE_READING_DIRECTION)IntegerFI(info[0]));
+        }));
+        jsFont->Set(isolate, "SetTextAlignment", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+            font->SetTextAlignment((DWRITE_TEXT_ALIGNMENT)IntegerFI(info[0]));
+        }));
+        jsFont->Set(isolate, "SetTrimming", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+            DWRITE_TRIMMING trimmingOptions{ (DWRITE_TRIMMING_GRANULARITY)IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]) };
+
+            font->SetTrimming(&trimmingOptions, nullptr);
+            //WOAH JUST SAW THIS ON THE NET! https://stackoverflow.com/questions/51009082/display-text-in-a-specified-rectangle-with-directwrite
+            //font->SetTrimming(&DWRITE_TRIMMING{ (DWRITE_TRIMMING_GRANULARITY)IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]) }, nullptr);
+            //nvm it didn't work :sob:
+        }));
+        jsFont->Set(isolate, "SetWordWrapping", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+            font->SetWordWrapping((DWRITE_WORD_WRAPPING)IntegerFI(info[0]));
+        }));
+        if (parent) {
+            jsFont->Set(isolate, "SetFontSize", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                UINT32 length = font->GetFontFamilyNameLength() + 1;
+                //oh shoot yeah i guess i could use a string instead of a new wchar_t[length]
+                std::wstring fontfamily(length, '#');
+                RetIfFailed(font->GetFontFamilyName(&fontfamily[0], length), "GetFontFamilyName failed (SetFontSize)");
+
+                IDWriteTextFormat* font2;
+
+                //wprint(fontfamily.data() << L" wfamily darta");
+
+                if (FloatFI(info[0]) <= 0.0) {
+                    HANDLE console = GetStdHandle(STD_OUTPUT_HANDLE);
+                    SetConsoleTextAttribute(console, 4);
+                    print("you CANNOT use SetFontSize with a value smaller than or equal to 0 (it will explode)" << "\007");
+                    SetConsoleTextAttribute(console, 7);
+                    return;
+                }
+
+                RetIfFailed(d2d->textfactory->CreateTextFormat(
+                    fontfamily.data(),
+                    NULL,
+                    font->GetFontWeight(),
+                    font->GetFontStyle(),
+                    font->GetFontStretch(),
+                    FloatFI(info[0]),
+                    L"en-us", //locale
+                    &font2
+                ), "CreateTextFormat failed (SetFontSize)");
+
+                font->Release();
+                info.This()->Set(isolate->GetCurrentContext(), LITERAL("internalPtr"), Number::New(isolate, (LONG_PTR)font2));
+                //remakefontonbjecnts
+            }));
+        }
+        //jsFont->Set(isolate, "Release", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+        //    Isolate* isolate = info.GetIsolate();
+        //    IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+        //
+        //    font->Release();
+        //}));
+        return jsFont;
     }
 
     Local<Object> getWICBitmapImpl(Isolate* isolate, /*IWICBitmapSource*/IWICBitmapSource* wicBitmap, GUID format) {
@@ -1733,6 +1984,7 @@ V8FUNC(createCanvas) {
     Local<ObjectTemplate> context = ObjectTemplate::New(isolate);
 
     const char* contextType = CStringFI(info[0]);
+    bool d2d11 = false;
     if (strcmp(contextType, "d2d") == 0 || strcmp(contextType, "direct2d") == 0) {
         //print("d2d");
         //https://cpp.sh/?source=%2F%2F+Example+program%0A%23include+%3Ciostream%3E%0A%23include+%3Cstring%3E%0A%0Aint+main()%0A%7B%0A++std%3A%3Astring+name%3B%0A++std%3A%3Acout+%3C%3C+%22What+is+your+name%3F+%22%3B%0A++getline+(std%3A%3Acin%2C+name)%3B%0A++std%3A%3Acout+%3C%3C+%22Hello%2C+%22+%3C%3C+name+%3C%3C+%22!%5Cn%22%3B%0A%7D
@@ -1749,8 +2001,19 @@ V8FUNC(createCanvas) {
         //    print("d2d dc");
         //}
         //Direct2D<ID2D1RenderTarget>* d2d = new Direct2D<ID2D1RenderTarget>();
-        
-        Direct2D* d2d = IntegerFI(info[1]) > 1 ? (Direct2D*)new Direct2D11() : new Direct2D();
+        d2d11 = IntegerFI(info[1]) > 1;
+        Direct2D* d2d = nullptr;
+        if (d2d11) {
+            d2d = (Direct2D*)new Direct2D11();
+            //ok bruh v8 is actually dogshit
+            //i tried setting an array into context (a v8::ObjectTemplate)
+            //and i kept getting an error like "a debugbreak has occured here" and it didnt' explain anything
+            //i finally googled it and apparently you can't set an array to be one of an ObjectTemplate's properties
+            //(which might be why i had to make ScopeGUIDs)
+        }
+        else {
+            d2d = new Direct2D();
+        }
         d2d->Init((HWND)IntegerFI(info[2]), IntegerFI(info[1]));
         if (!info[3]->IsNullOrUndefined()) {
             d2d->wicFactory = ((WICHelper*)IntegerFI(info[3].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()))->wicFactory;
@@ -1965,9 +2228,9 @@ V8FUNC(createCanvas) {
             d2d->renderTarget->FillEllipse(D2D1::Ellipse(ogPoints, radius.x, radius.y), brush);
         }));
         context->Set(isolate, "CreateFont", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            static bool msg = false;
-            if(!msg) MessageBoxA(NULL, "SetFontSize does NOT work yet", "CreateFont", MB_OK | MB_ICONWARNING);
-            msg = true;
+            //static bool msg = false;
+            //if(!msg) MessageBoxA(NULL, "SetFontSize does NOT work yet", "CreateFont", MB_OK | MB_ICONWARNING);
+            //msg = true;
             Isolate* isolate = info.GetIsolate();
             Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
 
@@ -1995,192 +2258,8 @@ V8FUNC(createCanvas) {
 
             //font->SetWordWrapping(DWRITE_WORD_WRAPPING_NO_WRAP);
 
-            Local<ObjectTemplate> jsFont = ObjectTemplate::New(isolate);
+            Local<ObjectTemplate> jsFont = DIRECT2D::getTextFormatImpl(isolate, d2d, font, true); //ObjectTemplate::New(isolate);
 
-            jsFont->Set(isolate, "internalPtr", Number::New(isolate, (LONG_PTR)font));
-            //jsFont->Set(isolate, "family", String::NewFromUtf8(isolate, fontFamily).ToLocalChecked());
-            jsFont->Set(isolate, "GetFontSize", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-                info.GetReturnValue().Set(font->GetFontSize());
-            }));
-            jsFont->Set(isolate, "GetFlowDirection", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-                info.GetReturnValue().Set(font->GetFlowDirection());
-            }));
-            //jsFont->Set(isolate, "GetFontCollection", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            //    Isolate* isolate = info.GetIsolate();
-            //    IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-            //
-            //    info.GetReturnValue().Set(font->GetFontCollection());
-            //}));
-            //font->GetFontCollection;
-            jsFont->Set(isolate, "GetFontFamilyName", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                UINT32 length = font->GetFontFamilyNameLength()+1;
-                /*wchar_t* wfontfamily;*/std::wstring wfontfamily(length, '#'); font->GetFontFamilyName(&wfontfamily[0], length);
-                //char fontfamily;
-                std::string fontfamily(length, '#');
-                wcstombs(&fontfamily[0], wfontfamily.c_str(), length); //FUCK THIS SHIT DAWG
-                info.GetReturnValue().Set(String::NewFromUtf8(isolate, fontfamily.c_str()).ToLocalChecked());
-            }));
-            jsFont->Set(isolate, "GetFontFamilyNameLength", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                
-                info.GetReturnValue().Set(font->GetFontFamilyNameLength());
-            }));
-            jsFont->Set(isolate, "GetFontStretch", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-                info.GetReturnValue().Set(font->GetFontStretch());
-            }));
-            jsFont->Set(isolate, "GetFontStyle", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-                info.GetReturnValue().Set(font->GetFontStyle());
-            }));
-            jsFont->Set(isolate, "GetFontWeight", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-                info.GetReturnValue().Set(font->GetFontWeight());
-            }));
-            jsFont->Set(isolate, "GetIncrementalTabStop", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-                info.GetReturnValue().Set(font->GetIncrementalTabStop());
-            }));
-            jsFont->Set(isolate, "GetLineSpacing", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                DWRITE_LINE_SPACING_METHOD lineSpacingMehtod; //keeping this mispelling LO!
-                FLOAT lineSpacing, baseline;
-                
-                font->GetLineSpacing(&lineSpacingMehtod, &lineSpacing, &baseline);
-                
-                Local<Object> jsLineSpacingInfo = Object::New(isolate);
-
-                jsLineSpacingInfo->Set(isolate->GetCurrentContext(), LITERAL("lineSpacingMethod"), Number::New(isolate, lineSpacingMehtod));
-                jsLineSpacingInfo->Set(isolate->GetCurrentContext(), LITERAL("lineSpacing"), Number::New(isolate, lineSpacing));
-                jsLineSpacingInfo->Set(isolate->GetCurrentContext(), LITERAL("baseline"), Number::New(isolate, baseline));
-
-                info.GetReturnValue().Set(jsLineSpacingInfo);
-            }));
-            jsFont->Set(isolate, "GetParagraphAlignment", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-                info.GetReturnValue().Set(font->GetParagraphAlignment());
-            }));
-            jsFont->Set(isolate, "GetReadingDirection", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-                info.GetReturnValue().Set(font->GetReadingDirection());
-            }));
-            jsFont->Set(isolate, "GetTextAlignment", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-                info.GetReturnValue().Set(font->GetTextAlignment());
-            }));
-            jsFont->Set(isolate, "GetWordWrapping", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-                info.GetReturnValue().Set(font->GetWordWrapping());
-            }));
-            //font->GetLocaleName;
-            //font->GetLocaleNameLength;
-            jsFont->Set(isolate, "GetTrimming", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                DWRITE_TRIMMING trimmingOptions;
-                font->GetTrimming(&trimmingOptions, NULL);
-
-                Local<Object> jsTrimmingOpt = Object::New(isolate);
-
-                jsTrimmingOpt->Set(isolate->GetCurrentContext(), LITERAL("granularity"), Number::New(isolate, trimmingOptions.granularity));
-                jsTrimmingOpt->Set(isolate->GetCurrentContext(), LITERAL("delimiter"), Number::New(isolate, trimmingOptions.delimiter));
-                jsTrimmingOpt->Set(isolate->GetCurrentContext(), LITERAL("delimiterCount"), Number::New(isolate, trimmingOptions.delimiterCount));
-
-                info.GetReturnValue().Set(jsTrimmingOpt);
-            }));
-
-            jsFont->Set(isolate, "SetFlowDirection", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-                font->SetFlowDirection((DWRITE_FLOW_DIRECTION)IntegerFI(info[0]));
-            }));
-            jsFont->Set(isolate, "SetIncrementalTabStop", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-                font->SetIncrementalTabStop(FloatFI(info[0]));
-            }));
-            jsFont->Set(isolate, "SetLineSpacing", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-                font->SetLineSpacing((DWRITE_LINE_SPACING_METHOD)IntegerFI(info[0]), FloatFI(info[1]), FloatFI(info[2]));
-            }));
-            jsFont->Set(isolate, "SetParagraphAlignment", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-                font->SetParagraphAlignment((DWRITE_PARAGRAPH_ALIGNMENT)IntegerFI(info[0]));
-            }));
-            jsFont->Set(isolate, "SetReadingDirection", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-                font->SetReadingDirection((DWRITE_READING_DIRECTION)IntegerFI(info[0]));
-            }));
-            jsFont->Set(isolate, "SetTextAlignment", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-                font->SetTextAlignment((DWRITE_TEXT_ALIGNMENT)IntegerFI(info[0]));
-            }));
-            jsFont->Set(isolate, "SetTrimming", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-                DWRITE_TRIMMING trimmingOptions{(DWRITE_TRIMMING_GRANULARITY)IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2])};
-
-                font->SetTrimming(&trimmingOptions, nullptr);
-                //WOAH JUST SAW THIS ON THE NET! https://stackoverflow.com/questions/51009082/display-text-in-a-specified-rectangle-with-directwrite
-                //font->SetTrimming(&DWRITE_TRIMMING{ (DWRITE_TRIMMING_GRANULARITY)IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]) }, nullptr);
-                //nvm it didn't work :sob:
-            }));
-            jsFont->Set(isolate, "SetWordWrapping", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-                font->SetWordWrapping((DWRITE_WORD_WRAPPING)IntegerFI(info[0]));
-            }));
-            jsFont->Set(isolate, "SetFontSize", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-            
-
-                //remakefontonbjecnts
-            }));
-            jsFont->Set(isolate, "Release", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                
-                font->Release();
-            }));
             //jsFont->Set(isolate, "GetWidth", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
             //    Isolate* isolate = info.GetIsolate();
             //    IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
@@ -2193,13 +2272,426 @@ V8FUNC(createCanvas) {
             info.GetReturnValue().Set(jsFont->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
 
         }));
+        context->Set(isolate, "CreateTextLayout", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+            IDWriteTextFormat* textFormat = (IDWriteTextFormat*)info[1].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            IDWriteTextLayout* layout;
+
+            RetIfFailed(d2d->textfactory->CreateTextLayout(WStringFI(info[0]), wcslen(WStringFI(info[0])), textFormat, FloatFI(info[2]), FloatFI(info[3]), &layout), "CreateTextLayout failed");
+
+            Local<ObjectTemplate> jsLayout = DIRECT2D::getTextFormatImpl(isolate, d2d, (IDWriteTextFormat*)layout, false); //ObjectTemplate::New(isolate);
+            //
+            //jsFont->Set(isolate, )
+
+            jsLayout->Set(isolate, "DetermineMinWidth", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                float minWidth = 0;
+
+                RetIfFailed(layout->DetermineMinWidth(&minWidth), "DetermineMinWidth failed");
+                
+                info.GetReturnValue().Set(Number::New(isolate, minWidth));
+            }));
+
+            //jsLayout->Set(isolate, "Draw", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            //    Isolate* isolate = info.GetIsolate();
+            //    IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            //
+            //}));
+
+            //jsLayout->Set(isolate, "GetClusterMetrics", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            //    Isolate* isolate = info.GetIsolate();
+            //    IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            //
+            //    
+            //}));
+
+            jsLayout->Set(isolate, "GetDrawingEffect", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                IUnknown* drawingEffect;
+
+                DWRITE_TEXT_RANGE textRange = DIRECT2D::genTextRange(isolate, layout, IntegerFI(info[1]), info[2]);
+
+                RetIfFailed(layout->GetDrawingEffect(IntegerFI(info[0]), &drawingEffect, &textRange), "GetDrawingEffect failed");
+
+                info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)drawingEffect));
+            }));
+
+            //jsLayout->Set(isolate, "GetInlineObject", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            //    Isolate* isolate = info.GetIsolate();
+            //    IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            //
+            //    
+            //}));
+
+            jsLayout->Set(isolate, "GetLineMetrics", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                Local<Context> context = isolate->GetCurrentContext();
+                IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                //DWRITE_LINE_METRICS* lineMetrics = nullptr; //oh it wanted me to allocate space for that myself
+                std::vector<DWRITE_LINE_METRICS> lineMetrics(IntegerFI(info[0])); //is this actually valid because im gonna be mad (visual studio says there's no constructor that just takes a number)
+                unsigned int actualLineCount = 0;
+
+                RetIfFailed(layout->GetLineMetrics(&lineMetrics[0], IntegerFI(info[0]), &actualLineCount), "GetLineMetrics failed");
+                
+                Local<Array> metricss = Array::New(isolate, actualLineCount);
+
+                for (unsigned int i = 0; i < actualLineCount; i++) {
+                    Local<Object> jsMetrics = Object::New(isolate);
+
+                    jsMetrics->Set(context, LITERAL("length"), Number::New(isolate, lineMetrics[i].length));
+                    jsMetrics->Set(context, LITERAL("trailingWhitespaceLength"), Number::New(isolate, lineMetrics[i].trailingWhitespaceLength));
+                    jsMetrics->Set(context, LITERAL("newlineLength"), Number::New(isolate, lineMetrics[i].newlineLength));
+                    jsMetrics->Set(context, LITERAL("height"), Number::New(isolate, lineMetrics[i].height));
+                    jsMetrics->Set(context, LITERAL("baseline"), Number::New(isolate, lineMetrics[i].baseline));
+                    jsMetrics->Set(context, LITERAL("isTrimmed"), Number::New(isolate, lineMetrics[i].isTrimmed));
+
+                    metricss->Set(context, i, jsMetrics);
+                }
+
+                info.GetReturnValue().Set(metricss);
+            }));
+
+            //jsLayout->Set(isolate, "GetLocaleName", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            //    Isolate* isolate = info.GetIsolate();
+            //    IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            //
+            //}));
+            //
+            //jsLayout->Set(isolate, "GetLocaleNameLength", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            //    Isolate* isolate = info.GetIsolate();
+            //    IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            //
+            //}));
+
+            jsLayout->Set(isolate, "GetMaxHeight", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                info.GetReturnValue().Set(Number::New(isolate, layout->GetMaxHeight()));
+            }));
+
+            jsLayout->Set(isolate, "GetMaxWidth", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                info.GetReturnValue().Set(Number::New(isolate, layout->GetMaxWidth()));
+            }));
+
+            jsLayout->Set(isolate, "GetMetrics", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                Local<Context> context = isolate->GetCurrentContext();
+                IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            
+                DWRITE_TEXT_METRICS textMetrics{0};
+
+                RetIfFailed(layout->GetMetrics(&textMetrics), "GetMetrics failed");
+
+                Local<Object> jsMetrics = Object::New(isolate);
+
+                jsMetrics->Set(context, LITERAL("left"), Number::New(isolate, textMetrics.left));
+                jsMetrics->Set(context, LITERAL("top"), Number::New(isolate, textMetrics.top));
+                jsMetrics->Set(context, LITERAL("width"), Number::New(isolate, textMetrics.width));
+                jsMetrics->Set(context, LITERAL("widthIncludingTrailingWhitespace"), Number::New(isolate, textMetrics.widthIncludingTrailingWhitespace));
+                jsMetrics->Set(context, LITERAL("height"), Number::New(isolate, textMetrics.height));
+                jsMetrics->Set(context, LITERAL("layoutWidth"), Number::New(isolate, textMetrics.layoutWidth));
+                jsMetrics->Set(context, LITERAL("layoutHeight"), Number::New(isolate, textMetrics.layoutHeight));
+                jsMetrics->Set(context, LITERAL("maxBidiReorderingDepth"), Number::New(isolate, textMetrics.maxBidiReorderingDepth));
+                jsMetrics->Set(context, LITERAL("lineCount"), Number::New(isolate, textMetrics.lineCount));
+
+                info.GetReturnValue().Set(jsMetrics);
+            }));
+            
+            jsLayout->Set(isolate, "GetOverhangMetrics", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            
+                DWRITE_OVERHANG_METRICS overhangMetrics{0};
+
+                RetIfFailed(layout->GetOverhangMetrics(&overhangMetrics), "GetOverhangMetrics failed");
+
+                Local<Object> jsRect = Object::New(isolate);
+
+                jsRect->Set(isolate->GetCurrentContext(), LITERAL("left"), Number::New(isolate, overhangMetrics.left));
+                jsRect->Set(isolate->GetCurrentContext(), LITERAL("top"), Number::New(isolate, overhangMetrics.top));
+                jsRect->Set(isolate->GetCurrentContext(), LITERAL("right"), Number::New(isolate, overhangMetrics.right));
+                jsRect->Set(isolate->GetCurrentContext(), LITERAL("bottom"), Number::New(isolate, overhangMetrics.bottom));
+
+                info.GetReturnValue().Set(jsRect);
+            }));
+
+            jsLayout->Set(isolate, "GetStrikethrough", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                BOOL strikethroughed = false;
+
+                DWRITE_TEXT_RANGE textRange = DIRECT2D::genTextRange(isolate, layout, IntegerFI(info[1]), info[2]);
+
+                RetIfFailed(layout->GetStrikethrough(IntegerFI(info[0]), &strikethroughed, &textRange), "GetStrikethrough failed");
+
+                info.GetReturnValue().Set(Boolean::New(isolate, strikethroughed));
+            }));
+
+            //jsLayout->Set(isolate, "GetTypography", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            //    Isolate* isolate = info.GetIsolate();
+            //    IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            //
+            //    
+            //}));
+
+            jsLayout->Set(isolate, "GetUnderline", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                BOOL underlined = false;
+
+                DWRITE_TEXT_RANGE textRange = DIRECT2D::genTextRange(isolate, layout, IntegerFI(info[1]), info[2]);
+
+                RetIfFailed(layout->GetUnderline(IntegerFI(info[0]), &underlined, &textRange), "GetUnderlined failed");
+
+                info.GetReturnValue().Set(Boolean::New(isolate, underlined));
+            }));
+
+            jsLayout->Set(isolate, "HitTestPoint", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                Local<Context> context = isolate->GetCurrentContext();
+                IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                BOOL isTrailingHit = false;
+                BOOL isInside = false;
+
+                DWRITE_HIT_TEST_METRICS hitTestMetrics{ 0 };
+
+                RetIfFailed(layout->HitTestPoint(FloatFI(info[0]), FloatFI(info[1]), &isTrailingHit, &isInside, &hitTestMetrics), "HitTestPoint failed");
+
+                Local<ObjectTemplate> ykykyk = ObjectTemplate::New(isolate);
+
+                ykykyk->Set(isolate, "isTrailingHit", Number::New(isolate, isTrailingHit));
+                ykykyk->Set(isolate, "isInside", Number::New(isolate, isInside));
+                
+                Local<Object> jsMetrics = Object::New(isolate);
+
+                jsMetrics->Set(context, LITERAL("textPosition"), Number::New(isolate, hitTestMetrics.textPosition));
+                jsMetrics->Set(context, LITERAL("length"), Number::New(isolate, hitTestMetrics.length));
+                jsMetrics->Set(context, LITERAL("left"), Number::New(isolate, hitTestMetrics.left));
+                jsMetrics->Set(context, LITERAL("top"), Number::New(isolate, hitTestMetrics.top));
+                jsMetrics->Set(context, LITERAL("width"), Number::New(isolate, hitTestMetrics.width));
+                jsMetrics->Set(context, LITERAL("height"), Number::New(isolate, hitTestMetrics.height));
+                jsMetrics->Set(context, LITERAL("bidiLevel"), Number::New(isolate, hitTestMetrics.bidiLevel));
+                jsMetrics->Set(context, LITERAL("isText"), Number::New(isolate, hitTestMetrics.isText));
+                jsMetrics->Set(context, LITERAL("isTrimmed"), Number::New(isolate, hitTestMetrics.isTrimmed));
+
+                ykykyk->Set(isolate, "hitTestMetrics", jsMetrics);
+
+                info.GetReturnValue().Set(ykykyk->NewInstance(context).ToLocalChecked());
+            }));
+
+            jsLayout->Set(isolate, "HitTestTextPosition", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                Local<Context> context = isolate->GetCurrentContext();
+                IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                float pointX = 0;
+                float pointY = 0;
+
+                DWRITE_HIT_TEST_METRICS hitTestMetrics{ 0 };
+
+                RetIfFailed(layout->HitTestTextPosition(IntegerFI(info[0]), IntegerFI(info[1]), &pointX, &pointY, &hitTestMetrics), "HitTestTextPosition failed");
+
+                Local<ObjectTemplate> ykykyk = ObjectTemplate::New(isolate);
+
+                ykykyk->Set(isolate, "x", Number::New(isolate, pointX));
+                ykykyk->Set(isolate, "y", Number::New(isolate, pointY));
+
+                Local<Object> jsMetrics = Object::New(isolate);
+
+                jsMetrics->Set(context, LITERAL("textPosition"), Number::New(isolate, hitTestMetrics.textPosition));
+                jsMetrics->Set(context, LITERAL("length"), Number::New(isolate, hitTestMetrics.length));
+                jsMetrics->Set(context, LITERAL("left"), Number::New(isolate, hitTestMetrics.left));
+                jsMetrics->Set(context, LITERAL("top"), Number::New(isolate, hitTestMetrics.top));
+                jsMetrics->Set(context, LITERAL("width"), Number::New(isolate, hitTestMetrics.width));
+                jsMetrics->Set(context, LITERAL("height"), Number::New(isolate, hitTestMetrics.height));
+                jsMetrics->Set(context, LITERAL("bidiLevel"), Number::New(isolate, hitTestMetrics.bidiLevel));
+                jsMetrics->Set(context, LITERAL("isText"), Number::New(isolate, hitTestMetrics.isText));
+                jsMetrics->Set(context, LITERAL("isTrimmed"), Number::New(isolate, hitTestMetrics.isTrimmed));
+
+                ykykyk->Set(isolate, "hitTestMetrics", jsMetrics);
+
+                info.GetReturnValue().Set(ykykyk->NewInstance(context).ToLocalChecked());
+            }));
+
+            jsLayout->Set(isolate, "HitTestTextRange", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                Local<Context> context = isolate->GetCurrentContext();
+                IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                unsigned int actualHitTestMetricsCount = 0;
+
+                //DWRITE_HIT_TEST_METRICS* hitTestMetrics = nullptr;
+                std::vector<DWRITE_HIT_TEST_METRICS> hitTestMetrics(IntegerFI(info[4]));
+
+                RetIfFailed(layout->HitTestTextRange(IntegerFI(info[0]), IntegerFI(info[1]), FloatFI(info[2]), FloatFI(info[3]), hitTestMetrics.data(), IntegerFI(info[4]), &actualHitTestMetricsCount), "HitTestTextPosition failed");
+
+                Local<ObjectTemplate> ykykyk = ObjectTemplate::New(isolate);
+
+                ykykyk->Set(isolate, "actualHitTestMetricsCount", Number::New(isolate, actualHitTestMetricsCount));
+
+                Local<Array> metricss = Array::New(isolate, actualHitTestMetricsCount);
+
+                for (unsigned int i = 0; i < actualHitTestMetricsCount; i++) {
+                    Local<Object> jsMetrics = Object::New(isolate);
+
+                    jsMetrics->Set(context, LITERAL("textPosition"), Number::New(isolate, hitTestMetrics[i].textPosition));
+                    jsMetrics->Set(context, LITERAL("length"), Number::New(isolate, hitTestMetrics[i].length));
+                    jsMetrics->Set(context, LITERAL("left"), Number::New(isolate, hitTestMetrics[i].left));
+                    jsMetrics->Set(context, LITERAL("top"), Number::New(isolate, hitTestMetrics[i].top));
+                    jsMetrics->Set(context, LITERAL("width"), Number::New(isolate, hitTestMetrics[i].width));
+                    jsMetrics->Set(context, LITERAL("height"), Number::New(isolate, hitTestMetrics[i].height));
+                    jsMetrics->Set(context, LITERAL("bidiLevel"), Number::New(isolate, hitTestMetrics[i].bidiLevel));
+                    jsMetrics->Set(context, LITERAL("isText"), Number::New(isolate, hitTestMetrics[i].isText));
+                    jsMetrics->Set(context, LITERAL("isTrimmed"), Number::New(isolate, hitTestMetrics[i].isTrimmed));
+                    
+                    metricss->Set(context, i, jsMetrics);
+                }
+
+                ykykyk->Set(isolate, "hitTestMetrics", metricss);
+
+                info.GetReturnValue().Set(ykykyk->NewInstance(context).ToLocalChecked());
+            }));
+
+            jsLayout->Set(isolate, "SetDrawingEffect", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                DWRITE_TEXT_RANGE textRange = DIRECT2D::genTextRange(isolate, layout, IntegerFI(info[1]), info[2]);
+
+                RetIfFailed(layout->SetDrawingEffect((IUnknown*)IntegerFI(info[0].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()), textRange), "SetDrawingEffect");
+            }));
+
+            //jsLayout->Set(isolate, "SetFontCollection", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            //    Isolate* isolate = info.GetIsolate();
+            //    IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            //
+            //}));
+
+            jsLayout->Set(isolate, "SetFontFamilyName", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                DWRITE_TEXT_RANGE textRange = DIRECT2D::genTextRange(isolate, layout, IntegerFI(info[1]), info[2]);
+
+                RetIfFailed(layout->SetFontFamilyName(WStringFI(info[0]), textRange), "SetFontFamilyName");
+            }));
+
+            jsLayout->Set(isolate, "SetFontSize", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                DWRITE_TEXT_RANGE textRange = DIRECT2D::genTextRange(isolate, layout, IntegerFI(info[1]), info[2]);
+
+                RetIfFailed(layout->SetFontSize(FloatFI(info[0]), textRange), "SetFontSize");
+            }));
+
+            jsLayout->Set(isolate, "SetFontStretch", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                DWRITE_FONT_STRETCH fontStretch = (DWRITE_FONT_STRETCH)IntegerFI(info[0]);
+
+                DWRITE_TEXT_RANGE textRange = DIRECT2D::genTextRange(isolate, layout, IntegerFI(info[1]), info[2]);
+
+                RetIfFailed(layout->SetFontStretch(fontStretch, textRange), "SetFontStretch failed");
+            }));
+
+            jsLayout->Set(isolate, "SetFontStyle", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                DWRITE_FONT_STYLE fontStyle = (DWRITE_FONT_STYLE)IntegerFI(info[0]);
+
+                DWRITE_TEXT_RANGE textRange = DIRECT2D::genTextRange(isolate, layout, IntegerFI(info[1]), info[2]);
+
+                RetIfFailed(layout->SetFontStyle(fontStyle, textRange), "SetFontStyle failed");
+            }));
+
+            jsLayout->Set(isolate, "SetFontWeight", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                DWRITE_FONT_WEIGHT fontWeight = (DWRITE_FONT_WEIGHT)IntegerFI(info[0]);
+
+                DWRITE_TEXT_RANGE textRange = DIRECT2D::genTextRange(isolate, layout, IntegerFI(info[1]), info[2]);
+
+                RetIfFailed(layout->SetFontWeight(fontWeight, textRange), "SetFontWeight failed");
+            }));
+
+            //jsLayout->Set(isolate, "SetInlineObject", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            //    Isolate* isolate = info.GetIsolate();
+            //    IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            //
+            //}));
+            //
+            //jsLayout->Set(isolate, "SetLocaleName", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            //    Isolate* isolate = info.GetIsolate();
+            //    IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            //
+            //}));
+
+            jsLayout->Set(isolate, "SetMaxHeight", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                RetIfFailed(layout->SetMaxHeight(FloatFI(info[0])), "SetMaxHeight failed?");
+            }));
+
+            jsLayout->Set(isolate, "SetMaxWidth", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                RetIfFailed(layout->SetMaxWidth(FloatFI(info[0])), "SetMaxWidth failed?");
+            }));
+
+            jsLayout->Set(isolate, "SetStrikethrough", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                DWRITE_TEXT_RANGE textRange = DIRECT2D::genTextRange(isolate, layout, IntegerFI(info[1]), info[2]);
+
+                RetIfFailed(layout->SetStrikethrough(IntegerFI(info[0]), textRange), "SetStrikethrough failed");
+            }));
+
+            //jsLayout->Set(isolate, "SetTypography", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            //    Isolate* isolate = info.GetIsolate();
+            //    IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            //
+            //}));
+
+            jsLayout->Set(isolate, "SetUnderline", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                DWRITE_TEXT_RANGE textRange = DIRECT2D::genTextRange(isolate, layout, IntegerFI(info[1]), info[2]);
+
+                RetIfFailed(layout->SetUnderline(IntegerFI(info[0]), textRange), "SetUnderline failed");
+            }));
+
+            info.GetReturnValue().Set(jsLayout->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
+        }));
         context->Set(isolate, "DrawText", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
             Isolate* isolate = info.GetIsolate();
             Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-        
+
+            //bruh this was me converting a char* string to a wchar_t* string because i didn't know how to get a utf16 string from v8
             const char* text = CStringFI(info[0]);
             size_t length = strlen(text);
-            std::wstring textws(length, L'#');
+            std::wstring textws(length, L'\0');
             mbstowcs(&textws[0], text, length);
 
             IDWriteTextFormat* textFormat = (IDWriteTextFormat*)info[1].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()->IntegerValue(isolate->GetCurrentContext()).FromJust();
@@ -2207,13 +2699,21 @@ V8FUNC(createCanvas) {
 
             d2d->renderTarget->DrawTextW(textws.c_str(), textws.length(), textFormat, D2D1::RectF(FloatFI(info[2]), FloatFI(info[3]), FloatFI(info[4]), FloatFI(info[5])), brush);
         }));
+        context->Set(isolate, "DrawTextLayout", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            IDWriteTextLayout* layout = (IDWriteTextLayout*)info[2].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            ID2D1Brush* brush = (ID2D1Brush*)info[3].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+            d2d->renderTarget->DrawTextLayout(D2D1::Point2F(FloatFI(info[0]), FloatFI(info[1])), layout, brush);
+        }));
         context->Set(isolate, "DrawGradientText", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
             Isolate* isolate = info.GetIsolate();
             Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
         
             const char* text = CStringFI(info[0]);
             size_t length = strlen(text);
-            std::wstring textws(length, L'#');
+            std::wstring textws(length, L'\0');
             mbstowcs(&textws[0], text, length);
 
             IDWriteTextFormat* textFormat = (IDWriteTextFormat*)info[1].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()->IntegerValue(isolate->GetCurrentContext()).FromJust();
@@ -2847,13 +3347,54 @@ V8FUNC(createCanvas) {
             
             delete d2d;
         }));
+
+        context->Set(isolate, "CreateEffect", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+            if (d2d->type >= 2) {
+                Direct2D11* d2d11 = (Direct2D11*)d2d;
+                Local<Context> context = isolate->GetCurrentContext();
+                ID2D1Effect* effect;
+                Local<Array> id = info[0].As<Array>();
+                GUID shit = { IntegerFI(id->Get(context, 0).ToLocalChecked()),
+                    IntegerFI(id->Get(context, 1).ToLocalChecked()),
+                    IntegerFI(id->Get(context, 2).ToLocalChecked()),
+                    IntegerFI(id->Get(context, 3).ToLocalChecked()),
+                    IntegerFI(id->Get(context, 4).ToLocalChecked()),
+                    IntegerFI(id->Get(context, 5).ToLocalChecked()),
+                    IntegerFI(id->Get(context, 6).ToLocalChecked()),
+                    IntegerFI(id->Get(context, 7).ToLocalChecked()),
+                    IntegerFI(id->Get(context, 8).ToLocalChecked()),
+                    IntegerFI(id->Get(context, 9).ToLocalChecked()),
+                    IntegerFI(id->Get(context, 10).ToLocalChecked()) };
+
+                RetIfFailed(d2d11->d2dcontext->CreateEffect(shit, &effect), "CreateEffect failed!");
+
+                Local<ObjectTemplate> jsEffect = DIRECT2D::getIUnknownImpl(isolate, effect);
+
+                jsEffect->Set(isolate, "SetValue", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                    Isolate* isolate = info.GetIsolate();
+                    ID2D1Effect* effect = (ID2D1Effect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                    //oh no bruh SetValue works super weird and idk if i can do it MAN FUCK
+                    RetIfFailed(effect->SetValue(IntegerFI(info[0]), IntegerFI(info[1])), "SetValue failed!");
+                }));
+
+                info.GetReturnValue().Set(jsEffect->NewInstance(context).ToLocalChecked());
+            }
+            else {
+                print(d2d->type);
+                MessageBox(NULL, L"CreateEffect only works if d2d was created with ID2D1DeviceContext or ID2D1DeviceContextDComposition", L"CreateEffect failed", MB_OK | MB_SYSTEMMODAL);
+            }
+        }));
         //context->Set(isolate, "EndDraw", d2d->EndDraw);
         //delete d2d;
     }
     else if (strcmp(contextType, "d3d") == 0 || strcmp(contextType, "direct3d") == 0 || strcmp(contextType, "directx") == 0) {
         print("d3d");
     }
-    else if (strcmp(contextType, "gl") == 0 || strcmp(contextType, "webgl") == 0) {
+    else if (strcmp(contextType, "gl") == 0 || strcmp(contextType, "webgl") == 0 || strcmp(contextType, "opengl") == 0) {
         HWND window = (HWND)IntegerFI(info[2]);
         //RECT r{}; GetClientRect(window, &r);
 
@@ -3377,7 +3918,55 @@ V8FUNC(createCanvas) {
     }
     //Local<Object> result = wndclass->NewInstance(isolate->GetCurrentContext()).ToLocalChecked();
 
-    info.GetReturnValue().Set(context->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
+    Local<Object> contextObject = context->NewInstance(isolate->GetCurrentContext()).ToLocalChecked();
+
+    if (d2d11) {
+        Local<Context> c = isolate->GetCurrentContext();
+        #define setGUID(id) { Local<Value> elem##id[] = {Number::New(isolate, id.Data1), Number::New(isolate, id.Data2), Number::New(isolate, id.Data3), Number::New(isolate, id.Data4[0]), Number::New(isolate, id.Data4[1]), Number::New(isolate, id.Data4[2]), Number::New(isolate, id.Data4[3]), Number::New(isolate, id.Data4[4]), Number::New(isolate, id.Data4[5]), Number::New(isolate, id.Data4[6]), Number::New(isolate, id.Data4[7])}; Local<Array> jsArr##id = Array::New(isolate, elem##id, 11); contextObject->Set(c, LITERAL(#id), jsArr##id); }
+            setGUID(CLSID_D2D13DPerspectiveTransform);
+            setGUID(CLSID_D2D13DTransform);
+            setGUID(CLSID_D2D1ArithmeticComposite);
+            setGUID(CLSID_D2D1Atlas);
+            setGUID(CLSID_D2D1BitmapSource);
+            setGUID(CLSID_D2D1Blend);
+            setGUID(CLSID_D2D1Border);
+            setGUID(CLSID_D2D1Brightness);
+            setGUID(CLSID_D2D1ColorManagement);
+            setGUID(CLSID_D2D1ColorMatrix);
+            setGUID(CLSID_D2D1Composite);
+            setGUID(CLSID_D2D1ConvolveMatrix);
+            setGUID(CLSID_D2D1Crop);
+            setGUID(CLSID_D2D1DirectionalBlur);
+            setGUID(CLSID_D2D1DiscreteTransfer);
+            setGUID(CLSID_D2D1DisplacementMap);
+            setGUID(CLSID_D2D1DistantDiffuse);
+            setGUID(CLSID_D2D1DistantSpecular);
+            setGUID(CLSID_D2D1DpiCompensation);
+            setGUID(CLSID_D2D1Flood);
+            setGUID(CLSID_D2D1GammaTransfer);
+            setGUID(CLSID_D2D1GaussianBlur);
+            setGUID(CLSID_D2D1Scale);
+            setGUID(CLSID_D2D1Histogram);
+            setGUID(CLSID_D2D1HueRotation);
+            setGUID(CLSID_D2D1LinearTransfer);
+            setGUID(CLSID_D2D1LuminanceToAlpha);
+            setGUID(CLSID_D2D1Morphology);
+            setGUID(CLSID_D2D1OpacityMetadata);
+            setGUID(CLSID_D2D1PointDiffuse);
+            setGUID(CLSID_D2D1PointSpecular);
+            setGUID(CLSID_D2D1Premultiply);
+            setGUID(CLSID_D2D1Saturation);
+            setGUID(CLSID_D2D1Shadow);
+            setGUID(CLSID_D2D1SpotDiffuse);
+            setGUID(CLSID_D2D1SpotSpecular);
+            setGUID(CLSID_D2D1TableTransfer);
+            setGUID(CLSID_D2D1Tile);
+            setGUID(CLSID_D2D1Turbulence);
+            setGUID(CLSID_D2D1UnPremultiply);
+#undef setGUID
+    }
+
+    info.GetReturnValue().Set(contextObject);
 }
 
 V8FUNC(SleepWrapper) {
@@ -6525,13 +7114,14 @@ V8FUNC(InitializeWIC) {
     }
 }
 
+#define setGlobalGUID(id) { Local<Value> elem##id[] = {Number::New(isolate, id.Data1), Number::New(isolate, id.Data2), Number::New(isolate, id.Data3), Number::New(isolate, id.Data4[0]), Number::New(isolate, id.Data4[1]), Number::New(isolate, id.Data4[2]), Number::New(isolate, id.Data4[3]), Number::New(isolate, id.Data4[4]), Number::New(isolate, id.Data4[5]), Number::New(isolate, id.Data4[6]), Number::New(isolate, id.Data4[7])}; Local<Array> jsArr##id = Array::New(isolate, elem##id, 11); global->Set(context, LITERAL(#id), jsArr##id); }
+
 V8FUNC(ScopeGUIDs) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
     Local<Context> context = isolate->GetCurrentContext();
     Local<Object> global = info[0].As<Object>(); //uhh idk about this one
     //global->Set(context, LITERAL("was"), LITERAL("GYTAT"));
-    #define setGlobalGUID(id) { Local<Value> elem##id[] = {Number::New(isolate, id.Data1), Number::New(isolate, id.Data2), Number::New(isolate, id.Data3), Number::New(isolate, id.Data4[0]), Number::New(isolate, id.Data4[1]), Number::New(isolate, id.Data4[2]), Number::New(isolate, id.Data4[3]), Number::New(isolate, id.Data4[4]), Number::New(isolate, id.Data4[5]), Number::New(isolate, id.Data4[6]), Number::New(isolate, id.Data4[7])}; Local<Array> jsArr##id = Array::New(isolate, elem##id, 11); global->Set(context, LITERAL(#id), jsArr##id); }
     setGlobalGUID(GUID_WICPixelFormatDontCare); //i had a little regex help on this hoe /GUID_\w+/g regexr.com/80jco
     setGlobalGUID(GUID_WICPixelFormat1bppIndexed);
     setGlobalGUID(GUID_WICPixelFormat2bppIndexed);
@@ -6629,7 +7219,7 @@ V8FUNC(ScopeGUIDs) {
     setGlobalGUID(GUID_ContainerFormatTiff);
     setGlobalGUID(GUID_ContainerFormatGif);
     setGlobalGUID(GUID_ContainerFormatWmp);
-    #undef setGlobalGUID
+    //#undef setGlobalGUID
 }
 
 void SystemWrapper(const v8::FunctionCallbackInfo<v8::Value>& info) {
@@ -8252,6 +8842,8 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
     setGlobalConst(DWRITE_TRIMMING_GRANULARITY_NONE);
     setGlobalConst(DWRITE_TRIMMING_GRANULARITY_CHARACTER);
     setGlobalConst(DWRITE_TRIMMING_GRANULARITY_WORD);
+
+    setGlobalConst(D2D1_BORDER_MODE_SOFT); setGlobalConst(D2D1_BORDER_MODE_HARD); setGlobalConst(D2D1_BORDER_MODE_FORCE_DWORD); setGlobalConst(D2D1_CHANNEL_SELECTOR_R); setGlobalConst(D2D1_CHANNEL_SELECTOR_G); setGlobalConst(D2D1_CHANNEL_SELECTOR_B); setGlobalConst(D2D1_CHANNEL_SELECTOR_A); setGlobalConst(D2D1_CHANNEL_SELECTOR_FORCE_DWORD); setGlobalConst(D2D1_BITMAPSOURCE_ORIENTATION_DEFAULT); setGlobalConst(D2D1_BITMAPSOURCE_ORIENTATION_FLIP_HORIZONTAL); setGlobalConst(D2D1_BITMAPSOURCE_ORIENTATION_ROTATE_CLOCKWISE180); setGlobalConst(D2D1_BITMAPSOURCE_ORIENTATION_ROTATE_CLOCKWISE180_FLIP_HORIZONTAL); setGlobalConst(D2D1_BITMAPSOURCE_ORIENTATION_ROTATE_CLOCKWISE270_FLIP_HORIZONTAL); setGlobalConst(D2D1_BITMAPSOURCE_ORIENTATION_ROTATE_CLOCKWISE90); setGlobalConst(D2D1_BITMAPSOURCE_ORIENTATION_ROTATE_CLOCKWISE90_FLIP_HORIZONTAL); setGlobalConst(D2D1_BITMAPSOURCE_ORIENTATION_ROTATE_CLOCKWISE270); setGlobalConst(D2D1_BITMAPSOURCE_ORIENTATION_FORCE_DWORD); setGlobalConst(D2D1_GAUSSIANBLUR_PROP_STANDARD_DEVIATION); setGlobalConst(D2D1_GAUSSIANBLUR_PROP_OPTIMIZATION); setGlobalConst(D2D1_GAUSSIANBLUR_PROP_BORDER_MODE); setGlobalConst(D2D1_GAUSSIANBLUR_PROP_FORCE_DWORD); setGlobalConst(D2D1_GAUSSIANBLUR_OPTIMIZATION_SPEED); setGlobalConst(D2D1_GAUSSIANBLUR_OPTIMIZATION_BALANCED); setGlobalConst(D2D1_GAUSSIANBLUR_OPTIMIZATION_QUALITY); setGlobalConst(D2D1_GAUSSIANBLUR_OPTIMIZATION_FORCE_DWORD); setGlobalConst(D2D1_DIRECTIONALBLUR_PROP_STANDARD_DEVIATION); setGlobalConst(D2D1_DIRECTIONALBLUR_PROP_ANGLE); setGlobalConst(D2D1_DIRECTIONALBLUR_PROP_OPTIMIZATION); setGlobalConst(D2D1_DIRECTIONALBLUR_PROP_BORDER_MODE); setGlobalConst(D2D1_DIRECTIONALBLUR_PROP_FORCE_DWORD); setGlobalConst(D2D1_DIRECTIONALBLUR_OPTIMIZATION_SPEED); setGlobalConst(D2D1_DIRECTIONALBLUR_OPTIMIZATION_BALANCED); setGlobalConst(D2D1_DIRECTIONALBLUR_OPTIMIZATION_QUALITY); setGlobalConst(D2D1_DIRECTIONALBLUR_OPTIMIZATION_FORCE_DWORD); setGlobalConst(D2D1_SHADOW_PROP_BLUR_STANDARD_DEVIATION); setGlobalConst(D2D1_SHADOW_PROP_COLOR); setGlobalConst(D2D1_SHADOW_PROP_OPTIMIZATION); setGlobalConst(D2D1_SHADOW_PROP_FORCE_DWORD); setGlobalConst(D2D1_SHADOW_OPTIMIZATION_SPEED); setGlobalConst(D2D1_SHADOW_OPTIMIZATION_BALANCED); setGlobalConst(D2D1_SHADOW_OPTIMIZATION_QUALITY); setGlobalConst(D2D1_SHADOW_OPTIMIZATION_FORCE_DWORD); setGlobalConst(D2D1_BLEND_PROP_MODE); setGlobalConst(D2D1_BLEND_PROP_FORCE_DWORD); setGlobalConst(D2D1_BLEND_MODE_MULTIPLY); setGlobalConst(D2D1_BLEND_MODE_SCREEN); setGlobalConst(D2D1_BLEND_MODE_DARKEN); setGlobalConst(D2D1_BLEND_MODE_LIGHTEN); setGlobalConst(D2D1_BLEND_MODE_DISSOLVE); setGlobalConst(D2D1_BLEND_MODE_COLOR_BURN); setGlobalConst(D2D1_BLEND_MODE_LINEAR_BURN); setGlobalConst(D2D1_BLEND_MODE_DARKER_COLOR); setGlobalConst(D2D1_BLEND_MODE_LIGHTER_COLOR); setGlobalConst(D2D1_BLEND_MODE_COLOR_DODGE); setGlobalConst(D2D1_BLEND_MODE_LINEAR_DODGE); setGlobalConst(D2D1_BLEND_MODE_OVERLAY); setGlobalConst(D2D1_BLEND_MODE_SOFT_LIGHT); setGlobalConst(D2D1_BLEND_MODE_HARD_LIGHT); setGlobalConst(D2D1_BLEND_MODE_VIVID_LIGHT); setGlobalConst(D2D1_BLEND_MODE_LINEAR_LIGHT); setGlobalConst(D2D1_BLEND_MODE_PIN_LIGHT); setGlobalConst(D2D1_BLEND_MODE_HARD_MIX); setGlobalConst(D2D1_BLEND_MODE_DIFFERENCE); setGlobalConst(D2D1_BLEND_MODE_EXCLUSION); setGlobalConst(D2D1_BLEND_MODE_HUE); setGlobalConst(D2D1_BLEND_MODE_SATURATION); setGlobalConst(D2D1_BLEND_MODE_COLOR); setGlobalConst(D2D1_BLEND_MODE_LUMINOSITY); setGlobalConst(D2D1_BLEND_MODE_SUBTRACT); setGlobalConst(D2D1_BLEND_MODE_DIVISION); setGlobalConst(D2D1_BLEND_MODE_FORCE_DWORD); setGlobalConst(D2D1_SATURATION_PROP_SATURATION); setGlobalConst(D2D1_SATURATION_PROP_FORCE_DWORD); setGlobalConst(D2D1_HUEROTATION_PROP_ANGLE); setGlobalConst(D2D1_HUEROTATION_PROP_FORCE_DWORD); setGlobalConst(D2D1_COLORMATRIX_PROP_COLOR_MATRIX); setGlobalConst(D2D1_COLORMATRIX_PROP_ALPHA_MODE); setGlobalConst(D2D1_COLORMATRIX_PROP_CLAMP_OUTPUT); setGlobalConst(D2D1_COLORMATRIX_PROP_FORCE_DWORD); setGlobalConst(D2D1_COLORMATRIX_ALPHA_MODE_PREMULTIPLIED); setGlobalConst(D2D1_COLORMATRIX_ALPHA_MODE_STRAIGHT); setGlobalConst(D2D1_COLORMATRIX_ALPHA_MODE_FORCE_DWORD); setGlobalConst(D2D1_BITMAPSOURCE_PROP_WIC_BITMAP_SOURCE); setGlobalConst(D2D1_BITMAPSOURCE_PROP_SCALE); setGlobalConst(D2D1_BITMAPSOURCE_PROP_INTERPOLATION_MODE); setGlobalConst(D2D1_BITMAPSOURCE_PROP_ENABLE_DPI_CORRECTION); setGlobalConst(D2D1_BITMAPSOURCE_PROP_ALPHA_MODE); setGlobalConst(D2D1_BITMAPSOURCE_PROP_ORIENTATION); setGlobalConst(D2D1_BITMAPSOURCE_PROP_FORCE_DWORD); setGlobalConst(D2D1_BITMAPSOURCE_INTERPOLATION_MODE_NEAREST_NEIGHBOR); setGlobalConst(D2D1_BITMAPSOURCE_INTERPOLATION_MODE_LINEAR); setGlobalConst(D2D1_BITMAPSOURCE_INTERPOLATION_MODE_CUBIC); setGlobalConst(D2D1_BITMAPSOURCE_INTERPOLATION_MODE_FANT); setGlobalConst(D2D1_BITMAPSOURCE_INTERPOLATION_MODE_MIPMAP_LINEAR); setGlobalConst(D2D1_BITMAPSOURCE_INTERPOLATION_MODE_FORCE_DWORD); setGlobalConst(D2D1_BITMAPSOURCE_ALPHA_MODE_PREMULTIPLIED); setGlobalConst(D2D1_BITMAPSOURCE_ALPHA_MODE_STRAIGHT); setGlobalConst(D2D1_BITMAPSOURCE_ALPHA_MODE_FORCE_DWORD); setGlobalConst(D2D1_COMPOSITE_PROP_MODE); setGlobalConst(D2D1_COMPOSITE_PROP_FORCE_DWORD); setGlobalConst(D2D1_3DTRANSFORM_PROP_INTERPOLATION_MODE); setGlobalConst(D2D1_3DTRANSFORM_PROP_BORDER_MODE); setGlobalConst(D2D1_3DTRANSFORM_PROP_TRANSFORM_MATRIX); setGlobalConst(D2D1_3DTRANSFORM_PROP_FORCE_DWORD); setGlobalConst(D2D1_3DTRANSFORM_INTERPOLATION_MODE_NEAREST_NEIGHBOR); setGlobalConst(D2D1_3DTRANSFORM_INTERPOLATION_MODE_LINEAR); setGlobalConst(D2D1_3DTRANSFORM_INTERPOLATION_MODE_CUBIC); setGlobalConst(D2D1_3DTRANSFORM_INTERPOLATION_MODE_MULTI_SAMPLE_LINEAR); setGlobalConst(D2D1_3DTRANSFORM_INTERPOLATION_MODE_ANISOTROPIC); setGlobalConst(D2D1_3DTRANSFORM_INTERPOLATION_MODE_FORCE_DWORD); setGlobalConst(D2D1_3DPERSPECTIVETRANSFORM_PROP_INTERPOLATION_MODE); setGlobalConst(D2D1_3DPERSPECTIVETRANSFORM_PROP_BORDER_MODE); setGlobalConst(D2D1_3DPERSPECTIVETRANSFORM_PROP_DEPTH); setGlobalConst(D2D1_3DPERSPECTIVETRANSFORM_PROP_PERSPECTIVE_ORIGIN); setGlobalConst(D2D1_3DPERSPECTIVETRANSFORM_PROP_LOCAL_OFFSET); setGlobalConst(D2D1_3DPERSPECTIVETRANSFORM_PROP_GLOBAL_OFFSET); setGlobalConst(D2D1_3DPERSPECTIVETRANSFORM_PROP_ROTATION_ORIGIN); setGlobalConst(D2D1_3DPERSPECTIVETRANSFORM_PROP_ROTATION); setGlobalConst(D2D1_3DPERSPECTIVETRANSFORM_PROP_FORCE_DWORD); setGlobalConst(D2D1_3DPERSPECTIVETRANSFORM_INTERPOLATION_MODE_NEAREST_NEIGHBOR); setGlobalConst(D2D1_3DPERSPECTIVETRANSFORM_INTERPOLATION_MODE_LINEAR); setGlobalConst(D2D1_3DPERSPECTIVETRANSFORM_INTERPOLATION_MODE_CUBIC); setGlobalConst(D2D1_3DPERSPECTIVETRANSFORM_INTERPOLATION_MODE_MULTI_SAMPLE_LINEAR); setGlobalConst(D2D1_3DPERSPECTIVETRANSFORM_INTERPOLATION_MODE_ANISOTROPIC); setGlobalConst(D2D1_3DPERSPECTIVETRANSFORM_INTERPOLATION_MODE_FORCE_DWORD); setGlobalConst(D2D1_2DAFFINETRANSFORM_PROP_INTERPOLATION_MODE); setGlobalConst(D2D1_2DAFFINETRANSFORM_PROP_BORDER_MODE); setGlobalConst(D2D1_2DAFFINETRANSFORM_PROP_TRANSFORM_MATRIX); setGlobalConst(D2D1_2DAFFINETRANSFORM_PROP_SHARPNESS); setGlobalConst(D2D1_2DAFFINETRANSFORM_PROP_FORCE_DWORD); setGlobalConst(D2D1_2DAFFINETRANSFORM_INTERPOLATION_MODE_NEAREST_NEIGHBOR); setGlobalConst(D2D1_2DAFFINETRANSFORM_INTERPOLATION_MODE_LINEAR); setGlobalConst(D2D1_2DAFFINETRANSFORM_INTERPOLATION_MODE_CUBIC); setGlobalConst(D2D1_2DAFFINETRANSFORM_INTERPOLATION_MODE_MULTI_SAMPLE_LINEAR); setGlobalConst(D2D1_2DAFFINETRANSFORM_INTERPOLATION_MODE_ANISOTROPIC); setGlobalConst(D2D1_2DAFFINETRANSFORM_INTERPOLATION_MODE_HIGH_QUALITY_CUBIC); setGlobalConst(D2D1_2DAFFINETRANSFORM_INTERPOLATION_MODE_FORCE_DWORD); setGlobalConst(D2D1_DPICOMPENSATION_PROP_INTERPOLATION_MODE); setGlobalConst(D2D1_DPICOMPENSATION_PROP_BORDER_MODE); setGlobalConst(D2D1_DPICOMPENSATION_PROP_INPUT_DPI); setGlobalConst(D2D1_DPICOMPENSATION_PROP_FORCE_DWORD); setGlobalConst(D2D1_DPICOMPENSATION_INTERPOLATION_MODE_NEAREST_NEIGHBOR); setGlobalConst(D2D1_DPICOMPENSATION_INTERPOLATION_MODE_LINEAR); setGlobalConst(D2D1_DPICOMPENSATION_INTERPOLATION_MODE_CUBIC); setGlobalConst(D2D1_DPICOMPENSATION_INTERPOLATION_MODE_MULTI_SAMPLE_LINEAR); setGlobalConst(D2D1_DPICOMPENSATION_INTERPOLATION_MODE_ANISOTROPIC); setGlobalConst(D2D1_DPICOMPENSATION_INTERPOLATION_MODE_HIGH_QUALITY_CUBIC); setGlobalConst(D2D1_DPICOMPENSATION_INTERPOLATION_MODE_FORCE_DWORD); setGlobalConst(D2D1_SCALE_PROP_SCALE); setGlobalConst(D2D1_SCALE_PROP_CENTER_POINT); setGlobalConst(D2D1_SCALE_PROP_INTERPOLATION_MODE); setGlobalConst(D2D1_SCALE_PROP_BORDER_MODE); setGlobalConst(D2D1_SCALE_PROP_SHARPNESS); setGlobalConst(D2D1_SCALE_PROP_FORCE_DWORD); setGlobalConst(D2D1_SCALE_INTERPOLATION_MODE_NEAREST_NEIGHBOR); setGlobalConst(D2D1_SCALE_INTERPOLATION_MODE_LINEAR); setGlobalConst(D2D1_SCALE_INTERPOLATION_MODE_CUBIC); setGlobalConst(D2D1_SCALE_INTERPOLATION_MODE_MULTI_SAMPLE_LINEAR); setGlobalConst(D2D1_SCALE_INTERPOLATION_MODE_ANISOTROPIC); setGlobalConst(D2D1_SCALE_INTERPOLATION_MODE_HIGH_QUALITY_CUBIC); setGlobalConst(D2D1_SCALE_INTERPOLATION_MODE_FORCE_DWORD); setGlobalConst(D2D1_TURBULENCE_PROP_OFFSET); setGlobalConst(D2D1_TURBULENCE_PROP_SIZE); setGlobalConst(D2D1_TURBULENCE_PROP_BASE_FREQUENCY); setGlobalConst(D2D1_TURBULENCE_PROP_NUM_OCTAVES); setGlobalConst(D2D1_TURBULENCE_PROP_SEED); setGlobalConst(D2D1_TURBULENCE_PROP_NOISE); setGlobalConst(D2D1_TURBULENCE_PROP_STITCHABLE); setGlobalConst(D2D1_TURBULENCE_PROP_FORCE_DWORD); setGlobalConst(D2D1_TURBULENCE_NOISE_FRACTAL_SUM); setGlobalConst(D2D1_TURBULENCE_NOISE_TURBULENCE); setGlobalConst(D2D1_TURBULENCE_NOISE_FORCE_DWORD); setGlobalConst(D2D1_DISPLACEMENTMAP_PROP_SCALE); setGlobalConst(D2D1_DISPLACEMENTMAP_PROP_X_CHANNEL_SELECT); setGlobalConst(D2D1_DISPLACEMENTMAP_PROP_Y_CHANNEL_SELECT); setGlobalConst(D2D1_DISPLACEMENTMAP_PROP_FORCE_DWORD); setGlobalConst(D2D1_COLORMANAGEMENT_PROP_SOURCE_COLOR_CONTEXT); setGlobalConst(D2D1_COLORMANAGEMENT_PROP_SOURCE_RENDERING_INTENT); setGlobalConst(D2D1_COLORMANAGEMENT_PROP_DESTINATION_COLOR_CONTEXT); setGlobalConst(D2D1_COLORMANAGEMENT_PROP_DESTINATION_RENDERING_INTENT); setGlobalConst(D2D1_COLORMANAGEMENT_PROP_ALPHA_MODE); setGlobalConst(D2D1_COLORMANAGEMENT_PROP_QUALITY); setGlobalConst(D2D1_COLORMANAGEMENT_PROP_FORCE_DWORD); setGlobalConst(D2D1_COLORMANAGEMENT_ALPHA_MODE_PREMULTIPLIED); setGlobalConst(D2D1_COLORMANAGEMENT_ALPHA_MODE_STRAIGHT); setGlobalConst(D2D1_COLORMANAGEMENT_ALPHA_MODE_FORCE_DWORD); setGlobalConst(D2D1_COLORMANAGEMENT_QUALITY_PROOF); setGlobalConst(D2D1_COLORMANAGEMENT_QUALITY_NORMAL); setGlobalConst(D2D1_COLORMANAGEMENT_QUALITY_BEST); setGlobalConst(D2D1_COLORMANAGEMENT_QUALITY_FORCE_DWORD); setGlobalConst(D2D1_COLORMANAGEMENT_RENDERING_INTENT_PERCEPTUAL); setGlobalConst(D2D1_COLORMANAGEMENT_RENDERING_INTENT_RELATIVE_COLORIMETRIC); setGlobalConst(D2D1_COLORMANAGEMENT_RENDERING_INTENT_SATURATION); setGlobalConst(D2D1_COLORMANAGEMENT_RENDERING_INTENT_ABSOLUTE_COLORIMETRIC); setGlobalConst(D2D1_COLORMANAGEMENT_RENDERING_INTENT_FORCE_DWORD); setGlobalConst(D2D1_HISTOGRAM_PROP_NUM_BINS); setGlobalConst(D2D1_HISTOGRAM_PROP_CHANNEL_SELECT); setGlobalConst(D2D1_HISTOGRAM_PROP_HISTOGRAM_OUTPUT); setGlobalConst(D2D1_HISTOGRAM_PROP_FORCE_DWORD); setGlobalConst(D2D1_POINTSPECULAR_PROP_LIGHT_POSITION); setGlobalConst(D2D1_POINTSPECULAR_PROP_SPECULAR_EXPONENT); setGlobalConst(D2D1_POINTSPECULAR_PROP_SPECULAR_CONSTANT); setGlobalConst(D2D1_POINTSPECULAR_PROP_SURFACE_SCALE); setGlobalConst(D2D1_POINTSPECULAR_PROP_COLOR); setGlobalConst(D2D1_POINTSPECULAR_PROP_KERNEL_UNIT_LENGTH); setGlobalConst(D2D1_POINTSPECULAR_PROP_SCALE_MODE); setGlobalConst(D2D1_POINTSPECULAR_PROP_FORCE_DWORD); setGlobalConst(D2D1_POINTSPECULAR_SCALE_MODE_NEAREST_NEIGHBOR); setGlobalConst(D2D1_POINTSPECULAR_SCALE_MODE_LINEAR); setGlobalConst(D2D1_POINTSPECULAR_SCALE_MODE_CUBIC); setGlobalConst(D2D1_POINTSPECULAR_SCALE_MODE_MULTI_SAMPLE_LINEAR); setGlobalConst(D2D1_POINTSPECULAR_SCALE_MODE_ANISOTROPIC); setGlobalConst(D2D1_POINTSPECULAR_SCALE_MODE_HIGH_QUALITY_CUBIC); setGlobalConst(D2D1_POINTSPECULAR_SCALE_MODE_FORCE_DWORD); setGlobalConst(D2D1_SPOTSPECULAR_PROP_LIGHT_POSITION); setGlobalConst(D2D1_SPOTSPECULAR_PROP_POINTS_AT); setGlobalConst(D2D1_SPOTSPECULAR_PROP_FOCUS); setGlobalConst(D2D1_SPOTSPECULAR_PROP_LIMITING_CONE_ANGLE); setGlobalConst(D2D1_SPOTSPECULAR_PROP_SPECULAR_EXPONENT); setGlobalConst(D2D1_SPOTSPECULAR_PROP_SPECULAR_CONSTANT); setGlobalConst(D2D1_SPOTSPECULAR_PROP_SURFACE_SCALE); setGlobalConst(D2D1_SPOTSPECULAR_PROP_COLOR); setGlobalConst(D2D1_SPOTSPECULAR_PROP_KERNEL_UNIT_LENGTH); setGlobalConst(D2D1_SPOTSPECULAR_PROP_SCALE_MODE); setGlobalConst(D2D1_SPOTSPECULAR_PROP_FORCE_DWORD); setGlobalConst(D2D1_SPOTSPECULAR_SCALE_MODE_NEAREST_NEIGHBOR); setGlobalConst(D2D1_SPOTSPECULAR_SCALE_MODE_LINEAR); setGlobalConst(D2D1_SPOTSPECULAR_SCALE_MODE_CUBIC); setGlobalConst(D2D1_SPOTSPECULAR_SCALE_MODE_MULTI_SAMPLE_LINEAR); setGlobalConst(D2D1_SPOTSPECULAR_SCALE_MODE_ANISOTROPIC); setGlobalConst(D2D1_SPOTSPECULAR_SCALE_MODE_HIGH_QUALITY_CUBIC); setGlobalConst(D2D1_SPOTSPECULAR_SCALE_MODE_FORCE_DWORD); setGlobalConst(D2D1_DISTANTSPECULAR_PROP_AZIMUTH); setGlobalConst(D2D1_DISTANTSPECULAR_PROP_ELEVATION); setGlobalConst(D2D1_DISTANTSPECULAR_PROP_SPECULAR_EXPONENT); setGlobalConst(D2D1_DISTANTSPECULAR_PROP_SPECULAR_CONSTANT); setGlobalConst(D2D1_DISTANTSPECULAR_PROP_SURFACE_SCALE); setGlobalConst(D2D1_DISTANTSPECULAR_PROP_COLOR); setGlobalConst(D2D1_DISTANTSPECULAR_PROP_KERNEL_UNIT_LENGTH); setGlobalConst(D2D1_DISTANTSPECULAR_PROP_SCALE_MODE); setGlobalConst(D2D1_DISTANTSPECULAR_PROP_FORCE_DWORD); setGlobalConst(D2D1_DISTANTSPECULAR_SCALE_MODE_NEAREST_NEIGHBOR); setGlobalConst(D2D1_DISTANTSPECULAR_SCALE_MODE_LINEAR); setGlobalConst(D2D1_DISTANTSPECULAR_SCALE_MODE_CUBIC); setGlobalConst(D2D1_DISTANTSPECULAR_SCALE_MODE_MULTI_SAMPLE_LINEAR); setGlobalConst(D2D1_DISTANTSPECULAR_SCALE_MODE_ANISOTROPIC); setGlobalConst(D2D1_DISTANTSPECULAR_SCALE_MODE_HIGH_QUALITY_CUBIC); setGlobalConst(D2D1_DISTANTSPECULAR_SCALE_MODE_FORCE_DWORD); setGlobalConst(D2D1_POINTDIFFUSE_PROP_LIGHT_POSITION); setGlobalConst(D2D1_POINTDIFFUSE_PROP_DIFFUSE_CONSTANT); setGlobalConst(D2D1_POINTDIFFUSE_PROP_SURFACE_SCALE); setGlobalConst(D2D1_POINTDIFFUSE_PROP_COLOR); setGlobalConst(D2D1_POINTDIFFUSE_PROP_KERNEL_UNIT_LENGTH); setGlobalConst(D2D1_POINTDIFFUSE_PROP_SCALE_MODE); setGlobalConst(D2D1_POINTDIFFUSE_PROP_FORCE_DWORD); setGlobalConst(D2D1_POINTDIFFUSE_SCALE_MODE_NEAREST_NEIGHBOR); setGlobalConst(D2D1_POINTDIFFUSE_SCALE_MODE_LINEAR); setGlobalConst(D2D1_POINTDIFFUSE_SCALE_MODE_CUBIC); setGlobalConst(D2D1_POINTDIFFUSE_SCALE_MODE_MULTI_SAMPLE_LINEAR); setGlobalConst(D2D1_POINTDIFFUSE_SCALE_MODE_ANISOTROPIC); setGlobalConst(D2D1_POINTDIFFUSE_SCALE_MODE_HIGH_QUALITY_CUBIC); setGlobalConst(D2D1_POINTDIFFUSE_SCALE_MODE_FORCE_DWORD); setGlobalConst(D2D1_SPOTDIFFUSE_PROP_LIGHT_POSITION); setGlobalConst(D2D1_SPOTDIFFUSE_PROP_POINTS_AT); setGlobalConst(D2D1_SPOTDIFFUSE_PROP_FOCUS); setGlobalConst(D2D1_SPOTDIFFUSE_PROP_LIMITING_CONE_ANGLE); setGlobalConst(D2D1_SPOTDIFFUSE_PROP_DIFFUSE_CONSTANT); setGlobalConst(D2D1_SPOTDIFFUSE_PROP_SURFACE_SCALE); setGlobalConst(D2D1_SPOTDIFFUSE_PROP_COLOR); setGlobalConst(D2D1_SPOTDIFFUSE_PROP_KERNEL_UNIT_LENGTH); setGlobalConst(D2D1_SPOTDIFFUSE_PROP_SCALE_MODE); setGlobalConst(D2D1_SPOTDIFFUSE_PROP_FORCE_DWORD); setGlobalConst(D2D1_SPOTDIFFUSE_SCALE_MODE_NEAREST_NEIGHBOR); setGlobalConst(D2D1_SPOTDIFFUSE_SCALE_MODE_LINEAR); setGlobalConst(D2D1_SPOTDIFFUSE_SCALE_MODE_CUBIC); setGlobalConst(D2D1_SPOTDIFFUSE_SCALE_MODE_MULTI_SAMPLE_LINEAR); setGlobalConst(D2D1_SPOTDIFFUSE_SCALE_MODE_ANISOTROPIC); setGlobalConst(D2D1_SPOTDIFFUSE_SCALE_MODE_HIGH_QUALITY_CUBIC); setGlobalConst(D2D1_SPOTDIFFUSE_SCALE_MODE_FORCE_DWORD); setGlobalConst(D2D1_DISTANTDIFFUSE_PROP_AZIMUTH); setGlobalConst(D2D1_DISTANTDIFFUSE_PROP_ELEVATION); setGlobalConst(D2D1_DISTANTDIFFUSE_PROP_DIFFUSE_CONSTANT); setGlobalConst(D2D1_DISTANTDIFFUSE_PROP_SURFACE_SCALE); setGlobalConst(D2D1_DISTANTDIFFUSE_PROP_COLOR); setGlobalConst(D2D1_DISTANTDIFFUSE_PROP_KERNEL_UNIT_LENGTH); setGlobalConst(D2D1_DISTANTDIFFUSE_PROP_SCALE_MODE); setGlobalConst(D2D1_DISTANTDIFFUSE_PROP_FORCE_DWORD); setGlobalConst(D2D1_DISTANTDIFFUSE_SCALE_MODE_NEAREST_NEIGHBOR); setGlobalConst(D2D1_DISTANTDIFFUSE_SCALE_MODE_LINEAR); setGlobalConst(D2D1_DISTANTDIFFUSE_SCALE_MODE_CUBIC); setGlobalConst(D2D1_DISTANTDIFFUSE_SCALE_MODE_MULTI_SAMPLE_LINEAR); setGlobalConst(D2D1_DISTANTDIFFUSE_SCALE_MODE_ANISOTROPIC); setGlobalConst(D2D1_DISTANTDIFFUSE_SCALE_MODE_HIGH_QUALITY_CUBIC); setGlobalConst(D2D1_DISTANTDIFFUSE_SCALE_MODE_FORCE_DWORD); setGlobalConst(D2D1_FLOOD_PROP_COLOR); setGlobalConst(D2D1_FLOOD_PROP_FORCE_DWORD); setGlobalConst(D2D1_LINEARTRANSFER_PROP_RED_Y_INTERCEPT); setGlobalConst(D2D1_LINEARTRANSFER_PROP_RED_SLOPE); setGlobalConst(D2D1_LINEARTRANSFER_PROP_RED_DISABLE); setGlobalConst(D2D1_LINEARTRANSFER_PROP_GREEN_Y_INTERCEPT); setGlobalConst(D2D1_LINEARTRANSFER_PROP_GREEN_SLOPE); setGlobalConst(D2D1_LINEARTRANSFER_PROP_GREEN_DISABLE); setGlobalConst(D2D1_LINEARTRANSFER_PROP_BLUE_Y_INTERCEPT); setGlobalConst(D2D1_LINEARTRANSFER_PROP_BLUE_SLOPE); setGlobalConst(D2D1_LINEARTRANSFER_PROP_BLUE_DISABLE); setGlobalConst(D2D1_LINEARTRANSFER_PROP_ALPHA_Y_INTERCEPT); setGlobalConst(D2D1_LINEARTRANSFER_PROP_ALPHA_SLOPE); setGlobalConst(D2D1_LINEARTRANSFER_PROP_ALPHA_DISABLE); setGlobalConst(D2D1_LINEARTRANSFER_PROP_CLAMP_OUTPUT); setGlobalConst(D2D1_LINEARTRANSFER_PROP_FORCE_DWORD); setGlobalConst(D2D1_GAMMATRANSFER_PROP_RED_AMPLITUDE); setGlobalConst(D2D1_GAMMATRANSFER_PROP_RED_EXPONENT); setGlobalConst(D2D1_GAMMATRANSFER_PROP_RED_OFFSET); setGlobalConst(D2D1_GAMMATRANSFER_PROP_RED_DISABLE); setGlobalConst(D2D1_GAMMATRANSFER_PROP_GREEN_AMPLITUDE); setGlobalConst(D2D1_GAMMATRANSFER_PROP_GREEN_EXPONENT); setGlobalConst(D2D1_GAMMATRANSFER_PROP_GREEN_OFFSET); setGlobalConst(D2D1_GAMMATRANSFER_PROP_GREEN_DISABLE); setGlobalConst(D2D1_GAMMATRANSFER_PROP_BLUE_AMPLITUDE); setGlobalConst(D2D1_GAMMATRANSFER_PROP_BLUE_EXPONENT); setGlobalConst(D2D1_GAMMATRANSFER_PROP_BLUE_OFFSET); setGlobalConst(D2D1_GAMMATRANSFER_PROP_BLUE_DISABLE); setGlobalConst(D2D1_GAMMATRANSFER_PROP_ALPHA_AMPLITUDE); setGlobalConst(D2D1_GAMMATRANSFER_PROP_ALPHA_EXPONENT); setGlobalConst(D2D1_GAMMATRANSFER_PROP_ALPHA_OFFSET); setGlobalConst(D2D1_GAMMATRANSFER_PROP_ALPHA_DISABLE); setGlobalConst(D2D1_GAMMATRANSFER_PROP_CLAMP_OUTPUT); setGlobalConst(D2D1_GAMMATRANSFER_PROP_FORCE_DWORD); setGlobalConst(D2D1_TABLETRANSFER_PROP_RED_TABLE); setGlobalConst(D2D1_TABLETRANSFER_PROP_RED_DISABLE); setGlobalConst(D2D1_TABLETRANSFER_PROP_GREEN_TABLE); setGlobalConst(D2D1_TABLETRANSFER_PROP_GREEN_DISABLE); setGlobalConst(D2D1_TABLETRANSFER_PROP_BLUE_TABLE); setGlobalConst(D2D1_TABLETRANSFER_PROP_BLUE_DISABLE); setGlobalConst(D2D1_TABLETRANSFER_PROP_ALPHA_TABLE); setGlobalConst(D2D1_TABLETRANSFER_PROP_ALPHA_DISABLE); setGlobalConst(D2D1_TABLETRANSFER_PROP_CLAMP_OUTPUT); setGlobalConst(D2D1_TABLETRANSFER_PROP_FORCE_DWORD); setGlobalConst(D2D1_DISCRETETRANSFER_PROP_RED_TABLE); setGlobalConst(D2D1_DISCRETETRANSFER_PROP_RED_DISABLE); setGlobalConst(D2D1_DISCRETETRANSFER_PROP_GREEN_TABLE); setGlobalConst(D2D1_DISCRETETRANSFER_PROP_GREEN_DISABLE); setGlobalConst(D2D1_DISCRETETRANSFER_PROP_BLUE_TABLE); setGlobalConst(D2D1_DISCRETETRANSFER_PROP_BLUE_DISABLE); setGlobalConst(D2D1_DISCRETETRANSFER_PROP_ALPHA_TABLE); setGlobalConst(D2D1_DISCRETETRANSFER_PROP_ALPHA_DISABLE); setGlobalConst(D2D1_DISCRETETRANSFER_PROP_CLAMP_OUTPUT); setGlobalConst(D2D1_DISCRETETRANSFER_PROP_FORCE_DWORD); setGlobalConst(D2D1_CONVOLVEMATRIX_PROP_KERNEL_UNIT_LENGTH); setGlobalConst(D2D1_CONVOLVEMATRIX_PROP_SCALE_MODE); setGlobalConst(D2D1_CONVOLVEMATRIX_PROP_KERNEL_SIZE_X); setGlobalConst(D2D1_CONVOLVEMATRIX_PROP_KERNEL_SIZE_Y); setGlobalConst(D2D1_CONVOLVEMATRIX_PROP_KERNEL_MATRIX); setGlobalConst(D2D1_CONVOLVEMATRIX_PROP_DIVISOR); setGlobalConst(D2D1_CONVOLVEMATRIX_PROP_BIAS); setGlobalConst(D2D1_CONVOLVEMATRIX_PROP_KERNEL_OFFSET); setGlobalConst(D2D1_CONVOLVEMATRIX_PROP_PRESERVE_ALPHA); setGlobalConst(D2D1_CONVOLVEMATRIX_PROP_BORDER_MODE); setGlobalConst(D2D1_CONVOLVEMATRIX_PROP_CLAMP_OUTPUT); setGlobalConst(D2D1_CONVOLVEMATRIX_PROP_FORCE_DWORD); setGlobalConst(D2D1_CONVOLVEMATRIX_SCALE_MODE_NEAREST_NEIGHBOR); setGlobalConst(D2D1_CONVOLVEMATRIX_SCALE_MODE_LINEAR); setGlobalConst(D2D1_CONVOLVEMATRIX_SCALE_MODE_CUBIC); setGlobalConst(D2D1_CONVOLVEMATRIX_SCALE_MODE_MULTI_SAMPLE_LINEAR); setGlobalConst(D2D1_CONVOLVEMATRIX_SCALE_MODE_ANISOTROPIC); setGlobalConst(D2D1_CONVOLVEMATRIX_SCALE_MODE_HIGH_QUALITY_CUBIC); setGlobalConst(D2D1_CONVOLVEMATRIX_SCALE_MODE_FORCE_DWORD); setGlobalConst(D2D1_BRIGHTNESS_PROP_WHITE_POINT); setGlobalConst(D2D1_BRIGHTNESS_PROP_BLACK_POINT); setGlobalConst(D2D1_BRIGHTNESS_PROP_FORCE_DWORD); setGlobalConst(D2D1_ARITHMETICCOMPOSITE_PROP_COEFFICIENTS); setGlobalConst(D2D1_ARITHMETICCOMPOSITE_PROP_CLAMP_OUTPUT); setGlobalConst(D2D1_ARITHMETICCOMPOSITE_PROP_FORCE_DWORD); setGlobalConst(D2D1_CROP_PROP_RECT); setGlobalConst(D2D1_CROP_PROP_BORDER_MODE); setGlobalConst(D2D1_CROP_PROP_FORCE_DWORD); setGlobalConst(D2D1_BORDER_PROP_EDGE_MODE_X); setGlobalConst(D2D1_BORDER_PROP_EDGE_MODE_Y); setGlobalConst(D2D1_BORDER_PROP_FORCE_DWORD); setGlobalConst(D2D1_BORDER_EDGE_MODE_CLAMP); setGlobalConst(D2D1_BORDER_EDGE_MODE_WRAP); setGlobalConst(D2D1_BORDER_EDGE_MODE_MIRROR); setGlobalConst(D2D1_BORDER_EDGE_MODE_FORCE_DWORD); setGlobalConst(D2D1_MORPHOLOGY_PROP_MODE); setGlobalConst(D2D1_MORPHOLOGY_PROP_WIDTH); setGlobalConst(D2D1_MORPHOLOGY_PROP_HEIGHT); setGlobalConst(D2D1_MORPHOLOGY_PROP_FORCE_DWORD); setGlobalConst(D2D1_MORPHOLOGY_MODE_ERODE); setGlobalConst(D2D1_MORPHOLOGY_MODE_DILATE); setGlobalConst(D2D1_MORPHOLOGY_MODE_FORCE_DWORD); setGlobalConst(D2D1_TILE_PROP_RECT); setGlobalConst(D2D1_TILE_PROP_FORCE_DWORD); setGlobalConst(D2D1_ATLAS_PROP_INPUT_RECT); setGlobalConst(D2D1_ATLAS_PROP_INPUT_PADDING_RECT); setGlobalConst(D2D1_ATLAS_PROP_FORCE_DWORD); setGlobalConst(D2D1_OPACITYMETADATA_PROP_INPUT_OPAQUE_RECT); setGlobalConst(D2D1_OPACITYMETADATA_PROP_FORCE_DWORD);
 
     setGlobalWrapper(GetWindowText);
     setGlobalWrapper(SetWindowText);
