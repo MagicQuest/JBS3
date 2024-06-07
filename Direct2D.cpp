@@ -100,6 +100,6 @@ bool Direct2D::Init(HWND window, int type) {
 	//err(21, typeid(T).name());
 }
 
-int Direct2D::EndDraw() {
-	return this->renderTarget->EndDraw();
+void Direct2D::EndDraw(bool unused) {
+	RetIfFailed(this->renderTarget->EndDraw(), "Direct2D EndDraw failed?");
 }

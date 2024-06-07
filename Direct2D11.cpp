@@ -224,7 +224,12 @@ bool Direct2D11::CreateAndSetDrawingBitmaps() {
     SusIfFailed(d2dcontext->CreateBitmapFromDxgiSurface(dxgiBackBuffer.Get(), &bitmapProperties, &d2dBackBitmap), "intellij(sense) just DIED");
 }
 
-int Direct2D11::EndDraw() {
-    d2dcontext->EndDraw();
-    return swapChain->Present(1, 0);
+void Direct2D11::EndDraw(bool donotpresent) {
+    if (!donotpresent) {
+        RetIfFailed(d2dcontext->EndDraw(), "D2D11 EndDraw failed?");
+        RetIfFailed(swapChain->Present(1, 0), "D2D11 swapChain->Present(1, 0) failed?");
+    }
+    else {
+        RetIfFailed(d2dcontext->EndDraw(), "D2D11 EndDraw (no present) failed?");
+    }
 }

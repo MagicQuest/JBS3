@@ -83,7 +83,7 @@ public:
 		}
 	}
 
-	virtual int EndDraw();
+	virtual void EndDraw(bool unused);
 
 	//void BeginDraw() {
 	//V8FUNC(BeginDraw) {

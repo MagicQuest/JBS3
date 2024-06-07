@@ -1841,7 +1841,8 @@ namespace DIRECT2D {
 		//https://stackoverflow.com/questions/22493524/decode-hresult-2147467259
             https://stackoverflow.com/questions/7008047/is-there-a-way-to-get-the-string-representation-of-hresult-value-using-win-api
             //IT THINKS MY UNCOMMENTED LINKS ARE LABELS FOR GOTO!
-            info.GetReturnValue().Set(Number::New(isolate, bmp->CopyFromBitmap(&point, /*(ID2D1Bitmap*)IntegerFI(info[2])*/copyFrom, &rect)));
+            //info.GetReturnValue().Set(Number::New(isolate, bmp->CopyFromBitmap(&point, /*(ID2D1Bitmap*)IntegerFI(info[2])*/copyFrom, &rect)));
+            RetIfFailed(bmp->CopyFromBitmap(&point, copyFrom, &rect), "CopyFromBitmap failed!");
         }));
         jsBitmap->Set(isolate, "CopyFromRenderTarget", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
             Isolate* isolate = info.GetIsolate();
@@ -1962,6 +1963,774 @@ namespace DIRECT2D {
         }
         return bruh;
     }
+
+    namespace JSCreateEffect {
+        void HandleMyGoofyD2D1EffectsFromAnotherNamespace(Isolate* isolate, const Local<ObjectTemplate>& jsEffect) {
+            jsEffect->Set(isolate, "SetValue", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                static bool msg = false; //shoot i wish js had static variables like this so i didn't have to make the variable outside that scope
+                if(!msg) MessageBoxA(NULL, "Any values that require a D2D1_MATRIX_4X4_F or D2D1_MATRIX_5X4_F do NOT work yet because i haven't implemented them", "SetValue warning", MB_OK | MB_ICONWARNING);
+                msg = true;
+
+                Isolate* isolate = info.GetIsolate();
+                ID2D1Effect* effect = (ID2D1Effect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                const char* mode = CStringFI(info[0]);
+                //oh no bruh SetValue works super weird and idk if i can do it MAN FUCK
+                //RetIfFailed(effect->SetValue(IntegerFI(info[0]), IntegerFI(info[1])), "SetValue failed!");
+                //effect->SetValue(D2D1_GAUSSIANBLUR_PROP_BORDER_MODE, D2D1_BORDER_MODE_HARD);
+                
+                //i had to use a little regex AND js to construct this function for me
+                //const deez = {"FLOAT": "(FLOAT)FloatFI(info[1])", "D2D1_VECTOR_2F": "D2D1_VECTOR_2F{(FLOAT)FloatFI(info[1]), (FLOAT)FloatFI(info[2])}", "D2D1_VECTOR_3F": "D2D1_VECTOR_3F{(FLOAT)FloatFI(info[1]), (FLOAT)FloatFI(info[2]), (FLOAT)FloatFI(info[3])}", "D2D1_VECTOR_4F": "D2D1_VECTOR_4F{(FLOAT)FloatFI(info[1]), (FLOAT)FloatFI(info[2]), (FLOAT)FloatFI(info[3]), (FLOAT)FloatFI(info[4])}", "IUnknown": "(IUnknown*)IntegerFI(info[1])", "ID2D1ColorContext": "(ID2D1ColorContext*)IntegerFI(info[1])"};
+                //lines = "";
+                //for(let i = 0; i < stringe.length; i++) {
+                //    const line = stringe[i];
+                //    let ptype = line.match(/Property Type: (\w+)/)?.[1];
+                //    if(ptype) {
+                //        let str = stringe[i+2].match(/([\w]+) /)[1];
+                //        let real = `${deez[ptype] || `(${ptype})IntegerFI(info[1])`}`;
+                //        /*let d = `if (strcmp(mode, "${str}") == 0) {
+                //    effect->SetValue(${str}, ${real});
+                //}
+                //`;*/
+                //        let d = `if (strcmp(mode, "${str}") == 0) {
+                //    effect->SetValue(${str}, ${real});
+                //}else
+                //`;
+                //        //console.log(str, ptype, d);
+                //        lines += d;
+                //    }
+                //}
+                //int mode = IntegerFI(info[0]);
+                //if (mode == D2D1_COLORMANAGEMENT_PROP_SOURCE_RENDERING_INTENT) {
+                //    effect->SetValue(D2D1_COLORMANAGEMENT_PROP_SOURCE_RENDERING_INTENT, (D2D1_RENDERING_INTENT)IntegerFI(info[1]));
+                //}
+                //if (mode == D2D1_COLORMANAGEMENT_PROP_DESTINATION_RENDERING_INTENT) {
+                //    effect->SetValue(D2D1_COLORMANAGEMENT_PROP_DESTINATION_RENDERING_INTENT, (D2D1_RENDERING_INTENT)IntegerFI(info[1]));
+                //}
+                if (strcmp(mode, "D2D1_GAUSSIANBLUR_PROP_STANDARD_DEVIATION") == 0) {
+                    effect->SetValue(D2D1_GAUSSIANBLUR_PROP_STANDARD_DEVIATION, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_GAUSSIANBLUR_PROP_OPTIMIZATION") == 0) {
+                    effect->SetValue(D2D1_GAUSSIANBLUR_PROP_OPTIMIZATION, (D2D1_GAUSSIANBLUR_OPTIMIZATION)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_GAUSSIANBLUR_PROP_BORDER_MODE") == 0) {
+                    effect->SetValue(D2D1_GAUSSIANBLUR_PROP_BORDER_MODE, (D2D1_BORDER_MODE)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_DIRECTIONALBLUR_PROP_STANDARD_DEVIATION") == 0) {
+                    effect->SetValue(D2D1_DIRECTIONALBLUR_PROP_STANDARD_DEVIATION, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_DIRECTIONALBLUR_PROP_ANGLE") == 0) {
+                    effect->SetValue(D2D1_DIRECTIONALBLUR_PROP_ANGLE, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_DIRECTIONALBLUR_PROP_OPTIMIZATION") == 0) {
+                    effect->SetValue(D2D1_DIRECTIONALBLUR_PROP_OPTIMIZATION, (D2D1_DIRECTIONALBLUR_OPTIMIZATION)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_DIRECTIONALBLUR_PROP_BORDER_MODE") == 0) {
+                    effect->SetValue(D2D1_DIRECTIONALBLUR_PROP_BORDER_MODE, (D2D1_BORDER_MODE)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_SHADOW_PROP_BLUR_STANDARD_DEVIATION") == 0) {
+                    effect->SetValue(D2D1_SHADOW_PROP_BLUR_STANDARD_DEVIATION, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_SHADOW_PROP_COLOR") == 0) {
+                    effect->SetValue(D2D1_SHADOW_PROP_COLOR, D2D1_VECTOR_4F{ (FLOAT)FloatFI(info[1]), (FLOAT)FloatFI(info[2]), (FLOAT)FloatFI(info[3]), (FLOAT)FloatFI(info[4]) });
+                    return;
+                }
+                if (strcmp(mode, "D2D1_SHADOW_PROP_OPTIMIZATION") == 0) {
+                    effect->SetValue(D2D1_SHADOW_PROP_OPTIMIZATION, (D2D1_SHADOW_OPTIMIZATION)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_BLEND_PROP_MODE") == 0) {
+                    effect->SetValue(D2D1_BLEND_PROP_MODE, (D2D1_BLEND_MODE)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_SATURATION_PROP_SATURATION") == 0) {
+                    effect->SetValue(D2D1_SATURATION_PROP_SATURATION, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_HUEROTATION_PROP_ANGLE") == 0) {
+                    effect->SetValue(D2D1_HUEROTATION_PROP_ANGLE, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_COLORMATRIX_PROP_COLOR_MATRIX") == 0) {
+                    //    effect->SetValue(D2D1_COLORMATRIX_PROP_COLOR_MATRIX, (D2D1_MATRIX_5X4_F)IntegerFI(info[1]));
+                    MessageBox(NULL, L"Sorry! Haven't implemented the necessary D2D1_MATRIX_5X4_F object", L"You can't use this mode right now.", MB_OK | MB_SYSTEMMODAL);
+                    return;
+                }
+                if (strcmp(mode, "D2D1_COLORMATRIX_PROP_ALPHA_MODE") == 0) {
+                    effect->SetValue(D2D1_COLORMATRIX_PROP_ALPHA_MODE, (D2D1_COLORMATRIX_ALPHA_MODE)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_COLORMATRIX_PROP_CLAMP_OUTPUT") == 0) {
+                    effect->SetValue(D2D1_COLORMATRIX_PROP_CLAMP_OUTPUT, (BOOL)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_BITMAPSOURCE_PROP_WIC_BITMAP_SOURCE") == 0) {
+                    effect->SetValue(D2D1_BITMAPSOURCE_PROP_WIC_BITMAP_SOURCE, (IUnknown*)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_BITMAPSOURCE_PROP_SCALE") == 0) {
+                    effect->SetValue(D2D1_BITMAPSOURCE_PROP_SCALE, D2D1_VECTOR_2F{ (FLOAT)FloatFI(info[1]), (FLOAT)FloatFI(info[2]) });
+                    return;
+                }
+                if (strcmp(mode, "D2D1_BITMAPSOURCE_PROP_INTERPOLATION_MODE") == 0) {
+                    effect->SetValue(D2D1_BITMAPSOURCE_PROP_INTERPOLATION_MODE, (D2D1_BITMAPSOURCE_INTERPOLATION_MODE)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_BITMAPSOURCE_PROP_ENABLE_DPI_CORRECTION") == 0) {
+                    effect->SetValue(D2D1_BITMAPSOURCE_PROP_ENABLE_DPI_CORRECTION, (BOOL)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_BITMAPSOURCE_PROP_ALPHA_MODE") == 0) {
+                    effect->SetValue(D2D1_BITMAPSOURCE_PROP_ALPHA_MODE, (D2D1_BITMAPSOURCE_ALPHA_MODE)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_BITMAPSOURCE_PROP_ORIENTATION") == 0) {
+                    effect->SetValue(D2D1_BITMAPSOURCE_PROP_ORIENTATION, (D2D1_BITMAPSOURCE_ORIENTATION)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_COMPOSITE_PROP_MODE") == 0) {
+                    effect->SetValue(D2D1_COMPOSITE_PROP_MODE, (D2D1_COMPOSITE_MODE)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_3DTRANSFORM_PROP_INTERPOLATION_MODE") == 0) {
+                    effect->SetValue(D2D1_3DTRANSFORM_PROP_INTERPOLATION_MODE, (D2D1_3DTRANSFORM_INTERPOLATION_MODE)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_3DTRANSFORM_PROP_BORDER_MODE") == 0) {
+                    effect->SetValue(D2D1_3DTRANSFORM_PROP_BORDER_MODE, (D2D1_BORDER_MODE)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_3DTRANSFORM_PROP_TRANSFORM_MATRIX") == 0) {
+                    //    effect->SetValue(D2D1_3DTRANSFORM_PROP_TRANSFORM_MATRIX, (D2D1_MATRIX_4X4_F)IntegerFI(info[1]));
+                    MessageBox(NULL, L"Sorry! Haven't implemented the necessary D2D1_MATRIX_4X4_F object", L"You can't use this mode right now.", MB_OK | MB_SYSTEMMODAL);
+                    return;
+                }
+                if (strcmp(mode, "D2D1_3DPERSPECTIVETRANSFORM_PROP_INTERPOLATION_MODE") == 0) {
+                    effect->SetValue(D2D1_3DPERSPECTIVETRANSFORM_PROP_INTERPOLATION_MODE, (D2D1_3DPERSPECTIVETRANSFORM_INTERPOLATION_MODE)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_3DPERSPECTIVETRANSFORM_PROP_BORDER_MODE") == 0) {
+                    effect->SetValue(D2D1_3DPERSPECTIVETRANSFORM_PROP_BORDER_MODE, (D2D1_BORDER_MODE)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_3DPERSPECTIVETRANSFORM_PROP_DEPTH") == 0) {
+                    effect->SetValue(D2D1_3DPERSPECTIVETRANSFORM_PROP_DEPTH, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_3DPERSPECTIVETRANSFORM_PROP_PERSPECTIVE_ORIGIN") == 0) {
+                    effect->SetValue(D2D1_3DPERSPECTIVETRANSFORM_PROP_PERSPECTIVE_ORIGIN, D2D1_VECTOR_2F{ (FLOAT)FloatFI(info[1]), (FLOAT)FloatFI(info[2]) });
+                    return;
+                }
+                if (strcmp(mode, "D2D1_3DPERSPECTIVETRANSFORM_PROP_LOCAL_OFFSET") == 0) {
+                    effect->SetValue(D2D1_3DPERSPECTIVETRANSFORM_PROP_LOCAL_OFFSET, D2D1_VECTOR_3F{ (FLOAT)FloatFI(info[1]), (FLOAT)FloatFI(info[2]), (FLOAT)FloatFI(info[3]) });
+                    return;
+                }
+                if (strcmp(mode, "D2D1_3DPERSPECTIVETRANSFORM_PROP_GLOBAL_OFFSET") == 0) {
+                    effect->SetValue(D2D1_3DPERSPECTIVETRANSFORM_PROP_GLOBAL_OFFSET, D2D1_VECTOR_3F{ (FLOAT)FloatFI(info[1]), (FLOAT)FloatFI(info[2]), (FLOAT)FloatFI(info[3]) });
+                    return;
+                }
+                if (strcmp(mode, "D2D1_3DPERSPECTIVETRANSFORM_PROP_ROTATION_ORIGIN") == 0) {
+                    effect->SetValue(D2D1_3DPERSPECTIVETRANSFORM_PROP_ROTATION_ORIGIN, D2D1_VECTOR_3F{ (FLOAT)FloatFI(info[1]), (FLOAT)FloatFI(info[2]), (FLOAT)FloatFI(info[3]) });
+                    return;
+                }
+                if (strcmp(mode, "D2D1_3DPERSPECTIVETRANSFORM_PROP_ROTATION") == 0) {
+                    effect->SetValue(D2D1_3DPERSPECTIVETRANSFORM_PROP_ROTATION, D2D1_VECTOR_3F{ (FLOAT)FloatFI(info[1]), (FLOAT)FloatFI(info[2]), (FLOAT)FloatFI(info[3]) });
+                    return;
+                }
+                if (strcmp(mode, "D2D1_2DAFFINETRANSFORM_PROP_INTERPOLATION_MODE") == 0) {
+                    effect->SetValue(D2D1_2DAFFINETRANSFORM_PROP_INTERPOLATION_MODE, (D2D1_2DAFFINETRANSFORM_INTERPOLATION_MODE)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_2DAFFINETRANSFORM_PROP_BORDER_MODE") == 0) {
+                    effect->SetValue(D2D1_2DAFFINETRANSFORM_PROP_BORDER_MODE, (D2D1_BORDER_MODE)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_2DAFFINETRANSFORM_PROP_TRANSFORM_MATRIX") == 0) {
+                    D2D1::Matrix3x2F matrix = DIRECT2D::fromJSMatrix3x2(isolate, info[1].As<Object>());
+                    effect->SetValue(D2D1_2DAFFINETRANSFORM_PROP_TRANSFORM_MATRIX, (D2D1_MATRIX_3X2_F)matrix);
+                    return;
+                }
+                if (strcmp(mode, "D2D1_2DAFFINETRANSFORM_PROP_SHARPNESS") == 0) {
+                    effect->SetValue(D2D1_2DAFFINETRANSFORM_PROP_SHARPNESS, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_DPICOMPENSATION_PROP_INTERPOLATION_MODE") == 0) {
+                    effect->SetValue(D2D1_DPICOMPENSATION_PROP_INTERPOLATION_MODE, (D2D1_DPICOMPENSATION_INTERPOLATION_MODE)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_DPICOMPENSATION_PROP_BORDER_MODE") == 0) {
+                    effect->SetValue(D2D1_DPICOMPENSATION_PROP_BORDER_MODE, (D2D1_BORDER_MODE)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_DPICOMPENSATION_PROP_INPUT_DPI") == 0) {
+                    effect->SetValue(D2D1_DPICOMPENSATION_PROP_INPUT_DPI, D2D1_VECTOR_2F{ (FLOAT)FloatFI(info[1]), (FLOAT)FloatFI(info[2]) });
+                    return;
+                }
+                if (strcmp(mode, "D2D1_SCALE_PROP_SCALE") == 0) {
+                    effect->SetValue(D2D1_SCALE_PROP_SCALE, D2D1_VECTOR_2F{ (FLOAT)FloatFI(info[1]), (FLOAT)FloatFI(info[2]) });
+                    return;
+                }
+                if (strcmp(mode, "D2D1_SCALE_PROP_CENTER_POINT") == 0) {
+                    effect->SetValue(D2D1_SCALE_PROP_CENTER_POINT, D2D1_VECTOR_2F{ (FLOAT)FloatFI(info[1]), (FLOAT)FloatFI(info[2]) });
+                    return;
+                }
+                if (strcmp(mode, "D2D1_SCALE_PROP_INTERPOLATION_MODE") == 0) {
+                    effect->SetValue(D2D1_SCALE_PROP_INTERPOLATION_MODE, (D2D1_SCALE_INTERPOLATION_MODE)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_SCALE_PROP_BORDER_MODE") == 0) {
+                    effect->SetValue(D2D1_SCALE_PROP_BORDER_MODE, (D2D1_BORDER_MODE)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_SCALE_PROP_SHARPNESS") == 0) {
+                    effect->SetValue(D2D1_SCALE_PROP_SHARPNESS, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_TURBULENCE_PROP_OFFSET") == 0) {
+                    effect->SetValue(D2D1_TURBULENCE_PROP_OFFSET, D2D1_VECTOR_2F{ (FLOAT)FloatFI(info[1]), (FLOAT)FloatFI(info[2]) });
+                    return;
+                }
+                if (strcmp(mode, "D2D1_TURBULENCE_PROP_SIZE") == 0) {
+                    effect->SetValue(D2D1_TURBULENCE_PROP_SIZE, D2D1_VECTOR_2F{ (FLOAT)FloatFI(info[1]), (FLOAT)FloatFI(info[2]) });
+                    return;
+                }
+                if (strcmp(mode, "D2D1_TURBULENCE_PROP_BASE_FREQUENCY") == 0) {
+                    effect->SetValue(D2D1_TURBULENCE_PROP_BASE_FREQUENCY, D2D1_VECTOR_2F{ (FLOAT)FloatFI(info[1]), (FLOAT)FloatFI(info[2]) });
+                    return;
+                }
+                if (strcmp(mode, "D2D1_TURBULENCE_PROP_NUM_OCTAVES") == 0) {
+                    effect->SetValue(D2D1_TURBULENCE_PROP_NUM_OCTAVES, (UINT32)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_TURBULENCE_PROP_SEED") == 0) {
+                    effect->SetValue(D2D1_TURBULENCE_PROP_SEED, (INT32)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_TURBULENCE_PROP_NOISE") == 0) {
+                    effect->SetValue(D2D1_TURBULENCE_PROP_NOISE, (D2D1_TURBULENCE_NOISE)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_TURBULENCE_PROP_STITCHABLE") == 0) {
+                    effect->SetValue(D2D1_TURBULENCE_PROP_STITCHABLE, (BOOL)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_DISPLACEMENTMAP_PROP_SCALE") == 0) {
+                    effect->SetValue(D2D1_DISPLACEMENTMAP_PROP_SCALE, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_DISPLACEMENTMAP_PROP_X_CHANNEL_SELECT") == 0) {
+                    effect->SetValue(D2D1_DISPLACEMENTMAP_PROP_X_CHANNEL_SELECT, (D2D1_CHANNEL_SELECTOR)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_DISPLACEMENTMAP_PROP_Y_CHANNEL_SELECT") == 0) {
+                    effect->SetValue(D2D1_DISPLACEMENTMAP_PROP_Y_CHANNEL_SELECT, (D2D1_CHANNEL_SELECTOR)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_COLORMANAGEMENT_PROP_SOURCE_COLOR_CONTEXT") == 0) {
+                    effect->SetValue(D2D1_COLORMANAGEMENT_PROP_SOURCE_COLOR_CONTEXT, (ID2D1ColorContext*)IntegerFI(info[1]));
+                    return;
+                }
+                //if (strcmp(mode, "D2D1_COLORMANAGEMENT_PROP_SOURCE_RENDERING_INTENT") == 0) {
+                //    effect->SetValue(D2D1_COLORMANAGEMENT_PROP_SOURCE_RENDERING_INTENT, (D2D1_RENDERING_INTENT)IntegerFI(info[1]));
+                //    return;
+                //}
+                if (strcmp(mode, "D2D1_COLORMANAGEMENT_PROP_DESTINATION_COLOR_CONTEXT") == 0) {
+                    effect->SetValue(D2D1_COLORMANAGEMENT_PROP_DESTINATION_COLOR_CONTEXT, (ID2D1ColorContext*)IntegerFI(info[1]));
+                    return;
+                }
+                //if (strcmp(mode, "D2D1_COLORMANAGEMENT_PROP_DESTINATION_RENDERING_INTENT") == 0) {
+                //    effect->SetValue(D2D1_COLORMANAGEMENT_PROP_DESTINATION_RENDERING_INTENT, (D2D1_RENDERING_INTENT)IntegerFI(info[1]));
+                //    return;
+                //}
+                if (strcmp(mode, "D2D1_COLORMANAGEMENT_PROP_ALPHA_MODE") == 0) {
+                    effect->SetValue(D2D1_COLORMANAGEMENT_PROP_ALPHA_MODE, (D2D1_COLORMANAGEMENT_ALPHA_MODE)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_COLORMANAGEMENT_PROP_QUALITY") == 0) {
+                    effect->SetValue(D2D1_COLORMANAGEMENT_PROP_QUALITY, (D2D1_COLORMANAGEMENT_QUALITY)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_HISTOGRAM_PROP_NUM_BINS") == 0) {
+                    effect->SetValue(D2D1_HISTOGRAM_PROP_NUM_BINS, (UINT32)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_HISTOGRAM_PROP_CHANNEL_SELECT") == 0) {
+                    effect->SetValue(D2D1_HISTOGRAM_PROP_CHANNEL_SELECT, (D2D1_CHANNEL_SELECTOR)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_POINTSPECULAR_PROP_LIGHT_POSITION") == 0) {
+                    effect->SetValue(D2D1_POINTSPECULAR_PROP_LIGHT_POSITION, D2D1_VECTOR_3F{ (FLOAT)FloatFI(info[1]), (FLOAT)FloatFI(info[2]), (FLOAT)FloatFI(info[3]) });
+                    return;
+                }
+                if (strcmp(mode, "D2D1_POINTSPECULAR_PROP_SPECULAR_EXPONENT") == 0) {
+                    effect->SetValue(D2D1_POINTSPECULAR_PROP_SPECULAR_EXPONENT, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_POINTSPECULAR_PROP_SPECULAR_CONSTANT") == 0) {
+                    effect->SetValue(D2D1_POINTSPECULAR_PROP_SPECULAR_CONSTANT, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_POINTSPECULAR_PROP_SURFACE_SCALE") == 0) {
+                    effect->SetValue(D2D1_POINTSPECULAR_PROP_SURFACE_SCALE, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_POINTSPECULAR_PROP_COLOR") == 0) {
+                    effect->SetValue(D2D1_POINTSPECULAR_PROP_COLOR, D2D1_VECTOR_3F{ (FLOAT)FloatFI(info[1]), (FLOAT)FloatFI(info[2]), (FLOAT)FloatFI(info[3]) });
+                    return;
+                }
+                if (strcmp(mode, "D2D1_POINTSPECULAR_PROP_KERNEL_UNIT_LENGTH") == 0) {
+                    effect->SetValue(D2D1_POINTSPECULAR_PROP_KERNEL_UNIT_LENGTH, D2D1_VECTOR_2F{ (FLOAT)FloatFI(info[1]), (FLOAT)FloatFI(info[2]) });
+                    return;
+                }
+                if (strcmp(mode, "D2D1_POINTSPECULAR_PROP_SCALE_MODE") == 0) {
+                    effect->SetValue(D2D1_POINTSPECULAR_PROP_SCALE_MODE, (D2D1_POINTSPECULAR_SCALE_MODE)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_SPOTSPECULAR_PROP_LIGHT_POSITION") == 0) {
+                    effect->SetValue(D2D1_SPOTSPECULAR_PROP_LIGHT_POSITION, D2D1_VECTOR_3F{ (FLOAT)FloatFI(info[1]), (FLOAT)FloatFI(info[2]), (FLOAT)FloatFI(info[3]) });
+                    return;
+                }
+                if (strcmp(mode, "D2D1_SPOTSPECULAR_PROP_POINTS_AT") == 0) {
+                    effect->SetValue(D2D1_SPOTSPECULAR_PROP_POINTS_AT, D2D1_VECTOR_3F{ (FLOAT)FloatFI(info[1]), (FLOAT)FloatFI(info[2]), (FLOAT)FloatFI(info[3]) });
+                    return;
+                }
+                if (strcmp(mode, "D2D1_SPOTSPECULAR_PROP_FOCUS") == 0) {
+                    effect->SetValue(D2D1_SPOTSPECULAR_PROP_FOCUS, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_SPOTSPECULAR_PROP_LIMITING_CONE_ANGLE") == 0) {
+                    effect->SetValue(D2D1_SPOTSPECULAR_PROP_LIMITING_CONE_ANGLE, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_SPOTSPECULAR_PROP_SPECULAR_EXPONENT") == 0) {
+                    effect->SetValue(D2D1_SPOTSPECULAR_PROP_SPECULAR_EXPONENT, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_SPOTSPECULAR_PROP_SPECULAR_CONSTANT") == 0) {
+                    effect->SetValue(D2D1_SPOTSPECULAR_PROP_SPECULAR_CONSTANT, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_SPOTSPECULAR_PROP_SURFACE_SCALE") == 0) {
+                    effect->SetValue(D2D1_SPOTSPECULAR_PROP_SURFACE_SCALE, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_SPOTSPECULAR_PROP_COLOR") == 0) {
+                    effect->SetValue(D2D1_SPOTSPECULAR_PROP_COLOR, D2D1_VECTOR_3F{ (FLOAT)FloatFI(info[1]), (FLOAT)FloatFI(info[2]), (FLOAT)FloatFI(info[3]) });
+                    return;
+                }
+                if (strcmp(mode, "D2D1_SPOTSPECULAR_PROP_KERNEL_UNIT_LENGTH") == 0) {
+                    effect->SetValue(D2D1_SPOTSPECULAR_PROP_KERNEL_UNIT_LENGTH, D2D1_VECTOR_2F{ (FLOAT)FloatFI(info[1]), (FLOAT)FloatFI(info[2]) });
+                    return;
+                }
+                if (strcmp(mode, "D2D1_SPOTSPECULAR_PROP_SCALE_MODE") == 0) {
+                    effect->SetValue(D2D1_SPOTSPECULAR_PROP_SCALE_MODE, (D2D1_SPOTSPECULAR_SCALE_MODE)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_DISTANTSPECULAR_PROP_AZIMUTH") == 0) {
+                    effect->SetValue(D2D1_DISTANTSPECULAR_PROP_AZIMUTH, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_DISTANTSPECULAR_PROP_ELEVATION") == 0) {
+                    effect->SetValue(D2D1_DISTANTSPECULAR_PROP_ELEVATION, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_DISTANTSPECULAR_PROP_SPECULAR_EXPONENT") == 0) {
+                    effect->SetValue(D2D1_DISTANTSPECULAR_PROP_SPECULAR_EXPONENT, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_DISTANTSPECULAR_PROP_SPECULAR_CONSTANT") == 0) {
+                    effect->SetValue(D2D1_DISTANTSPECULAR_PROP_SPECULAR_CONSTANT, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_DISTANTSPECULAR_PROP_SURFACE_SCALE") == 0) {
+                    effect->SetValue(D2D1_DISTANTSPECULAR_PROP_SURFACE_SCALE, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_DISTANTSPECULAR_PROP_COLOR") == 0) {
+                    effect->SetValue(D2D1_DISTANTSPECULAR_PROP_COLOR, D2D1_VECTOR_3F{ (FLOAT)FloatFI(info[1]), (FLOAT)FloatFI(info[2]), (FLOAT)FloatFI(info[3]) });
+                    return;
+                }
+                if (strcmp(mode, "D2D1_DISTANTSPECULAR_PROP_KERNEL_UNIT_LENGTH") == 0) {
+                    effect->SetValue(D2D1_DISTANTSPECULAR_PROP_KERNEL_UNIT_LENGTH, D2D1_VECTOR_2F{ (FLOAT)FloatFI(info[1]), (FLOAT)FloatFI(info[2]) });
+                    return;
+                }
+                if (strcmp(mode, "D2D1_DISTANTSPECULAR_PROP_SCALE_MODE") == 0) {
+                    effect->SetValue(D2D1_DISTANTSPECULAR_PROP_SCALE_MODE, (D2D1_DISTANTSPECULAR_SCALE_MODE)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_POINTDIFFUSE_PROP_LIGHT_POSITION") == 0) {
+                    effect->SetValue(D2D1_POINTDIFFUSE_PROP_LIGHT_POSITION, D2D1_VECTOR_3F{ (FLOAT)FloatFI(info[1]), (FLOAT)FloatFI(info[2]), (FLOAT)FloatFI(info[3]) });
+                    return;
+                }
+                if (strcmp(mode, "D2D1_POINTDIFFUSE_PROP_DIFFUSE_CONSTANT") == 0) {
+                    effect->SetValue(D2D1_POINTDIFFUSE_PROP_DIFFUSE_CONSTANT, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_POINTDIFFUSE_PROP_SURFACE_SCALE") == 0) {
+                    effect->SetValue(D2D1_POINTDIFFUSE_PROP_SURFACE_SCALE, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_POINTDIFFUSE_PROP_COLOR") == 0) {
+                    effect->SetValue(D2D1_POINTDIFFUSE_PROP_COLOR, D2D1_VECTOR_3F{ (FLOAT)FloatFI(info[1]), (FLOAT)FloatFI(info[2]), (FLOAT)FloatFI(info[3]) });
+                    return;
+                }
+                if (strcmp(mode, "D2D1_POINTDIFFUSE_PROP_KERNEL_UNIT_LENGTH") == 0) {
+                    effect->SetValue(D2D1_POINTDIFFUSE_PROP_KERNEL_UNIT_LENGTH, D2D1_VECTOR_2F{ (FLOAT)FloatFI(info[1]), (FLOAT)FloatFI(info[2]) });
+                    return;
+                }
+                if (strcmp(mode, "D2D1_POINTDIFFUSE_PROP_SCALE_MODE") == 0) {
+                    effect->SetValue(D2D1_POINTDIFFUSE_PROP_SCALE_MODE, (D2D1_POINTDIFFUSE_SCALE_MODE)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_SPOTDIFFUSE_PROP_LIGHT_POSITION") == 0) {
+                    effect->SetValue(D2D1_SPOTDIFFUSE_PROP_LIGHT_POSITION, D2D1_VECTOR_3F{ (FLOAT)FloatFI(info[1]), (FLOAT)FloatFI(info[2]), (FLOAT)FloatFI(info[3]) });
+                    return;
+                }
+                if (strcmp(mode, "D2D1_SPOTDIFFUSE_PROP_POINTS_AT") == 0) {
+                    effect->SetValue(D2D1_SPOTDIFFUSE_PROP_POINTS_AT, D2D1_VECTOR_3F{ (FLOAT)FloatFI(info[1]), (FLOAT)FloatFI(info[2]), (FLOAT)FloatFI(info[3]) });
+                    return;
+                }
+                if (strcmp(mode, "D2D1_SPOTDIFFUSE_PROP_FOCUS") == 0) {
+                    effect->SetValue(D2D1_SPOTDIFFUSE_PROP_FOCUS, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_SPOTDIFFUSE_PROP_LIMITING_CONE_ANGLE") == 0) {
+                    effect->SetValue(D2D1_SPOTDIFFUSE_PROP_LIMITING_CONE_ANGLE, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_SPOTDIFFUSE_PROP_DIFFUSE_CONSTANT") == 0) {
+                    effect->SetValue(D2D1_SPOTDIFFUSE_PROP_DIFFUSE_CONSTANT, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_SPOTDIFFUSE_PROP_SURFACE_SCALE") == 0) {
+                    effect->SetValue(D2D1_SPOTDIFFUSE_PROP_SURFACE_SCALE, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_SPOTDIFFUSE_PROP_COLOR") == 0) {
+                    effect->SetValue(D2D1_SPOTDIFFUSE_PROP_COLOR, D2D1_VECTOR_3F{ (FLOAT)FloatFI(info[1]), (FLOAT)FloatFI(info[2]), (FLOAT)FloatFI(info[3]) });
+                    return;
+                }
+                if (strcmp(mode, "D2D1_SPOTDIFFUSE_PROP_KERNEL_UNIT_LENGTH") == 0) {
+                    effect->SetValue(D2D1_SPOTDIFFUSE_PROP_KERNEL_UNIT_LENGTH, D2D1_VECTOR_2F{ (FLOAT)FloatFI(info[1]), (FLOAT)FloatFI(info[2]) });
+                    return;
+                }
+                if (strcmp(mode, "D2D1_SPOTDIFFUSE_PROP_SCALE_MODE") == 0) {
+                    effect->SetValue(D2D1_SPOTDIFFUSE_PROP_SCALE_MODE, (D2D1_SPOTDIFFUSE_SCALE_MODE)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_DISTANTDIFFUSE_PROP_AZIMUTH") == 0) {
+                    effect->SetValue(D2D1_DISTANTDIFFUSE_PROP_AZIMUTH, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_DISTANTDIFFUSE_PROP_ELEVATION") == 0) {
+                    effect->SetValue(D2D1_DISTANTDIFFUSE_PROP_ELEVATION, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_DISTANTDIFFUSE_PROP_DIFFUSE_CONSTANT") == 0) {
+                    effect->SetValue(D2D1_DISTANTDIFFUSE_PROP_DIFFUSE_CONSTANT, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_DISTANTDIFFUSE_PROP_SURFACE_SCALE") == 0) {
+                    effect->SetValue(D2D1_DISTANTDIFFUSE_PROP_SURFACE_SCALE, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_DISTANTDIFFUSE_PROP_COLOR") == 0) {
+                    effect->SetValue(D2D1_DISTANTDIFFUSE_PROP_COLOR, D2D1_VECTOR_3F{ (FLOAT)FloatFI(info[1]), (FLOAT)FloatFI(info[2]), (FLOAT)FloatFI(info[3]) });
+                    return;
+                }
+                if (strcmp(mode, "D2D1_DISTANTDIFFUSE_PROP_KERNEL_UNIT_LENGTH") == 0) {
+                    effect->SetValue(D2D1_DISTANTDIFFUSE_PROP_KERNEL_UNIT_LENGTH, D2D1_VECTOR_2F{ (FLOAT)FloatFI(info[1]), (FLOAT)FloatFI(info[2]) });
+                    return;
+                }
+                if (strcmp(mode, "D2D1_DISTANTDIFFUSE_PROP_SCALE_MODE") == 0) {
+                    effect->SetValue(D2D1_DISTANTDIFFUSE_PROP_SCALE_MODE, (D2D1_DISTANTDIFFUSE_SCALE_MODE)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_FLOOD_PROP_COLOR") == 0) {
+                    effect->SetValue(D2D1_FLOOD_PROP_COLOR, D2D1_VECTOR_4F{ (FLOAT)FloatFI(info[1]), (FLOAT)FloatFI(info[2]), (FLOAT)FloatFI(info[3]), (FLOAT)FloatFI(info[4]) });
+                    return;
+                }
+                if (strcmp(mode, "D2D1_LINEARTRANSFER_PROP_RED_Y_INTERCEPT") == 0) {
+                    effect->SetValue(D2D1_LINEARTRANSFER_PROP_RED_Y_INTERCEPT, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_LINEARTRANSFER_PROP_RED_SLOPE") == 0) {
+                    effect->SetValue(D2D1_LINEARTRANSFER_PROP_RED_SLOPE, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_LINEARTRANSFER_PROP_RED_DISABLE") == 0) {
+                    effect->SetValue(D2D1_LINEARTRANSFER_PROP_RED_DISABLE, (BOOL)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_LINEARTRANSFER_PROP_GREEN_Y_INTERCEPT") == 0) {
+                    effect->SetValue(D2D1_LINEARTRANSFER_PROP_GREEN_Y_INTERCEPT, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_LINEARTRANSFER_PROP_GREEN_SLOPE") == 0) {
+                    effect->SetValue(D2D1_LINEARTRANSFER_PROP_GREEN_SLOPE, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_LINEARTRANSFER_PROP_GREEN_DISABLE") == 0) {
+                    effect->SetValue(D2D1_LINEARTRANSFER_PROP_GREEN_DISABLE, (BOOL)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_LINEARTRANSFER_PROP_BLUE_Y_INTERCEPT") == 0) {
+                    effect->SetValue(D2D1_LINEARTRANSFER_PROP_BLUE_Y_INTERCEPT, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_LINEARTRANSFER_PROP_BLUE_SLOPE") == 0) {
+                    effect->SetValue(D2D1_LINEARTRANSFER_PROP_BLUE_SLOPE, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_LINEARTRANSFER_PROP_BLUE_DISABLE") == 0) {
+                    effect->SetValue(D2D1_LINEARTRANSFER_PROP_BLUE_DISABLE, (BOOL)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_LINEARTRANSFER_PROP_ALPHA_Y_INTERCEPT") == 0) {
+                    effect->SetValue(D2D1_LINEARTRANSFER_PROP_ALPHA_Y_INTERCEPT, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_LINEARTRANSFER_PROP_ALPHA_SLOPE") == 0) {
+                    effect->SetValue(D2D1_LINEARTRANSFER_PROP_ALPHA_SLOPE, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_LINEARTRANSFER_PROP_ALPHA_DISABLE") == 0) {
+                    effect->SetValue(D2D1_LINEARTRANSFER_PROP_ALPHA_DISABLE, (BOOL)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_LINEARTRANSFER_PROP_CLAMP_OUTPUT") == 0) {
+                    effect->SetValue(D2D1_LINEARTRANSFER_PROP_CLAMP_OUTPUT, (BOOL)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_GAMMATRANSFER_PROP_RED_AMPLITUDE") == 0) {
+                    effect->SetValue(D2D1_GAMMATRANSFER_PROP_RED_AMPLITUDE, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_GAMMATRANSFER_PROP_RED_EXPONENT") == 0) {
+                    effect->SetValue(D2D1_GAMMATRANSFER_PROP_RED_EXPONENT, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_GAMMATRANSFER_PROP_RED_OFFSET") == 0) {
+                    effect->SetValue(D2D1_GAMMATRANSFER_PROP_RED_OFFSET, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_GAMMATRANSFER_PROP_RED_DISABLE") == 0) {
+                    effect->SetValue(D2D1_GAMMATRANSFER_PROP_RED_DISABLE, (BOOL)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_GAMMATRANSFER_PROP_GREEN_AMPLITUDE") == 0) {
+                    effect->SetValue(D2D1_GAMMATRANSFER_PROP_GREEN_AMPLITUDE, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_GAMMATRANSFER_PROP_GREEN_EXPONENT") == 0) {
+                    effect->SetValue(D2D1_GAMMATRANSFER_PROP_GREEN_EXPONENT, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_GAMMATRANSFER_PROP_GREEN_OFFSET") == 0) {
+                    effect->SetValue(D2D1_GAMMATRANSFER_PROP_GREEN_OFFSET, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_GAMMATRANSFER_PROP_GREEN_DISABLE") == 0) {
+                    effect->SetValue(D2D1_GAMMATRANSFER_PROP_GREEN_DISABLE, (BOOL)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_GAMMATRANSFER_PROP_BLUE_AMPLITUDE") == 0) {
+                    effect->SetValue(D2D1_GAMMATRANSFER_PROP_BLUE_AMPLITUDE, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_GAMMATRANSFER_PROP_BLUE_EXPONENT") == 0) {
+                    effect->SetValue(D2D1_GAMMATRANSFER_PROP_BLUE_EXPONENT, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_GAMMATRANSFER_PROP_BLUE_OFFSET") == 0) {
+                    effect->SetValue(D2D1_GAMMATRANSFER_PROP_BLUE_OFFSET, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_GAMMATRANSFER_PROP_BLUE_DISABLE") == 0) {
+                    effect->SetValue(D2D1_GAMMATRANSFER_PROP_BLUE_DISABLE, (BOOL)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_GAMMATRANSFER_PROP_ALPHA_AMPLITUDE") == 0) {
+                    effect->SetValue(D2D1_GAMMATRANSFER_PROP_ALPHA_AMPLITUDE, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_GAMMATRANSFER_PROP_ALPHA_EXPONENT") == 0) {
+                    effect->SetValue(D2D1_GAMMATRANSFER_PROP_ALPHA_EXPONENT, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_GAMMATRANSFER_PROP_ALPHA_OFFSET") == 0) {
+                    effect->SetValue(D2D1_GAMMATRANSFER_PROP_ALPHA_OFFSET, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_GAMMATRANSFER_PROP_ALPHA_DISABLE") == 0) {
+                    effect->SetValue(D2D1_GAMMATRANSFER_PROP_ALPHA_DISABLE, (BOOL)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_GAMMATRANSFER_PROP_CLAMP_OUTPUT") == 0) {
+                    effect->SetValue(D2D1_GAMMATRANSFER_PROP_CLAMP_OUTPUT, (BOOL)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_TABLETRANSFER_PROP_RED_DISABLE") == 0) {
+                    effect->SetValue(D2D1_TABLETRANSFER_PROP_RED_DISABLE, (BOOL)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_TABLETRANSFER_PROP_GREEN_DISABLE") == 0) {
+                    effect->SetValue(D2D1_TABLETRANSFER_PROP_GREEN_DISABLE, (BOOL)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_TABLETRANSFER_PROP_BLUE_DISABLE") == 0) {
+                    effect->SetValue(D2D1_TABLETRANSFER_PROP_BLUE_DISABLE, (BOOL)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_TABLETRANSFER_PROP_ALPHA_DISABLE") == 0) {
+                    effect->SetValue(D2D1_TABLETRANSFER_PROP_ALPHA_DISABLE, (BOOL)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_TABLETRANSFER_PROP_CLAMP_OUTPUT") == 0) {
+                    effect->SetValue(D2D1_TABLETRANSFER_PROP_CLAMP_OUTPUT, (BOOL)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_DISCRETETRANSFER_PROP_RED_DISABLE") == 0) {
+                    effect->SetValue(D2D1_DISCRETETRANSFER_PROP_RED_DISABLE, (BOOL)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_DISCRETETRANSFER_PROP_GREEN_DISABLE") == 0) {
+                    effect->SetValue(D2D1_DISCRETETRANSFER_PROP_GREEN_DISABLE, (BOOL)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_DISCRETETRANSFER_PROP_BLUE_DISABLE") == 0) {
+                    effect->SetValue(D2D1_DISCRETETRANSFER_PROP_BLUE_DISABLE, (BOOL)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_DISCRETETRANSFER_PROP_ALPHA_DISABLE") == 0) {
+                    effect->SetValue(D2D1_DISCRETETRANSFER_PROP_ALPHA_DISABLE, (BOOL)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_DISCRETETRANSFER_PROP_CLAMP_OUTPUT") == 0) {
+                    effect->SetValue(D2D1_DISCRETETRANSFER_PROP_CLAMP_OUTPUT, (BOOL)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_CONVOLVEMATRIX_PROP_KERNEL_UNIT_LENGTH") == 0) {
+                    effect->SetValue(D2D1_CONVOLVEMATRIX_PROP_KERNEL_UNIT_LENGTH, D2D1_VECTOR_2F{ (FLOAT)FloatFI(info[1]), (FLOAT)FloatFI(info[2]) });
+                    return;
+                }
+                if (strcmp(mode, "D2D1_CONVOLVEMATRIX_PROP_SCALE_MODE") == 0) {
+                    effect->SetValue(D2D1_CONVOLVEMATRIX_PROP_SCALE_MODE, (D2D1_CONVOLVEMATRIX_SCALE_MODE)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_CONVOLVEMATRIX_PROP_KERNEL_SIZE_X") == 0) {
+                    effect->SetValue(D2D1_CONVOLVEMATRIX_PROP_KERNEL_SIZE_X, (UINT32)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_CONVOLVEMATRIX_PROP_KERNEL_SIZE_Y") == 0) {
+                    effect->SetValue(D2D1_CONVOLVEMATRIX_PROP_KERNEL_SIZE_Y, (UINT32)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_CONVOLVEMATRIX_PROP_DIVISOR") == 0) {
+                    effect->SetValue(D2D1_CONVOLVEMATRIX_PROP_DIVISOR, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_CONVOLVEMATRIX_PROP_BIAS") == 0) {
+                    effect->SetValue(D2D1_CONVOLVEMATRIX_PROP_BIAS, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_CONVOLVEMATRIX_PROP_KERNEL_OFFSET") == 0) {
+                    effect->SetValue(D2D1_CONVOLVEMATRIX_PROP_KERNEL_OFFSET, D2D1_VECTOR_2F{ (FLOAT)FloatFI(info[1]), (FLOAT)FloatFI(info[2]) });
+                    return;
+                }
+                if (strcmp(mode, "D2D1_CONVOLVEMATRIX_PROP_PRESERVE_ALPHA") == 0) {
+                    effect->SetValue(D2D1_CONVOLVEMATRIX_PROP_PRESERVE_ALPHA, (BOOL)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_CONVOLVEMATRIX_PROP_BORDER_MODE") == 0) {
+                    effect->SetValue(D2D1_CONVOLVEMATRIX_PROP_BORDER_MODE, (D2D1_BORDER_MODE)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_CONVOLVEMATRIX_PROP_CLAMP_OUTPUT") == 0) {
+                    effect->SetValue(D2D1_CONVOLVEMATRIX_PROP_CLAMP_OUTPUT, (BOOL)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_BRIGHTNESS_PROP_WHITE_POINT") == 0) {
+                    effect->SetValue(D2D1_BRIGHTNESS_PROP_WHITE_POINT, D2D1_VECTOR_2F{ (FLOAT)FloatFI(info[1]), (FLOAT)FloatFI(info[2]) });
+                    return;
+                }
+                if (strcmp(mode, "D2D1_BRIGHTNESS_PROP_BLACK_POINT") == 0) {
+                    effect->SetValue(D2D1_BRIGHTNESS_PROP_BLACK_POINT, D2D1_VECTOR_2F{ (FLOAT)FloatFI(info[1]), (FLOAT)FloatFI(info[2]) });
+                    return;
+                }
+                if (strcmp(mode, "D2D1_ARITHMETICCOMPOSITE_PROP_COEFFICIENTS") == 0) {
+                    effect->SetValue(D2D1_ARITHMETICCOMPOSITE_PROP_COEFFICIENTS, D2D1_VECTOR_4F{ (FLOAT)FloatFI(info[1]), (FLOAT)FloatFI(info[2]), (FLOAT)FloatFI(info[3]), (FLOAT)FloatFI(info[4]) });
+                    return;
+                }
+                if (strcmp(mode, "D2D1_ARITHMETICCOMPOSITE_PROP_CLAMP_OUTPUT") == 0) {
+                    effect->SetValue(D2D1_ARITHMETICCOMPOSITE_PROP_CLAMP_OUTPUT, (BOOL)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_CROP_PROP_RECT") == 0) {
+                    effect->SetValue(D2D1_CROP_PROP_RECT, D2D1_VECTOR_4F{ (FLOAT)FloatFI(info[1]), (FLOAT)FloatFI(info[2]), (FLOAT)FloatFI(info[3]), (FLOAT)FloatFI(info[4]) });
+                    return;
+                }
+                if (strcmp(mode, "D2D1_CROP_PROP_BORDER_MODE") == 0) {
+                    effect->SetValue(D2D1_CROP_PROP_BORDER_MODE, (D2D1_BORDER_MODE)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_BORDER_PROP_EDGE_MODE_X") == 0) {
+                    effect->SetValue(D2D1_BORDER_PROP_EDGE_MODE_X, (D2D1_BORDER_EDGE_MODE)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_BORDER_PROP_EDGE_MODE_Y") == 0) {
+                    effect->SetValue(D2D1_BORDER_PROP_EDGE_MODE_Y, (D2D1_BORDER_EDGE_MODE)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_MORPHOLOGY_PROP_MODE") == 0) {
+                    effect->SetValue(D2D1_MORPHOLOGY_PROP_MODE, (D2D1_MORPHOLOGY_MODE)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_MORPHOLOGY_PROP_WIDTH") == 0) {
+                    effect->SetValue(D2D1_MORPHOLOGY_PROP_WIDTH, (UINT32)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_MORPHOLOGY_PROP_HEIGHT") == 0) {
+                    effect->SetValue(D2D1_MORPHOLOGY_PROP_HEIGHT, (UINT32)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_TILE_PROP_RECT") == 0) {
+                    effect->SetValue(D2D1_TILE_PROP_RECT, D2D1_VECTOR_4F{ (FLOAT)FloatFI(info[1]), (FLOAT)FloatFI(info[2]), (FLOAT)FloatFI(info[3]), (FLOAT)FloatFI(info[4]) });
+                    return;
+                }
+                if (strcmp(mode, "D2D1_ATLAS_PROP_INPUT_RECT") == 0) {
+                    effect->SetValue(D2D1_ATLAS_PROP_INPUT_RECT, D2D1_VECTOR_4F{ (FLOAT)FloatFI(info[1]), (FLOAT)FloatFI(info[2]), (FLOAT)FloatFI(info[3]), (FLOAT)FloatFI(info[4]) });
+                    return;
+                }
+                if (strcmp(mode, "D2D1_ATLAS_PROP_INPUT_PADDING_RECT") == 0) {
+                    effect->SetValue(D2D1_ATLAS_PROP_INPUT_PADDING_RECT, D2D1_VECTOR_4F{ (FLOAT)FloatFI(info[1]), (FLOAT)FloatFI(info[2]), (FLOAT)FloatFI(info[3]), (FLOAT)FloatFI(info[4]) });
+                    return;
+                }
+                if (strcmp(mode, "D2D1_OPACITYMETADATA_PROP_INPUT_OPAQUE_RECT") == 0) {
+                    effect->SetValue(D2D1_OPACITYMETADATA_PROP_INPUT_OPAQUE_RECT, D2D1_VECTOR_4F{ (FLOAT)FloatFI(info[1]), (FLOAT)FloatFI(info[2]), (FLOAT)FloatFI(info[3]), (FLOAT)FloatFI(info[4]) });
+                    return;
+                }
+            }));
+
+            jsEffect->Set(isolate, "SetInput", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1Effect* effect = (ID2D1Effect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                ID2D1Image* copyFrom = (ID2D1Image*)(IntegerFI(info[1].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()));
+                effect->SetInput(IntegerFI(info[0]), copyFrom);
+            }));
+
+            jsEffect->Set(isolate, "effect", Boolean::New(isolate, true));
+        }
+    }
 }
 
 //#include "GL/glew.c"
@@ -2022,6 +2791,11 @@ V8FUNC(createCanvas) {
         context->Set(isolate, "renderTarget", Number::New(isolate, (LONG_PTR)d2d->renderTarget));
         //context->Set(isolate, "type", info[1]);
         print("TRENDERTARF< " << d2d->renderTarget);
+        if (d2d11) {
+            Direct2D11* locald2d11 = (Direct2D11*)d2d;
+            context->Set(isolate, "backBitmap", DIRECT2D::getBitmapImpl(isolate, locald2d11->d2dBackBitmap.Get()));
+            context->Set(isolate, "targetBitmap", DIRECT2D::getBitmapImpl(isolate, locald2d11->d2dTargetBitmap.Get()));
+        }
         context->Set(isolate, "BeginDraw", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
             Isolate* isolate = info.GetIsolate();
             Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
@@ -2033,8 +2807,60 @@ V8FUNC(createCanvas) {
             Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
             //print((LONG_PTR)d2d);
             //d2d->renderTarget->EndDraw();
-            info.GetReturnValue().Set(d2d->EndDraw());
+            //info.GetReturnValue().Set(d2d->EndDraw(info[0]->BooleanValue(isolate)));
+            d2d->EndDraw(info[0]->BooleanValue(isolate));
         }));
+        context->Set(isolate, "Present", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+            if (d2d->type >= 2) {
+                RetIfFailed(((Direct2D11*)d2d)->swapChain->Present(1, 0), "D2D11 Present failed?");
+            }
+            else {
+                MessageBox(NULL, L"To use Present you must create this canvas with ID2D1DeviceContext or ID2D1DeviceContextDComposition", L"Sorry", MB_OK | MB_SYSTEMMODAL);
+            }
+        }));
+        context->Set(isolate, "SetTarget", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+            if (d2d->type >= 2) {
+                ID2D1Image* target = (ID2D1Image*)(IntegerFI(info[0].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()));
+
+                ((Direct2D11*) d2d)->d2dcontext->SetTarget(target);
+            }
+            else {
+                MessageBox(NULL, L"To use SetTarget you must create this canvas with ID2D1DeviceContext or ID2D1DeviceContextDComposition", L"Sorry", MB_OK | MB_SYSTEMMODAL);
+            }
+        }));
+        context->Set(isolate, "DrawImage", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+            if (d2d->type >= 2) {
+                IUnknown* image = (IUnknown*)(IntegerFI(info[0].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()));
+
+                D2D1_POINT_2F point = D2D1::Point2F(FloatFI(info[1]), FloatFI(info[2]));
+                D2D1_RECT_F rect = D2D1::RectF(FloatFI(info[3]), FloatFI(info[4]), FloatFI(info[5]), FloatFI(info[6]));
+
+                Local<Value> diddydidit;
+
+                info[0].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("effect")).ToLocal(&diddydidit);
+
+                if (!diddydidit.IsEmpty()) {
+                    ((Direct2D11*)d2d)->d2dcontext->DrawImage((ID2D1Effect*)image, point, rect, (D2D1_INTERPOLATION_MODE)IntegerFI(info[7]));
+                }
+                else {
+                    ((Direct2D11*)d2d)->d2dcontext->DrawImage((ID2D1Image*)image, point, rect, (D2D1_INTERPOLATION_MODE)IntegerFI(info[7]));
+                }
+                //((Direct2D11*)d2d)->d2dcontext->DrawImage(image);
+            }
+            else {
+                MessageBox(NULL, L"To use DrawImage you must create this canvas with ID2D1DeviceContext or ID2D1DeviceContextDComposition", L"Sorry", MB_OK | MB_SYSTEMMODAL);
+            }
+        }));
+
         context->Set(isolate, "Resize", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
             Isolate* isolate = info.GetIsolate();
             Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
@@ -3373,13 +4199,15 @@ V8FUNC(createCanvas) {
 
                 Local<ObjectTemplate> jsEffect = DIRECT2D::getIUnknownImpl(isolate, effect);
 
-                jsEffect->Set(isolate, "SetValue", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                    Isolate* isolate = info.GetIsolate();
-                    ID2D1Effect* effect = (ID2D1Effect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                DIRECT2D::JSCreateEffect::HandleMyGoofyD2D1EffectsFromAnotherNamespace(isolate, jsEffect);
 
-                    //oh no bruh SetValue works super weird and idk if i can do it MAN FUCK
-                    RetIfFailed(effect->SetValue(IntegerFI(info[0]), IntegerFI(info[1])), "SetValue failed!");
-                }));
+                //jsEffect->Set(isolate, "SetValue", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                //    Isolate* isolate = info.GetIsolate();
+                //    ID2D1Effect* effect = (ID2D1Effect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                //
+                //    //oh no bruh SetValue works super weird and idk if i can do it MAN FUCK
+                //    //RetIfFailed(effect->SetValue(IntegerFI(info[0]), IntegerFI(info[1])), "SetValue failed!");
+                //}));
 
                 info.GetReturnValue().Set(jsEffect->NewInstance(context).ToLocalChecked());
             }
@@ -7903,7 +8731,7 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
         }));
 
     global->Set(isolate, "Matrix3x2", matrixhelper);
-    //yo wtf i don't think you can use Arrays without a context???
+    //yo wtf i don't think you can use Arrays without a context??? (nope, arrays don't work with an object template)
     //{ 
     //    Local<Value> elemid[11] = { Number::New(isolate, 1),
     //        Number::New(isolate, 2),
@@ -8159,6 +8987,11 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     setGlobalConst(MB_APPLMODAL);
     setGlobalConst(MB_SYSTEMMODAL);
     setGlobalConst(MB_TASKMODAL);
+    setGlobalConst(MB_SERVICE_NOTIFICATION);
+    setGlobalConst(MB_RIGHT);
+    setGlobalConst(MB_RTLREADING);
+    setGlobalConst(MB_SETFOREGROUND);
+    setGlobalConst(MB_TOPMOST);
 
     setGlobalConst(SS_LEFT);
     setGlobalConst(SS_CENTER);
@@ -8408,6 +9241,14 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     setGlobalConst(D2D1_BITMAP_INTERPOLATION_MODE_NEAREST_NEIGHBOR);
     setGlobalConst(D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);
     setGlobalConst(D2D1_BITMAP_INTERPOLATION_MODE_FORCE_DWORD);
+
+    setGlobalConst(D2D1_INTERPOLATION_MODE_NEAREST_NEIGHBOR);
+    setGlobalConst(D2D1_INTERPOLATION_MODE_LINEAR);
+    setGlobalConst(D2D1_INTERPOLATION_MODE_CUBIC);
+    setGlobalConst(D2D1_INTERPOLATION_MODE_MULTI_SAMPLE_LINEAR);
+    setGlobalConst(D2D1_INTERPOLATION_MODE_ANISOTROPIC);
+    setGlobalConst(D2D1_INTERPOLATION_MODE_HIGH_QUALITY_CUBIC);
+    setGlobalConst(D2D1_INTERPOLATION_MODE_FORCE_DWORD);
 
 
 //string.replaceAll(" ", "").replaceAll("\t", "").split("\n").map(s = > "#define " + s + " " + s).map(s = > console.log(s));
@@ -9044,7 +9885,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInstance, char* nCmdList, int
     //print("uhhh i need to define like 100 WM_ global macros kthxbai");
     print(sizeof(int) << " " << sizeof(long) << " " << sizeof(LONG_PTR));
     print("also i MUST consider adding convenience functions like setting the color of objects that don't support it (by creating new ones)");
-    print("[D2D] UNFORTUNATELY i need to use create text layout some where for font boldness and the like");
+    //print("[D2D] UNFORTUNATELY i need to use create text layout some where for font boldness and the like");
     //print("replace all using of RGB() with a js function");
     //print("figure out win timers"); //i couldn't be bothered to immediately figure it out because the param names seems so weird that i couldn\'t be beothereed
     //print("maybe do send input but if i can't i can't");
@@ -9062,7 +9903,8 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInstance, char* nCmdList, int
     //1.5.33 because i realized 1.6.0 should be when i add all of them (i've only added OPENGL)
     //1.5.40 because i added screenshaders but more importantly libusb/hidapi
     //1.5.56 because i added the minimum support for d2d11 (that's what im gonna call it) and because directcomposition works (i still need to add effects)
-    print("JBS3 -> Version 1.5.56"); //so idk how normal version things work so the first number will probably stay one --- i will increment the second number if i change an existing function like when i remade the CreateWindowClass and CreateWindow functions --- i might random increment the third number if i feel like it
+    //1.5.66 because THE BLUR EFFECT WORKS BUDDY NEWDIRECT2D11FUNCS is BEAUTIFUL (i need to figure out resizing and all that BUT IT WORKS)
+    print("JBS3 -> Version 1.5.66"); //so idk how normal version things work so the first number will probably stay one --- i will increment the second number if i change an existing function like when i remade the CreateWindowClass and CreateWindow functions --- i might random increment the third number if i feel like it
     print(screenWidth << "x" << screenHeight);
     
 

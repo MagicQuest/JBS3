@@ -39,5 +39,5 @@ public:
 
     bool CreateAndSetDrawingBitmaps();
 
-    int EndDraw();
+    void EndDraw(bool donotpresent);
 };
