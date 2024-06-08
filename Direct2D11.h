@@ -28,6 +28,7 @@ public:
     ComPtr<IDCompositionDesktopDevice> m_dcompDevice;
     ComPtr<IDCompositionTarget> m_dcompTarget;
     ComPtr<IDCompositionVisual2> m_dcompVisual;
+    ComPtr<IDCompositionDevice3> m_dcompD1;
 
     Direct2D11() {
 

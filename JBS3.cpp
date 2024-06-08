@@ -1192,6 +1192,7 @@ V8FUNC(BeepWrapper) {
 #pragma comment(lib, "dcomp.lib")
 #pragma comment(lib, "D3D11.lib")
 #pragma comment(lib, "dxguid.lib")
+//#pragma comment(lib, "dxgi.lib")
 
 //float lerp(float a, float b, float f)
 //{
@@ -1204,6 +1205,7 @@ V8FUNC(BeepWrapper) {
 //wtf it's still like that https://github.com/v8/v8/blob/main/include/v8-typed-array.h
 
 #include <limits>
+//#include <dxgidebug.h>
 
 namespace DIRECT2D {
     using namespace v8;
@@ -1355,7 +1357,16 @@ namespace DIRECT2D {
         jsGenericIU->Set(isolate, "Release", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
             Isolate* isolate = info.GetIsolate();
             IUnknown* ptr = (IUnknown*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-            ptr->Release();
+            //print("IUnknownImpl Release -> " << ptr << " " << refCount);
+            //ptr->Release();
+            //ComPtr<IDXGIDebug> dbg;
+            //RetIfFailed(ptr->QueryInterface(dbg.GetAddressOf()), "QueryInterface");
+            //ComPtr<IDXGIDebug1> dbg2;
+            //RetIfFailed(DXGIGetDebugInterface1(NULL, __uuidof(IDXGIDebug1), (void**)dbg2.GetAddressOf()), "GetDebugInterface1");
+            //RetIfFailed(dbg2->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_DETAIL), "ReportLiveObjects");
+
+            ULONG refCount = ptr->Release();
+            info.GetReturnValue().Set(Number::New(isolate, refCount));
         }));
 
         return jsGenericIU;
@@ -1892,6 +1903,17 @@ namespace DIRECT2D {
         return jsPoint;
     }
 
+    Local<ObjectTemplate> getCompositionEffectImpl(Isolate* isolate, IDCompositionFilterEffect* effect) {
+        Local<ObjectTemplate> jsDCompEffect = DIRECT2D::getIUnknownImpl(isolate, effect);
+        jsDCompEffect->Set(isolate, "SetInput", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            IDCompositionFilterEffect* effect = (IDCompositionFilterEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+            RetIfFailed(effect->SetInput(IntegerFI(info[0]), (IUnknown*)IntegerFI(info[1].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()), IntegerFI(info[2])), "IDCompositionFIlterEffect* -> SetInput failed");
+        }));
+        return jsDCompEffect;
+    }
+
     float f(float x) {
         if (x < .875) {
             return min((max(abs(6*x-1.5)-.75, 0))/1.5, 1);
@@ -1966,6 +1988,8 @@ namespace DIRECT2D {
 
     namespace JSCreateEffect {
         void HandleMyGoofyD2D1EffectsFromAnotherNamespace(Isolate* isolate, const Local<ObjectTemplate>& jsEffect) {
+            HandleScope handle_scope(isolate);
+
             jsEffect->Set(isolate, "SetValue", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
                 static bool msg = false; //shoot i wish js had static variables like this so i didn't have to make the variable outside that scope
                 if(!msg) MessageBoxA(NULL, "Any values that require a D2D1_MATRIX_4X4_F or D2D1_MATRIX_5X4_F do NOT work yet because i haven't implemented them", "SetValue warning", MB_OK | MB_ICONWARNING);
@@ -1973,7 +1997,7 @@ namespace DIRECT2D {
 
                 Isolate* isolate = info.GetIsolate();
                 ID2D1Effect* effect = (ID2D1Effect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
+                
                 const char* mode = CStringFI(info[0]);
                 //oh no bruh SetValue works super weird and idk if i can do it MAN FUCK
                 //RetIfFailed(effect->SetValue(IntegerFI(info[0]), IntegerFI(info[1])), "SetValue failed!");
@@ -2718,6 +2742,195 @@ namespace DIRECT2D {
                     effect->SetValue(D2D1_OPACITYMETADATA_PROP_INPUT_OPAQUE_RECT, D2D1_VECTOR_4F{ (FLOAT)FloatFI(info[1]), (FLOAT)FloatFI(info[2]), (FLOAT)FloatFI(info[3]), (FLOAT)FloatFI(info[4]) });
                     return;
                 }
+                //D2D1EFFECTS_2.H
+                if (strcmp(mode, "D2D1_CONTRAST_PROP_CONTRAST") == 0) {
+                    effect->SetValue(D2D1_CONTRAST_PROP_CONTRAST, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_CONTRAST_PROP_CLAMP_INPUT") == 0) {
+                    effect->SetValue(D2D1_CONTRAST_PROP_CLAMP_INPUT, (BOOL)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_RGBTOHUE_PROP_OUTPUT_COLOR_SPACE") == 0) {
+                    effect->SetValue(D2D1_RGBTOHUE_PROP_OUTPUT_COLOR_SPACE, (D2D1_RGBTOHUE_OUTPUT_COLOR_SPACE)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_HUETORGB_PROP_INPUT_COLOR_SPACE") == 0) {
+                    effect->SetValue(D2D1_HUETORGB_PROP_INPUT_COLOR_SPACE, (D2D1_HUETORGB_INPUT_COLOR_SPACE)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_CHROMAKEY_PROP_COLOR") == 0) {
+                    effect->SetValue(D2D1_CHROMAKEY_PROP_COLOR, D2D1_VECTOR_3F{ (FLOAT)FloatFI(info[1]), (FLOAT)FloatFI(info[2]), (FLOAT)FloatFI(info[3]) });
+                    return;
+                }
+                if (strcmp(mode, "D2D1_CHROMAKEY_PROP_TOLERANCE") == 0) {
+                    effect->SetValue(D2D1_CHROMAKEY_PROP_TOLERANCE, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_CHROMAKEY_PROP_INVERT_ALPHA") == 0) {
+                    effect->SetValue(D2D1_CHROMAKEY_PROP_INVERT_ALPHA, (BOOL)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_CHROMAKEY_PROP_FEATHER") == 0) {
+                    effect->SetValue(D2D1_CHROMAKEY_PROP_FEATHER, (BOOL)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_EMBOSS_PROP_HEIGHT") == 0) {
+                    effect->SetValue(D2D1_EMBOSS_PROP_HEIGHT, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_EMBOSS_PROP_DIRECTION") == 0) {
+                    effect->SetValue(D2D1_EMBOSS_PROP_DIRECTION, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_EXPOSURE_PROP_EXPOSURE_VALUE") == 0) {
+                    effect->SetValue(D2D1_EXPOSURE_PROP_EXPOSURE_VALUE, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_POSTERIZE_PROP_RED_VALUE_COUNT") == 0) {
+                    effect->SetValue(D2D1_POSTERIZE_PROP_RED_VALUE_COUNT, (UINT32)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_POSTERIZE_PROP_GREEN_VALUE_COUNT") == 0) {
+                    effect->SetValue(D2D1_POSTERIZE_PROP_GREEN_VALUE_COUNT, (UINT32)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_POSTERIZE_PROP_BLUE_VALUE_COUNT") == 0) {
+                    effect->SetValue(D2D1_POSTERIZE_PROP_BLUE_VALUE_COUNT, (UINT32)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_SEPIA_PROP_INTENSITY") == 0) {
+                    effect->SetValue(D2D1_SEPIA_PROP_INTENSITY, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_SEPIA_PROP_ALPHA_MODE") == 0) {
+                    effect->SetValue(D2D1_SEPIA_PROP_ALPHA_MODE, (D2D1_ALPHA_MODE)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_SHARPEN_PROP_SHARPNESS") == 0) {
+                    effect->SetValue(D2D1_SHARPEN_PROP_SHARPNESS, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_SHARPEN_PROP_THRESHOLD") == 0) {
+                    effect->SetValue(D2D1_SHARPEN_PROP_THRESHOLD, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_STRAIGHTEN_PROP_ANGLE") == 0) {
+                    effect->SetValue(D2D1_STRAIGHTEN_PROP_ANGLE, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_STRAIGHTEN_PROP_MAINTAIN_SIZE") == 0) {
+                    effect->SetValue(D2D1_STRAIGHTEN_PROP_MAINTAIN_SIZE, (BOOL)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_STRAIGHTEN_PROP_SCALE_MODE") == 0) {
+                    effect->SetValue(D2D1_STRAIGHTEN_PROP_SCALE_MODE, (D2D1_STRAIGHTEN_SCALE_MODE)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_TEMPERATUREANDTINT_PROP_TEMPERATURE") == 0) {
+                    effect->SetValue(D2D1_TEMPERATUREANDTINT_PROP_TEMPERATURE, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_TEMPERATUREANDTINT_PROP_TINT") == 0) {
+                    effect->SetValue(D2D1_TEMPERATUREANDTINT_PROP_TINT, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_VIGNETTE_PROP_COLOR") == 0) {
+                    effect->SetValue(D2D1_VIGNETTE_PROP_COLOR, D2D1_VECTOR_4F{ (FLOAT)FloatFI(info[1]), (FLOAT)FloatFI(info[2]), (FLOAT)FloatFI(info[3]), (FLOAT)FloatFI(info[4]) });
+                    return;
+                }
+                if (strcmp(mode, "D2D1_VIGNETTE_PROP_TRANSITION_SIZE") == 0) {
+                    effect->SetValue(D2D1_VIGNETTE_PROP_TRANSITION_SIZE, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_VIGNETTE_PROP_STRENGTH") == 0) {
+                    effect->SetValue(D2D1_VIGNETTE_PROP_STRENGTH, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_EDGEDETECTION_PROP_STRENGTH") == 0) {
+                    effect->SetValue(D2D1_EDGEDETECTION_PROP_STRENGTH, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_EDGEDETECTION_PROP_BLUR_RADIUS") == 0) {
+                    effect->SetValue(D2D1_EDGEDETECTION_PROP_BLUR_RADIUS, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_EDGEDETECTION_PROP_MODE") == 0) {
+                    effect->SetValue(D2D1_EDGEDETECTION_PROP_MODE, (D2D1_EDGEDETECTION_MODE)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_EDGEDETECTION_PROP_OVERLAY_EDGES") == 0) {
+                    effect->SetValue(D2D1_EDGEDETECTION_PROP_OVERLAY_EDGES, (BOOL)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_EDGEDETECTION_PROP_ALPHA_MODE") == 0) {
+                    effect->SetValue(D2D1_EDGEDETECTION_PROP_ALPHA_MODE, (D2D1_ALPHA_MODE)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_HIGHLIGHTSANDSHADOWS_PROP_HIGHLIGHTS") == 0) {
+                    effect->SetValue(D2D1_HIGHLIGHTSANDSHADOWS_PROP_HIGHLIGHTS, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_HIGHLIGHTSANDSHADOWS_PROP_SHADOWS") == 0) {
+                    effect->SetValue(D2D1_HIGHLIGHTSANDSHADOWS_PROP_SHADOWS, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_HIGHLIGHTSANDSHADOWS_PROP_CLARITY") == 0) {
+                    effect->SetValue(D2D1_HIGHLIGHTSANDSHADOWS_PROP_CLARITY, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_HIGHLIGHTSANDSHADOWS_PROP_INPUT_GAMMA") == 0) {
+                    effect->SetValue(D2D1_HIGHLIGHTSANDSHADOWS_PROP_INPUT_GAMMA, (D2D1_HIGHLIGHTSANDSHADOWS_INPUT_GAMMA)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_HIGHLIGHTSANDSHADOWS_PROP_MASK_BLUR_RADIUS") == 0) {
+                    effect->SetValue(D2D1_HIGHLIGHTSANDSHADOWS_PROP_MASK_BLUR_RADIUS, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_LOOKUPTABLE3D_PROP_LUT") == 0) {
+                    effect->SetValue(D2D1_LOOKUPTABLE3D_PROP_LUT, (IUnknown*)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_LOOKUPTABLE3D_PROP_ALPHA_MODE") == 0) {
+                    effect->SetValue(D2D1_LOOKUPTABLE3D_PROP_ALPHA_MODE, (D2D1_ALPHA_MODE)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_OPACITY_PROP_OPACITY") == 0) {
+                    effect->SetValue(D2D1_OPACITY_PROP_OPACITY, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_CROSSFADE_PROP_WEIGHT") == 0) {
+                    effect->SetValue(D2D1_CROSSFADE_PROP_WEIGHT, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_TINT_PROP_COLOR") == 0) {
+                    effect->SetValue(D2D1_TINT_PROP_COLOR, D2D1_VECTOR_4F{ (FLOAT)FloatFI(info[1]), (FLOAT)FloatFI(info[2]), (FLOAT)FloatFI(info[3]), (FLOAT)FloatFI(info[4]) });
+                    return;
+                }
+                if (strcmp(mode, "D2D1_TINT_PROP_CLAMP_OUTPUT") == 0) {
+                    effect->SetValue(D2D1_TINT_PROP_CLAMP_OUTPUT, (BOOL)IntegerFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_WHITELEVELADJUSTMENT_PROP_INPUT_WHITE_LEVEL") == 0) {
+                    effect->SetValue(D2D1_WHITELEVELADJUSTMENT_PROP_INPUT_WHITE_LEVEL, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_WHITELEVELADJUSTMENT_PROP_OUTPUT_WHITE_LEVEL") == 0) {
+                    effect->SetValue(D2D1_WHITELEVELADJUSTMENT_PROP_OUTPUT_WHITE_LEVEL, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_HDRTONEMAP_PROP_INPUT_MAX_LUMINANCE") == 0) {
+                    effect->SetValue(D2D1_HDRTONEMAP_PROP_INPUT_MAX_LUMINANCE, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_HDRTONEMAP_PROP_OUTPUT_MAX_LUMINANCE") == 0) {
+                    effect->SetValue(D2D1_HDRTONEMAP_PROP_OUTPUT_MAX_LUMINANCE, (FLOAT)FloatFI(info[1]));
+                    return;
+                }
+                if (strcmp(mode, "D2D1_HDRTONEMAP_PROP_DISPLAY_MODE") == 0) {
+                    effect->SetValue(D2D1_HDRTONEMAP_PROP_DISPLAY_MODE, (D2D1_HDRTONEMAP_DISPLAY_MODE)IntegerFI(info[1]));
+                    return;
+                }
             }));
 
             jsEffect->Set(isolate, "SetInput", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
@@ -2725,7 +2938,26 @@ namespace DIRECT2D {
                 ID2D1Effect* effect = (ID2D1Effect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
 
                 ID2D1Image* copyFrom = (ID2D1Image*)(IntegerFI(info[1].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()));
+                //ID2D1Image* copyFrom = nullptr;
+                //if (info[1]->BooleanValue(isolate)) {
+                //    copyFrom = (ID2D1Image*)(IntegerFI(info[1].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()));
+                //}
+
                 effect->SetInput(IntegerFI(info[0]), copyFrom);
+            }));
+
+            jsEffect->Set(isolate, "SetInputEffect", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1Effect* effect = (ID2D1Effect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                ID2D1Effect* inputEffect = (ID2D1Effect*)(IntegerFI(info[1].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()));
+
+                //ID2D1Effect* inputEffect = nullptr;
+                //if (info[1]->BooleanValue(isolate)) {
+                //    inputEffect = (ID2D1Effect*)(IntegerFI(info[1].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()));
+                //}
+
+                effect->SetInputEffect(IntegerFI(info[0]), inputEffect);
             }));
 
             jsEffect->Set(isolate, "effect", Boolean::New(isolate, true));
@@ -2745,6 +2977,8 @@ void GLAPIENTRY glMessageCallback(GLenum source, GLenum type, GLuint id, GLenum 
     MessageBoxA(NULL, (std::string("GL CALLBACK: ") + (type == GL_DEBUG_TYPE_ERROR ? "** GL ERROR **" : "") + " type = " + std::to_string(type) + ", severity = " + std::to_string(severity) + ", message = " + message).c_str(), NULL, MB_OK | MB_ICONERROR); //just learned that passing null for the title will just default to "Error"
     fprintf(stderr, "GL CALLBACK: %s type = 0x%x, severity = 0x%x, message = %s\n", (type == GL_DEBUG_TYPE_ERROR ? "** GL ERROR **" : ""), type, severity, message);
 }
+
+v8::Local<v8::ObjectTemplate> jsEffectOT;
 
 V8FUNC(createCanvas) {
     using namespace v8;
@@ -2826,8 +3060,10 @@ V8FUNC(createCanvas) {
             Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
 
             if (d2d->type >= 2) {
-                ID2D1Image* target = (ID2D1Image*)(IntegerFI(info[0].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()));
-
+                ID2D1Image* target = nullptr;
+                if (info[0]->BooleanValue(isolate)) {
+                    target = (ID2D1Image*)(IntegerFI(info[0].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()));
+                }
                 ((Direct2D11*) d2d)->d2dcontext->SetTarget(target);
             }
             else {
@@ -2846,13 +3082,29 @@ V8FUNC(createCanvas) {
 
                 Local<Value> diddydidit;
 
-                info[0].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("effect")).ToLocal(&diddydidit);
+                info[0].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("effect")).ToLocal(&diddydidit); //i think this is the first time im using ToLocal (without commenting it out)
 
                 if (!diddydidit.IsEmpty()) {
-                    ((Direct2D11*)d2d)->d2dcontext->DrawImage((ID2D1Effect*)image, point, rect, (D2D1_INTERPOLATION_MODE)IntegerFI(info[7]));
+                    if (info[1]->IsNullOrUndefined()) {
+                        ((Direct2D11*)d2d)->d2dcontext->DrawImage((ID2D1Effect*)image);
+                    }
+                    else if (info[3]->IsNullOrUndefined()) {
+                        ((Direct2D11*)d2d)->d2dcontext->DrawImage((ID2D1Effect*)image, point);
+                    }
+                    else {
+                        ((Direct2D11*)d2d)->d2dcontext->DrawImage((ID2D1Effect*)image, point, rect, (D2D1_INTERPOLATION_MODE)IntegerFI(info[7]));
+                    }
                 }
                 else {
-                    ((Direct2D11*)d2d)->d2dcontext->DrawImage((ID2D1Image*)image, point, rect, (D2D1_INTERPOLATION_MODE)IntegerFI(info[7]));
+                    if (info[1]->IsNullOrUndefined()) {
+                        ((Direct2D11*)d2d)->d2dcontext->DrawImage((ID2D1Image*)image);
+                    }
+                    else if (info[3]->IsNullOrUndefined()) {
+                        ((Direct2D11*)d2d)->d2dcontext->DrawImage((ID2D1Image*)image, point);
+                    }
+                    else {
+                        ((Direct2D11*)d2d)->d2dcontext->DrawImage((ID2D1Image*)image, point, rect, (D2D1_INTERPOLATION_MODE)IntegerFI(info[7]));
+                    }
                 }
                 //((Direct2D11*)d2d)->d2dcontext->DrawImage(image);
             }
@@ -2860,15 +3112,61 @@ V8FUNC(createCanvas) {
                 MessageBox(NULL, L"To use DrawImage you must create this canvas with ID2D1DeviceContext or ID2D1DeviceContextDComposition", L"Sorry", MB_OK | MB_SYSTEMMODAL);
             }
         }));
-
-        context->Set(isolate, "Resize", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+        context->Set(isolate, "CreateBitmapFromDxgiSurface", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
             Isolate* isolate = info.GetIsolate();
             Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+            if (d2d->type >= 2) {
+                Direct2D11* d2d11 = (Direct2D11*)d2d;
+
+                ID2D1Bitmap1* target;
+
+                D2D1_BITMAP_OPTIONS options = (D2D1_BITMAP_OPTIONS)IntegerFI(info[0]);
+                D2D1_PIXEL_FORMAT format;
+                if (info[1]->IsNullOrUndefined()) {
+                    format = d2d->renderTarget->GetPixelFormat();
+                    print("getting default format");
+                }
+                else {
+                    format = D2D1::PixelFormat((DXGI_FORMAT)IntegerFI(info[1]), (D2D1_ALPHA_MODE)IntegerFI(info[2]));
+                }
+
+                D2D1_BITMAP_PROPERTIES1 bitmapProperties =
+                    D2D1::BitmapProperties1(
+                        options,
+                        format,
+                        0,//dpi, //dxgi
+                        0//dpi  //dxgi
+                    );
+                // Get a D2D surface from the DXGI back buffer to use.
+                //DX::ThrowIfFailed(
+                RetIfFailed(d2d11->d2dcontext->CreateBitmapFromDxgiSurface(
+                    d2d11->dxgiBackBuffer.Get(),
+                    &bitmapProperties,
+                    &target
+                ), "CreateBitmapFromDxgiSurface failed");
+                //  );
+
+                info.GetReturnValue().Set(DIRECT2D::getBitmapImpl(isolate, target)->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
+            }
+            else {
+                MessageBox(NULL, L"To use CreateBitmapFromDxgiSurface you must create this canvas with ID2D1DeviceContext or ID2D1DeviceContextDComposition", L"Sorry", MB_OK | MB_SYSTEMMODAL);
+            }
+        }));
+        context->Set(isolate, "Resize", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            Local<Context> context = isolate->GetCurrentContext();
+            Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(context, LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
             
             info.GetReturnValue().Set(Number::New(isolate, d2d->Resize(IntegerFI(info[0]), IntegerFI(info[1]))));
             if (d2d->type == 1) {
                 ReleaseDC(d2d->window, d2d->tempDC);
                 d2d->tempDC = NULL;
+            }
+            else if (d2d->type >= 2) { //OOPS when you resize you erase the backbitmap and targetbitmaps to resize them
+                Direct2D11* locald2d11 = (Direct2D11*)d2d;
+                info.This()->Set(context, LITERAL("backBitmap"), DIRECT2D::getBitmapImpl(isolate, locald2d11->d2dBackBitmap.Get())->NewInstance(context).ToLocalChecked());
+                info.This()->Set(context, LITERAL("targetBitmap"), DIRECT2D::getBitmapImpl(isolate, locald2d11->d2dTargetBitmap.Get())->NewInstance(context).ToLocalChecked());
             }
             //if (d2d->type == 0) {
             //    ID2D1HwndRenderTarget* renderTarget = (ID2D1HwndRenderTarget*)d2d->renderTarget;
@@ -4157,7 +4455,7 @@ V8FUNC(createCanvas) {
         context->Set(isolate, "Clear", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
             Isolate* isolate = info.GetIsolate();
             Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-            if (info[3]->IsNumber() && d2d->clearBrush != nullptr) {
+            if (info[3]->IsNumber() && d2d->clearBrush != nullptr && d2d->type < 3) {
                 d2d->clearBrush->SetColor(D2D1::ColorF(FloatFI(info[0]), FloatFI(info[1]), FloatFI(info[2]), FloatFI(info[3])));
                 D2D1_SIZE_F size = d2d->renderTarget->GetSize();
                 d2d->renderTarget->FillRectangle(D2D1::RectF(0,0,size.width, size.height), d2d->clearBrush);
@@ -4181,25 +4479,36 @@ V8FUNC(createCanvas) {
             if (d2d->type >= 2) {
                 Direct2D11* d2d11 = (Direct2D11*)d2d;
                 Local<Context> context = isolate->GetCurrentContext();
+                HandleScope handle_scope(isolate);
                 ID2D1Effect* effect;
-                Local<Array> id = info[0].As<Array>();
-                GUID shit = { IntegerFI(id->Get(context, 0).ToLocalChecked()),
-                    IntegerFI(id->Get(context, 1).ToLocalChecked()),
-                    IntegerFI(id->Get(context, 2).ToLocalChecked()),
-                    IntegerFI(id->Get(context, 3).ToLocalChecked()),
-                    IntegerFI(id->Get(context, 4).ToLocalChecked()),
-                    IntegerFI(id->Get(context, 5).ToLocalChecked()),
-                    IntegerFI(id->Get(context, 6).ToLocalChecked()),
-                    IntegerFI(id->Get(context, 7).ToLocalChecked()),
-                    IntegerFI(id->Get(context, 8).ToLocalChecked()),
-                    IntegerFI(id->Get(context, 9).ToLocalChecked()),
-                    IntegerFI(id->Get(context, 10).ToLocalChecked()) };
+                GUID shit;
+                if (!info[0]->IsNumber()) {
+                    //print("NOT NUMBER");
+                    Local<Array> id = info[0].As<Array>();
+                    shit = GUID{ (unsigned long)IntegerFI(id->Get(context, 0).ToLocalChecked()),
+                        (unsigned short)IntegerFI(id->Get(context, 1).ToLocalChecked()),
+                        (unsigned short)IntegerFI(id->Get(context, 2).ToLocalChecked()),
+                        (unsigned char)IntegerFI(id->Get(context, 3).ToLocalChecked()),
+                        (unsigned char)IntegerFI(id->Get(context, 4).ToLocalChecked()),
+                        (unsigned char)IntegerFI(id->Get(context, 5).ToLocalChecked()),
+                        (unsigned char)IntegerFI(id->Get(context, 6).ToLocalChecked()),
+                        (unsigned char)IntegerFI(id->Get(context, 7).ToLocalChecked()),
+                        (unsigned char)IntegerFI(id->Get(context, 8).ToLocalChecked()),
+                        (unsigned char)IntegerFI(id->Get(context, 9).ToLocalChecked()),
+                        (unsigned char)IntegerFI(id->Get(context, 10).ToLocalChecked()) };
+                }
+                else {
+                    //print("UIS NUMBER");
+                    shit = CLSID_D2D12DAffineTransform;
+                }
 
                 RetIfFailed(d2d11->d2dcontext->CreateEffect(shit, &effect), "CreateEffect failed!");
 
-                Local<ObjectTemplate> jsEffect = DIRECT2D::getIUnknownImpl(isolate, effect);
-
-                DIRECT2D::JSCreateEffect::HandleMyGoofyD2D1EffectsFromAnotherNamespace(isolate, jsEffect);
+                //Local<ObjectTemplate> jsEffect = DIRECT2D::getIUnknownImpl(isolate, effect);
+                //
+                //DIRECT2D::JSCreateEffect::HandleMyGoofyD2D1EffectsFromAnotherNamespace(isolate, jsEffect);
+                //
+                //info.GetReturnValue().Set(jsEffect->NewInstance(context).ToLocalChecked());
 
                 //jsEffect->Set(isolate, "SetValue", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
                 //    Isolate* isolate = info.GetIsolate();
@@ -4209,13 +4518,390 @@ V8FUNC(createCanvas) {
                 //    //RetIfFailed(effect->SetValue(IntegerFI(info[0]), IntegerFI(info[1])), "SetValue failed!");
                 //}));
 
-                info.GetReturnValue().Set(jsEffect->NewInstance(context).ToLocalChecked());
+                Local<Object> jsEffectObj = jsEffectOT->NewInstance(context).ToLocalChecked(); //OH SHIT V8 DOES NOT WORK LIKE I THOUGHT IT DID (I'VE BEEN CREATING AN OBJECTTEMPLATE AND THEN GETTING THE OBJECT AFTER (WHICH IS FILLING UP THE MEMORY))
+                jsEffectObj->Set(context, LITERAL("internalPtr"), Number::New(isolate, (LONG_PTR)effect));
+
+                info.GetReturnValue().Set(jsEffectObj);
             }
             else {
                 print(d2d->type);
                 MessageBox(NULL, L"CreateEffect only works if d2d was created with ID2D1DeviceContext or ID2D1DeviceContextDComposition", L"CreateEffect failed", MB_OK | MB_SYSTEMMODAL);
             }
         }));
+
+        context->Set(isolate, "Commit", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+            if (d2d->type >= 3) {
+                RetIfFailed(((Direct2D11*)d2d)->m_dcompDevice->Commit(), "D2D11 DComposition Commit failed?");
+            }
+            else {
+                MessageBox(NULL, L"To use Commit you must create this canvas with ID2D1DeviceContextDComposition", L"Sorry", MB_OK | MB_SYSTEMMODAL);
+            }
+        }));
+
+        context->Set(isolate, "SetEffect", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+            if (d2d->type >= 3) {
+                IDCompositionEffect* effect = (IDCompositionEffect*)info[0].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                RetIfFailed(((Direct2D11*)d2d)->m_dcompVisual->SetEffect(effect), "D2D11 DComposition SetEffect failed?");
+            }
+            else {
+                MessageBox(NULL, L"SetEffect is for ID2D1DeviceContextDComposition only", L"Sorry", MB_OK | MB_SYSTEMMODAL);
+            }
+        }));
+
+
+        if(d2d11) {
+            //regexr.com/81e39
+            context->Set(isolate, "CreateGaussianBlurEffect", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                Direct2D11* d2d11 = (Direct2D11*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                IDCompositionGaussianBlurEffect* effect;
+            
+                RetIfFailed(d2d11->m_dcompD1->CreateGaussianBlurEffect(&effect), "DComposition CreateGaussianBlurEffect");
+            
+                Local<ObjectTemplate> jsDCompEffect = DIRECT2D::getCompositionEffectImpl(isolate, effect);
+                jsDCompEffect->Set(isolate, "SetStandardDeviation", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                    Isolate* isolate = info.GetIsolate();
+                    IDCompositionGaussianBlurEffect* effect = (IDCompositionGaussianBlurEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                    RetIfFailed(effect->SetStandardDeviation(FloatFI(info[0])), "SetStandardDeviation failed (IDCompositionGaussianBlurEffect)");
+                }));
+                jsDCompEffect->Set(isolate, "SetBorderMode", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                    Isolate* isolate = info.GetIsolate();
+                    IDCompositionGaussianBlurEffect* effect = (IDCompositionGaussianBlurEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                    RetIfFailed(effect->SetBorderMode((D2D1_BORDER_MODE)IntegerFI(info[0])), "SetBorderMode failed (IDCompositionGaussianBlurEffect)");
+                }));
+
+                info.GetReturnValue().Set(jsDCompEffect->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
+            }));
+            context->Set(isolate, "CreateBrightnessEffect", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                Direct2D11* d2d11 = (Direct2D11*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                IDCompositionBrightnessEffect* effect;
+            
+                RetIfFailed(d2d11->m_dcompD1->CreateBrightnessEffect(&effect), "DComposition CreateBrightnessEffect");
+            
+                Local<ObjectTemplate> jsDCompEffect = DIRECT2D::getCompositionEffectImpl(isolate, effect);
+                jsDCompEffect->Set(isolate, "SetWhitePoint", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                    Isolate* isolate = info.GetIsolate();
+                    IDCompositionBrightnessEffect* effect = (IDCompositionBrightnessEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                    RetIfFailed(effect->SetWhitePoint(D2D1_VECTOR_2F{(FLOAT)FloatFI(info[0]), (FLOAT)FloatFI(info[1])}), "SetWhitePoint failed (IDCompositionBrightnessEffect)");
+                }));
+                jsDCompEffect->Set(isolate, "SetBlackPoint", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                    Isolate* isolate = info.GetIsolate();
+                    IDCompositionBrightnessEffect* effect = (IDCompositionBrightnessEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                    RetIfFailed(effect->SetBlackPoint(D2D1_VECTOR_2F{(FLOAT)FloatFI(info[0]), (FLOAT)FloatFI(info[1])}), "SetBlackPoint failed (IDCompositionBrightnessEffect)");
+                }));
+                info.GetReturnValue().Set(jsDCompEffect->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
+            }));
+            context->Set(isolate, "CreateColorMatrixEffect", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                Direct2D11* d2d11 = (Direct2D11*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                MessageBoxA(NULL, "Can't use a ColorMatrixEffect because i haven't implemented Matrix5x4F", "My fault og.", MB_OK | MB_SYSTEMMODAL);
+                //IDCompositionColorMatrixEffect* effect;
+                //
+                //RetIfFailed(d2d11->m_dcompD1->CreateColorMatrixEffect(&effect), "DComposition CreateColorMatrixEffect");
+                //
+                //Local<ObjectTemplate> jsDCompEffect = DIRECT2D::getCompositionEffectImpl(isolate, effect);
+                //info.GetReturnValue().Set(jsDCompEffect->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
+            }));
+            context->Set(isolate, "CreateShadowEffect", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                Direct2D11* d2d11 = (Direct2D11*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                IDCompositionShadowEffect* effect;
+            
+                RetIfFailed(d2d11->m_dcompD1->CreateShadowEffect(&effect), "DComposition CreateShadowEffect");
+            
+                Local<ObjectTemplate> jsDCompEffect = DIRECT2D::getCompositionEffectImpl(isolate, effect);
+                jsDCompEffect->Set(isolate, "SetStandardDeviation", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                    Isolate* isolate = info.GetIsolate();
+                    IDCompositionShadowEffect* effect = (IDCompositionShadowEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                    RetIfFailed(effect->SetStandardDeviation(FloatFI(info[0])), "SetStandardDeviation failed (IDCompositionShadowEffect)");
+                }));
+                jsDCompEffect->Set(isolate, "SetColor", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                    Isolate* isolate = info.GetIsolate();
+                    IDCompositionShadowEffect* effect = (IDCompositionShadowEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                    RetIfFailed(effect->SetColor(D2D1_VECTOR_4F{ (FLOAT)FloatFI(info[0]) , (FLOAT)FloatFI(info[1]) , (FLOAT)FloatFI(info[2]) , (FLOAT)FloatFI(info[3]) }), "SetColor failed (IDCompositionShadowEffect)");
+                }));
+
+                info.GetReturnValue().Set(jsDCompEffect->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
+            }));
+            context->Set(isolate, "CreateHueRotationEffect", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                Direct2D11* d2d11 = (Direct2D11*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                IDCompositionHueRotationEffect* effect;
+            
+                RetIfFailed(d2d11->m_dcompD1->CreateHueRotationEffect(&effect), "DComposition CreateHueRotationEffect");
+            
+                Local<ObjectTemplate> jsDCompEffect = DIRECT2D::getCompositionEffectImpl(isolate, effect);
+                jsDCompEffect->Set(isolate, "SetAngle", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                    Isolate* isolate = info.GetIsolate();
+                    IDCompositionHueRotationEffect* effect = (IDCompositionHueRotationEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                    RetIfFailed(effect->SetAngle(FloatFI(info[0])), "SetAngle failed (IDCompositionHueRotationEffect)");
+                }));
+
+                info.GetReturnValue().Set(jsDCompEffect->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
+            }));
+            context->Set(isolate, "CreateSaturationEffect", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                Direct2D11* d2d11 = (Direct2D11*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                IDCompositionSaturationEffect* effect;
+            
+                RetIfFailed(d2d11->m_dcompD1->CreateSaturationEffect(&effect), "DComposition CreateSaturationEffect");
+            
+                Local<ObjectTemplate> jsDCompEffect = DIRECT2D::getCompositionEffectImpl(isolate, effect);
+                jsDCompEffect->Set(isolate, "SetSaturation", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                    Isolate* isolate = info.GetIsolate();
+                    IDCompositionSaturationEffect* effect = (IDCompositionSaturationEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                    RetIfFailed(effect->SetSaturation(FloatFI(info[0])), "SetSaturation failed (IDCompositionSaturationEffect)");
+                }));
+                info.GetReturnValue().Set(jsDCompEffect->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
+            }));
+            context->Set(isolate, "CreateTurbulenceEffect", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                Direct2D11* d2d11 = (Direct2D11*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                IDCompositionTurbulenceEffect* effect;
+            
+                RetIfFailed(d2d11->m_dcompD1->CreateTurbulenceEffect(&effect), "DComposition CreateTurbulenceEffect");
+            
+                Local<ObjectTemplate> jsDCompEffect = DIRECT2D::getCompositionEffectImpl(isolate, effect);
+                jsDCompEffect->Set(isolate, "SetOffset", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                    Isolate* isolate = info.GetIsolate();
+                    IDCompositionTurbulenceEffect* effect = (IDCompositionTurbulenceEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                    RetIfFailed(effect->SetOffset(D2D1_VECTOR_2F{ (FLOAT)FloatFI(info[0]), (FLOAT)FloatFI(info[1]) }), "SetOffset failed (IDCompositionTurbulenceEffect)");
+                }));
+                jsDCompEffect->Set(isolate, "SetBaseFrequency", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                    Isolate* isolate = info.GetIsolate();
+                    IDCompositionTurbulenceEffect* effect = (IDCompositionTurbulenceEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                    RetIfFailed(effect->SetBaseFrequency(D2D1_VECTOR_2F{ (FLOAT)FloatFI(info[0]), (FLOAT)FloatFI(info[1]) }), "SetBaseFrequency failed (IDCompositionTurbulenceEffect)");
+                }));
+                jsDCompEffect->Set(isolate, "SetSize", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                    Isolate* isolate = info.GetIsolate();
+                    IDCompositionTurbulenceEffect* effect = (IDCompositionTurbulenceEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                    RetIfFailed(effect->SetSize(D2D1_VECTOR_2F{ (FLOAT)FloatFI(info[0]), (FLOAT)FloatFI(info[1]) }), "SetSize failed (IDCompositionTurbulenceEffect)");
+                }));
+                jsDCompEffect->Set(isolate, "SetNumOctaves", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                    Isolate* isolate = info.GetIsolate();
+                    IDCompositionTurbulenceEffect* effect = (IDCompositionTurbulenceEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                    RetIfFailed(effect->SetNumOctaves(IntegerFI(info[0])), "SetNumOctaves failed (IDCompositionTurbulenceEffect)");
+                }));
+                jsDCompEffect->Set(isolate, "SetSeed", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                    Isolate* isolate = info.GetIsolate();
+                    IDCompositionTurbulenceEffect* effect = (IDCompositionTurbulenceEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                    RetIfFailed(effect->SetSeed(IntegerFI(info[0])), "SetSeed failed (IDCompositionTurbulenceEffect)");
+                }));
+                jsDCompEffect->Set(isolate, "SetNoise", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                    Isolate* isolate = info.GetIsolate();
+                    IDCompositionTurbulenceEffect* effect = (IDCompositionTurbulenceEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                    RetIfFailed(effect->SetNoise((D2D1_TURBULENCE_NOISE)IntegerFI(info[0])), "SetNoise failed (IDCompositionTurbulenceEffect)");
+                }));
+                jsDCompEffect->Set(isolate, "SetStitchable", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                    Isolate* isolate = info.GetIsolate();
+                    IDCompositionTurbulenceEffect* effect = (IDCompositionTurbulenceEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                    RetIfFailed(effect->SetStitchable(IntegerFI(info[0])), "SetStitchable failed (IDCompositionTurbulenceEffect)");
+                }));
+                info.GetReturnValue().Set(jsDCompEffect->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
+            }));
+            context->Set(isolate, "CreateLinearTransferEffect", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                Direct2D11* d2d11 = (Direct2D11*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                IDCompositionLinearTransferEffect* effect;
+            
+                RetIfFailed(d2d11->m_dcompD1->CreateLinearTransferEffect(&effect), "DComposition CreateLinearTransferEffect");
+            
+                Local<ObjectTemplate> jsDCompEffect = DIRECT2D::getCompositionEffectImpl(isolate, effect);
+                jsDCompEffect->Set(isolate, "SetRedYIntercept", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                    Isolate* isolate = info.GetIsolate();
+                    IDCompositionLinearTransferEffect* effect = (IDCompositionLinearTransferEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                    RetIfFailed(effect->SetRedYIntercept(FloatFI(info[0])), "SetRedYIntercept failed (IDCompositionLinearTransferEffect)");
+                }));
+                jsDCompEffect->Set(isolate, "SetRedSlope", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                    Isolate* isolate = info.GetIsolate();
+                    IDCompositionLinearTransferEffect* effect = (IDCompositionLinearTransferEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                    RetIfFailed(effect->SetRedSlope(FloatFI(info[0])), "SetRedSlope failed (IDCompositionLinearTransferEffect)");
+                }));
+                jsDCompEffect->Set(isolate, "SetRedDisable", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                    Isolate* isolate = info.GetIsolate();
+                    IDCompositionLinearTransferEffect* effect = (IDCompositionLinearTransferEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                    RetIfFailed(effect->SetRedDisable(IntegerFI(info[0])), "SetRedDisable failed (IDCompositionLinearTransferEffect)");
+                }));
+                jsDCompEffect->Set(isolate, "SetGreenYIntercept", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                    Isolate* isolate = info.GetIsolate();
+                    IDCompositionLinearTransferEffect* effect = (IDCompositionLinearTransferEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                    RetIfFailed(effect->SetGreenYIntercept(FloatFI(info[0])), "SetGreenYIntercept failed (IDCompositionLinearTransferEffect)");
+                }));
+                jsDCompEffect->Set(isolate, "SetGreenSlope", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                    Isolate* isolate = info.GetIsolate();
+                    IDCompositionLinearTransferEffect* effect = (IDCompositionLinearTransferEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                    RetIfFailed(effect->SetGreenSlope(FloatFI(info[0])), "SetGreenSlope failed (IDCompositionLinearTransferEffect)");
+                }));
+                jsDCompEffect->Set(isolate, "SetGreenDisable", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                    Isolate* isolate = info.GetIsolate();
+                    IDCompositionLinearTransferEffect* effect = (IDCompositionLinearTransferEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                    RetIfFailed(effect->SetGreenDisable(IntegerFI(info[0])), "SetGreenDisable failed (IDCompositionLinearTransferEffect)");
+                }));
+                jsDCompEffect->Set(isolate, "SetBlueYIntercept", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                    Isolate* isolate = info.GetIsolate();
+                    IDCompositionLinearTransferEffect* effect = (IDCompositionLinearTransferEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                    RetIfFailed(effect->SetBlueYIntercept(FloatFI(info[0])), "SetBlueYIntercept failed (IDCompositionLinearTransferEffect)");
+                }));
+                jsDCompEffect->Set(isolate, "SetBlueSlope", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                    Isolate* isolate = info.GetIsolate();
+                    IDCompositionLinearTransferEffect* effect = (IDCompositionLinearTransferEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                    RetIfFailed(effect->SetBlueSlope(FloatFI(info[0])), "SetBlueSlope failed (IDCompositionLinearTransferEffect)");
+                }));
+                jsDCompEffect->Set(isolate, "SetBlueDisable", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                    Isolate* isolate = info.GetIsolate();
+                    IDCompositionLinearTransferEffect* effect = (IDCompositionLinearTransferEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                    RetIfFailed(effect->SetBlueDisable(IntegerFI(info[0])), "SetBlueDisable failed (IDCompositionLinearTransferEffect)");
+                }));
+                jsDCompEffect->Set(isolate, "SetAlphaYIntercept", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                    Isolate* isolate = info.GetIsolate();
+                    IDCompositionLinearTransferEffect* effect = (IDCompositionLinearTransferEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                    RetIfFailed(effect->SetAlphaYIntercept(FloatFI(info[0])), "SetAlphaYIntercept failed (IDCompositionLinearTransferEffect)");
+                }));
+                jsDCompEffect->Set(isolate, "SetAlphaSlope", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                    Isolate* isolate = info.GetIsolate();
+                    IDCompositionLinearTransferEffect* effect = (IDCompositionLinearTransferEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                    RetIfFailed(effect->SetAlphaSlope(FloatFI(info[0])), "SetAlphaSlope failed (IDCompositionLinearTransferEffect)");
+                }));
+                jsDCompEffect->Set(isolate, "SetAlphaDisable", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                    Isolate* isolate = info.GetIsolate();
+                    IDCompositionLinearTransferEffect* effect = (IDCompositionLinearTransferEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                    RetIfFailed(effect->SetAlphaDisable(IntegerFI(info[0])), "SetAlphaDisable failed (IDCompositionLinearTransferEffect)");
+                }));
+                jsDCompEffect->Set(isolate, "SetClampOutput", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                    Isolate* isolate = info.GetIsolate();
+                    IDCompositionLinearTransferEffect* effect = (IDCompositionLinearTransferEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                    RetIfFailed(effect->SetClampOutput(IntegerFI(info[0])), "SetClampOutput failed (IDCompositionLinearTransferEffect)");
+                }));
+                info.GetReturnValue().Set(jsDCompEffect->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
+            }));
+            //idk how this one works
+            //context->Set(isolate, "CreateTableTransferEffect", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            //    Isolate* isolate = info.GetIsolate();
+            //    Direct2D11* d2d11 = (Direct2D11*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            //    IDCompositionTableTransferEffect* effect;
+            //    
+            //    RetIfFailed(d2d11->m_dcompD1->CreateTableTransferEffect(&effect), "DComposition CreateTableTransferEffect");
+            //    
+            //    Local<ObjectTemplate> jsDCompEffect = DIRECT2D::getCompositionEffectImpl(isolate, effect);
+            //    jsDCompEffect->Set(isolate, "SetRedDisable", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            //        Isolate* isolate = info.GetIsolate();
+            //        IDCompositionTableTransferEffect* effect = (IDCompositionTableTransferEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            //        RetIfFailed(effect->SetRedDisable(IntegerFI(info[0])), "SetRedDisable failed (IDCompositionTableTransferEffect)");
+            //    }));
+            //    jsDCompEffect->Set(isolate, "SetGreenDisable", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            //        Isolate* isolate = info.GetIsolate();
+            //        IDCompositionTableTransferEffect* effect = (IDCompositionTableTransferEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            //        RetIfFailed(effect->SetGreenDisable(IntegerFI(info[0])), "SetGreenDisable failed (IDCompositionTableTransferEffect)");
+            //    }));
+            //    jsDCompEffect->Set(isolate, "SetBlueDisable", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            //        Isolate* isolate = info.GetIsolate();
+            //        IDCompositionTableTransferEffect* effect = (IDCompositionTableTransferEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            //        RetIfFailed(effect->SetBlueDisable(IntegerFI(info[0])), "SetBlueDisable failed (IDCompositionTableTransferEffect)");
+            //    }));
+            //    jsDCompEffect->Set(isolate, "SetAlphaDisable", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            //        Isolate* isolate = info.GetIsolate();
+            //        IDCompositionTableTransferEffect* effect = (IDCompositionTableTransferEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            //        RetIfFailed(effect->SetAlphaDisable(IntegerFI(info[0])), "SetAlphaDisable failed (IDCompositionTableTransferEffect)");
+            //    }));
+            //    jsDCompEffect->Set(isolate, "SetClampOutput", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            //        Isolate* isolate = info.GetIsolate();
+            //        IDCompositionTableTransferEffect* effect = (IDCompositionTableTransferEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            //        RetIfFailed(effect->SetClampOutput(IntegerFI(info[0])), "SetClampOutput failed (IDCompositionTableTransferEffect)");
+            //    }));
+            //    info.GetReturnValue().Set(jsDCompEffect->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
+            //}));
+            context->Set(isolate, "CreateCompositeEffect", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                Direct2D11* d2d11 = (Direct2D11*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                IDCompositionCompositeEffect* effect;
+            
+                RetIfFailed(d2d11->m_dcompD1->CreateCompositeEffect(&effect), "DComposition CreateCompositeEffect");
+            
+                Local<ObjectTemplate> jsDCompEffect = DIRECT2D::getCompositionEffectImpl(isolate, effect);
+                jsDCompEffect->Set(isolate, "SetMode", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                    Isolate* isolate = info.GetIsolate();
+                    IDCompositionCompositeEffect* effect = (IDCompositionCompositeEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                    RetIfFailed(effect->SetMode((D2D1_COMPOSITE_MODE)IntegerFI(info[0])), "SetMode failed (IDCompositionCompositeEffect)");
+                }));
+                info.GetReturnValue().Set(jsDCompEffect->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
+            }));
+            context->Set(isolate, "CreateBlendEffect", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                Direct2D11* d2d11 = (Direct2D11*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                IDCompositionBlendEffect* effect;
+            
+                RetIfFailed(d2d11->m_dcompD1->CreateBlendEffect(&effect), "DComposition CreateBlendEffect");
+            
+                Local<ObjectTemplate> jsDCompEffect = DIRECT2D::getCompositionEffectImpl(isolate, effect);
+                jsDCompEffect->Set(isolate, "SetMode", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                    Isolate* isolate = info.GetIsolate();
+                    IDCompositionBlendEffect* effect = (IDCompositionBlendEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                    RetIfFailed(effect->SetMode((D2D1_BLEND_MODE)IntegerFI(info[0])), "SetMode failed (IDCompositionBlendEffect)");
+                }));
+                info.GetReturnValue().Set(jsDCompEffect->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
+            }));
+            context->Set(isolate, "CreateArithmeticCompositeEffect", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                Direct2D11* d2d11 = (Direct2D11*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                IDCompositionArithmeticCompositeEffect* effect;
+            
+                RetIfFailed(d2d11->m_dcompD1->CreateArithmeticCompositeEffect(&effect), "DComposition CreateArithmeticCompositeEffect");
+            
+                Local<ObjectTemplate> jsDCompEffect = DIRECT2D::getCompositionEffectImpl(isolate, effect);
+                jsDCompEffect->Set(isolate, "SetCoefficients", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                    Isolate* isolate = info.GetIsolate();
+                    IDCompositionArithmeticCompositeEffect* effect = (IDCompositionArithmeticCompositeEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                    RetIfFailed(effect->SetCoefficients(D2D1_VECTOR_4F{ (FLOAT)FloatFI(info[0]) , (FLOAT)FloatFI(info[1]) , (FLOAT)FloatFI(info[2]) , (FLOAT)FloatFI(info[3]) }), "SetCoefficients failed (IDCompositionArithmeticCompositeEffect)");
+                }));
+                jsDCompEffect->Set(isolate, "SetClampOutput", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                    Isolate* isolate = info.GetIsolate();
+                    IDCompositionArithmeticCompositeEffect* effect = (IDCompositionArithmeticCompositeEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                    RetIfFailed(effect->SetClampOutput(IntegerFI(info[0])), "SetClampOutput failed (IDCompositionArithmeticCompositeEffect)");
+                }));
+                info.GetReturnValue().Set(jsDCompEffect->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
+            }));
+            context->Set(isolate, "CreateAffineTransform2DEffect", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                Direct2D11* d2d11 = (Direct2D11*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                IDCompositionAffineTransform2DEffect* effect;
+            
+                RetIfFailed(d2d11->m_dcompD1->CreateAffineTransform2DEffect(&effect), "DComposition CreateAffineTransform2DEffect");
+            
+                Local<ObjectTemplate> jsDCompEffect = DIRECT2D::getCompositionEffectImpl(isolate, effect);
+                jsDCompEffect->Set(isolate, "SetInterpolationMode", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                    Isolate* isolate = info.GetIsolate();
+                    IDCompositionAffineTransform2DEffect* effect = (IDCompositionAffineTransform2DEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                    RetIfFailed(effect->SetInterpolationMode((D2D1_2DAFFINETRANSFORM_INTERPOLATION_MODE)IntegerFI(info[0])), "SetInterpolationMode failed (IDCompositionAffineTransform2DEffect)");
+                }));
+                jsDCompEffect->Set(isolate, "SetBorderMode", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                    Isolate* isolate = info.GetIsolate();
+                    IDCompositionAffineTransform2DEffect* effect = (IDCompositionAffineTransform2DEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                    RetIfFailed(effect->SetBorderMode((D2D1_BORDER_MODE)IntegerFI(info[0])), "SetBorderMode failed (IDCompositionAffineTransform2DEffect)");
+                }));
+                jsDCompEffect->Set(isolate, "SetTransformMatrix", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                    Isolate* isolate = info.GetIsolate();
+                    IDCompositionAffineTransform2DEffect* effect = (IDCompositionAffineTransform2DEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                
+                    D2D1::Matrix3x2F matrix = DIRECT2D::fromJSMatrix3x2(isolate, info[0].As<Object>());
+                    RetIfFailed(effect->SetTransformMatrix(matrix), "SetTransformMatrix failed (IDCompositionAffineTransform2DEffect)");
+                }));
+                jsDCompEffect->Set(isolate, "SetSharpness", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                    Isolate* isolate = info.GetIsolate();
+                    IDCompositionAffineTransform2DEffect* effect = (IDCompositionAffineTransform2DEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                    RetIfFailed(effect->SetSharpness(FloatFI(info[0])), "SetSharpness failed (IDCompositionAffineTransform2DEffect)");
+                }));
+                info.GetReturnValue().Set(jsDCompEffect->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
+            }));
+        }
+
+
         //context->Set(isolate, "EndDraw", d2d->EndDraw);
         //delete d2d;
     }
@@ -4750,47 +5436,72 @@ V8FUNC(createCanvas) {
 
     if (d2d11) {
         Local<Context> c = isolate->GetCurrentContext();
-        #define setGUID(id) { Local<Value> elem##id[] = {Number::New(isolate, id.Data1), Number::New(isolate, id.Data2), Number::New(isolate, id.Data3), Number::New(isolate, id.Data4[0]), Number::New(isolate, id.Data4[1]), Number::New(isolate, id.Data4[2]), Number::New(isolate, id.Data4[3]), Number::New(isolate, id.Data4[4]), Number::New(isolate, id.Data4[5]), Number::New(isolate, id.Data4[6]), Number::New(isolate, id.Data4[7])}; Local<Array> jsArr##id = Array::New(isolate, elem##id, 11); contextObject->Set(c, LITERAL(#id), jsArr##id); }
-            setGUID(CLSID_D2D13DPerspectiveTransform);
-            setGUID(CLSID_D2D13DTransform);
-            setGUID(CLSID_D2D1ArithmeticComposite);
-            setGUID(CLSID_D2D1Atlas);
-            setGUID(CLSID_D2D1BitmapSource);
-            setGUID(CLSID_D2D1Blend);
-            setGUID(CLSID_D2D1Border);
-            setGUID(CLSID_D2D1Brightness);
-            setGUID(CLSID_D2D1ColorManagement);
-            setGUID(CLSID_D2D1ColorMatrix);
-            setGUID(CLSID_D2D1Composite);
-            setGUID(CLSID_D2D1ConvolveMatrix);
-            setGUID(CLSID_D2D1Crop);
-            setGUID(CLSID_D2D1DirectionalBlur);
-            setGUID(CLSID_D2D1DiscreteTransfer);
-            setGUID(CLSID_D2D1DisplacementMap);
-            setGUID(CLSID_D2D1DistantDiffuse);
-            setGUID(CLSID_D2D1DistantSpecular);
-            setGUID(CLSID_D2D1DpiCompensation);
-            setGUID(CLSID_D2D1Flood);
-            setGUID(CLSID_D2D1GammaTransfer);
-            setGUID(CLSID_D2D1GaussianBlur);
-            setGUID(CLSID_D2D1Scale);
-            setGUID(CLSID_D2D1Histogram);
-            setGUID(CLSID_D2D1HueRotation);
-            setGUID(CLSID_D2D1LinearTransfer);
-            setGUID(CLSID_D2D1LuminanceToAlpha);
-            setGUID(CLSID_D2D1Morphology);
-            setGUID(CLSID_D2D1OpacityMetadata);
-            setGUID(CLSID_D2D1PointDiffuse);
-            setGUID(CLSID_D2D1PointSpecular);
-            setGUID(CLSID_D2D1Premultiply);
-            setGUID(CLSID_D2D1Saturation);
-            setGUID(CLSID_D2D1Shadow);
-            setGUID(CLSID_D2D1SpotDiffuse);
-            setGUID(CLSID_D2D1SpotSpecular);
-            setGUID(CLSID_D2D1TableTransfer);
-            setGUID(CLSID_D2D1Tile);
-            setGUID(CLSID_D2D1Turbulence);
-            setGUID(CLSID_D2D1UnPremultiply);
+#define setGUID(id) { Local<Value> elem##id[] = {Number::New(isolate, id.Data1), Number::New(isolate, id.Data2), Number::New(isolate, id.Data3), Number::New(isolate, id.Data4[0]), Number::New(isolate, id.Data4[1]), Number::New(isolate, id.Data4[2]), Number::New(isolate, id.Data4[3]), Number::New(isolate, id.Data4[4]), Number::New(isolate, id.Data4[5]), Number::New(isolate, id.Data4[6]), Number::New(isolate, id.Data4[7])}; Local<Array> jsArr##id = Array::New(isolate, elem##id, 11); contextObject->Set(c, LITERAL(#id), jsArr##id); }
+        setGUID(CLSID_D2D12DAffineTransform); //haha some how i forgot to add this one and i actually caught it!
+        setGUID(CLSID_D2D13DPerspectiveTransform);
+        setGUID(CLSID_D2D13DTransform);
+        setGUID(CLSID_D2D1ArithmeticComposite);
+        setGUID(CLSID_D2D1Atlas);
+        setGUID(CLSID_D2D1BitmapSource);
+        setGUID(CLSID_D2D1Blend);
+        setGUID(CLSID_D2D1Border);
+        setGUID(CLSID_D2D1Brightness);
+        setGUID(CLSID_D2D1ColorManagement);
+        setGUID(CLSID_D2D1ColorMatrix);
+        setGUID(CLSID_D2D1Composite);
+        setGUID(CLSID_D2D1ConvolveMatrix);
+        setGUID(CLSID_D2D1Crop);
+        setGUID(CLSID_D2D1DirectionalBlur);
+        setGUID(CLSID_D2D1DiscreteTransfer);
+        setGUID(CLSID_D2D1DisplacementMap);
+        setGUID(CLSID_D2D1DistantDiffuse);
+        setGUID(CLSID_D2D1DistantSpecular);
+        setGUID(CLSID_D2D1DpiCompensation);
+        setGUID(CLSID_D2D1Flood);
+        setGUID(CLSID_D2D1GammaTransfer);
+        setGUID(CLSID_D2D1GaussianBlur);
+        setGUID(CLSID_D2D1Scale);
+        setGUID(CLSID_D2D1Histogram);
+        setGUID(CLSID_D2D1HueRotation);
+        setGUID(CLSID_D2D1LinearTransfer);
+        setGUID(CLSID_D2D1LuminanceToAlpha);
+        setGUID(CLSID_D2D1Morphology);
+        setGUID(CLSID_D2D1OpacityMetadata);
+        setGUID(CLSID_D2D1PointDiffuse);
+        setGUID(CLSID_D2D1PointSpecular);
+        setGUID(CLSID_D2D1Premultiply);
+        setGUID(CLSID_D2D1Saturation);
+        setGUID(CLSID_D2D1Shadow);
+        setGUID(CLSID_D2D1SpotDiffuse);
+        setGUID(CLSID_D2D1SpotSpecular);
+        setGUID(CLSID_D2D1TableTransfer);
+        setGUID(CLSID_D2D1Tile);
+        setGUID(CLSID_D2D1Turbulence);
+        setGUID(CLSID_D2D1UnPremultiply);
+        //OH MY GOD THERE ARE MORE DEFINED IN d2d1effects_2.h ?!?!?!
+        setGUID(CLSID_D2D1Contrast);
+        setGUID(CLSID_D2D1RgbToHue);
+        setGUID(CLSID_D2D1HueToRgb);
+        setGUID(CLSID_D2D1ChromaKey);
+        setGUID(CLSID_D2D1Emboss);
+        setGUID(CLSID_D2D1Exposure);
+        setGUID(CLSID_D2D1Grayscale);
+        setGUID(CLSID_D2D1Invert);
+        setGUID(CLSID_D2D1Posterize);
+        setGUID(CLSID_D2D1Sepia);
+        setGUID(CLSID_D2D1Sharpen);
+        setGUID(CLSID_D2D1Straighten);
+        setGUID(CLSID_D2D1TemperatureTint);
+        setGUID(CLSID_D2D1Vignette);
+        setGUID(CLSID_D2D1EdgeDetection);
+        setGUID(CLSID_D2D1HighlightsShadows);
+        setGUID(CLSID_D2D1LookupTable3D);
+        setGUID(CLSID_D2D1Opacity);
+        setGUID(CLSID_D2D1AlphaMask);
+        setGUID(CLSID_D2D1CrossFade);
+        setGUID(CLSID_D2D1Tint);
+        setGUID(CLSID_D2D1WhiteLevelAdjustment);
+        setGUID(CLSID_D2D1HdrToneMap);
 #undef setGUID
     }
 
@@ -8663,6 +9374,13 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     setGlobalConst(WICBitmapIgnoreAlpha);
     setGlobalConst(WICBITMAPALPHACHANNELOPTIONS_FORCE_DWORD);
 
+    setGlobalConst(D2D1_BITMAP_OPTIONS_NONE);
+    setGlobalConst(D2D1_BITMAP_OPTIONS_TARGET);
+    setGlobalConst(D2D1_BITMAP_OPTIONS_CANNOT_DRAW);
+    setGlobalConst(D2D1_BITMAP_OPTIONS_CPU_READ);
+    setGlobalConst(D2D1_BITMAP_OPTIONS_GDI_COMPATIBLE);
+    setGlobalConst(D2D1_BITMAP_OPTIONS_FORCE_DWORD);
+
     Local<ObjectTemplate> matrixhelper = ObjectTemplate::New(isolate);
     matrixhelper->Set(isolate, "Identity", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
         Isolate* isolate = info.GetIsolate();
@@ -8730,7 +9448,7 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
         info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)matrix));
         }));
 
-    global->Set(isolate, "Matrix3x2", matrixhelper);
+    global->Set(isolate, "Matrix3x2F", matrixhelper);
     //yo wtf i don't think you can use Arrays without a context??? (nope, arrays don't work with an object template)
     //{ 
     //    Local<Value> elemid[11] = { Number::New(isolate, 1),
@@ -9525,6 +10243,26 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
 
     setGlobalWrapper(SetTextColor);
 
+    //jsEffectOT = DIRECT2D::getIUnknownImpl(isolate, nullptr);
+    jsEffectOT = ObjectTemplate::New(isolate);
+
+    jsEffectOT->Set(isolate, "Release", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+        Isolate* isolate = info.GetIsolate();
+        IUnknown* ptr = (IUnknown*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+        //print("IUnknownImpl Release -> " << ptr << " " << refCount);
+        //ptr->Release();
+        //ComPtr<IDXGIDebug> dbg;
+        //RetIfFailed(ptr->QueryInterface(dbg.GetAddressOf()), "QueryInterface");
+        //ComPtr<IDXGIDebug1> dbg2;
+        //RetIfFailed(DXGIGetDebugInterface1(NULL, __uuidof(IDXGIDebug1), (void**)dbg2.GetAddressOf()), "GetDebugInterface1");
+        //RetIfFailed(dbg2->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_DETAIL), "ReportLiveObjects");
+
+        ULONG refCount = ptr->Release();
+        info.GetReturnValue().Set(Number::New(isolate, refCount));
+    }));
+
+    DIRECT2D::JSCreateEffect::HandleMyGoofyD2D1EffectsFromAnotherNamespace(isolate, jsEffectOT);
+
     setGlobal(createCanvas);
 
 #define ID2D1RenderTarget 0
@@ -9685,6 +10423,8 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
     setGlobalConst(DWRITE_TRIMMING_GRANULARITY_WORD);
 
     setGlobalConst(D2D1_BORDER_MODE_SOFT); setGlobalConst(D2D1_BORDER_MODE_HARD); setGlobalConst(D2D1_BORDER_MODE_FORCE_DWORD); setGlobalConst(D2D1_CHANNEL_SELECTOR_R); setGlobalConst(D2D1_CHANNEL_SELECTOR_G); setGlobalConst(D2D1_CHANNEL_SELECTOR_B); setGlobalConst(D2D1_CHANNEL_SELECTOR_A); setGlobalConst(D2D1_CHANNEL_SELECTOR_FORCE_DWORD); setGlobalConst(D2D1_BITMAPSOURCE_ORIENTATION_DEFAULT); setGlobalConst(D2D1_BITMAPSOURCE_ORIENTATION_FLIP_HORIZONTAL); setGlobalConst(D2D1_BITMAPSOURCE_ORIENTATION_ROTATE_CLOCKWISE180); setGlobalConst(D2D1_BITMAPSOURCE_ORIENTATION_ROTATE_CLOCKWISE180_FLIP_HORIZONTAL); setGlobalConst(D2D1_BITMAPSOURCE_ORIENTATION_ROTATE_CLOCKWISE270_FLIP_HORIZONTAL); setGlobalConst(D2D1_BITMAPSOURCE_ORIENTATION_ROTATE_CLOCKWISE90); setGlobalConst(D2D1_BITMAPSOURCE_ORIENTATION_ROTATE_CLOCKWISE90_FLIP_HORIZONTAL); setGlobalConst(D2D1_BITMAPSOURCE_ORIENTATION_ROTATE_CLOCKWISE270); setGlobalConst(D2D1_BITMAPSOURCE_ORIENTATION_FORCE_DWORD); setGlobalConst(D2D1_GAUSSIANBLUR_PROP_STANDARD_DEVIATION); setGlobalConst(D2D1_GAUSSIANBLUR_PROP_OPTIMIZATION); setGlobalConst(D2D1_GAUSSIANBLUR_PROP_BORDER_MODE); setGlobalConst(D2D1_GAUSSIANBLUR_PROP_FORCE_DWORD); setGlobalConst(D2D1_GAUSSIANBLUR_OPTIMIZATION_SPEED); setGlobalConst(D2D1_GAUSSIANBLUR_OPTIMIZATION_BALANCED); setGlobalConst(D2D1_GAUSSIANBLUR_OPTIMIZATION_QUALITY); setGlobalConst(D2D1_GAUSSIANBLUR_OPTIMIZATION_FORCE_DWORD); setGlobalConst(D2D1_DIRECTIONALBLUR_PROP_STANDARD_DEVIATION); setGlobalConst(D2D1_DIRECTIONALBLUR_PROP_ANGLE); setGlobalConst(D2D1_DIRECTIONALBLUR_PROP_OPTIMIZATION); setGlobalConst(D2D1_DIRECTIONALBLUR_PROP_BORDER_MODE); setGlobalConst(D2D1_DIRECTIONALBLUR_PROP_FORCE_DWORD); setGlobalConst(D2D1_DIRECTIONALBLUR_OPTIMIZATION_SPEED); setGlobalConst(D2D1_DIRECTIONALBLUR_OPTIMIZATION_BALANCED); setGlobalConst(D2D1_DIRECTIONALBLUR_OPTIMIZATION_QUALITY); setGlobalConst(D2D1_DIRECTIONALBLUR_OPTIMIZATION_FORCE_DWORD); setGlobalConst(D2D1_SHADOW_PROP_BLUR_STANDARD_DEVIATION); setGlobalConst(D2D1_SHADOW_PROP_COLOR); setGlobalConst(D2D1_SHADOW_PROP_OPTIMIZATION); setGlobalConst(D2D1_SHADOW_PROP_FORCE_DWORD); setGlobalConst(D2D1_SHADOW_OPTIMIZATION_SPEED); setGlobalConst(D2D1_SHADOW_OPTIMIZATION_BALANCED); setGlobalConst(D2D1_SHADOW_OPTIMIZATION_QUALITY); setGlobalConst(D2D1_SHADOW_OPTIMIZATION_FORCE_DWORD); setGlobalConst(D2D1_BLEND_PROP_MODE); setGlobalConst(D2D1_BLEND_PROP_FORCE_DWORD); setGlobalConst(D2D1_BLEND_MODE_MULTIPLY); setGlobalConst(D2D1_BLEND_MODE_SCREEN); setGlobalConst(D2D1_BLEND_MODE_DARKEN); setGlobalConst(D2D1_BLEND_MODE_LIGHTEN); setGlobalConst(D2D1_BLEND_MODE_DISSOLVE); setGlobalConst(D2D1_BLEND_MODE_COLOR_BURN); setGlobalConst(D2D1_BLEND_MODE_LINEAR_BURN); setGlobalConst(D2D1_BLEND_MODE_DARKER_COLOR); setGlobalConst(D2D1_BLEND_MODE_LIGHTER_COLOR); setGlobalConst(D2D1_BLEND_MODE_COLOR_DODGE); setGlobalConst(D2D1_BLEND_MODE_LINEAR_DODGE); setGlobalConst(D2D1_BLEND_MODE_OVERLAY); setGlobalConst(D2D1_BLEND_MODE_SOFT_LIGHT); setGlobalConst(D2D1_BLEND_MODE_HARD_LIGHT); setGlobalConst(D2D1_BLEND_MODE_VIVID_LIGHT); setGlobalConst(D2D1_BLEND_MODE_LINEAR_LIGHT); setGlobalConst(D2D1_BLEND_MODE_PIN_LIGHT); setGlobalConst(D2D1_BLEND_MODE_HARD_MIX); setGlobalConst(D2D1_BLEND_MODE_DIFFERENCE); setGlobalConst(D2D1_BLEND_MODE_EXCLUSION); setGlobalConst(D2D1_BLEND_MODE_HUE); setGlobalConst(D2D1_BLEND_MODE_SATURATION); setGlobalConst(D2D1_BLEND_MODE_COLOR); setGlobalConst(D2D1_BLEND_MODE_LUMINOSITY); setGlobalConst(D2D1_BLEND_MODE_SUBTRACT); setGlobalConst(D2D1_BLEND_MODE_DIVISION); setGlobalConst(D2D1_BLEND_MODE_FORCE_DWORD); setGlobalConst(D2D1_SATURATION_PROP_SATURATION); setGlobalConst(D2D1_SATURATION_PROP_FORCE_DWORD); setGlobalConst(D2D1_HUEROTATION_PROP_ANGLE); setGlobalConst(D2D1_HUEROTATION_PROP_FORCE_DWORD); setGlobalConst(D2D1_COLORMATRIX_PROP_COLOR_MATRIX); setGlobalConst(D2D1_COLORMATRIX_PROP_ALPHA_MODE); setGlobalConst(D2D1_COLORMATRIX_PROP_CLAMP_OUTPUT); setGlobalConst(D2D1_COLORMATRIX_PROP_FORCE_DWORD); setGlobalConst(D2D1_COLORMATRIX_ALPHA_MODE_PREMULTIPLIED); setGlobalConst(D2D1_COLORMATRIX_ALPHA_MODE_STRAIGHT); setGlobalConst(D2D1_COLORMATRIX_ALPHA_MODE_FORCE_DWORD); setGlobalConst(D2D1_BITMAPSOURCE_PROP_WIC_BITMAP_SOURCE); setGlobalConst(D2D1_BITMAPSOURCE_PROP_SCALE); setGlobalConst(D2D1_BITMAPSOURCE_PROP_INTERPOLATION_MODE); setGlobalConst(D2D1_BITMAPSOURCE_PROP_ENABLE_DPI_CORRECTION); setGlobalConst(D2D1_BITMAPSOURCE_PROP_ALPHA_MODE); setGlobalConst(D2D1_BITMAPSOURCE_PROP_ORIENTATION); setGlobalConst(D2D1_BITMAPSOURCE_PROP_FORCE_DWORD); setGlobalConst(D2D1_BITMAPSOURCE_INTERPOLATION_MODE_NEAREST_NEIGHBOR); setGlobalConst(D2D1_BITMAPSOURCE_INTERPOLATION_MODE_LINEAR); setGlobalConst(D2D1_BITMAPSOURCE_INTERPOLATION_MODE_CUBIC); setGlobalConst(D2D1_BITMAPSOURCE_INTERPOLATION_MODE_FANT); setGlobalConst(D2D1_BITMAPSOURCE_INTERPOLATION_MODE_MIPMAP_LINEAR); setGlobalConst(D2D1_BITMAPSOURCE_INTERPOLATION_MODE_FORCE_DWORD); setGlobalConst(D2D1_BITMAPSOURCE_ALPHA_MODE_PREMULTIPLIED); setGlobalConst(D2D1_BITMAPSOURCE_ALPHA_MODE_STRAIGHT); setGlobalConst(D2D1_BITMAPSOURCE_ALPHA_MODE_FORCE_DWORD); setGlobalConst(D2D1_COMPOSITE_PROP_MODE); setGlobalConst(D2D1_COMPOSITE_PROP_FORCE_DWORD); setGlobalConst(D2D1_3DTRANSFORM_PROP_INTERPOLATION_MODE); setGlobalConst(D2D1_3DTRANSFORM_PROP_BORDER_MODE); setGlobalConst(D2D1_3DTRANSFORM_PROP_TRANSFORM_MATRIX); setGlobalConst(D2D1_3DTRANSFORM_PROP_FORCE_DWORD); setGlobalConst(D2D1_3DTRANSFORM_INTERPOLATION_MODE_NEAREST_NEIGHBOR); setGlobalConst(D2D1_3DTRANSFORM_INTERPOLATION_MODE_LINEAR); setGlobalConst(D2D1_3DTRANSFORM_INTERPOLATION_MODE_CUBIC); setGlobalConst(D2D1_3DTRANSFORM_INTERPOLATION_MODE_MULTI_SAMPLE_LINEAR); setGlobalConst(D2D1_3DTRANSFORM_INTERPOLATION_MODE_ANISOTROPIC); setGlobalConst(D2D1_3DTRANSFORM_INTERPOLATION_MODE_FORCE_DWORD); setGlobalConst(D2D1_3DPERSPECTIVETRANSFORM_PROP_INTERPOLATION_MODE); setGlobalConst(D2D1_3DPERSPECTIVETRANSFORM_PROP_BORDER_MODE); setGlobalConst(D2D1_3DPERSPECTIVETRANSFORM_PROP_DEPTH); setGlobalConst(D2D1_3DPERSPECTIVETRANSFORM_PROP_PERSPECTIVE_ORIGIN); setGlobalConst(D2D1_3DPERSPECTIVETRANSFORM_PROP_LOCAL_OFFSET); setGlobalConst(D2D1_3DPERSPECTIVETRANSFORM_PROP_GLOBAL_OFFSET); setGlobalConst(D2D1_3DPERSPECTIVETRANSFORM_PROP_ROTATION_ORIGIN); setGlobalConst(D2D1_3DPERSPECTIVETRANSFORM_PROP_ROTATION); setGlobalConst(D2D1_3DPERSPECTIVETRANSFORM_PROP_FORCE_DWORD); setGlobalConst(D2D1_3DPERSPECTIVETRANSFORM_INTERPOLATION_MODE_NEAREST_NEIGHBOR); setGlobalConst(D2D1_3DPERSPECTIVETRANSFORM_INTERPOLATION_MODE_LINEAR); setGlobalConst(D2D1_3DPERSPECTIVETRANSFORM_INTERPOLATION_MODE_CUBIC); setGlobalConst(D2D1_3DPERSPECTIVETRANSFORM_INTERPOLATION_MODE_MULTI_SAMPLE_LINEAR); setGlobalConst(D2D1_3DPERSPECTIVETRANSFORM_INTERPOLATION_MODE_ANISOTROPIC); setGlobalConst(D2D1_3DPERSPECTIVETRANSFORM_INTERPOLATION_MODE_FORCE_DWORD); setGlobalConst(D2D1_2DAFFINETRANSFORM_PROP_INTERPOLATION_MODE); setGlobalConst(D2D1_2DAFFINETRANSFORM_PROP_BORDER_MODE); setGlobalConst(D2D1_2DAFFINETRANSFORM_PROP_TRANSFORM_MATRIX); setGlobalConst(D2D1_2DAFFINETRANSFORM_PROP_SHARPNESS); setGlobalConst(D2D1_2DAFFINETRANSFORM_PROP_FORCE_DWORD); setGlobalConst(D2D1_2DAFFINETRANSFORM_INTERPOLATION_MODE_NEAREST_NEIGHBOR); setGlobalConst(D2D1_2DAFFINETRANSFORM_INTERPOLATION_MODE_LINEAR); setGlobalConst(D2D1_2DAFFINETRANSFORM_INTERPOLATION_MODE_CUBIC); setGlobalConst(D2D1_2DAFFINETRANSFORM_INTERPOLATION_MODE_MULTI_SAMPLE_LINEAR); setGlobalConst(D2D1_2DAFFINETRANSFORM_INTERPOLATION_MODE_ANISOTROPIC); setGlobalConst(D2D1_2DAFFINETRANSFORM_INTERPOLATION_MODE_HIGH_QUALITY_CUBIC); setGlobalConst(D2D1_2DAFFINETRANSFORM_INTERPOLATION_MODE_FORCE_DWORD); setGlobalConst(D2D1_DPICOMPENSATION_PROP_INTERPOLATION_MODE); setGlobalConst(D2D1_DPICOMPENSATION_PROP_BORDER_MODE); setGlobalConst(D2D1_DPICOMPENSATION_PROP_INPUT_DPI); setGlobalConst(D2D1_DPICOMPENSATION_PROP_FORCE_DWORD); setGlobalConst(D2D1_DPICOMPENSATION_INTERPOLATION_MODE_NEAREST_NEIGHBOR); setGlobalConst(D2D1_DPICOMPENSATION_INTERPOLATION_MODE_LINEAR); setGlobalConst(D2D1_DPICOMPENSATION_INTERPOLATION_MODE_CUBIC); setGlobalConst(D2D1_DPICOMPENSATION_INTERPOLATION_MODE_MULTI_SAMPLE_LINEAR); setGlobalConst(D2D1_DPICOMPENSATION_INTERPOLATION_MODE_ANISOTROPIC); setGlobalConst(D2D1_DPICOMPENSATION_INTERPOLATION_MODE_HIGH_QUALITY_CUBIC); setGlobalConst(D2D1_DPICOMPENSATION_INTERPOLATION_MODE_FORCE_DWORD); setGlobalConst(D2D1_SCALE_PROP_SCALE); setGlobalConst(D2D1_SCALE_PROP_CENTER_POINT); setGlobalConst(D2D1_SCALE_PROP_INTERPOLATION_MODE); setGlobalConst(D2D1_SCALE_PROP_BORDER_MODE); setGlobalConst(D2D1_SCALE_PROP_SHARPNESS); setGlobalConst(D2D1_SCALE_PROP_FORCE_DWORD); setGlobalConst(D2D1_SCALE_INTERPOLATION_MODE_NEAREST_NEIGHBOR); setGlobalConst(D2D1_SCALE_INTERPOLATION_MODE_LINEAR); setGlobalConst(D2D1_SCALE_INTERPOLATION_MODE_CUBIC); setGlobalConst(D2D1_SCALE_INTERPOLATION_MODE_MULTI_SAMPLE_LINEAR); setGlobalConst(D2D1_SCALE_INTERPOLATION_MODE_ANISOTROPIC); setGlobalConst(D2D1_SCALE_INTERPOLATION_MODE_HIGH_QUALITY_CUBIC); setGlobalConst(D2D1_SCALE_INTERPOLATION_MODE_FORCE_DWORD); setGlobalConst(D2D1_TURBULENCE_PROP_OFFSET); setGlobalConst(D2D1_TURBULENCE_PROP_SIZE); setGlobalConst(D2D1_TURBULENCE_PROP_BASE_FREQUENCY); setGlobalConst(D2D1_TURBULENCE_PROP_NUM_OCTAVES); setGlobalConst(D2D1_TURBULENCE_PROP_SEED); setGlobalConst(D2D1_TURBULENCE_PROP_NOISE); setGlobalConst(D2D1_TURBULENCE_PROP_STITCHABLE); setGlobalConst(D2D1_TURBULENCE_PROP_FORCE_DWORD); setGlobalConst(D2D1_TURBULENCE_NOISE_FRACTAL_SUM); setGlobalConst(D2D1_TURBULENCE_NOISE_TURBULENCE); setGlobalConst(D2D1_TURBULENCE_NOISE_FORCE_DWORD); setGlobalConst(D2D1_DISPLACEMENTMAP_PROP_SCALE); setGlobalConst(D2D1_DISPLACEMENTMAP_PROP_X_CHANNEL_SELECT); setGlobalConst(D2D1_DISPLACEMENTMAP_PROP_Y_CHANNEL_SELECT); setGlobalConst(D2D1_DISPLACEMENTMAP_PROP_FORCE_DWORD); setGlobalConst(D2D1_COLORMANAGEMENT_PROP_SOURCE_COLOR_CONTEXT); setGlobalConst(D2D1_COLORMANAGEMENT_PROP_SOURCE_RENDERING_INTENT); setGlobalConst(D2D1_COLORMANAGEMENT_PROP_DESTINATION_COLOR_CONTEXT); setGlobalConst(D2D1_COLORMANAGEMENT_PROP_DESTINATION_RENDERING_INTENT); setGlobalConst(D2D1_COLORMANAGEMENT_PROP_ALPHA_MODE); setGlobalConst(D2D1_COLORMANAGEMENT_PROP_QUALITY); setGlobalConst(D2D1_COLORMANAGEMENT_PROP_FORCE_DWORD); setGlobalConst(D2D1_COLORMANAGEMENT_ALPHA_MODE_PREMULTIPLIED); setGlobalConst(D2D1_COLORMANAGEMENT_ALPHA_MODE_STRAIGHT); setGlobalConst(D2D1_COLORMANAGEMENT_ALPHA_MODE_FORCE_DWORD); setGlobalConst(D2D1_COLORMANAGEMENT_QUALITY_PROOF); setGlobalConst(D2D1_COLORMANAGEMENT_QUALITY_NORMAL); setGlobalConst(D2D1_COLORMANAGEMENT_QUALITY_BEST); setGlobalConst(D2D1_COLORMANAGEMENT_QUALITY_FORCE_DWORD); setGlobalConst(D2D1_COLORMANAGEMENT_RENDERING_INTENT_PERCEPTUAL); setGlobalConst(D2D1_COLORMANAGEMENT_RENDERING_INTENT_RELATIVE_COLORIMETRIC); setGlobalConst(D2D1_COLORMANAGEMENT_RENDERING_INTENT_SATURATION); setGlobalConst(D2D1_COLORMANAGEMENT_RENDERING_INTENT_ABSOLUTE_COLORIMETRIC); setGlobalConst(D2D1_COLORMANAGEMENT_RENDERING_INTENT_FORCE_DWORD); setGlobalConst(D2D1_HISTOGRAM_PROP_NUM_BINS); setGlobalConst(D2D1_HISTOGRAM_PROP_CHANNEL_SELECT); setGlobalConst(D2D1_HISTOGRAM_PROP_HISTOGRAM_OUTPUT); setGlobalConst(D2D1_HISTOGRAM_PROP_FORCE_DWORD); setGlobalConst(D2D1_POINTSPECULAR_PROP_LIGHT_POSITION); setGlobalConst(D2D1_POINTSPECULAR_PROP_SPECULAR_EXPONENT); setGlobalConst(D2D1_POINTSPECULAR_PROP_SPECULAR_CONSTANT); setGlobalConst(D2D1_POINTSPECULAR_PROP_SURFACE_SCALE); setGlobalConst(D2D1_POINTSPECULAR_PROP_COLOR); setGlobalConst(D2D1_POINTSPECULAR_PROP_KERNEL_UNIT_LENGTH); setGlobalConst(D2D1_POINTSPECULAR_PROP_SCALE_MODE); setGlobalConst(D2D1_POINTSPECULAR_PROP_FORCE_DWORD); setGlobalConst(D2D1_POINTSPECULAR_SCALE_MODE_NEAREST_NEIGHBOR); setGlobalConst(D2D1_POINTSPECULAR_SCALE_MODE_LINEAR); setGlobalConst(D2D1_POINTSPECULAR_SCALE_MODE_CUBIC); setGlobalConst(D2D1_POINTSPECULAR_SCALE_MODE_MULTI_SAMPLE_LINEAR); setGlobalConst(D2D1_POINTSPECULAR_SCALE_MODE_ANISOTROPIC); setGlobalConst(D2D1_POINTSPECULAR_SCALE_MODE_HIGH_QUALITY_CUBIC); setGlobalConst(D2D1_POINTSPECULAR_SCALE_MODE_FORCE_DWORD); setGlobalConst(D2D1_SPOTSPECULAR_PROP_LIGHT_POSITION); setGlobalConst(D2D1_SPOTSPECULAR_PROP_POINTS_AT); setGlobalConst(D2D1_SPOTSPECULAR_PROP_FOCUS); setGlobalConst(D2D1_SPOTSPECULAR_PROP_LIMITING_CONE_ANGLE); setGlobalConst(D2D1_SPOTSPECULAR_PROP_SPECULAR_EXPONENT); setGlobalConst(D2D1_SPOTSPECULAR_PROP_SPECULAR_CONSTANT); setGlobalConst(D2D1_SPOTSPECULAR_PROP_SURFACE_SCALE); setGlobalConst(D2D1_SPOTSPECULAR_PROP_COLOR); setGlobalConst(D2D1_SPOTSPECULAR_PROP_KERNEL_UNIT_LENGTH); setGlobalConst(D2D1_SPOTSPECULAR_PROP_SCALE_MODE); setGlobalConst(D2D1_SPOTSPECULAR_PROP_FORCE_DWORD); setGlobalConst(D2D1_SPOTSPECULAR_SCALE_MODE_NEAREST_NEIGHBOR); setGlobalConst(D2D1_SPOTSPECULAR_SCALE_MODE_LINEAR); setGlobalConst(D2D1_SPOTSPECULAR_SCALE_MODE_CUBIC); setGlobalConst(D2D1_SPOTSPECULAR_SCALE_MODE_MULTI_SAMPLE_LINEAR); setGlobalConst(D2D1_SPOTSPECULAR_SCALE_MODE_ANISOTROPIC); setGlobalConst(D2D1_SPOTSPECULAR_SCALE_MODE_HIGH_QUALITY_CUBIC); setGlobalConst(D2D1_SPOTSPECULAR_SCALE_MODE_FORCE_DWORD); setGlobalConst(D2D1_DISTANTSPECULAR_PROP_AZIMUTH); setGlobalConst(D2D1_DISTANTSPECULAR_PROP_ELEVATION); setGlobalConst(D2D1_DISTANTSPECULAR_PROP_SPECULAR_EXPONENT); setGlobalConst(D2D1_DISTANTSPECULAR_PROP_SPECULAR_CONSTANT); setGlobalConst(D2D1_DISTANTSPECULAR_PROP_SURFACE_SCALE); setGlobalConst(D2D1_DISTANTSPECULAR_PROP_COLOR); setGlobalConst(D2D1_DISTANTSPECULAR_PROP_KERNEL_UNIT_LENGTH); setGlobalConst(D2D1_DISTANTSPECULAR_PROP_SCALE_MODE); setGlobalConst(D2D1_DISTANTSPECULAR_PROP_FORCE_DWORD); setGlobalConst(D2D1_DISTANTSPECULAR_SCALE_MODE_NEAREST_NEIGHBOR); setGlobalConst(D2D1_DISTANTSPECULAR_SCALE_MODE_LINEAR); setGlobalConst(D2D1_DISTANTSPECULAR_SCALE_MODE_CUBIC); setGlobalConst(D2D1_DISTANTSPECULAR_SCALE_MODE_MULTI_SAMPLE_LINEAR); setGlobalConst(D2D1_DISTANTSPECULAR_SCALE_MODE_ANISOTROPIC); setGlobalConst(D2D1_DISTANTSPECULAR_SCALE_MODE_HIGH_QUALITY_CUBIC); setGlobalConst(D2D1_DISTANTSPECULAR_SCALE_MODE_FORCE_DWORD); setGlobalConst(D2D1_POINTDIFFUSE_PROP_LIGHT_POSITION); setGlobalConst(D2D1_POINTDIFFUSE_PROP_DIFFUSE_CONSTANT); setGlobalConst(D2D1_POINTDIFFUSE_PROP_SURFACE_SCALE); setGlobalConst(D2D1_POINTDIFFUSE_PROP_COLOR); setGlobalConst(D2D1_POINTDIFFUSE_PROP_KERNEL_UNIT_LENGTH); setGlobalConst(D2D1_POINTDIFFUSE_PROP_SCALE_MODE); setGlobalConst(D2D1_POINTDIFFUSE_PROP_FORCE_DWORD); setGlobalConst(D2D1_POINTDIFFUSE_SCALE_MODE_NEAREST_NEIGHBOR); setGlobalConst(D2D1_POINTDIFFUSE_SCALE_MODE_LINEAR); setGlobalConst(D2D1_POINTDIFFUSE_SCALE_MODE_CUBIC); setGlobalConst(D2D1_POINTDIFFUSE_SCALE_MODE_MULTI_SAMPLE_LINEAR); setGlobalConst(D2D1_POINTDIFFUSE_SCALE_MODE_ANISOTROPIC); setGlobalConst(D2D1_POINTDIFFUSE_SCALE_MODE_HIGH_QUALITY_CUBIC); setGlobalConst(D2D1_POINTDIFFUSE_SCALE_MODE_FORCE_DWORD); setGlobalConst(D2D1_SPOTDIFFUSE_PROP_LIGHT_POSITION); setGlobalConst(D2D1_SPOTDIFFUSE_PROP_POINTS_AT); setGlobalConst(D2D1_SPOTDIFFUSE_PROP_FOCUS); setGlobalConst(D2D1_SPOTDIFFUSE_PROP_LIMITING_CONE_ANGLE); setGlobalConst(D2D1_SPOTDIFFUSE_PROP_DIFFUSE_CONSTANT); setGlobalConst(D2D1_SPOTDIFFUSE_PROP_SURFACE_SCALE); setGlobalConst(D2D1_SPOTDIFFUSE_PROP_COLOR); setGlobalConst(D2D1_SPOTDIFFUSE_PROP_KERNEL_UNIT_LENGTH); setGlobalConst(D2D1_SPOTDIFFUSE_PROP_SCALE_MODE); setGlobalConst(D2D1_SPOTDIFFUSE_PROP_FORCE_DWORD); setGlobalConst(D2D1_SPOTDIFFUSE_SCALE_MODE_NEAREST_NEIGHBOR); setGlobalConst(D2D1_SPOTDIFFUSE_SCALE_MODE_LINEAR); setGlobalConst(D2D1_SPOTDIFFUSE_SCALE_MODE_CUBIC); setGlobalConst(D2D1_SPOTDIFFUSE_SCALE_MODE_MULTI_SAMPLE_LINEAR); setGlobalConst(D2D1_SPOTDIFFUSE_SCALE_MODE_ANISOTROPIC); setGlobalConst(D2D1_SPOTDIFFUSE_SCALE_MODE_HIGH_QUALITY_CUBIC); setGlobalConst(D2D1_SPOTDIFFUSE_SCALE_MODE_FORCE_DWORD); setGlobalConst(D2D1_DISTANTDIFFUSE_PROP_AZIMUTH); setGlobalConst(D2D1_DISTANTDIFFUSE_PROP_ELEVATION); setGlobalConst(D2D1_DISTANTDIFFUSE_PROP_DIFFUSE_CONSTANT); setGlobalConst(D2D1_DISTANTDIFFUSE_PROP_SURFACE_SCALE); setGlobalConst(D2D1_DISTANTDIFFUSE_PROP_COLOR); setGlobalConst(D2D1_DISTANTDIFFUSE_PROP_KERNEL_UNIT_LENGTH); setGlobalConst(D2D1_DISTANTDIFFUSE_PROP_SCALE_MODE); setGlobalConst(D2D1_DISTANTDIFFUSE_PROP_FORCE_DWORD); setGlobalConst(D2D1_DISTANTDIFFUSE_SCALE_MODE_NEAREST_NEIGHBOR); setGlobalConst(D2D1_DISTANTDIFFUSE_SCALE_MODE_LINEAR); setGlobalConst(D2D1_DISTANTDIFFUSE_SCALE_MODE_CUBIC); setGlobalConst(D2D1_DISTANTDIFFUSE_SCALE_MODE_MULTI_SAMPLE_LINEAR); setGlobalConst(D2D1_DISTANTDIFFUSE_SCALE_MODE_ANISOTROPIC); setGlobalConst(D2D1_DISTANTDIFFUSE_SCALE_MODE_HIGH_QUALITY_CUBIC); setGlobalConst(D2D1_DISTANTDIFFUSE_SCALE_MODE_FORCE_DWORD); setGlobalConst(D2D1_FLOOD_PROP_COLOR); setGlobalConst(D2D1_FLOOD_PROP_FORCE_DWORD); setGlobalConst(D2D1_LINEARTRANSFER_PROP_RED_Y_INTERCEPT); setGlobalConst(D2D1_LINEARTRANSFER_PROP_RED_SLOPE); setGlobalConst(D2D1_LINEARTRANSFER_PROP_RED_DISABLE); setGlobalConst(D2D1_LINEARTRANSFER_PROP_GREEN_Y_INTERCEPT); setGlobalConst(D2D1_LINEARTRANSFER_PROP_GREEN_SLOPE); setGlobalConst(D2D1_LINEARTRANSFER_PROP_GREEN_DISABLE); setGlobalConst(D2D1_LINEARTRANSFER_PROP_BLUE_Y_INTERCEPT); setGlobalConst(D2D1_LINEARTRANSFER_PROP_BLUE_SLOPE); setGlobalConst(D2D1_LINEARTRANSFER_PROP_BLUE_DISABLE); setGlobalConst(D2D1_LINEARTRANSFER_PROP_ALPHA_Y_INTERCEPT); setGlobalConst(D2D1_LINEARTRANSFER_PROP_ALPHA_SLOPE); setGlobalConst(D2D1_LINEARTRANSFER_PROP_ALPHA_DISABLE); setGlobalConst(D2D1_LINEARTRANSFER_PROP_CLAMP_OUTPUT); setGlobalConst(D2D1_LINEARTRANSFER_PROP_FORCE_DWORD); setGlobalConst(D2D1_GAMMATRANSFER_PROP_RED_AMPLITUDE); setGlobalConst(D2D1_GAMMATRANSFER_PROP_RED_EXPONENT); setGlobalConst(D2D1_GAMMATRANSFER_PROP_RED_OFFSET); setGlobalConst(D2D1_GAMMATRANSFER_PROP_RED_DISABLE); setGlobalConst(D2D1_GAMMATRANSFER_PROP_GREEN_AMPLITUDE); setGlobalConst(D2D1_GAMMATRANSFER_PROP_GREEN_EXPONENT); setGlobalConst(D2D1_GAMMATRANSFER_PROP_GREEN_OFFSET); setGlobalConst(D2D1_GAMMATRANSFER_PROP_GREEN_DISABLE); setGlobalConst(D2D1_GAMMATRANSFER_PROP_BLUE_AMPLITUDE); setGlobalConst(D2D1_GAMMATRANSFER_PROP_BLUE_EXPONENT); setGlobalConst(D2D1_GAMMATRANSFER_PROP_BLUE_OFFSET); setGlobalConst(D2D1_GAMMATRANSFER_PROP_BLUE_DISABLE); setGlobalConst(D2D1_GAMMATRANSFER_PROP_ALPHA_AMPLITUDE); setGlobalConst(D2D1_GAMMATRANSFER_PROP_ALPHA_EXPONENT); setGlobalConst(D2D1_GAMMATRANSFER_PROP_ALPHA_OFFSET); setGlobalConst(D2D1_GAMMATRANSFER_PROP_ALPHA_DISABLE); setGlobalConst(D2D1_GAMMATRANSFER_PROP_CLAMP_OUTPUT); setGlobalConst(D2D1_GAMMATRANSFER_PROP_FORCE_DWORD); setGlobalConst(D2D1_TABLETRANSFER_PROP_RED_TABLE); setGlobalConst(D2D1_TABLETRANSFER_PROP_RED_DISABLE); setGlobalConst(D2D1_TABLETRANSFER_PROP_GREEN_TABLE); setGlobalConst(D2D1_TABLETRANSFER_PROP_GREEN_DISABLE); setGlobalConst(D2D1_TABLETRANSFER_PROP_BLUE_TABLE); setGlobalConst(D2D1_TABLETRANSFER_PROP_BLUE_DISABLE); setGlobalConst(D2D1_TABLETRANSFER_PROP_ALPHA_TABLE); setGlobalConst(D2D1_TABLETRANSFER_PROP_ALPHA_DISABLE); setGlobalConst(D2D1_TABLETRANSFER_PROP_CLAMP_OUTPUT); setGlobalConst(D2D1_TABLETRANSFER_PROP_FORCE_DWORD); setGlobalConst(D2D1_DISCRETETRANSFER_PROP_RED_TABLE); setGlobalConst(D2D1_DISCRETETRANSFER_PROP_RED_DISABLE); setGlobalConst(D2D1_DISCRETETRANSFER_PROP_GREEN_TABLE); setGlobalConst(D2D1_DISCRETETRANSFER_PROP_GREEN_DISABLE); setGlobalConst(D2D1_DISCRETETRANSFER_PROP_BLUE_TABLE); setGlobalConst(D2D1_DISCRETETRANSFER_PROP_BLUE_DISABLE); setGlobalConst(D2D1_DISCRETETRANSFER_PROP_ALPHA_TABLE); setGlobalConst(D2D1_DISCRETETRANSFER_PROP_ALPHA_DISABLE); setGlobalConst(D2D1_DISCRETETRANSFER_PROP_CLAMP_OUTPUT); setGlobalConst(D2D1_DISCRETETRANSFER_PROP_FORCE_DWORD); setGlobalConst(D2D1_CONVOLVEMATRIX_PROP_KERNEL_UNIT_LENGTH); setGlobalConst(D2D1_CONVOLVEMATRIX_PROP_SCALE_MODE); setGlobalConst(D2D1_CONVOLVEMATRIX_PROP_KERNEL_SIZE_X); setGlobalConst(D2D1_CONVOLVEMATRIX_PROP_KERNEL_SIZE_Y); setGlobalConst(D2D1_CONVOLVEMATRIX_PROP_KERNEL_MATRIX); setGlobalConst(D2D1_CONVOLVEMATRIX_PROP_DIVISOR); setGlobalConst(D2D1_CONVOLVEMATRIX_PROP_BIAS); setGlobalConst(D2D1_CONVOLVEMATRIX_PROP_KERNEL_OFFSET); setGlobalConst(D2D1_CONVOLVEMATRIX_PROP_PRESERVE_ALPHA); setGlobalConst(D2D1_CONVOLVEMATRIX_PROP_BORDER_MODE); setGlobalConst(D2D1_CONVOLVEMATRIX_PROP_CLAMP_OUTPUT); setGlobalConst(D2D1_CONVOLVEMATRIX_PROP_FORCE_DWORD); setGlobalConst(D2D1_CONVOLVEMATRIX_SCALE_MODE_NEAREST_NEIGHBOR); setGlobalConst(D2D1_CONVOLVEMATRIX_SCALE_MODE_LINEAR); setGlobalConst(D2D1_CONVOLVEMATRIX_SCALE_MODE_CUBIC); setGlobalConst(D2D1_CONVOLVEMATRIX_SCALE_MODE_MULTI_SAMPLE_LINEAR); setGlobalConst(D2D1_CONVOLVEMATRIX_SCALE_MODE_ANISOTROPIC); setGlobalConst(D2D1_CONVOLVEMATRIX_SCALE_MODE_HIGH_QUALITY_CUBIC); setGlobalConst(D2D1_CONVOLVEMATRIX_SCALE_MODE_FORCE_DWORD); setGlobalConst(D2D1_BRIGHTNESS_PROP_WHITE_POINT); setGlobalConst(D2D1_BRIGHTNESS_PROP_BLACK_POINT); setGlobalConst(D2D1_BRIGHTNESS_PROP_FORCE_DWORD); setGlobalConst(D2D1_ARITHMETICCOMPOSITE_PROP_COEFFICIENTS); setGlobalConst(D2D1_ARITHMETICCOMPOSITE_PROP_CLAMP_OUTPUT); setGlobalConst(D2D1_ARITHMETICCOMPOSITE_PROP_FORCE_DWORD); setGlobalConst(D2D1_CROP_PROP_RECT); setGlobalConst(D2D1_CROP_PROP_BORDER_MODE); setGlobalConst(D2D1_CROP_PROP_FORCE_DWORD); setGlobalConst(D2D1_BORDER_PROP_EDGE_MODE_X); setGlobalConst(D2D1_BORDER_PROP_EDGE_MODE_Y); setGlobalConst(D2D1_BORDER_PROP_FORCE_DWORD); setGlobalConst(D2D1_BORDER_EDGE_MODE_CLAMP); setGlobalConst(D2D1_BORDER_EDGE_MODE_WRAP); setGlobalConst(D2D1_BORDER_EDGE_MODE_MIRROR); setGlobalConst(D2D1_BORDER_EDGE_MODE_FORCE_DWORD); setGlobalConst(D2D1_MORPHOLOGY_PROP_MODE); setGlobalConst(D2D1_MORPHOLOGY_PROP_WIDTH); setGlobalConst(D2D1_MORPHOLOGY_PROP_HEIGHT); setGlobalConst(D2D1_MORPHOLOGY_PROP_FORCE_DWORD); setGlobalConst(D2D1_MORPHOLOGY_MODE_ERODE); setGlobalConst(D2D1_MORPHOLOGY_MODE_DILATE); setGlobalConst(D2D1_MORPHOLOGY_MODE_FORCE_DWORD); setGlobalConst(D2D1_TILE_PROP_RECT); setGlobalConst(D2D1_TILE_PROP_FORCE_DWORD); setGlobalConst(D2D1_ATLAS_PROP_INPUT_RECT); setGlobalConst(D2D1_ATLAS_PROP_INPUT_PADDING_RECT); setGlobalConst(D2D1_ATLAS_PROP_FORCE_DWORD); setGlobalConst(D2D1_OPACITYMETADATA_PROP_INPUT_OPAQUE_RECT); setGlobalConst(D2D1_OPACITYMETADATA_PROP_FORCE_DWORD);
+    //d2d1effects_2.h
+    setGlobalConst(D2D1_CONTRAST_PROP_CONTRAST); setGlobalConst(D2D1_CONTRAST_PROP_CLAMP_INPUT); setGlobalConst(D2D1_CONTRAST_PROP_FORCE_DWORD); setGlobalConst(D2D1_RGBTOHUE_PROP_OUTPUT_COLOR_SPACE); setGlobalConst(D2D1_RGBTOHUE_PROP_FORCE_DWORD); setGlobalConst(D2D1_RGBTOHUE_OUTPUT_COLOR_SPACE_HUE_SATURATION_VALUE); setGlobalConst(D2D1_RGBTOHUE_OUTPUT_COLOR_SPACE_HUE_SATURATION_LIGHTNESS); setGlobalConst(D2D1_RGBTOHUE_OUTPUT_COLOR_SPACE_FORCE_DWORD); setGlobalConst(D2D1_HUETORGB_PROP_INPUT_COLOR_SPACE); setGlobalConst(D2D1_HUETORGB_PROP_FORCE_DWORD); setGlobalConst(D2D1_HUETORGB_INPUT_COLOR_SPACE_HUE_SATURATION_VALUE); setGlobalConst(D2D1_HUETORGB_INPUT_COLOR_SPACE_HUE_SATURATION_LIGHTNESS); setGlobalConst(D2D1_HUETORGB_INPUT_COLOR_SPACE_FORCE_DWORD); setGlobalConst(D2D1_CHROMAKEY_PROP_COLOR); setGlobalConst(D2D1_CHROMAKEY_PROP_TOLERANCE); setGlobalConst(D2D1_CHROMAKEY_PROP_INVERT_ALPHA); setGlobalConst(D2D1_CHROMAKEY_PROP_FEATHER); setGlobalConst(D2D1_CHROMAKEY_PROP_FORCE_DWORD); setGlobalConst(D2D1_EMBOSS_PROP_HEIGHT); setGlobalConst(D2D1_EMBOSS_PROP_DIRECTION); setGlobalConst(D2D1_EMBOSS_PROP_FORCE_DWORD); setGlobalConst(D2D1_EXPOSURE_PROP_EXPOSURE_VALUE); setGlobalConst(D2D1_EXPOSURE_PROP_FORCE_DWORD); setGlobalConst(D2D1_POSTERIZE_PROP_RED_VALUE_COUNT); setGlobalConst(D2D1_POSTERIZE_PROP_GREEN_VALUE_COUNT); setGlobalConst(D2D1_POSTERIZE_PROP_BLUE_VALUE_COUNT); setGlobalConst(D2D1_POSTERIZE_PROP_FORCE_DWORD); setGlobalConst(D2D1_SEPIA_PROP_INTENSITY); setGlobalConst(D2D1_SEPIA_PROP_ALPHA_MODE); setGlobalConst(D2D1_SEPIA_PROP_FORCE_DWORD); setGlobalConst(D2D1_SHARPEN_PROP_SHARPNESS); setGlobalConst(D2D1_SHARPEN_PROP_THRESHOLD); setGlobalConst(D2D1_SHARPEN_PROP_FORCE_DWORD); setGlobalConst(D2D1_STRAIGHTEN_PROP_ANGLE); setGlobalConst(D2D1_STRAIGHTEN_PROP_MAINTAIN_SIZE); setGlobalConst(D2D1_STRAIGHTEN_PROP_SCALE_MODE); setGlobalConst(D2D1_STRAIGHTEN_PROP_FORCE_DWORD); setGlobalConst(D2D1_STRAIGHTEN_SCALE_MODE_NEAREST_NEIGHBOR); setGlobalConst(D2D1_STRAIGHTEN_SCALE_MODE_LINEAR); setGlobalConst(D2D1_STRAIGHTEN_SCALE_MODE_CUBIC); setGlobalConst(D2D1_STRAIGHTEN_SCALE_MODE_MULTI_SAMPLE_LINEAR); setGlobalConst(D2D1_STRAIGHTEN_SCALE_MODE_ANISOTROPIC); setGlobalConst(D2D1_STRAIGHTEN_SCALE_MODE_FORCE_DWORD); setGlobalConst(D2D1_TEMPERATUREANDTINT_PROP_TEMPERATURE); setGlobalConst(D2D1_TEMPERATUREANDTINT_PROP_TINT); setGlobalConst(D2D1_TEMPERATUREANDTINT_PROP_FORCE_DWORD); setGlobalConst(D2D1_VIGNETTE_PROP_COLOR); setGlobalConst(D2D1_VIGNETTE_PROP_TRANSITION_SIZE); setGlobalConst(D2D1_VIGNETTE_PROP_STRENGTH); setGlobalConst(D2D1_VIGNETTE_PROP_FORCE_DWORD); setGlobalConst(D2D1_EDGEDETECTION_PROP_STRENGTH); setGlobalConst(D2D1_EDGEDETECTION_PROP_BLUR_RADIUS); setGlobalConst(D2D1_EDGEDETECTION_PROP_MODE); setGlobalConst(D2D1_EDGEDETECTION_PROP_OVERLAY_EDGES); setGlobalConst(D2D1_EDGEDETECTION_PROP_ALPHA_MODE); setGlobalConst(D2D1_EDGEDETECTION_PROP_FORCE_DWORD); setGlobalConst(D2D1_EDGEDETECTION_MODE_SOBEL); setGlobalConst(D2D1_EDGEDETECTION_MODE_PREWITT); setGlobalConst(D2D1_EDGEDETECTION_MODE_FORCE_DWORD); setGlobalConst(D2D1_HIGHLIGHTSANDSHADOWS_PROP_HIGHLIGHTS); setGlobalConst(D2D1_HIGHLIGHTSANDSHADOWS_PROP_SHADOWS); setGlobalConst(D2D1_HIGHLIGHTSANDSHADOWS_PROP_CLARITY); setGlobalConst(D2D1_HIGHLIGHTSANDSHADOWS_PROP_INPUT_GAMMA); setGlobalConst(D2D1_HIGHLIGHTSANDSHADOWS_PROP_MASK_BLUR_RADIUS); setGlobalConst(D2D1_HIGHLIGHTSANDSHADOWS_PROP_FORCE_DWORD); setGlobalConst(D2D1_HIGHLIGHTSANDSHADOWS_INPUT_GAMMA_LINEAR); setGlobalConst(D2D1_HIGHLIGHTSANDSHADOWS_INPUT_GAMMA_SRGB); setGlobalConst(D2D1_HIGHLIGHTSANDSHADOWS_INPUT_GAMMA_FORCE_DWORD); setGlobalConst(D2D1_LOOKUPTABLE3D_PROP_LUT); setGlobalConst(D2D1_LOOKUPTABLE3D_PROP_ALPHA_MODE); setGlobalConst(D2D1_LOOKUPTABLE3D_PROP_FORCE_DWORD); setGlobalConst(D2D1_OPACITY_PROP_OPACITY); setGlobalConst(D2D1_OPACITY_PROP_FORCE_DWORD); setGlobalConst(D2D1_CROSSFADE_PROP_WEIGHT); setGlobalConst(D2D1_CROSSFADE_PROP_FORCE_DWORD); setGlobalConst(D2D1_TINT_PROP_COLOR); setGlobalConst(D2D1_TINT_PROP_CLAMP_OUTPUT); setGlobalConst(D2D1_TINT_PROP_FORCE_DWORD); setGlobalConst(D2D1_WHITELEVELADJUSTMENT_PROP_INPUT_WHITE_LEVEL); setGlobalConst(D2D1_WHITELEVELADJUSTMENT_PROP_OUTPUT_WHITE_LEVEL); setGlobalConst(D2D1_WHITELEVELADJUSTMENT_PROP_FORCE_DWORD); setGlobalConst(D2D1_HDRTONEMAP_PROP_INPUT_MAX_LUMINANCE); setGlobalConst(D2D1_HDRTONEMAP_PROP_OUTPUT_MAX_LUMINANCE); setGlobalConst(D2D1_HDRTONEMAP_PROP_DISPLAY_MODE); setGlobalConst(D2D1_HDRTONEMAP_PROP_FORCE_DWORD); setGlobalConst(D2D1_HDRTONEMAP_DISPLAY_MODE_SDR); setGlobalConst(D2D1_HDRTONEMAP_DISPLAY_MODE_HDR); setGlobalConst(D2D1_HDRTONEMAP_DISPLAY_MODE_FORCE_DWORD);
 
     setGlobalWrapper(GetWindowText);
     setGlobalWrapper(SetWindowText);
@@ -9891,6 +10631,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInstance, char* nCmdList, int
     //print("maybe do send input but if i can't i can't");
     //print("investigate 3/11 -> why does SetClassLongPtr AND GetWindowLongPtr not work?"); //haha i can change the icons now! (it wasn't working because i was using WINCLASS instead of the EX versions)
     print(/*"GDI CreateFont and CreateWindowExA AND */"use ID2D1BitmapBrush1!");
+    print("JUST LEARNED THAT I'VE BEEN USING OBJECT TEMPLATES WRONG AND IT'S BEEN SLOWING DOWN JBS3 THIS ENTIRE TIME CHECK jsEffectOT!!!");
 
     SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), 7);
 
@@ -9904,7 +10645,8 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInstance, char* nCmdList, int
     //1.5.40 because i added screenshaders but more importantly libusb/hidapi
     //1.5.56 because i added the minimum support for d2d11 (that's what im gonna call it) and because directcomposition works (i still need to add effects)
     //1.5.66 because THE BLUR EFFECT WORKS BUDDY NEWDIRECT2D11FUNCS is BEAUTIFUL (i need to figure out resizing and all that BUT IT WORKS)
-    print("JBS3 -> Version 1.5.66"); //so idk how normal version things work so the first number will probably stay one --- i will increment the second number if i change an existing function like when i remade the CreateWindowClass and CreateWindow functions --- i might random increment the third number if i feel like it
+    //1.5.73 BECAUSE THE DIRECT2D + DXGI SAGA IS OVER! (and because i renamed Matrix3x2 to Matrix3x2F)
+    print("JBS3 -> Version 1.5.73"); //so idk how normal version things work so the first number will probably stay one --- i will increment the second number if i change an existing function like when i remade the CreateWindowClass and CreateWindow functions --- i might random increment the third number if i feel like it
     print(screenWidth << "x" << screenHeight);
     
 

@@ -156,7 +156,7 @@ bool Direct2D11::Init(HWND window, int type) {
     CreateAndSetDrawingBitmaps();
 
     if (type == 3) {
-        ComPtr<IDCompositionDevice3> m_dcompD1;
+        //ComPtr<IDCompositionDevice3> m_dcompD1;
         // (1) Create the DirectComposition device
         SusIfFailed(DCompositionCreateDevice3(
             //nullptr, // <- DirectX 12 specific; see below

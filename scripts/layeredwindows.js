@@ -20,6 +20,9 @@ function windowProc(hwnd, msg, wp, lp) {
         
         InvalidateRect(hwnd, 0, 0, 1920, 1080, true);
         UpdateWindow(hwnd); //draw immediately
+
+        //d2d.BindDC(hwnd);
+
     //}else if(msg == WM_PAINT) {
     //    d2d.BeginDraw();
     //    //d2d.Clear(0, 255, 0);
@@ -82,6 +85,7 @@ function loop() {
         d2d.DrawText("left clicks: "+stats.mouse.left, font, 0, 1080/1.25, 1920, 1080, brush);
         d2d.DrawText("right clicks: "+stats.mouse.right, font, 0, 1080/1.25+40, 1920, 1080, brush);
         d2d.DrawText("middle clicks: "+stats.mouse.middle, font, 0, 1080/1.25+80, 1920, 1080, brush);
+
         d2d.EndDraw();
         //const ps = BeginPaint(hwnd);
         ////FillRect(ps.hdc, 0, 0, 1920, 400, NULL);

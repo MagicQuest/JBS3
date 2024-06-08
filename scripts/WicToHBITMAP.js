@@ -6,7 +6,7 @@ let bitmap;
 let i = 0;
 //let backBufferBmp;
 
-function Matrix3x2ToXFORM(matrix) {
+function Matrix3x2FToXFORM(matrix) {
     //print(matrix);
     return {
         "eM11": matrix._11,
@@ -63,7 +63,7 @@ function windowProc(hwnd, msg, wp, lp) {
         mouse.y -= window.top+32;
 
         SetGraphicsMode(dc, GM_ADVANCED);
-        SetWorldTransform(dc, Matrix3x2ToXFORM(Matrix3x2.SetProduct(Matrix3x2.Translation(mouse.x, mouse.y), Matrix3x2.Rotation(i, mouse.x, mouse.y)))); //hell yeah
+        SetWorldTransform(dc, Matrix3x2FToXFORM(Matrix3x2F.SetProduct(Matrix3x2F.Translation(mouse.x, mouse.y), Matrix3x2F.Rotation(i, mouse.x, mouse.y)))); //hell yeah
         
         const memDC = CreateCompatibleDC(dc);
         SelectObject(memDC, bitmap);
