@@ -50,7 +50,7 @@ function windowProc(hwnd, msg, wp, lp) {
 
         d2d.SaveDrawingState();
         
-        d2d.SetTransform(Matrix3x2F.SetProduct(Matrix3x2F.Translation(width/4, height/2), Matrix3x2F.Rotation(i, width/2, height/2)));
+        d2d.SetTransform(Matrix3x2F.Multiply(Matrix3x2F.Translation(width/4, height/2), Matrix3x2F.Rotation(i, width/2, height/2)));
         
         brush.SetColor(0.0, 1.0, 1.0);
         //print(i);

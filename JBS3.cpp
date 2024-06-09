@@ -3971,7 +3971,12 @@ V8FUNC(createCanvas) {
             Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
             ID2D1Bitmap* bmp = (ID2D1Bitmap*)info[0].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()->IntegerValue(isolate->GetCurrentContext()).FromJust();//IntegerFI(info[0]);
                                                                                                                 //had the unfortunate realization that the alpha is not automatically set to 1
-            d2d->renderTarget->DrawBitmap(bmp, D2D1::RectF(FloatFI(info[1]), FloatFI(info[2]), FloatFI(info[3]), FloatFI(info[4])), info[5]->IsNumber() ? FloatFI(info[5]) : 1.0, (D2D1_BITMAP_INTERPOLATION_MODE)IntegerFI(info[6]), D2D1::RectF(info[7]->IsNumber() ? FloatFI(info[7]) : 0.0F, info[8]->IsNumber() ? FloatFI(info[8]) : 0.0F, info[9]->IsNumber() ? FloatFI(info[9]) : bmp->GetSize().width, info[10]->IsNumber() ? FloatFI(info[10]) : bmp->GetSize().height));
+            if (info[1]->IsNullOrUndefined()) {
+                d2d->renderTarget->DrawBitmap(bmp);
+            }
+            else {
+                d2d->renderTarget->DrawBitmap(bmp, D2D1::RectF(FloatFI(info[1]), FloatFI(info[2]), FloatFI(info[3]), FloatFI(info[4])), info[5]->IsNumber() ? FloatFI(info[5]) : 1.0, (D2D1_BITMAP_INTERPOLATION_MODE)IntegerFI(info[6]), D2D1::RectF(info[7]->IsNumber() ? FloatFI(info[7]) : 0.0F, info[8]->IsNumber() ? FloatFI(info[8]) : 0.0F, info[9]->IsNumber() ? FloatFI(info[9]) : bmp->GetSize().width, info[10]->IsNumber() ? FloatFI(info[10]) : bmp->GetSize().height));
+            }
         }));
         context->Set(isolate, "CreateBitmapBrush", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
             Isolate* isolate = info.GetIsolate();
@@ -4482,7 +4487,7 @@ V8FUNC(createCanvas) {
                 HandleScope handle_scope(isolate);
                 ID2D1Effect* effect;
                 GUID shit;
-                if (!info[0]->IsNumber()) {
+                //if (!info[0]->IsNumber()) {
                     //print("NOT NUMBER");
                     Local<Array> id = info[0].As<Array>();
                     shit = GUID{ (unsigned long)IntegerFI(id->Get(context, 0).ToLocalChecked()),
@@ -4496,11 +4501,11 @@ V8FUNC(createCanvas) {
                         (unsigned char)IntegerFI(id->Get(context, 8).ToLocalChecked()),
                         (unsigned char)IntegerFI(id->Get(context, 9).ToLocalChecked()),
                         (unsigned char)IntegerFI(id->Get(context, 10).ToLocalChecked()) };
-                }
-                else {
-                    //print("UIS NUMBER");
-                    shit = CLSID_D2D12DAffineTransform;
-                }
+                //}
+                //else {
+                //    //print("UIS NUMBER");
+                //    shit = CLSID_D2D12DAffineTransform;
+                //}
 
                 RetIfFailed(d2d11->d2dcontext->CreateEffect(shit, &effect), "CreateEffect failed!");
 
@@ -4541,7 +4546,7 @@ V8FUNC(createCanvas) {
             }
         }));
 
-        context->Set(isolate, "SetEffect", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+        context->Set(isolate, "SetDCompEffect", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
             Isolate* isolate = info.GetIsolate();
             Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
 
@@ -4550,13 +4555,35 @@ V8FUNC(createCanvas) {
                 RetIfFailed(((Direct2D11*)d2d)->m_dcompVisual->SetEffect(effect), "D2D11 DComposition SetEffect failed?");
             }
             else {
-                MessageBox(NULL, L"SetEffect is for ID2D1DeviceContextDComposition only", L"Sorry", MB_OK | MB_SYSTEMMODAL);
+                MessageBox(NULL, L"SetDCompEffect is for ID2D1DeviceContextDComposition only", L"Sorry", MB_OK | MB_SYSTEMMODAL);
             }
         }));
 
 
         if(d2d11) {
             //regexr.com/81e39
+            context->Set(isolate, "AcquireNextFrame", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                Direct2D11* d2d11 = (Direct2D11*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                
+                DXGI_OUTDUPL_FRAME_INFO frameInfo;
+                while (true) {
+                    if (SUCCEEDED(d2d11->pDuplication->AcquireNextFrame(INFINITE, &frameInfo, &d2d11->pDesktopResource)) && frameInfo.LastPresentTime.QuadPart) {
+                        break;
+                    }
+                    d2d11->pDuplication->ReleaseFrame();
+                }
+
+                ComPtr<ID3D11Texture2D> desktopImage; //why tf would i want an ID3D11Texture FUCK;
+                RetIfFailed(d2d11->pDesktopResource->QueryInterface(__uuidof(ID3D11Texture2D), &desktopImage), "desktop image queryinterface");
+
+                ID2D1Bitmap* source = (ID2D1Bitmap*)IntegerFI(info[0].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+                ID2D1Bitmap1* specialsource = nullptr;
+                RetIfFailed(source->QueryInterface(&specialsource), "COM Cast (QueryInterface) ID2D1Bitmap as ID2D1Bitmap1");
+
+                info.GetReturnValue().Set(d2d11->ConvertID3D11Texture2DToID2D1Bitmap(d2d11->d11context.Get(), desktopImage.Get(), specialsource)); //copies le ID3D11Texture2D into my ID2D1Bitmap1
+            }));
+
             context->Set(isolate, "CreateGaussianBlurEffect", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
                 Isolate* isolate = info.GetIsolate();
                 Direct2D11* d2d11 = (Direct2D11*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
@@ -9423,7 +9450,7 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
         Isolate* isolate = info.GetIsolate();
         info.GetReturnValue().Set(DIRECT2D::getMatrixFImpl(isolate, D2D1::Matrix3x2F::Translation(FloatFI(info[0]), FloatFI(info[1]))));
         }));
-    matrixhelper->Set(isolate, "SetProduct", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+    matrixhelper->Set(isolate, "Multiply", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
         Isolate* isolate = info.GetIsolate();
 
         D2D1::Matrix3x2F matrix = DIRECT2D::fromJSMatrix3x2(isolate, info[0].As<Object>());//D2D1::Matrix3x2F();
@@ -10645,7 +10672,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInstance, char* nCmdList, int
     //1.5.40 because i added screenshaders but more importantly libusb/hidapi
     //1.5.56 because i added the minimum support for d2d11 (that's what im gonna call it) and because directcomposition works (i still need to add effects)
     //1.5.66 because THE BLUR EFFECT WORKS BUDDY NEWDIRECT2D11FUNCS is BEAUTIFUL (i need to figure out resizing and all that BUT IT WORKS)
-    //1.5.73 BECAUSE THE DIRECT2D + DXGI SAGA IS OVER! (and because i renamed Matrix3x2 to Matrix3x2F)
+    //1.5.73 BECAUSE THE DIRECT2D + DXGI SAGA IS OVER! (and because i renamed Matrix3x2 to Matrix3x2F and then renamed Matrix3x2F.SetProduct to Multiply and now finished desktop duplication)
     print("JBS3 -> Version 1.5.73"); //so idk how normal version things work so the first number will probably stay one --- i will increment the second number if i change an existing function like when i remade the CreateWindowClass and CreateWindow functions --- i might random increment the third number if i feel like it
     print(screenWidth << "x" << screenHeight);
     

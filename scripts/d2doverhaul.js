@@ -18,7 +18,7 @@ function windowProc(hwnd, msg, wp, lp) {
 
         //bmpBrush.SetTransform(d2d.Matrix3x2F.Translation(i, i));
         //watch out bruh Matrix3x2F is global
-        gradient.SetTransform(Matrix3x2F.SetProduct(Matrix3x2F.Translation(100+Math.sin(i/100)*100, 0), Matrix3x2F.Rotation(i, 128+(100+Math.sin(i/100)*100), 128)));
+        gradient.SetTransform(Matrix3x2F.Multiply(Matrix3x2F.Translation(100+Math.sin(i/100)*100, 0), Matrix3x2F.Rotation(i, 128+(100+Math.sin(i/100)*100), 128)));
 
         d2d.SaveDrawingState();
 
@@ -26,7 +26,7 @@ function windowProc(hwnd, msg, wp, lp) {
         //const transPtr = d2d.Matrix3x2F.FromMatrix(d2d.Matrix3x2F.Translation(256, 256)); //yeah this system is too weird i gotta change it
         //const rotPtr = d2d.Matrix3x2F.FromMatrix(d2d.Matrix3x2F.Rotation(i, 256, 256));
         //d2d.SetTransform(d2d.Matrix3x2F.SetProduct(transPtr, rotPtr));
-        d2d.SetTransform(Matrix3x2F.SetProduct(Matrix3x2F.Translation(256, 256), Matrix3x2F.Rotation(i, 256, 256))); //oh yeah that's better
+        d2d.SetTransform(Matrix3x2F.Multiply(Matrix3x2F.Translation(256, 256), Matrix3x2F.Rotation(i, 256, 256))); //oh yeah that's better
 
         //gradient.SetTransform(d2d.Matrix3x2F.SetProduct(d2d.Matrix3x2F.Translation(256, 256), d2d.Matrix3x2F.Rotation(i, 256, 256)));
 

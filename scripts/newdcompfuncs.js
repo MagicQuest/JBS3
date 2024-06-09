@@ -18,7 +18,7 @@ function windowProc(hwnd, msg, wp, lp) {
         compositeEffect.SetInput(0, gaussianBlur);
         compositeEffect.SetInput(1, hueEffect);
 
-        d2d.SetEffect(compositeEffect); //oh shoot i didn't realize the compositeEffect would put them on top of eachother but it looks kinda cool
+        d2d.SetDCompEffect(compositeEffect); //oh shoot i didn't realize the compositeEffect would put them on top of eachother but it looks kinda cool
         d2d.Commit(); //you gotta commit after applying an effect
         
         SetTimer(hwnd, 0, 16);
@@ -34,7 +34,7 @@ function windowProc(hwnd, msg, wp, lp) {
 
         d2d.SaveDrawingState();
         
-        d2d.SetTransform(Matrix3x2F.SetProduct(Matrix3x2F.Translation(width/4, height/2), Matrix3x2F.Rotation(i, width/2, height/2)));
+        d2d.SetTransform(Matrix3x2F.Multiply(Matrix3x2F.Translation(width/4, height/2), Matrix3x2F.Rotation(i, width/2, height/2)));
         
         brush.SetColor(0.0, 1.0, 1.0);
         d2d.FillRectangle(0, 0, 100, 100, brush);

@@ -1,3 +1,5 @@
+//fixed
+
 let d2d, brush;
 let i = 1;
 

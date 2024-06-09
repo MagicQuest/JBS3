@@ -179,6 +179,34 @@ bool Direct2D11::Init(HWND window, int type) {
         SusIfFailed(m_dcompTarget->SetRoot(m_dcompVisual.Get()), "Dcomp SetRoot");
         SusIfFailed(m_dcompDevice->Commit(), "Dcomp Commit");
     }
+
+    ComPtr<IDXGIOutput> tempOutput;
+    for (UINT i = 0; dxgiAdapter->EnumOutputs(i, &tempOutput) != DXGI_ERROR_NOT_FOUND; i++) {
+        break;
+    }
+    ComPtr<IDXGIOutput1> dxgiOutput;
+    //ComPtr<IDXGIOutputDuplication> pDuplication;
+
+    SusIfFailed(tempOutput->QueryInterface(__uuidof(IDXGIOutput1), (void**)&dxgiOutput), "QueryInterface dxgiOutput (for desktop duplication)");
+    SusIfFailed(dxgiOutput->DuplicateOutput(dxgiDevice.Get(), &pDuplication), "duplicate output");//d2device.Get(), &pDuplication);
+
+    DXGI_OUTDUPL_DESC duplDesc;
+    pDuplication->GetDesc(&duplDesc);
+
+    //ComPtr<IDXGIResource> pDesktopResource;
+    D2D1_BITMAP_PROPERTIES screenProperties =
+        D2D1::BitmapProperties(
+            D2D1::PixelFormat(
+                DXGI_FORMAT_B8G8R8A8_UNORM,
+                D2D1_ALPHA_MODE_IGNORE),
+            0,
+            0
+        );
+
+    //ComPtr<ID2D1Bitmap> pTempBitmap;
+    //d2dcontext->CreateBitmap(D2D1::SizeU(GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN)), screenProperties, pTempBitmap.GetAddressOf());
+    ////SusIfFailed(d2dcontext->CreateBitmapFromDxgiSurface(dxgiBackBuffer.Get(), &screenProperties, &pDesktopBitmap), "creat enew pdesktopbitmap");
+    //pTempBitmap.As(&pDesktopBitmap);
 }
 
 int Direct2D11::Resize(UINT width, UINT height) {
@@ -222,6 +250,22 @@ bool Direct2D11::CreateAndSetDrawingBitmaps() {
     //RECT r; GetClientRect(window, &r);
     //SusIfFailed(d2dcontext->CreateBitmap(D2D1::SizeU(r.right, r.bottom), BitmapProperties(PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_IGNORE)), &d2dBackBitmap);
     SusIfFailed(d2dcontext->CreateBitmapFromDxgiSurface(dxgiBackBuffer.Get(), &bitmapProperties, &d2dBackBitmap), "intellij(sense) just DIED");
+}
+
+//https://stackoverflow.com/questions/22383209/id3d11texture2d-to-id2d1bitmap-is-it-possible
+bool Direct2D11::ConvertID3D11Texture2DToID2D1Bitmap(ID3D11DeviceContext* ctx,
+    ID3D11Texture2D* texture,
+    ID2D1Bitmap1* bitmap)
+{
+    ComPtr<IDXGISurface> dxgiSurface;
+    SusIfFailed(bitmap->GetSurface(&dxgiSurface), "ID2D1Bitmap1 GetSurface");
+    //if (hr != S_OK)
+    //    return false;
+    ComPtr<ID3D11Resource> d3dResource;
+    SusIfFailed(dxgiSurface.As(&d3dResource), "QueryInterface IDXGISurface as ID3D11Resource");
+    //if (hr != S_OK)
+    //    return false;
+    ctx->CopyResource(d3dResource.Get(), texture);
 }
 
 void Direct2D11::EndDraw(bool donotpresent) {

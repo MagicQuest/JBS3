@@ -30,6 +30,10 @@ public:
     ComPtr<IDCompositionVisual2> m_dcompVisual;
     ComPtr<IDCompositionDevice3> m_dcompD1;
 
+    ComPtr<IDXGIOutputDuplication> pDuplication;
+    ComPtr<IDXGIResource> pDesktopResource;
+    //ComPtr<ID2D1Bitmap1> pDesktopBitmap;
+
     Direct2D11() {
 
     }
@@ -39,6 +43,8 @@ public:
     int Resize(UINT width, UINT height);
 
     bool CreateAndSetDrawingBitmaps();
+
+    bool ConvertID3D11Texture2DToID2D1Bitmap(ID3D11DeviceContext* ctx, ID3D11Texture2D* texture, ID2D1Bitmap1* bitmap);
 
     void EndDraw(bool donotpresent);
 };
