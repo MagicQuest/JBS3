@@ -1,43 +1,105 @@
-let d2d, brush, font, testBmp, dragging;
+let d2d, brush, font, biggerfont, testBmp, dragging;
 let width = 1280;
 let height = 720;
-let scrollPos = 0;
+let scrollPos = 0.5;
 let i = 1;
+let tempo = 130;
+
+let pianoKeys = [];
 
 class Interactable {
-    constructor(x, y, width, height, color, DragCallback) {
+    constructor(x, y, width, height, color, interact) {//, DragCallback) {
         this.x = x;
         this.y = y;
         this.width = width;
         this.height = height;
         this.color = color;
-        this.Drag = DragCallback;//.bind(this); //haha imma JS jenius (ok for some reason it didn't work)
+        if(interact) {
+            this.Interact = interact; //this breaks the Draggable's interact func so i gotta put it in the if stanteemtn
+        }
+        //this.Drag = DragCallback//.bind(this); //haha imma JS jenius (ok for some reason it didn't work) OH it was because i was using an anonymous function!
+        //this.dragOffset = {x: 0, y: 0};
     }
     Update(mouse) {
         let realcolor = this.color;
         if(mouse.x > this.x && mouse.x < this.x+this.width && mouse.y > this.y && mouse.y < this.y+this.height) {
-            realcolor = realcolor.map((val) => Math.min(val+.1, 1));
-            if(GetKey(VK_LBUTTON)) {
-                dragging = this;
-            }
+            //realcolor = realcolor.map((val) => Math.min(val+.1, 1));
+            //print(this);
+            realcolor = this.Interact(realcolor, mouse);
         }
         brush.SetColor(...realcolor);
         d2d.FillRectangle(this.x, this.y, this.x+this.width, this.y+this.height, brush);
     }
 }
 
-function DrawPianoKeys() {
+class Draggable extends Interactable {
+    constructor(x, y, width, height, color, DragCallback) {
+        super(x, y, width, height, color);
+        this.Drag = DragCallback;
+        this.dragOffset = {x: 0, y: 0};
+    }
+    Interact(realcolor, mouse) {
+        if(GetKey(VK_LBUTTON) && !dragging) {
+            dragging = this;
+            this.dragOffset = {x: mouse.x-this.x, y: mouse.y-this.y};
+        }else if(GetKey(VK_RBUTTON)) {
+            this.AltInteract(mouse);
+        }
+        return realcolor.map((val) => Math.min(val+.1, 1));
+    }
+}
+
+class ABSDraggable extends Draggable { //affected by scroll
+    constructor(x, y, width, height, color, DragCallback) {
+        super(x, y, width, height, color, DragCallback);
+    }
+    Interact(realcolor, mouse) {
+        if(GetKey(VK_LBUTTON) && !dragging) {
+            dragging = this;
+            let scrolledY = this.y-scrollPos*(131*21);
+            this.dragOffset = {x: mouse.x-this.x, y: mouse.y-scrolledY};
+        }else if(GetKey(VK_RBUTTON)) {
+            this.AltInteract(mouse);
+        }
+        return realcolor.map((val) => Math.min(val+.1, 1));
+    }
+    Update(mouse) {
+        let realcolor = this.color;
+        let scrolledY = this.y-scrollPos*(131*21);
+        if(mouse.x > this.x && mouse.x < this.x+this.width && mouse.y > scrolledY && mouse.y < scrolledY+this.height) {
+            //realcolor = realcolor.map((val) => Math.min(val+.1, 1));
+            //print(this);
+            realcolor = this.Interact(realcolor, mouse);
+        }
+        brush.SetColor(...realcolor);
+        d2d.FillRoundedRectangle(this.x, scrolledY, this.x+this.width, scrolledY+this.height, 2, 2, brush);
+        //d2d.FillRectangle(this.x, scrolledY, this.x+this.width, scrolledY+this.height, brush);
+    }
+}
+
+function DrawPianoKeys(mouse) {
     for(let i = 0; i < 132; i++) {
         let blackkey = (i%12 < 5 ? (i%12) % 2 == 1 : (i%12) % 2 == 0);
         let c = blackkey ? 0.0 : 1.0;
+
+        pianoKeys[i].y = ((131-i)*21)-(scrollPos*(131*21));
+        pianoKeys[i].Update(mouse);
+
         //if(!blackkey) {
-            brush.SetColor(c,c,c);
-            d2d.FillRectangle(0, ((131-i)*21)-(scrollPos*(131*21)), 70, ((131-i)*21 + 20)-(scrollPos*(131*21)), brush);
+            //brush.SetColor(c,c,c);
+            //d2d.FillRectangle(0, ((131-i)*21)-(scrollPos*(131*21)), 70, ((131-i)*21 + 20)-(scrollPos*(131*21)), brush);
         //}
         if(i%12 == 0) {
             c = 1.0-c;
             brush.SetColor(c,c,c);
-            d2d.DrawText("C"+i/12, font, 50, (131-i)*21-(scrollPos*(131*21)), 70, ((131-i)*21 + 20)-(scrollPos*(131*21)), brush);
+            d2d.DrawText("C"+i/12, font, 45, pianoKeys[i].y, 70, ((131-i)*21 + 20)-(scrollPos*(131*21)), brush);
+        }
+        brush.SetColor(42/255, 58/255, 68/255);
+        d2d.DrawLine(70, pianoKeys[i].y, width, pianoKeys[i].y, brush);
+
+        if(blackkey) {
+            brush.SetColor(0.0, 0.0, 0.0, 0.1);
+            d2d.FillRectangle(70, pianoKeys[i].y, width, ((131-i)*21 + 20)-(scrollPos*(131*21)), brush);
         }
     }
 }
@@ -47,12 +109,78 @@ function GetClientCursorPos(rect) {
     return {x: mouse.x-rect.left-8, y: mouse.y-rect.top-33};
 }
 
+const tones = [
+    16.35,
+    17.32,
+    18.35,
+    19.45,
+    20.6,
+    21.83,
+    23.12,
+    24.5,
+    25.96,
+    27.5,
+    29.14,
+    30.87
+]; //im using https://muted.io/note-frequencies/ 
+//apparently every octave's tone is just the 0th octave's tone multiplied by 2 to the power of the octave
+
+function playTone(key, pitch) {
+    print(key, pitch);
+    let tone = tones[key]*(2**pitch);
+    Beep(tone, 500);//.then(any => console.log("promise: ", any)); //ok for some reason it keeps randomly crashing and idk what the error is saying
+}
+
+let keyNotes = {
+    "Z": [0, 4],
+    "S": [1, 4],
+    "X": [2, 4],
+    "D": [3, 4],
+    "C": [4, 4],
+    "V": [5, 4],
+    "G": [6, 4],
+    "B": [7, 4],
+    "H": [8, 4],
+    "N": [9, 4],
+    "J": [10, 4],
+    "M": [11, 4],
+    ",": [0, 5],
+    "L": [1, 5],
+    ".": [2, 5],
+    ";": [3, 5],
+    "/": [4, 5],
+
+    "Q": [0, 5],
+    "2": [1, 5],
+    "W": [2, 5],
+    "3": [3, 5],
+    "E": [4, 5],
+    "R": [5, 5],
+    "5": [6, 5],
+    "T": [7, 5],
+    "6": [8, 5],
+    "Y": [9, 5],
+    "7": [10, 5],
+    "U": [11, 5],
+    "I": [0, 6],
+    "9": [1, 6],
+    "O": [2, 6],
+    "0": [3, 6],
+    "P": [4, 6],
+    "[": [5, 6],
+    "=": [6, 6],
+    "]": [7, 6],
+};
+
+let pianoRollNotes = [];
+
 function windowProc(hwnd, msg, wp, lp) {
     if(msg == WM_CREATE) {
         d2d = createCanvas("d2d", ID2D1DeviceContext, hwnd);  //DComposition
         brush = d2d.CreateSolidColorBrush(1.0, 1.0, 0.0);
         
-        font = d2d.CreateFont("impact", 12);
+        font = d2d.CreateFont("arial", 12);
+        biggerfont = d2d.CreateFont("arial", 30);
         
         print(d2d.backBitmap, d2d.targetBitmap);
 
@@ -60,11 +188,28 @@ function windowProc(hwnd, msg, wp, lp) {
         
         print(testBmp);
 
-        scrollBar = new Interactable(1280-20, 0, 20, 70, [80/255, 89/255, 94/255], (mouse) => {
-            scrollPos = Math.min(Math.max(mouse.y, 0), height-70) / (height-70);
-            scrollBar.y = scrollPos * (height-70);
+        scrollBar = new Draggable(1280-20, 0, 20, 70, [80/255, 89/255, 94/255], function(mouse) {
+            scrollPos = Math.min(Math.max(mouse.y-this.dragOffset.y, 0), height-70) / (height-70);
             print(scrollPos);
         });
+
+        for(let i = 0; i < 132; i++) {
+            let blackkey = (i%12 < 5 ? (i%12) % 2 == 1 : (i%12) % 2 == 0);
+            let c = blackkey ? 0.0 : 1.0;
+            
+            pianoKeys.push(new Interactable(0, ((131-i)*21), 70, 20, [c,c,c], function(realcolor, mouse) {
+                if(GetKeyDown(VK_LBUTTON)) {
+                    playTone(i%12, Math.floor(i/12));
+                }
+                return [1.0, 205/255, 145/255];
+            }));
+
+                //brush.SetColor(c,c,c);
+                //d2d.FillRectangle(0, ((131-i)*21)-(scrollPos*(131*21)), 70, ((131-i)*21 + 20)-(scrollPos*(131*21)), brush);
+
+            //brush.SetColor(42/255, 58/255, 68/255);
+            //d2d.DrawLine(70, ((131-i)*21)-(scrollPos*(131*21)), width, ((131-i)*21)-(scrollPos*(131*21)), brush);
+        }
 
         SetTimer(hwnd, 0, 16);
     }else if(msg == WM_TIMER) {
@@ -75,16 +220,55 @@ function windowProc(hwnd, msg, wp, lp) {
         let mouse = GetClientCursorPos(rect);
         //let {width, height} = d2d.GetSize();
 
-        DrawPianoKeys();
+        brush.SetColor(42/255, 58/255, 68/255);
+        let dark = false;
+        for(let i = 4; i <= Math.floor(width/23); i++) { //dang my math is brazy
+            if((i+1)%4 == 0) {
+                brush.SetColor(34/255, 50/255, 60/255);
+                dark = true;
+            }else if(dark) {
+                brush.SetColor(42/255, 58/255, 68/255);
+                dark = false;
+            }
+            d2d.DrawLine(23*i, 0, 23*i, height, brush);
+        }
+
+        DrawPianoKeys(mouse);
 
         //print(dragging);
 
         dragging?.Drag(mouse); //goated operator for times like these
 
+        scrollBar.y = scrollPos * (height-70);
         scrollBar.Update(mouse);
+
+        for(let note of pianoRollNotes) {
+            note.Update(mouse);
+        }
+
+        if(mouse.x > 70 && GetKeyDown(VK_LBUTTON) && !dragging) {
+            let note = new ABSDraggable(mouse.x, mouse.y, 4*23, 20, [154/255, 203/255, 164/255], function(mouse) {
+                this.x = Math.min(Math.max(Math.floor((mouse.x-this.dragOffset.x)/23)*23, 70), width-20);
+                this.y = Math.floor((mouse.y-this.dragOffset.y+scrollPos*(131*21))/21)*21;// - (Math.floor((mouse.y-this.dragOffset.y)/23));
+                //print((scrollPos*(131*21))/this.y);
+                //((131-i)*21)-(scrollPos*(131*21))
+                this.key = 131-this.y/21;
+                //print(131-this.y/21);
+            });
+            note.beats = 1;
+            //note.key = 0;
+            note.AltInteract = function(mouse) {
+                pianoRollNotes.splice(pianoRollNotes.findIndex((note) => note.x == this.x && note.y == this.y), 1);
+                //oops this is causing a pseudo concurrent modification exception type problem where i don't draw the last note because i skip one after splicing (it's not a big enoug problem to fix LO!)
+            }
+            pianoRollNotes.push(note);
+            dragging = note;
+        }
 
         //brush.SetColor(80/255, 89/255, 94/255);
         //d2d.FillRectangle(width-20, scrollPos, width, scrollPos+70, brush);
+        brush.SetColor(1.0, 1.0, 1.0);
+        d2d.DrawText("Tempo: "+tempo, biggerfont, width-200, 0, width-20, height, brush);
 
         d2d.EndDraw();
 
@@ -98,10 +282,59 @@ function windowProc(hwnd, msg, wp, lp) {
         width = nWidth;
         height = nHeight;
     }else if(msg == WM_LBUTTONDOWN) {
-        SetCapture(hwnd);
+        SetCapture(hwnd); //window still recieves mouse events even when the mouse is off the window
     }else if(msg == WM_LBUTTONUP) {
         ReleaseCapture(hwnd);
         dragging = undefined;
+    }else if(msg == WM_MOUSEWHEEL) {
+        //print(GET_WHEEL_DELTA_WPARAM(wp), lp);
+        scrollPos = Math.min(Math.max(scrollPos+GET_WHEEL_DELTA_WPARAM(wp)/-2400, 0), 1);
+    }else if(msg == WM_KEYDOWN) {
+        print(String.fromCharCode(wp));
+        let args = keyNotes[String.fromCharCode(wp)];
+        if(args) {
+            playTone(...args);
+        }
+        if(wp == VK_UP || wp == VK_RIGHT) {
+            print(wp, lp);
+            let mul = (GetKey(VK_SHIFT)) ? 1/5 : (GetKey(VK_CONTROL)) ? 10 : 1
+            tempo += 5*mul;
+        }else if(wp == VK_DOWN || wp == VK_LEFT) {
+            let mul = (GetKey(VK_SHIFT)) ? 1/5 : (GetKey(VK_CONTROL)) ? 10 : 1
+            tempo -= 5*mul;
+        }else if(wp == VK_SPACE) {
+            //let ms = beats*(60/tempo)*(1000);
+            let milliseconds = [];
+            let hertz = [];
+            let sorted = pianoRollNotes.sort((noteL, noteR) => noteL.x - noteR.x); //ascending by x value
+
+            for(let note of sorted) {
+                milliseconds.push(note.beats*(60/tempo)*(1000));
+                hertz.push(tones[note.key%12]*(2**Math.floor(note.key/12)));
+                note.timing = Math.floor((note.x - 70)/91)*(60/tempo)*1000;
+            }
+
+            let j = 0;
+
+            let start = Date.now();
+
+            while((Date.now() - start) < sorted.at(-1).timing+(sorted.at(-1).beats*(60/tempo)*(1000))) {
+                if((Date.now() - start) > sorted[j].timing) {
+                    Beep(hertz[j], milliseconds[j]); //, true);
+                    j++;
+                }
+                Sleep(16);
+            }
+
+            //for(let i = 0; i < sorted.length; i++) {
+            //    print(i, hertz[i], milliseconds[i]);
+            //    Beep(hertz[i], milliseconds[i]);
+            //}
+
+            //for(let note of pianoRollNotes) {
+            //    
+            //}
+        }
     }
     else if(msg == WM_DESTROY) {
         PostQuitMessage(0);
@@ -113,4 +346,4 @@ const wc = CreateWindowClass("jbstudio", windowProc);
 wc.hbrBackground = COLOR_WINDOW+1;
 wc.hCursor = LoadCursor(NULL, IDC_ARROW);
 
-window = CreateWindow(WS_EX_OVERLAPPEDWINDOW, wc, "jbstudio3.js", WS_OVERLAPPEDWINDOW | WS_VISIBLE, CW_USEDEFAULT, CW_USEDEFAULT, width+20, height+42, NULL, NULL, hInstance);
+window = CreateWindow(WS_EX_OVERLAPPEDWINDOW, wc, "jbstudio3.js (use arrows to edit tempo)", WS_OVERLAPPEDWINDOW | WS_VISIBLE, CW_USEDEFAULT, CW_USEDEFAULT, width+20, height+42, NULL, NULL, hInstance);

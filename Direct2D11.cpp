@@ -188,20 +188,20 @@ bool Direct2D11::Init(HWND window, int type) {
     //ComPtr<IDXGIOutputDuplication> pDuplication;
 
     SusIfFailed(tempOutput->QueryInterface(__uuidof(IDXGIOutput1), (void**)&dxgiOutput), "QueryInterface dxgiOutput (for desktop duplication)");
-    SusIfFailed(dxgiOutput->DuplicateOutput(dxgiDevice.Get(), &pDuplication), "duplicate output");//d2device.Get(), &pDuplication);
+    SusIfFailed(dxgiOutput->DuplicateOutput(dxgiDevice.Get(), &pDuplication), "duplicate output (for desktop duplication)");//d2device.Get(), &pDuplication);
 
     DXGI_OUTDUPL_DESC duplDesc;
     pDuplication->GetDesc(&duplDesc);
 
     //ComPtr<IDXGIResource> pDesktopResource;
-    D2D1_BITMAP_PROPERTIES screenProperties =
-        D2D1::BitmapProperties(
-            D2D1::PixelFormat(
-                DXGI_FORMAT_B8G8R8A8_UNORM,
-                D2D1_ALPHA_MODE_IGNORE),
-            0,
-            0
-        );
+    //D2D1_BITMAP_PROPERTIES screenProperties =
+    //    D2D1::BitmapProperties(
+    //        D2D1::PixelFormat(
+    //            DXGI_FORMAT_B8G8R8A8_UNORM,
+    //            D2D1_ALPHA_MODE_IGNORE),
+    //        0,
+    //        0
+    //    );
 
     //ComPtr<ID2D1Bitmap> pTempBitmap;
     //d2dcontext->CreateBitmap(D2D1::SizeU(GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN)), screenProperties, pTempBitmap.GetAddressOf());

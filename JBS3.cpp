@@ -1174,11 +1174,31 @@ V8FUNC(_com_errorWrapper) {
     info.GetReturnValue().Set(String::NewFromUtf8(isolate, errMsgCStr).ToLocalChecked());//jsErr);
 }
 
+#include <thread>
+#include <v8-locker.h>
+
 V8FUNC(BeepWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
 
-    info.GetReturnValue().Set(Beep(IntegerFI(info[0]), IntegerFI(info[1])));
+    if (info[2]->BooleanValue(isolate)) {
+        int freq = IntegerFI(info[0]);
+        int ms = IntegerFI(info[1]);
+
+        Persistent<Promise::Resolver> pp = Persistent<Promise::Resolver>(isolate, v8::Promise::Resolver::New(isolate->GetCurrentContext()).ToLocalChecked()); //ok so i think this should be persistent then instaed of local
+        std::thread f([=] { //uhoh something keeps crashing around here
+            //print(freq << " FREQ " << ms);
+            BOOL val = Beep(freq, ms);
+            pp.Get(isolate)->Resolve(isolate->GetCurrentContext(), Number::New(isolate, val));
+            //print("promise should'v ereturned with " << val << " (but didn't?)");
+        });
+        //std::thread thread_object(f);//, info, isolate, notify, wait, pp);
+        info.GetReturnValue().Set(pp.Get(isolate)->GetPromise());
+        f.detach();
+    }
+    else {
+        info.GetReturnValue().Set(Beep(IntegerFI(info[0]), IntegerFI(info[1])));
+    }
 }
 
 //weird how defining the macros in goodmacrosfordirect2dandwichelper.h right here caused visual studio to die
@@ -1231,7 +1251,7 @@ namespace DIRECT2D {
         return textRange;
     }
 
-    Local<Object> getMatrixFImpl(Isolate* isolate, D2D1_MATRIX_3X2_F matrix) {
+    Local<Object> getMatrix3x2FImpl(Isolate* isolate, D2D1_MATRIX_3X2_F matrix) {
         Local<Object> jsMatrix = Object::New(isolate);
 
         Local<Context> context = isolate->GetCurrentContext();
@@ -1268,6 +1288,131 @@ namespace DIRECT2D {
         jsMatrix->Set(context, LITERAL("_22"), Number::New(isolate, matrix._22));
         jsMatrix->Set(context, LITERAL("_31"), Number::New(isolate, matrix._31));
         jsMatrix->Set(context, LITERAL("_32"), Number::New(isolate, matrix._32));
+
+        return jsMatrix;
+    }
+
+    Local<Object> getMatrix4x4FImpl(Isolate* isolate, D2D1_MATRIX_4X4_F matrix) {
+        Local<Object> jsMatrix = Object::New(isolate);
+
+        Local<Context> context = isolate->GetCurrentContext();
+
+        Local<Array> jsM = Array::New(isolate, 4);
+        Local<Array> jsM1 = Array::New(isolate, 4);
+        jsM1->Set(context, 0, Number::New(isolate, matrix.m[0][0]));
+        jsM1->Set(context, 1, Number::New(isolate, matrix.m[0][1]));
+        jsM1->Set(context, 2, Number::New(isolate, matrix.m[0][2]));
+        jsM1->Set(context, 3, Number::New(isolate, matrix.m[0][3]));
+
+        Local<Array> jsM2 = Array::New(isolate, 2);
+        jsM2->Set(context, 0, Number::New(isolate, matrix.m[1][0]));
+        jsM2->Set(context, 1, Number::New(isolate, matrix.m[1][1]));
+        jsM2->Set(context, 2, Number::New(isolate, matrix.m[1][2]));
+        jsM2->Set(context, 3, Number::New(isolate, matrix.m[1][3]));
+
+        Local<Array> jsM3 = Array::New(isolate, 2);
+        jsM3->Set(context, 0, Number::New(isolate, matrix.m[2][0]));
+        jsM3->Set(context, 1, Number::New(isolate, matrix.m[2][1]));
+        jsM3->Set(context, 2, Number::New(isolate, matrix.m[2][2]));
+        jsM3->Set(context, 3, Number::New(isolate, matrix.m[2][3]));
+
+        Local<Array> jsM4 = Array::New(isolate, 2);
+        jsM4->Set(context, 0, Number::New(isolate, matrix.m[3][0]));
+        jsM4->Set(context, 1, Number::New(isolate, matrix.m[3][1]));
+        jsM4->Set(context, 2, Number::New(isolate, matrix.m[3][2]));
+        jsM4->Set(context, 3, Number::New(isolate, matrix.m[3][3]));
+
+        jsM->Set(context, 0, jsM1);
+        jsM->Set(context, 1, jsM2);
+        jsM->Set(context, 2, jsM3);
+        jsM->Set(context, 3, jsM4);
+
+        jsMatrix->Set(context, LITERAL("m"), jsM);
+
+        jsMatrix->Set(context, LITERAL("_11"), Number::New(isolate, matrix._11));
+        jsMatrix->Set(context, LITERAL("_12"), Number::New(isolate, matrix._12));
+        jsMatrix->Set(context, LITERAL("_13"), Number::New(isolate, matrix._13));
+        jsMatrix->Set(context, LITERAL("_14"), Number::New(isolate, matrix._14));
+        jsMatrix->Set(context, LITERAL("_21"), Number::New(isolate, matrix._21));
+        jsMatrix->Set(context, LITERAL("_22"), Number::New(isolate, matrix._22));
+        jsMatrix->Set(context, LITERAL("_23"), Number::New(isolate, matrix._23));
+        jsMatrix->Set(context, LITERAL("_24"), Number::New(isolate, matrix._24));
+        jsMatrix->Set(context, LITERAL("_31"), Number::New(isolate, matrix._31));
+        jsMatrix->Set(context, LITERAL("_32"), Number::New(isolate, matrix._32));
+        jsMatrix->Set(context, LITERAL("_33"), Number::New(isolate, matrix._33));
+        jsMatrix->Set(context, LITERAL("_34"), Number::New(isolate, matrix._34));
+        jsMatrix->Set(context, LITERAL("_41"), Number::New(isolate, matrix._41));
+        jsMatrix->Set(context, LITERAL("_42"), Number::New(isolate, matrix._42));
+        jsMatrix->Set(context, LITERAL("_43"), Number::New(isolate, matrix._43));
+        jsMatrix->Set(context, LITERAL("_44"), Number::New(isolate, matrix._44));
+
+        return jsMatrix;
+    }
+
+    Local<Object> getMatrix5x4FImpl(Isolate* isolate, D2D1_MATRIX_5X4_F matrix) {
+        Local<Object> jsMatrix = Object::New(isolate);
+
+        Local<Context> context = isolate->GetCurrentContext();
+
+        Local<Array> jsM = Array::New(isolate, 4);
+        Local<Array> jsM1 = Array::New(isolate, 4);
+        jsM1->Set(context, 0, Number::New(isolate, matrix.m[0][0]));
+        jsM1->Set(context, 1, Number::New(isolate, matrix.m[0][1]));
+        jsM1->Set(context, 2, Number::New(isolate, matrix.m[0][2]));
+        jsM1->Set(context, 3, Number::New(isolate, matrix.m[0][3]));
+
+        Local<Array> jsM2 = Array::New(isolate, 2);
+        jsM2->Set(context, 0, Number::New(isolate, matrix.m[1][0]));
+        jsM2->Set(context, 1, Number::New(isolate, matrix.m[1][1]));
+        jsM2->Set(context, 2, Number::New(isolate, matrix.m[1][2]));
+        jsM2->Set(context, 3, Number::New(isolate, matrix.m[1][3]));
+
+        Local<Array> jsM3 = Array::New(isolate, 2);
+        jsM3->Set(context, 0, Number::New(isolate, matrix.m[2][0]));
+        jsM3->Set(context, 1, Number::New(isolate, matrix.m[2][1]));
+        jsM3->Set(context, 2, Number::New(isolate, matrix.m[2][2]));
+        jsM3->Set(context, 3, Number::New(isolate, matrix.m[2][3]));
+
+        Local<Array> jsM4 = Array::New(isolate, 2);
+        jsM4->Set(context, 0, Number::New(isolate, matrix.m[3][0]));
+        jsM4->Set(context, 1, Number::New(isolate, matrix.m[3][1]));
+        jsM4->Set(context, 2, Number::New(isolate, matrix.m[3][2]));
+        jsM4->Set(context, 3, Number::New(isolate, matrix.m[3][3]));
+
+        Local<Array> jsM5 = Array::New(isolate, 2);
+        jsM4->Set(context, 0, Number::New(isolate, matrix.m[4][0]));
+        jsM4->Set(context, 1, Number::New(isolate, matrix.m[4][1]));
+        jsM4->Set(context, 2, Number::New(isolate, matrix.m[4][2]));
+        jsM4->Set(context, 3, Number::New(isolate, matrix.m[4][3]));
+
+        jsM->Set(context, 0, jsM1);
+        jsM->Set(context, 1, jsM2);
+        jsM->Set(context, 2, jsM3);
+        jsM->Set(context, 3, jsM4);
+        jsM->Set(context, 4, jsM5);
+
+        jsMatrix->Set(context, LITERAL("m"), jsM);
+
+        jsMatrix->Set(context, LITERAL("_11"), Number::New(isolate, matrix._11));
+        jsMatrix->Set(context, LITERAL("_12"), Number::New(isolate, matrix._12));
+        jsMatrix->Set(context, LITERAL("_13"), Number::New(isolate, matrix._13));
+        jsMatrix->Set(context, LITERAL("_14"), Number::New(isolate, matrix._14));
+        jsMatrix->Set(context, LITERAL("_21"), Number::New(isolate, matrix._21));
+        jsMatrix->Set(context, LITERAL("_22"), Number::New(isolate, matrix._22));
+        jsMatrix->Set(context, LITERAL("_23"), Number::New(isolate, matrix._23));
+        jsMatrix->Set(context, LITERAL("_24"), Number::New(isolate, matrix._24));
+        jsMatrix->Set(context, LITERAL("_31"), Number::New(isolate, matrix._31));
+        jsMatrix->Set(context, LITERAL("_32"), Number::New(isolate, matrix._32));
+        jsMatrix->Set(context, LITERAL("_33"), Number::New(isolate, matrix._33));
+        jsMatrix->Set(context, LITERAL("_34"), Number::New(isolate, matrix._34));
+        jsMatrix->Set(context, LITERAL("_41"), Number::New(isolate, matrix._41));
+        jsMatrix->Set(context, LITERAL("_42"), Number::New(isolate, matrix._42));
+        jsMatrix->Set(context, LITERAL("_43"), Number::New(isolate, matrix._43));
+        jsMatrix->Set(context, LITERAL("_44"), Number::New(isolate, matrix._44));
+        jsMatrix->Set(context, LITERAL("_51"), Number::New(isolate, matrix._51));
+        jsMatrix->Set(context, LITERAL("_52"), Number::New(isolate, matrix._52));
+        jsMatrix->Set(context, LITERAL("_53"), Number::New(isolate, matrix._53));
+        jsMatrix->Set(context, LITERAL("_54"), Number::New(isolate, matrix._54));
 
         return jsMatrix;
     }
@@ -1347,6 +1492,58 @@ namespace DIRECT2D {
         Local<Context> context = isolate->GetCurrentContext();
 
         D2D1::Matrix3x2F matrix(FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_11")).ToLocalChecked()), FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_12")).ToLocalChecked()), FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_21")).ToLocalChecked()), FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_22")).ToLocalChecked()), FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_31")).ToLocalChecked()), FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_32")).ToLocalChecked()));
+        return matrix;
+    }
+
+    D2D1::Matrix4x4F fromJSMatrix4x4(Isolate* isolate, Local<Object> jsMatrix) {//D2D1_MATRIX_3X2_F matrix) {
+        Local<Context> context = isolate->GetCurrentContext();
+
+        D2D1::Matrix4x4F matrix(
+            FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_11")).ToLocalChecked()),
+            FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_12")).ToLocalChecked()),
+            FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_13")).ToLocalChecked()),
+            FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_14")).ToLocalChecked()),
+            FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_21")).ToLocalChecked()),
+            FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_22")).ToLocalChecked()),
+            FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_23")).ToLocalChecked()),
+            FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_24")).ToLocalChecked()),
+            FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_31")).ToLocalChecked()),
+            FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_32")).ToLocalChecked()),
+            FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_33")).ToLocalChecked()),
+            FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_34")).ToLocalChecked()),
+            FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_41")).ToLocalChecked()),
+            FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_42")).ToLocalChecked()),
+            FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_43")).ToLocalChecked()),
+            FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_44")).ToLocalChecked())
+        );
+        return matrix;
+    }
+
+    D2D1::Matrix5x4F fromJSMatrix5x4(Isolate* isolate, Local<Object> jsMatrix) {//D2D1_MATRIX_3X2_F matrix) {
+        Local<Context> context = isolate->GetCurrentContext();
+
+        D2D1::Matrix5x4F matrix(
+            FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_11")).ToLocalChecked()),
+            FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_12")).ToLocalChecked()),
+            FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_13")).ToLocalChecked()),
+            FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_14")).ToLocalChecked()),
+            FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_21")).ToLocalChecked()),
+            FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_22")).ToLocalChecked()),
+            FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_23")).ToLocalChecked()),
+            FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_24")).ToLocalChecked()),
+            FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_31")).ToLocalChecked()),
+            FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_32")).ToLocalChecked()),
+            FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_33")).ToLocalChecked()),
+            FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_34")).ToLocalChecked()),
+            FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_41")).ToLocalChecked()),
+            FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_42")).ToLocalChecked()),
+            FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_43")).ToLocalChecked()),
+            FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_44")).ToLocalChecked()),
+            FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_51")).ToLocalChecked()),
+            FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_52")).ToLocalChecked()),
+            FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_53")).ToLocalChecked()),
+            FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_54")).ToLocalChecked())
+        );
         return matrix;
     }
 
@@ -1765,7 +1962,7 @@ namespace DIRECT2D {
             ID2D1Brush* newBrush = (ID2D1Brush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
             D2D1::Matrix3x2F::D2D_MATRIX_3X2_F matrix;
             newBrush->GetTransform(&matrix);
-            info.GetReturnValue().Set(DIRECT2D::getMatrixFImpl(isolate, matrix));
+            info.GetReturnValue().Set(DIRECT2D::getMatrix3x2FImpl(isolate, matrix));
         }));
         jsBrush->Set(isolate, "SetTransform", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
             Isolate* isolate = info.GetIsolate();
@@ -1991,9 +2188,9 @@ namespace DIRECT2D {
             HandleScope handle_scope(isolate);
 
             jsEffect->Set(isolate, "SetValue", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                static bool msg = false; //shoot i wish js had static variables like this so i didn't have to make the variable outside that scope
-                if(!msg) MessageBoxA(NULL, "Any values that require a D2D1_MATRIX_4X4_F or D2D1_MATRIX_5X4_F do NOT work yet because i haven't implemented them", "SetValue warning", MB_OK | MB_ICONWARNING);
-                msg = true;
+                //static bool msg = false; //shoot i wish js had static variables like this so i didn't have to make the variable outside that scope
+                //if(!msg) MessageBoxA(NULL, "Any values that require a D2D1_MATRIX_4X4_F or D2D1_MATRIX_5X4_F do NOT work yet because i haven't implemented them", "SetValue warning", MB_OK | MB_ICONWARNING);
+                //msg = true;
 
                 Isolate* isolate = info.GetIsolate();
                 ID2D1Effect* effect = (ID2D1Effect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
@@ -2084,8 +2281,11 @@ namespace DIRECT2D {
                     return;
                 }
                 if (strcmp(mode, "D2D1_COLORMATRIX_PROP_COLOR_MATRIX") == 0) {
+                    D2D1::Matrix5x4F matrix = DIRECT2D::fromJSMatrix5x4(isolate, info[1].As<Object>());
+                    effect->SetValue(D2D1_COLORMATRIX_PROP_COLOR_MATRIX, (D2D1_MATRIX_5X4_F)matrix);
+
                     //    effect->SetValue(D2D1_COLORMATRIX_PROP_COLOR_MATRIX, (D2D1_MATRIX_5X4_F)IntegerFI(info[1]));
-                    MessageBox(NULL, L"Sorry! Haven't implemented the necessary D2D1_MATRIX_5X4_F object", L"You can't use this mode right now.", MB_OK | MB_SYSTEMMODAL);
+                    //MessageBox(NULL, L"Sorry! Haven't implemented the necessary D2D1_MATRIX_5X4_F object", L"You can't use this mode right now.", MB_OK | MB_SYSTEMMODAL);
                     return;
                 }
                 if (strcmp(mode, "D2D1_COLORMATRIX_PROP_ALPHA_MODE") == 0) {
@@ -2133,8 +2333,11 @@ namespace DIRECT2D {
                     return;
                 }
                 if (strcmp(mode, "D2D1_3DTRANSFORM_PROP_TRANSFORM_MATRIX") == 0) {
+                    D2D1::Matrix4x4F matrix = DIRECT2D::fromJSMatrix4x4(isolate, info[1].As<Object>());
+                    effect->SetValue(D2D1_3DTRANSFORM_PROP_TRANSFORM_MATRIX, (D2D1_MATRIX_4X4_F)matrix);
+
                     //    effect->SetValue(D2D1_3DTRANSFORM_PROP_TRANSFORM_MATRIX, (D2D1_MATRIX_4X4_F)IntegerFI(info[1]));
-                    MessageBox(NULL, L"Sorry! Haven't implemented the necessary D2D1_MATRIX_4X4_F object", L"You can't use this mode right now.", MB_OK | MB_SYSTEMMODAL);
+                    //MessageBox(NULL, L"Sorry! Haven't implemented the necessary D2D1_MATRIX_4X4_F object", L"You can't use this mode right now.", MB_OK | MB_SYSTEMMODAL);
                     return;
                 }
                 if (strcmp(mode, "D2D1_3DPERSPECTIVETRANSFORM_PROP_INTERPOLATION_MODE") == 0) {
@@ -2262,18 +2465,18 @@ namespace DIRECT2D {
                     effect->SetValue(D2D1_COLORMANAGEMENT_PROP_SOURCE_COLOR_CONTEXT, (ID2D1ColorContext*)IntegerFI(info[1]));
                     return;
                 }
-                //if (strcmp(mode, "D2D1_COLORMANAGEMENT_PROP_SOURCE_RENDERING_INTENT") == 0) {
-                //    effect->SetValue(D2D1_COLORMANAGEMENT_PROP_SOURCE_RENDERING_INTENT, (D2D1_RENDERING_INTENT)IntegerFI(info[1]));
-                //    return;
-                //}
+                if (strcmp(mode, "D2D1_COLORMANAGEMENT_PROP_SOURCE_RENDERING_INTENT") == 0) {
+                    effect->SetValue(D2D1_COLORMANAGEMENT_PROP_SOURCE_RENDERING_INTENT, (D2D1_COLORMANAGEMENT_RENDERING_INTENT)IntegerFI(info[1]));
+                    return;
+                }
                 if (strcmp(mode, "D2D1_COLORMANAGEMENT_PROP_DESTINATION_COLOR_CONTEXT") == 0) {
                     effect->SetValue(D2D1_COLORMANAGEMENT_PROP_DESTINATION_COLOR_CONTEXT, (ID2D1ColorContext*)IntegerFI(info[1]));
                     return;
                 }
-                //if (strcmp(mode, "D2D1_COLORMANAGEMENT_PROP_DESTINATION_RENDERING_INTENT") == 0) {
-                //    effect->SetValue(D2D1_COLORMANAGEMENT_PROP_DESTINATION_RENDERING_INTENT, (D2D1_RENDERING_INTENT)IntegerFI(info[1]));
-                //    return;
-                //}
+                if (strcmp(mode, "D2D1_COLORMANAGEMENT_PROP_DESTINATION_RENDERING_INTENT") == 0) {
+                    effect->SetValue(D2D1_COLORMANAGEMENT_PROP_DESTINATION_RENDERING_INTENT, (D2D1_COLORMANAGEMENT_RENDERING_INTENT)IntegerFI(info[1]));
+                    return;
+                }
                 if (strcmp(mode, "D2D1_COLORMANAGEMENT_PROP_ALPHA_MODE") == 0) {
                     effect->SetValue(D2D1_COLORMANAGEMENT_PROP_ALPHA_MODE, (D2D1_COLORMANAGEMENT_ALPHA_MODE)IntegerFI(info[1]));
                     return;
@@ -4323,7 +4526,7 @@ V8FUNC(createCanvas) {
             Isolate* isolate = info.GetIsolate();
             Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
             D2D1_MATRIX_3X2_F matrix; d2d->renderTarget->GetTransform(&matrix);
-            info.GetReturnValue().Set(DIRECT2D::getMatrixFImpl(isolate, matrix));
+            info.GetReturnValue().Set(DIRECT2D::getMatrix3x2FImpl(isolate, matrix));
             
             //D2D1_MATRIX_3X2_F* matrix = new D2D1_MATRIX_3X2_F(); d2d->renderTarget->GetTransform(matrix);
             
@@ -7211,9 +7414,6 @@ V8FUNC(PlaySoundWrapper) {
     info.GetReturnValue().Set(Number::New(isolate, PlaySoundA(CStringFI(info[0]), (HINSTANCE)IntegerFI(info[1]), IntegerFI(info[2]))));
 }
 
-#include <thread>
-#include <v8-locker.h>
-
 V8FUNC(PlaySoundSpecial) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
@@ -9411,54 +9611,54 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     Local<ObjectTemplate> matrixhelper = ObjectTemplate::New(isolate);
     matrixhelper->Set(isolate, "Identity", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
         Isolate* isolate = info.GetIsolate();
-        info.GetReturnValue().Set(DIRECT2D::getMatrixFImpl(isolate, D2D1::Matrix3x2F::Identity()));
-        }));
+        info.GetReturnValue().Set(DIRECT2D::getMatrix3x2FImpl(isolate, D2D1::Matrix3x2F::Identity()));
+    }));
     matrixhelper->Set(isolate, "IsIdentity", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
         Isolate* isolate = info.GetIsolate();
         D2D1::Matrix3x2F matrix = DIRECT2D::fromJSMatrix3x2(isolate, info[0].As<Object>());
         info.GetReturnValue().Set(matrix.IsIdentity());
-        }));
+    }));
     matrixhelper->Set(isolate, "IsInvertible", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
         Isolate* isolate = info.GetIsolate();
         D2D1::Matrix3x2F matrix = DIRECT2D::fromJSMatrix3x2(isolate, info[0].As<Object>());
         info.GetReturnValue().Set(matrix.IsInvertible());
-        }));
+    }));
     matrixhelper->Set(isolate, "Determinant", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
         Isolate* isolate = info.GetIsolate();
         D2D1::Matrix3x2F matrix = DIRECT2D::fromJSMatrix3x2(isolate, info[0].As<Object>());
         info.GetReturnValue().Set(matrix.Determinant());
-        }));
+    }));
     matrixhelper->Set(isolate, "Scale", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
         Isolate* isolate = info.GetIsolate();
-        info.GetReturnValue().Set(DIRECT2D::getMatrixFImpl(isolate, D2D1::Matrix3x2F::Scale(FloatFI(info[0]), FloatFI(info[1]), D2D1::Point2F(FloatFI(info[2]), FloatFI(info[3])))));
-        }));
+        info.GetReturnValue().Set(DIRECT2D::getMatrix3x2FImpl(isolate, D2D1::Matrix3x2F::Scale(FloatFI(info[0]), FloatFI(info[1]), D2D1::Point2F(FloatFI(info[2]), FloatFI(info[3])))));
+    }));
     matrixhelper->Set(isolate, "Skew", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
         Isolate* isolate = info.GetIsolate();
-        info.GetReturnValue().Set(DIRECT2D::getMatrixFImpl(isolate, D2D1::Matrix3x2F::Skew(FloatFI(info[0]), FloatFI(info[1]), D2D1::Point2F(FloatFI(info[2]), FloatFI(info[3])))));
-        }));
+        info.GetReturnValue().Set(DIRECT2D::getMatrix3x2FImpl(isolate, D2D1::Matrix3x2F::Skew(FloatFI(info[0]), FloatFI(info[1]), D2D1::Point2F(FloatFI(info[2]), FloatFI(info[3])))));
+    }));
     matrixhelper->Set(isolate, "Invert", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
         Isolate* isolate = info.GetIsolate();
         D2D1::Matrix3x2F matrix = DIRECT2D::fromJSMatrix3x2(isolate, info[0].As<Object>());
         info.GetReturnValue().Set(matrix.Invert());
         DIRECT2D::setJSMatrixF(isolate, matrix, info[0].As<Object>()); //ok this seems kinda weird but not THAT weird
-        }));
+    }));
     matrixhelper->Set(isolate, "Rotation", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
         Isolate* isolate = info.GetIsolate();
-        info.GetReturnValue().Set(DIRECT2D::getMatrixFImpl(isolate, D2D1::Matrix3x2F::Rotation(FloatFI(info[0]), D2D1::Point2F(FloatFI(info[1]), FloatFI(info[2])))));
-        }));
+        info.GetReturnValue().Set(DIRECT2D::getMatrix3x2FImpl(isolate, D2D1::Matrix3x2F::Rotation(FloatFI(info[0]), D2D1::Point2F(FloatFI(info[1]), FloatFI(info[2])))));
+    }));
     matrixhelper->Set(isolate, "Translation", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
         Isolate* isolate = info.GetIsolate();
-        info.GetReturnValue().Set(DIRECT2D::getMatrixFImpl(isolate, D2D1::Matrix3x2F::Translation(FloatFI(info[0]), FloatFI(info[1]))));
-        }));
+        info.GetReturnValue().Set(DIRECT2D::getMatrix3x2FImpl(isolate, D2D1::Matrix3x2F::Translation(FloatFI(info[0]), FloatFI(info[1]))));
+    }));
     matrixhelper->Set(isolate, "Multiply", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
         Isolate* isolate = info.GetIsolate();
 
         D2D1::Matrix3x2F matrix = DIRECT2D::fromJSMatrix3x2(isolate, info[0].As<Object>());//D2D1::Matrix3x2F();
         D2D1::Matrix3x2F matrix2 = DIRECT2D::fromJSMatrix3x2(isolate, info[1].As<Object>());//D2D1::Matrix3x2F();
-        info.GetReturnValue().Set(DIRECT2D::getMatrixFImpl(isolate, matrix * matrix2));
+        info.GetReturnValue().Set(DIRECT2D::getMatrix3x2FImpl(isolate, matrix * matrix2));
         //matrix.SetProduct(*(D2D1::Matrix3x2F*)IntegerFI(info[0]), *(D2D1::Matrix3x2F*)IntegerFI(info[1]));
         //info.GetReturnValue().Set(DIRECT2D::getMatrixImpl(isolate, matrix));
-        }));
+    }));
     matrixhelper->Set(isolate, "FromMatrix", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
         Isolate* isolate = info.GetIsolate();
         Local<Context> context = isolate->GetCurrentContext();
@@ -9466,16 +9666,103 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
 
         D2D1::Matrix3x2F* matrix = new D2D1::Matrix3x2F(FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_11")).ToLocalChecked()), FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_12")).ToLocalChecked()), FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_21")).ToLocalChecked()), FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_22")).ToLocalChecked()), FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_31")).ToLocalChecked()), FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_32")).ToLocalChecked()));
         info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)matrix));
-        }));
+    }));
     matrixhelper->Set(isolate, "DeleteMatrix", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
         Isolate* isolate = info.GetIsolate();
 
         D2D1::Matrix3x2F* matrix = (D2D1::Matrix3x2F*)IntegerFI(info[0]);
         delete matrix;
         info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)matrix));
-        }));
+    }));
 
     global->Set(isolate, "Matrix3x2F", matrixhelper);
+
+    Local<ObjectTemplate> matrix4x4helper = ObjectTemplate::New(isolate);
+    matrix4x4helper->Set(isolate, "Identity", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+        Isolate* isolate = info.GetIsolate();
+        info.GetReturnValue().Set(DIRECT2D::getMatrix4x4FImpl(isolate, D2D1::Matrix4x4F::Matrix4x4F()));
+    }));
+    matrix4x4helper->Set(isolate, "IsIdentity", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+        Isolate* isolate = info.GetIsolate();
+        D2D1::Matrix4x4F matrix = DIRECT2D::fromJSMatrix4x4(isolate, info[0].As<Object>());
+        info.GetReturnValue().Set(matrix.IsIdentity());
+    }));
+    matrix4x4helper->Set(isolate, "Determinant", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+        Isolate* isolate = info.GetIsolate();
+        D2D1::Matrix4x4F matrix = DIRECT2D::fromJSMatrix4x4(isolate, info[0].As<Object>());
+        info.GetReturnValue().Set(matrix.Determinant());
+    }));
+    matrix4x4helper->Set(isolate, "Scale", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+        Isolate* isolate = info.GetIsolate();
+        info.GetReturnValue().Set(DIRECT2D::getMatrix4x4FImpl(isolate, D2D1::Matrix4x4F::Scale(FloatFI(info[0]), FloatFI(info[1]), FloatFI(info[2]))));
+    }));
+    matrix4x4helper->Set(isolate, "SkewX", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+        Isolate* isolate = info.GetIsolate();
+        info.GetReturnValue().Set(DIRECT2D::getMatrix4x4FImpl(isolate, D2D1::Matrix4x4F::SkewX(FloatFI(info[0]))));
+    }));
+    matrix4x4helper->Set(isolate, "SkewY", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+        Isolate* isolate = info.GetIsolate();
+        info.GetReturnValue().Set(DIRECT2D::getMatrix4x4FImpl(isolate, D2D1::Matrix4x4F::SkewY(FloatFI(info[0]))));
+    }));
+    matrix4x4helper->Set(isolate, "RotationArbitraryAxis", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+        Isolate* isolate = info.GetIsolate();
+        info.GetReturnValue().Set(DIRECT2D::getMatrix4x4FImpl(isolate, D2D1::Matrix4x4F::RotationArbitraryAxis(FloatFI(info[0]), FloatFI(info[1]), FloatFI(info[2]), FloatFI(info[3]))));
+    }));
+    matrix4x4helper->Set(isolate, "RotationX", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+        Isolate* isolate = info.GetIsolate();
+        info.GetReturnValue().Set(DIRECT2D::getMatrix4x4FImpl(isolate, D2D1::Matrix4x4F::RotationX(FloatFI(info[0]))));
+    }));
+    matrix4x4helper->Set(isolate, "RotationY", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+        Isolate* isolate = info.GetIsolate();
+        info.GetReturnValue().Set(DIRECT2D::getMatrix4x4FImpl(isolate, D2D1::Matrix4x4F::RotationY(FloatFI(info[0]))));
+    }));
+    matrix4x4helper->Set(isolate, "RotationZ", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+        Isolate* isolate = info.GetIsolate();
+        info.GetReturnValue().Set(DIRECT2D::getMatrix4x4FImpl(isolate, D2D1::Matrix4x4F::RotationZ(FloatFI(info[0]))));
+    }));
+    matrix4x4helper->Set(isolate, "Translation", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+        Isolate* isolate = info.GetIsolate();
+        info.GetReturnValue().Set(DIRECT2D::getMatrix4x4FImpl(isolate, D2D1::Matrix4x4F::Translation(FloatFI(info[0]), FloatFI(info[1]), FloatFI(info[2]))));
+    }));
+    matrix4x4helper->Set(isolate, "PerspectiveProjection", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+        Isolate* isolate = info.GetIsolate();
+        info.GetReturnValue().Set(DIRECT2D::getMatrix4x4FImpl(isolate, D2D1::Matrix4x4F::PerspectiveProjection(FloatFI(info[0]))));
+    }));
+    matrix4x4helper->Set(isolate, "Multiply", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+        Isolate* isolate = info.GetIsolate();
+
+        D2D1::Matrix4x4F matrix = DIRECT2D::fromJSMatrix4x4(isolate, info[0].As<Object>());//D2D1::Matrix3x2F();
+        D2D1::Matrix4x4F matrix2 = DIRECT2D::fromJSMatrix4x4(isolate, info[1].As<Object>());//D2D1::Matrix3x2F();
+        info.GetReturnValue().Set(DIRECT2D::getMatrix4x4FImpl(isolate, matrix * matrix2));
+        //matrix.SetProduct(*(D2D1::Matrix3x2F*)IntegerFI(info[0]), *(D2D1::Matrix3x2F*)IntegerFI(info[1]));
+        //info.GetReturnValue().Set(DIRECT2D::getMatrixImpl(isolate, matrix));
+    }));
+    
+    //matrix4x4helper->Set(isolate, "FromMatrix", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+    //    Isolate* isolate = info.GetIsolate();
+    //    Local<Context> context = isolate->GetCurrentContext();
+    //    Local<Object> jsMatrix = info[0].As<Object>();
+    //
+    //    D2D1::Matrix4x4F* matrix = new D2D1::Matrix4x4F(FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_11")).ToLocalChecked()), FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_12")).ToLocalChecked()), FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_21")).ToLocalChecked()), FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_22")).ToLocalChecked()), FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_31")).ToLocalChecked()), FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_32")).ToLocalChecked()));
+    //    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)matrix));
+    //    }));
+    //matrix4x4helper->Set(isolate, "DeleteMatrix", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+    //    Isolate* isolate = info.GetIsolate();
+    //
+    //    D2D1::Matrix4x4F* matrix = (D2D1::Matrix4x4F*)IntegerFI(info[0]);
+    //    delete matrix;
+    //    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)matrix));
+    //    }));
+
+    global->Set(isolate, "Matrix4x4F", matrix4x4helper);
+    
+    Local<ObjectTemplate> matrix5x4helper = ObjectTemplate::New(isolate);
+    matrix5x4helper->Set(isolate, "Identity", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+        Isolate* isolate = info.GetIsolate();
+        info.GetReturnValue().Set(DIRECT2D::getMatrix5x4FImpl(isolate, D2D1::Matrix5x4F::Matrix5x4F()));
+    }));
+    global->Set(isolate, "Matrix5x4F", matrix5x4helper); //well for some reason Matrix5x4F has no functions so you on your own
+
     //yo wtf i don't think you can use Arrays without a context??? (nope, arrays don't work with an object template)
     //{ 
     //    Local<Value> elemid[11] = { Number::New(isolate, 1),

@@ -62,8 +62,8 @@ function windowProc(hwnd, msg, wp, lp) {
 const wc = CreateWindowClass("jbsintro", windowProc);
 wc.hbrBackground = COLOR_WINDOW+1;
 wc.hCursor = LoadCursor(NULL, IDC_ARROW);
-
-window = CreateWindow(WS_EX_NOREDIRECTIONBITMAP | WS_EX_TOOLWINDOW, wc, "jbstudio3.js", WS_POPUP | WS_VISIBLE, screenWidth/2 - (512/2), screenHeight/2 - (512/2), 512, 512, NULL, NULL, hInstance);
+                                                                     //oh yeah forgot that one
+window = CreateWindow(WS_EX_NOREDIRECTIONBITMAP | WS_EX_TOOLWINDOW | WS_EX_TOPMOST, wc, "jbstudio3.js", WS_POPUP | WS_VISIBLE, screenWidth/2 - (512/2), screenHeight/2 - (512/2), 512, 512, NULL, NULL, hInstance);
 
 {
     eval(require("fs").read(`${__dirname}/jbstudio3.js`));
