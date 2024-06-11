@@ -6672,6 +6672,45 @@ V8FUNC(CreateWindowWrapper) {
     //MessageBoxA(NULL, (std::string("shit")+std::to_string(GetLastError())).c_str(), "titlke", MB_OKCANCEL); //https://www.youtube.com/watch?v=58OhXFmTUo0
 }
 
+V8FUNC(CreateMenuWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)CreateMenu()));
+}
+
+V8FUNC(AppendMenuWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    info.GetReturnValue().Set(Number::New(isolate, AppendMenuW((HMENU) IntegerFI(info[0]), IntegerFI(info[1]), (UINT_PTR)IntegerFI(info[2]), WStringFI(info[3]))));
+}
+
+V8FUNC(SetMenuWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    info.GetReturnValue().Set(Number::New(isolate, SetMenu((HWND)IntegerFI(info[0]), (HMENU)IntegerFI(info[1]))));
+}
+
+V8FUNC(RemoveMenuWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, RemoveMenu((HMENU)IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]))));
+}
+
+V8FUNC(DestroyMenuWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, DestroyMenu((HMENU)IntegerFI(info[0]))));
+}
+
+V8FUNC(DeleteMenuWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, DeleteMenu((HMENU)IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]))));
+}
+
 V8FUNC(RedrawWindowWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
@@ -9927,12 +9966,67 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     
     global->Set(isolate, "CreateWindow", FunctionTemplate::New(isolate, CreateWindowWrapper));
     global->Set(isolate, "CreateWindowClass", FunctionTemplate::New(isolate, CreateWindowClass));
+
     setGlobalConst(WS_EX_ACCEPTFILES); setGlobalConst(WS_EX_APPWINDOW); setGlobalConst(WS_EX_CLIENTEDGE); setGlobalConst(WS_EX_COMPOSITED); setGlobalConst(WS_EX_CONTEXTHELP); setGlobalConst(WS_EX_CONTROLPARENT); setGlobalConst(WS_EX_DLGMODALFRAME); setGlobalConst(WS_EX_LAYERED); setGlobalConst(WS_EX_LAYOUTRTL); setGlobalConst(WS_EX_LEFT); setGlobalConst(WS_EX_LEFTSCROLLBAR); setGlobalConst(WS_EX_LTRREADING); setGlobalConst(WS_EX_MDICHILD); setGlobalConst(WS_EX_NOACTIVATE); setGlobalConst(WS_EX_NOINHERITLAYOUT); setGlobalConst(WS_EX_NOPARENTNOTIFY); setGlobalConst(WS_EX_NOREDIRECTIONBITMAP); setGlobalConst(WS_EX_OVERLAPPEDWINDOW); setGlobalConst(WS_EX_PALETTEWINDOW); setGlobalConst(WS_EX_RIGHT); setGlobalConst(WS_EX_RIGHTSCROLLBAR); setGlobalConst(WS_EX_RTLREADING); setGlobalConst(WS_EX_STATICEDGE); setGlobalConst(WS_EX_TOOLWINDOW); setGlobalConst(WS_EX_TOPMOST); setGlobalConst(WS_EX_TRANSPARENT); setGlobalConst(WS_EX_WINDOWEDGE);
     setGlobalConst(COLOR_ACTIVEBORDER); setGlobalConst(COLOR_ACTIVECAPTION); setGlobalConst(COLOR_APPWORKSPACE); setGlobalConst(COLOR_BACKGROUND); setGlobalConst(COLOR_BTNFACE); setGlobalConst(COLOR_BTNSHADOW); setGlobalConst(COLOR_BTNTEXT); setGlobalConst(COLOR_CAPTIONTEXT); setGlobalConst(COLOR_GRAYTEXT); setGlobalConst(COLOR_HIGHLIGHT); setGlobalConst(COLOR_HIGHLIGHTTEXT); setGlobalConst(COLOR_INACTIVEBORDER); setGlobalConst(COLOR_INACTIVECAPTION); setGlobalConst(COLOR_MENU); setGlobalConst(COLOR_MENUTEXT); setGlobalConst(COLOR_SCROLLBAR); setGlobalConst(COLOR_WINDOW); setGlobalConst(COLOR_WINDOWFRAME); setGlobalConst(COLOR_WINDOWTEXT);
     setGlobalConst(WS_BORDER); setGlobalConst(WS_CAPTION); setGlobalConst(WS_CHILD); setGlobalConst(WS_CHILDWINDOW); setGlobalConst(WS_CLIPCHILDREN); setGlobalConst(WS_CLIPSIBLINGS); setGlobalConst(WS_DISABLED); setGlobalConst(WS_DLGFRAME); setGlobalConst(WS_GROUP); setGlobalConst(WS_HSCROLL); setGlobalConst(WS_ICONIC); setGlobalConst(WS_MAXIMIZE); setGlobalConst(WS_MAXIMIZEBOX); setGlobalConst(WS_MINIMIZE); setGlobalConst(WS_MINIMIZEBOX); setGlobalConst(WS_OVERLAPPED); setGlobalConst(WS_OVERLAPPEDWINDOW); setGlobalConst(WS_POPUP); setGlobalConst(WS_POPUPWINDOW); setGlobalConst(WS_SIZEBOX); setGlobalConst(WS_SYSMENU); setGlobalConst(WS_TABSTOP); setGlobalConst(WS_THICKFRAME); setGlobalConst(WS_TILED); setGlobalConst(WS_TILEDWINDOW); setGlobalConst(WS_VISIBLE); setGlobalConst(WS_VSCROLL);
     setGlobalConst(CS_BYTEALIGNCLIENT); setGlobalConst(CS_BYTEALIGNWINDOW); setGlobalConst(CS_CLASSDC); setGlobalConst(CS_DBLCLKS); setGlobalConst(CS_DROPSHADOW); setGlobalConst(CS_GLOBALCLASS); setGlobalConst(CS_HREDRAW); setGlobalConst(CS_NOCLOSE); setGlobalConst(CS_OWNDC); setGlobalConst(CS_PARENTDC); setGlobalConst(CS_SAVEBITS); setGlobalConst(CS_VREDRAW);
     setGlobalConst(BS_3STATE); setGlobalConst(BS_AUTO3STATE); setGlobalConst(BS_AUTOCHECKBOX); setGlobalConst(BS_AUTORADIOBUTTON); setGlobalConst(BS_BITMAP); setGlobalConst(BS_BOTTOM); setGlobalConst(BS_CENTER); setGlobalConst(BS_CHECKBOX); /*setGlobalConst(BS_COMMANDLINK); setGlobalConst(BS_DEFCOMMANDLINK);*/ setGlobalConst(BS_DEFPUSHBUTTON); /*setGlobalConst(BS_DEFSPLITBUTTON);*/ setGlobalConst(BS_GROUPBOX); setGlobalConst(BS_ICON); setGlobalConst(BS_FLAT); setGlobalConst(BS_LEFT); setGlobalConst(BS_LEFTTEXT); setGlobalConst(BS_MULTILINE); setGlobalConst(BS_NOTIFY); setGlobalConst(BS_OWNERDRAW); setGlobalConst(BS_PUSHBUTTON); setGlobalConst(BS_PUSHLIKE); setGlobalConst(BS_RADIOBUTTON); setGlobalConst(BS_RIGHT); setGlobalConst(BS_RIGHTBUTTON); /*setGlobalConst(BS_SPLITBUTTON);*/ setGlobalConst(BS_TEXT); setGlobalConst(BS_TOP); setGlobalConst(BS_TYPEMASK); setGlobalConst(BS_USERBUTTON); setGlobalConst(BS_VCENTER);
     /*setGlobalConst(BCN_HOTITEMCHANGE);*/ setGlobalConst(BN_CLICKED); setGlobalConst(BN_DBLCLK); setGlobalConst(BN_DOUBLECLICKED); setGlobalConst(BN_DISABLE); setGlobalConst(BN_PUSHED); setGlobalConst(BN_HILITE); setGlobalConst(BN_KILLFOCUS); setGlobalConst(BN_PAINT); setGlobalConst(BN_SETFOCUS); setGlobalConst(BN_UNPUSHED); setGlobalConst(BN_UNHILITE);
+
+    global->Set(isolate, "CreateMenu", FunctionTemplate::New(isolate, CreateMenuWrapper));
+    global->Set(isolate, "SetMenu", FunctionTemplate::New(isolate, SetMenuWrapper));
+    global->Set(isolate, "RemoveMenu", FunctionTemplate::New(isolate, RemoveMenuWrapper));
+    global->Set(isolate, "AppendMenu", FunctionTemplate::New(isolate, AppendMenuWrapper));
+    global->Set(isolate, "DestroyMenu", FunctionTemplate::New(isolate, DestroyMenuWrapper));
+    global->Set(isolate, "DeleteMenu", FunctionTemplate::New(isolate, DeleteMenuWrapper));
+
+    setGlobalConst(MF_INSERT);
+    setGlobalConst(MF_CHANGE);
+    setGlobalConst(MF_APPEND);
+    setGlobalConst(MF_DELETE);
+    setGlobalConst(MF_REMOVE);
+    setGlobalConst(MF_BYCOMMAND);
+    setGlobalConst(MF_BYPOSITION);
+    setGlobalConst(MF_SEPARATOR);
+    setGlobalConst(MF_ENABLED);
+    setGlobalConst(MF_GRAYED);
+    setGlobalConst(MF_DISABLED);
+    setGlobalConst(MF_UNCHECKED);
+    setGlobalConst(MF_CHECKED);
+    setGlobalConst(MF_USECHECKBITMAPS);
+    setGlobalConst(MF_STRING);
+    setGlobalConst(MF_BITMAP);
+    setGlobalConst(MF_OWNERDRAW);
+    setGlobalConst(MF_POPUP);
+    setGlobalConst(MF_MENUBARBREAK);
+    setGlobalConst(MF_MENUBREAK);
+    setGlobalConst(MF_UNHILITE);
+    setGlobalConst(MF_HILITE);
+    setGlobalConst(MF_DEFAULT);
+    setGlobalConst(MF_SYSMENU);
+    setGlobalConst(MF_HELP);
+    setGlobalConst(MF_RIGHTJUSTIFY);
+    setGlobalConst(MF_MOUSESELECT);
+    setGlobalConst(MF_END);
+    setGlobalConst(MFT_STRING);
+    setGlobalConst(MFT_BITMAP);
+    setGlobalConst(MFT_MENUBARBREAK);
+    setGlobalConst(MFT_MENUBREAK);
+    setGlobalConst(MFT_OWNERDRAW);
+    setGlobalConst(MFT_RADIOCHECK);
+    setGlobalConst(MFT_SEPARATOR);
+    setGlobalConst(MFT_RIGHTORDER);
+    setGlobalConst(MFT_RIGHTJUSTIFY);
+    setGlobalConst(MFS_GRAYED);
+    setGlobalConst(MFS_DISABLED);
+    setGlobalConst(MFS_CHECKED);
+    setGlobalConst(MFS_HILITE);
+    setGlobalConst(MFS_ENABLED);
+    setGlobalConst(MFS_UNCHECKED);
+    setGlobalConst(MFS_UNHILITE);
+    setGlobalConst(MFS_DEFAULT);
+
 
     setGlobalConst(ES_LEFT);
     setGlobalConst(ES_CENTER);

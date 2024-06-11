@@ -7,6 +7,8 @@ let tempo = 130;
 
 let pianoKeys = [];
 
+const readMidi = eval(require("fs").read(`${__dirname}/readmidi.js`));
+
 class Interactable {
     constructor(x, y, width, height, color, interact) {//, DragCallback) {
         this.x = x;
@@ -174,6 +176,20 @@ let keyNotes = {
 
 let pianoRollNotes = [];
 
+function pianoRollNoteDrag(mouse) {
+    this.x = Math.min(Math.max(Math.floor((mouse.x-this.dragOffset.x)/23)*23, 70), width-20);
+    this.y = Math.floor((mouse.y-this.dragOffset.y+scrollPos*(131*21))/21)*21;// - (Math.floor((mouse.y-this.dragOffset.y)/23));
+    //print((scrollPos*(131*21))/this.y);
+    //((131-i)*21)-(scrollPos*(131*21))
+    this.key = 131-this.y/21;
+    //print(131-this.y/21);
+}
+
+function pianoRollNoteAlt(mouse) {
+    pianoRollNotes.splice(pianoRollNotes.findIndex((note) => note.x == this.x && note.y == this.y), 1);
+    //oops this is causing a pseudo concurrent modification exception type problem where i don't draw the last note because i skip one after splicing (it's not a big enoug problem to fix LO!)
+}
+
 function windowProc(hwnd, msg, wp, lp) {
     if(msg == WM_CREATE) {
         d2d = createCanvas("d2d", ID2D1DeviceContext, hwnd);  //DComposition
@@ -211,6 +227,17 @@ function windowProc(hwnd, msg, wp, lp) {
             //d2d.DrawLine(70, ((131-i)*21)-(scrollPos*(131*21)), width, ((131-i)*21)-(scrollPos*(131*21)), brush);
         }
 
+        let hMenu = CreateMenu();
+        let hFileMenu = CreateMenu();
+        AppendMenu(hFileMenu, MF_STRING, 1, "New");
+        AppendMenu(hFileMenu, MF_STRING, 2, "Open...");
+        AppendMenu(hFileMenu, MF_STRING, 3, "Save As...");
+        AppendMenu(hFileMenu, MF_STRING, 4, "Exit");
+        AppendMenu(hFileMenu, MF_SEPARATOR, NULL, "NULL");
+        AppendMenu(hMenu, MF_POPUP, hFileMenu, "File");
+
+        SetMenu(hwnd, hMenu);
+
         SetTimer(hwnd, 0, 16);
     }else if(msg == WM_TIMER) {
         d2d.BeginDraw();
@@ -247,20 +274,10 @@ function windowProc(hwnd, msg, wp, lp) {
         }
 
         if(mouse.x > 70 && GetKeyDown(VK_LBUTTON) && !dragging) {
-            let note = new ABSDraggable(mouse.x, mouse.y, 4*23, 20, [154/255, 203/255, 164/255], function(mouse) {
-                this.x = Math.min(Math.max(Math.floor((mouse.x-this.dragOffset.x)/23)*23, 70), width-20);
-                this.y = Math.floor((mouse.y-this.dragOffset.y+scrollPos*(131*21))/21)*21;// - (Math.floor((mouse.y-this.dragOffset.y)/23));
-                //print((scrollPos*(131*21))/this.y);
-                //((131-i)*21)-(scrollPos*(131*21))
-                this.key = 131-this.y/21;
-                //print(131-this.y/21);
-            });
-            note.beats = 1;
+            let note = new ABSDraggable(mouse.x, mouse.y, 4*23, 20, [154/255, 203/255, 164/255], pianoRollNoteDrag);
+            //note.beats = 1;
             //note.key = 0;
-            note.AltInteract = function(mouse) {
-                pianoRollNotes.splice(pianoRollNotes.findIndex((note) => note.x == this.x && note.y == this.y), 1);
-                //oops this is causing a pseudo concurrent modification exception type problem where i don't draw the last note because i skip one after splicing (it's not a big enoug problem to fix LO!)
-            }
+            note.AltInteract = pianoRollNoteAlt;
             pianoRollNotes.push(note);
             dragging = note;
         }
@@ -284,7 +301,7 @@ function windowProc(hwnd, msg, wp, lp) {
     }else if(msg == WM_LBUTTONDOWN) {
         SetCapture(hwnd); //window still recieves mouse events even when the mouse is off the window
     }else if(msg == WM_LBUTTONUP) {
-        ReleaseCapture(hwnd);
+        ReleaseCapture();
         dragging = undefined;
     }else if(msg == WM_MOUSEWHEEL) {
         //print(GET_WHEEL_DELTA_WPARAM(wp), lp);
@@ -296,7 +313,7 @@ function windowProc(hwnd, msg, wp, lp) {
             playTone(...args);
         }
         if(wp == VK_UP || wp == VK_RIGHT) {
-            print(wp, lp);
+            //print(wp, lp);
             let mul = (GetKey(VK_SHIFT)) ? 1/5 : (GetKey(VK_CONTROL)) ? 10 : 1
             tempo += 5*mul;
         }else if(wp == VK_DOWN || wp == VK_LEFT) {
@@ -309,19 +326,25 @@ function windowProc(hwnd, msg, wp, lp) {
             let sorted = pianoRollNotes.sort((noteL, noteR) => noteL.x - noteR.x); //ascending by x value
 
             for(let note of sorted) {
+                note.beats = note.width/92;
                 milliseconds.push(note.beats*(60/tempo)*(1000));
                 hertz.push(tones[note.key%12]*(2**Math.floor(note.key/12)));
-                note.timing = Math.floor((note.x - 70)/91)*(60/tempo)*1000;
+                note.timing = Math.floor((note.x - 70)/92)*(60/tempo)*1000;
             }
 
             let j = 0;
 
             let start = Date.now();
 
-            while((Date.now() - start) < sorted.at(-1).timing+(sorted.at(-1).beats*(60/tempo)*(1000))) {
+            //while((Date.now() - start) < sorted.at(-1).timing+(sorted.at(-1).beats*(60/tempo)*(1000))) { //bruh i think the beeps are blocking the thread for so long that it runs out of time
+            while(true) {
                 if((Date.now() - start) > sorted[j].timing) {
+                    //print(hertz[j], milliseconds[j]);
                     Beep(hertz[j], milliseconds[j]); //, true);
                     j++;
+                    if(j >= sorted.length) {
+                        break;
+                    }
                 }
                 Sleep(16);
             }
@@ -335,9 +358,55 @@ function windowProc(hwnd, msg, wp, lp) {
             //    
             //}
         }
+    }else if(msg == WM_COMMAND) {
+                                        //wp == id
+        //AppendMenu(hFileMenu, MF_STRING, 1, "New");
+        //AppendMenu(hFileMenu, MF_STRING, 2, "Open...");
+        //AppendMenu(hFileMenu, MF_STRING, 3, "Save As...");
+        //AppendMenu(hFileMenu, MF_STRING, 4, "Exit");
+        
+        if(wp == 1) {
+            pianoRollNotes = [];
+        }else if(wp == 2) {
+            let file = showOpenFilePicker({
+                multiple: false,
+                excludeAcceptAllOption: true,
+                types: [
+                    {
+                        description: "MIDI files",
+                        accept: [".midi", ".mid"] //i can't be bothered to implement the mime types :sob:
+                    }
+                ]
+            });
+            print(file);
+            if(file) {
+                pianoRollNotes = [];
+                let midi = readMidi(file[0]);
+                tempo = midi[0];
+                for(const note of midi[1]) {
+                    //print(note);
+                    //Math.floor((note.x - 70)/91)*(60/tempo)*1000;
+                    //ok symbolab told me that to find note.x it's (91*note.start*tempo)/60000 + 70
+                    let x = (92*note.start*tempo)/60000 + 70;
+                    print(note.start, tempo, x, note.key, "erm...");
+                    let pRN = new ABSDraggable(x, ((131-note.key)*21), (note.beats*4)*23, 20, [154/255, 203/255, 164/255], pianoRollNoteDrag); //haha prn
+                    pRN.key = note.key;
+                    pRN.AltInteract = pianoRollNoteAlt;
+                    pianoRollNotes.push(pRN);
+                }
+            }
+        }else if(wp == 3) {
+            //uh idk yet
+        }else if(wp == 4) {
+            DestroyWindow(hwnd);
+        }
     }
     else if(msg == WM_DESTROY) {
         PostQuitMessage(0);
+        font.Release();
+        biggerfont.Release();
+        brush.Release();
+        testBmp.Release();
         d2d.Release();
     }
 }
