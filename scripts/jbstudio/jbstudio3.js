@@ -2,6 +2,9 @@ let d2d, brush, font, biggerfont, testBmp, dragging;
 let width = 1280;
 let height = 720;
 let scrollPos = 0.5;
+let scrollBar, scrollBarX;
+let scrollWidth = 10000;
+let scrollPosX = 0;
 let i = 1;
 let tempo = 130;
 
@@ -58,8 +61,9 @@ class ABSDraggable extends Draggable { //affected by scroll
     Interact(realcolor, mouse) {
         if(GetKey(VK_LBUTTON) && !dragging) {
             dragging = this;
+            let scrolledX = this.x-scrollPosX*scrollWidth;
             let scrolledY = this.y-scrollPos*(131*21);
-            this.dragOffset = {x: mouse.x-this.x, y: mouse.y-scrolledY};
+            this.dragOffset = {x: mouse.x-scrolledX, y: mouse.y-scrolledY};
         }else if(GetKey(VK_RBUTTON)) {
             this.AltInteract(mouse);
         }
@@ -67,14 +71,15 @@ class ABSDraggable extends Draggable { //affected by scroll
     }
     Update(mouse) {
         let realcolor = this.color;
+        let scrolledX = this.x-scrollPosX*scrollWidth;
         let scrolledY = this.y-scrollPos*(131*21);
-        if(mouse.x > this.x && mouse.x < this.x+this.width && mouse.y > scrolledY && mouse.y < scrolledY+this.height) {
+        if(mouse.x > scrolledX && mouse.x < scrolledX+this.width && mouse.y > scrolledY && mouse.y < scrolledY+this.height) {
             //realcolor = realcolor.map((val) => Math.min(val+.1, 1));
             //print(this);
             realcolor = this.Interact(realcolor, mouse);
         }
         brush.SetColor(...realcolor);
-        d2d.FillRoundedRectangle(this.x, scrolledY, this.x+this.width, scrolledY+this.height, 2, 2, brush);
+        d2d.FillRoundedRectangle(scrolledX, scrolledY, scrolledX+this.width, scrolledY+this.height, 2, 2, brush);
         //d2d.FillRectangle(this.x, scrolledY, this.x+this.width, scrolledY+this.height, brush);
     }
 }
@@ -108,7 +113,7 @@ function DrawPianoKeys(mouse) {
 
 function GetClientCursorPos(rect) {
     let mouse = GetCursorPos();
-    return {x: mouse.x-rect.left-8, y: mouse.y-rect.top-33};
+    return {x: mouse.x-rect.left-8, y: mouse.y-rect.top-33/*-20*/}; //uh oh the menu bar is messing up my calculations!
 }
 
 const tones = [
@@ -176,8 +181,10 @@ let keyNotes = {
 
 let pianoRollNotes = [];
 
+const channelColors = [[158, 209, 165], [159, 211, 186], [161, 214, 208], [163, 202, 216], [165, 184, 219], [168, 167, 222], [188, 167, 222], [209, 167, 222], [221, 167, 214], [219, 165, 192], [217, 163, 169], [214, 175, 162], [212, 193, 160], [209, 210, 158], [189, 209, 158], [169, 209, 157]];
+
 function pianoRollNoteDrag(mouse) {
-    this.x = Math.min(Math.max(Math.floor((mouse.x-this.dragOffset.x)/23)*23, 70), width-20);
+    this.x = /*Math.min(*/Math.max(Math.floor((mouse.x-this.dragOffset.x+scrollPosX*scrollWidth)/23)*23, 70);//, width-20);
     this.y = Math.floor((mouse.y-this.dragOffset.y+scrollPos*(131*21))/21)*21;// - (Math.floor((mouse.y-this.dragOffset.y)/23));
     //print((scrollPos*(131*21))/this.y);
     //((131-i)*21)-(scrollPos*(131*21))
@@ -204,9 +211,13 @@ function windowProc(hwnd, msg, wp, lp) {
         
         print(testBmp);
 
-        scrollBar = new Draggable(1280-20, 0, 20, 70, [80/255, 89/255, 94/255], function(mouse) {
+        scrollBar = new Draggable(width-20, 0, 20, 70, [80/255, 89/255, 94/255], function(mouse) {
             scrollPos = Math.min(Math.max(mouse.y-this.dragOffset.y, 0), height-70) / (height-70);
             print(scrollPos);
+        });
+        scrollBarX = new Draggable(70, height-20, 70, 20, [80/255, 89/255, 94/255], function(mouse) {
+            scrollPosX = Math.min(Math.max(mouse.x-this.dragOffset.x-70, 0), width-70) / (width-70);
+            print(scrollPosX);
         });
 
         for(let i = 0; i < 132; i++) {
@@ -245,11 +256,12 @@ function windowProc(hwnd, msg, wp, lp) {
 
         let rect = GetWindowRect(hwnd);
         let mouse = GetClientCursorPos(rect);
+        //print(mouse.y, scrollBarX.y);
         //let {width, height} = d2d.GetSize();
 
         brush.SetColor(42/255, 58/255, 68/255);
         let dark = false;
-        for(let i = 4; i <= Math.floor(width/23); i++) { //dang my math is brazy
+        for(let i = 4; i <= Math.floor(width/23)+2; i++) { //dang my math is brazy
             if((i+1)%4 == 0) {
                 brush.SetColor(34/255, 50/255, 60/255);
                 dark = true;
@@ -257,7 +269,13 @@ function windowProc(hwnd, msg, wp, lp) {
                 brush.SetColor(42/255, 58/255, 68/255);
                 dark = false;
             }
-            d2d.DrawLine(23*i, 0, 23*i, height, brush);
+            let x = (23*i)-scrollPosX*scrollWidth;
+            //while(x < 0) {
+            //    x = x < 0 ? width+x : x; //i SWEAR there is an easier way to do this but im trying really hard and i can't figure it out
+            //}
+            //WAIT I THINK I GOT IT
+            x = x < 0 ? (width*(Math.ceil(Math.abs(x)/width))+x) : x;
+            d2d.DrawLine(x, 0, x, height, brush);
         }
 
         DrawPianoKeys(mouse);
@@ -269,12 +287,15 @@ function windowProc(hwnd, msg, wp, lp) {
         scrollBar.y = scrollPos * (height-70);
         scrollBar.Update(mouse);
 
+        scrollBarX.x = (scrollPosX*(width-140)) + 70;
+        scrollBarX.Update(mouse);
+
         for(let note of pianoRollNotes) {
             note.Update(mouse);
         }
 
         if(mouse.x > 70 && GetKeyDown(VK_LBUTTON) && !dragging) {
-            let note = new ABSDraggable(mouse.x, mouse.y, 4*23, 20, [154/255, 203/255, 164/255], pianoRollNoteDrag);
+            let note = new ABSDraggable(mouse.x, mouse.y, 4*23, 20, [158/255, 209/255, 165/255], pianoRollNoteDrag);
             //note.beats = 1;
             //note.key = 0;
             note.AltInteract = pianoRollNoteAlt;
@@ -292,9 +313,11 @@ function windowProc(hwnd, msg, wp, lp) {
         i++;
     }else if(msg == WM_SIZE) {
         let [nWidth, nHeight] = [LOWORD(lp), HIWORD(lp)];
+        nHeight += 20; //idk something about the menu bar is messing my shit up
         testBmp.Release(); //oh shoot bitmaps created from the dxgisurface MUST be released BEFORE resizing that's really important!
         d2d.Resize(nWidth, nHeight);
         scrollBar.x = nWidth-20;
+        scrollBarX.y = nHeight-20;
         testBmp = d2d.CreateBitmapFromDxgiSurface(D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW); //recreate
         width = nWidth;
         height = nHeight;
@@ -305,7 +328,12 @@ function windowProc(hwnd, msg, wp, lp) {
         dragging = undefined;
     }else if(msg == WM_MOUSEWHEEL) {
         //print(GET_WHEEL_DELTA_WPARAM(wp), lp);
-        scrollPos = Math.min(Math.max(scrollPos+GET_WHEEL_DELTA_WPARAM(wp)/-2400, 0), 1);
+        const wheel = GET_WHEEL_DELTA_WPARAM(wp)/-2400;
+        if((LOWORD(wp) & MK_SHIFT) == MK_SHIFT) {
+            scrollPosX = Math.min(Math.max(scrollPosX+wheel, 0), 1);
+        }else {
+            scrollPos = Math.min(Math.max(scrollPos+wheel, 0), 1);
+        }    
     }else if(msg == WM_KEYDOWN) {
         print(String.fromCharCode(wp));
         let args = keyNotes[String.fromCharCode(wp)];
@@ -383,13 +411,17 @@ function windowProc(hwnd, msg, wp, lp) {
                 pianoRollNotes = [];
                 let midi = readMidi(file[0]);
                 tempo = midi[0];
+                scrollWidth = (92*(midi[1].at(-1).start)*tempo)/60000 + 70;
+                //for(let i = midi[1].length-1; i > 0; i--) {
+                //    if(midi[1][i])
+                //}
                 for(const note of midi[1]) {
                     //print(note);
                     //Math.floor((note.x - 70)/91)*(60/tempo)*1000;
                     //ok symbolab told me that to find note.x it's (91*note.start*tempo)/60000 + 70
                     let x = (92*note.start*tempo)/60000 + 70;
                     print(note.start, tempo, x, note.key, "erm...");
-                    let pRN = new ABSDraggable(x, ((131-note.key)*21), (note.beats*4)*23, 20, [154/255, 203/255, 164/255], pianoRollNoteDrag); //haha prn
+                    let pRN = new ABSDraggable(x, ((131-note.key)*21), (note.beats*4)*23, 20, channelColors[note.channel].map(val => val/255), pianoRollNoteDrag); //haha prn
                     pRN.key = note.key;
                     pRN.AltInteract = pianoRollNoteAlt;
                     pianoRollNotes.push(pRN);
@@ -415,4 +447,4 @@ const wc = CreateWindowClass("jbstudio", windowProc);
 wc.hbrBackground = COLOR_WINDOW+1;
 wc.hCursor = LoadCursor(NULL, IDC_ARROW);
 
-window = CreateWindow(WS_EX_OVERLAPPEDWINDOW, wc, "jbstudio3.js (use arrows to edit tempo)", WS_OVERLAPPEDWINDOW | WS_VISIBLE, CW_USEDEFAULT, CW_USEDEFAULT, width+20, height+42, NULL, NULL, hInstance);
+window = CreateWindow(WS_EX_OVERLAPPEDWINDOW, wc, "jbstudio3.js (use arrows to edit tempo)", WS_OVERLAPPEDWINDOW | WS_VISIBLE, CW_USEDEFAULT, CW_USEDEFAULT, width+20, height+42+20, NULL, NULL, hInstance);
