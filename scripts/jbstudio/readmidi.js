@@ -4,6 +4,7 @@
 //https://people.carleton.edu/~jellinge/m108f13/pages/04/04StandardMIDIFiles.html#:~:text=There%20are%20three%20types%20of%20track%20events%3A%201,event.%203%20Sysex%20Event%20-%20System%20Exclusive%20messages.
 //https://www.ccarh.org/courses/253/handout/vlv/
 //http://midi.teragonaudio.com/tech/midifile/vari.htm
+//https://sites.uci.edu/camp2014/2014/05/19/timing-in-midi-files/
 //filename = showOpenFilePicker({multiple: false,
 //    excludeAcceptAllOption: true,
 //    types: [

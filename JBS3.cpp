@@ -1205,6 +1205,7 @@ V8FUNC(BeepWrapper) {
 
 #include "Direct2D.h"
 #include "Direct2D11.h"
+#include "Canvas2DRenderingContext.h"
 #include "WICHelper.h"
 
 #pragma comment(lib, "d2d1.lib")
@@ -3182,6 +3183,7 @@ void GLAPIENTRY glMessageCallback(GLenum source, GLenum type, GLuint id, GLenum 
 }
 
 v8::Local<v8::ObjectTemplate> jsEffectOT;
+v8::Local<v8::ObjectTemplate> js2DRenderingContextCopy;
 
 V8FUNC(createCanvas) {
     using namespace v8;
@@ -9450,6 +9452,18 @@ void WStringFromPointer(const v8::FunctionCallbackInfo<v8::Value>& info) {
     info.GetReturnValue().Set(String::NewFromTwoByte(isolate, (const uint16_t*)IntegerFI(info[0])).ToLocalChecked());
 }
 
+V8FUNC(spawn) {
+    //OH YEAH lua(u) spawn use this at your own risk
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    Persistent<Function> func = Persistent<Function>(isolate, info[0].As<Function>());
+    std::thread f([=] { //
+        func.Get(isolate)->Call(isolate->GetCurrentContext(), isolate->GetCurrentContext()->Global(), 0, nullptr);
+    });
+    f.detach();
+}
+
 v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     using namespace v8;
 
@@ -9619,6 +9633,8 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
 
     setGlobal(StringFromPointer);
     setGlobal(WStringFromPointer);
+    setGlobal(spawn);
+
 
     setGlobalConst(WICBitmapTransformRotate0);
     setGlobalConst(WICBitmapTransformRotate90);
@@ -10671,6 +10687,74 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
 
     DIRECT2D::JSCreateEffect::HandleMyGoofyD2D1EffectsFromAnotherNamespace(isolate, jsEffectOT);
 
+    js2DRenderingContextCopy = ObjectTemplate::New(isolate);
+    js2DRenderingContextCopy->Set(isolate, "BeginDraw", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+        Isolate* isolate = info.GetIsolate();
+        Canvas2DRenderingContext* d2d = (Canvas2DRenderingContext*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+        d2d->d2dcontext->BeginDraw();
+    }));
+    js2DRenderingContextCopy->Set(isolate, "scale", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+        Isolate* isolate = info.GetIsolate();
+        Canvas2DRenderingContext* d2d = (Canvas2DRenderingContext*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+        d2d->currentTransform.Scale(FloatFI(info[0]), FloatFI(info[1]));
+        d2d->UpdateTransform();
+    }));
+    js2DRenderingContextCopy->Set(isolate, "rotate", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+        Isolate* isolate = info.GetIsolate();
+        Canvas2DRenderingContext* d2d = (Canvas2DRenderingContext*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+        d2d->currentTransform.Rotation(FloatFI(info[0]));
+        d2d->UpdateTransform();
+    }));
+    js2DRenderingContextCopy->Set(isolate, "translate", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+        Isolate* isolate = info.GetIsolate();
+        Canvas2DRenderingContext* d2d = (Canvas2DRenderingContext*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+        d2d->currentTransform.Translation(FloatFI(info[0]), FloatFI(info[1]));
+        d2d->UpdateTransform();
+    }));
+    js2DRenderingContextCopy->Set(isolate, "setTransform", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+        Isolate* isolate = info.GetIsolate();
+        Canvas2DRenderingContext* d2d = (Canvas2DRenderingContext*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+        
+        d2d->currentTransform = DIRECT2D::fromJSMatrix3x2(isolate, info[0].As<Object>());
+        d2d->UpdateTransform();
+    }));
+    js2DRenderingContextCopy->Set(isolate, "resetTransform", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+        Isolate* isolate = info.GetIsolate();
+        Canvas2DRenderingContext* d2d = (Canvas2DRenderingContext*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+        d2d->currentTransform = D2D1::Matrix3x2F::Identity();
+        d2d->UpdateTransform();
+    }));
+    //
+    js2DRenderingContextCopy->Set(isolate, "fillRect", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+        Isolate* isolate = info.GetIsolate();
+        Canvas2DRenderingContext* d2d = (Canvas2DRenderingContext*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+        const char* brush = CStringFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("fillStyle")).ToLocalChecked());
+        d2d->FindOrCreateBrush(brush); //https://html.spec.whatwg.org/multipage/canvas.html#serialisation-of-a-color
+        float x = FloatFI(info[0]);
+        float y = FloatFI(info[1]);
+        d2d->d2dcontext->FillRectangle(D2D1::RectF(x, y, x + FloatFI(info[2]), y + FloatFI(info[3])), d2d->colorBrushes[brush]);
+    }));
+    js2DRenderingContextCopy->Set(isolate, "strokeRect", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+        Isolate* isolate = info.GetIsolate();
+        Canvas2DRenderingContext* d2d = (Canvas2DRenderingContext*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+        const char* brush = CStringFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("strokeStyle")).ToLocalChecked());
+        d2d->FindOrCreateBrush(brush);
+        float x = FloatFI(info[0]);
+        float y = FloatFI(info[1]);
+        d2d->d2dcontext->DrawRectangle(D2D1::RectF(x, y, x + FloatFI(info[2]), y + FloatFI(info[3])), d2d->colorBrushes[brush]);
+    }));
+    js2DRenderingContextCopy->Set(isolate, "EndDraw", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+        Isolate* isolate = info.GetIsolate();
+        Canvas2DRenderingContext* d2d = (Canvas2DRenderingContext*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+        d2d->EndDraw(info[0]->BooleanValue(isolate));
+    }));
+
     setGlobal(createCanvas);
 
 #define ID2D1RenderTarget 0
@@ -11058,7 +11142,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInstance, char* nCmdList, int
     print(screenWidth << "x" << screenHeight);
     
 
-    CoInitialize(NULL);
+    ContIfFailed(CoInitialize(NULL), "COINITIALIZE FAILED????");
 
     //system("pause");
     //print(SetClassLongPtr(FindWindow(NULL, L"jbs"),          // window handle 

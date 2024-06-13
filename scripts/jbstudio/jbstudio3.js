@@ -7,6 +7,10 @@ let scrollWidth = 10000;
 let scrollPosX = 0;
 let i = 1;
 let tempo = 130;
+let playStart = 0;
+let playing = false;
+let playJ = 0;
+let sortedNotes;
 
 let pianoKeys = [];
 
@@ -194,7 +198,7 @@ function pianoRollNoteDrag(mouse) {
 
 function pianoRollNoteAlt(mouse) {
     pianoRollNotes.splice(pianoRollNotes.findIndex((note) => note.x == this.x && note.y == this.y), 1);
-    //oops this is causing a pseudo concurrent modification exception type problem where i don't draw the last note because i skip one after splicing (it's not a big enoug problem to fix LO!)
+    //oops this is causing a pseudo concurrent modification exception type problem where i don't draw the last note because i skip one after splicing (it's not a big enough problem to fix LO!)
 }
 
 function windowProc(hwnd, msg, wp, lp) {
@@ -261,7 +265,7 @@ function windowProc(hwnd, msg, wp, lp) {
 
         brush.SetColor(42/255, 58/255, 68/255);
         let dark = false;
-        for(let i = 4; i <= Math.floor(width/23)+2; i++) { //dang my math is brazy
+        for(let i = /*4*/0; i <= Math.floor(width/23); i++) { //dang my math is brazy
             if((i+1)%4 == 0) {
                 brush.SetColor(34/255, 50/255, 60/255);
                 dark = true;
@@ -298,6 +302,7 @@ function windowProc(hwnd, msg, wp, lp) {
             let note = new ABSDraggable(mouse.x, mouse.y, 4*23, 20, [158/255, 209/255, 165/255], pianoRollNoteDrag);
             //note.beats = 1;
             //note.key = 0;
+            note.channel = 0;
             note.AltInteract = pianoRollNoteAlt;
             pianoRollNotes.push(note);
             dragging = note;
@@ -307,6 +312,43 @@ function windowProc(hwnd, msg, wp, lp) {
         //d2d.FillRectangle(width-20, scrollPos, width, scrollPos+70, brush);
         brush.SetColor(1.0, 1.0, 1.0);
         d2d.DrawText("Tempo: "+tempo, biggerfont, width-200, 0, width-20, height, brush);
+
+        if(playing) {
+            let time = Date.now()-playStart;
+            let playheadX = ((92*time*tempo)/60000 + 70)-scrollPosX*scrollWidth;//(70+time)-scrollPosX*scrollWidth;
+            brush.SetColor(0.0, 1.0, 0.2);
+            d2d.DrawLine(playheadX, 0, playheadX, height, brush, 2);
+            if(time > sortedNotes[playJ].timing) {
+                Beep(tones[sortedNotes[playJ].key%12]*(2**Math.floor(sortedNotes[playJ].key/12)), sortedNotes[playJ].beats*(60/tempo)*(1000), true); //ok for some reason the thread created by beep crashes randomly
+                //spawn(() => {
+                //    Beep(tones[sortedNotes[playJ].key%12]*(2**Math.floor(sortedNotes[playJ].key/12)), sortedNotes[playJ].beats*(60/tempo)*(1000), false); //OK THIS CRASHED MORE OFTEN THAN BEEP(..., ..., true);
+                //});
+                //milliseconds.push(note.beats*(60/tempo)*(1000));
+                //hertz.push(tones[note.key%12]*(2**Math.floor(note.key/12)));
+                if(playJ > 0) {
+                    //print(playJ, sortedNotes[playJ-1]);
+                    //doing this is kinda weird because im not waiting for the note to end
+                    sortedNotes[playJ-1].color = channelColors[sortedNotes[playJ-1].channel].map(val => val/255);
+                }
+                sortedNotes[playJ].color = channelColors[10].map(val => val/255);
+                playJ++;
+                if(playJ >= sortedNotes.length) {
+                    playing = false;
+                }
+            }
+            ////while((Date.now() - start) < sorted.at(-1).timing+(sorted.at(-1).beats*(60/tempo)*(1000))) { //bruh i think the beeps are blocking the thread for so long that it runs out of time
+            //while(true) {
+            //    if((Date.now() - start) > sorted[j].timing) {
+            //        //print(hertz[j], milliseconds[j]);
+            //        Beep(hertz[j], milliseconds[j]); //, true);
+            //        j++;
+            //        if(j >= sorted.length) {
+            //            break;
+            //        }
+            //    }
+            //    Sleep(16);
+            //}
+        }
 
         d2d.EndDraw();
 
@@ -347,35 +389,41 @@ function windowProc(hwnd, msg, wp, lp) {
         }else if(wp == VK_DOWN || wp == VK_LEFT) {
             let mul = (GetKey(VK_SHIFT)) ? 1/5 : (GetKey(VK_CONTROL)) ? 10 : 1
             tempo -= 5*mul;
-        }else if(wp == VK_SPACE) {
+        }else if(wp == VK_SPACE && !playing) {
+            playing = true;
+            playStart = Date.now();
+            playJ = 0;
             //let ms = beats*(60/tempo)*(1000);
-            let milliseconds = [];
-            let hertz = [];
-            let sorted = pianoRollNotes.sort((noteL, noteR) => noteL.x - noteR.x); //ascending by x value
-
-            for(let note of sorted) {
+            //let milliseconds = [];
+            //let hertz = [];
+            sortedNotes = pianoRollNotes.sort((noteL, noteR) => noteL.x - noteR.x); //ascending by x value
+//
+            for(let note of sortedNotes) {
                 note.beats = note.width/92;
-                milliseconds.push(note.beats*(60/tempo)*(1000));
-                hertz.push(tones[note.key%12]*(2**Math.floor(note.key/12)));
-                note.timing = Math.floor((note.x - 70)/92)*(60/tempo)*1000;
+                //milliseconds.push(note.beats*(60/tempo)*(1000));
+                //hertz.push(tones[note.key%12]*(2**Math.floor(note.key/12)));
+                note.timing = /*Math.floor*/((note.x - 70)/92)*(60/tempo)*1000; //yo wait wtf i think my floor here is fucking it up
+                //print(note.timing);
             }
-
-            let j = 0;
-
-            let start = Date.now();
-
-            //while((Date.now() - start) < sorted.at(-1).timing+(sorted.at(-1).beats*(60/tempo)*(1000))) { //bruh i think the beeps are blocking the thread for so long that it runs out of time
-            while(true) {
-                if((Date.now() - start) > sorted[j].timing) {
-                    //print(hertz[j], milliseconds[j]);
-                    Beep(hertz[j], milliseconds[j]); //, true);
-                    j++;
-                    if(j >= sorted.length) {
-                        break;
-                    }
-                }
-                Sleep(16);
-            }
+            //print("Using asynchronous Beep(, , true); sometimes crashes jbs for some reason so watch out for that"); //wait running it in the debugger shows that d2d is actually crashing it
+//
+            //let j = 0;
+//
+            //let start = Date.now();
+            //print("start",start);
+//
+            ////while((Date.now() - start) < sorted.at(-1).timing+(sorted.at(-1).beats*(60/tempo)*(1000))) { //bruh i think the beeps are blocking the thread for so long that it runs out of time
+            //while(true) {
+            //    if((Date.now() - start) > sorted[j].timing) {
+            //        //print(hertz[j], milliseconds[j]);
+            //        Beep(hertz[j], milliseconds[j]); //, true);
+            //        j++;
+            //        if(j >= sorted.length) {
+            //            break;
+            //        }
+            //    }
+            //    Sleep(16);
+            //}
 
             //for(let i = 0; i < sorted.length; i++) {
             //    print(i, hertz[i], milliseconds[i]);
@@ -411,7 +459,8 @@ function windowProc(hwnd, msg, wp, lp) {
                 pianoRollNotes = [];
                 let midi = readMidi(file[0]);
                 tempo = midi[0];
-                scrollWidth = (92*(midi[1].at(-1).start)*tempo)/60000 + 70;
+                let maxX = 0;
+                //scrollWidth = (92*(midi[1].at(-1).start)*tempo)/60000 + 70;
                 //for(let i = midi[1].length-1; i > 0; i--) {
                 //    if(midi[1][i])
                 //}
@@ -423,12 +472,18 @@ function windowProc(hwnd, msg, wp, lp) {
                     print(note.start, tempo, x, note.key, "erm...");
                     let pRN = new ABSDraggable(x, ((131-note.key)*21), (note.beats*4)*23, 20, channelColors[note.channel].map(val => val/255), pianoRollNoteDrag); //haha prn
                     pRN.key = note.key;
+                    pRN.channel = note.channel;
                     pRN.AltInteract = pianoRollNoteAlt;
                     pianoRollNotes.push(pRN);
+                    if(x > maxX) {
+                        maxX = x;
+                    }
                 }
+                scrollWidth = maxX;
             }
         }else if(wp == 3) {
-            //uh idk yet
+            //uh idk yet about that yet
+            print(pianoRollNotes);
         }else if(wp == 4) {
             DestroyWindow(hwnd);
         }

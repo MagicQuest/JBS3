@@ -8,7 +8,7 @@
 
 using namespace Microsoft::WRL;
 
-class Direct2D11 : Direct2D
+class Direct2D11 : public Direct2D
 {
 public:
     ComPtr<ID3D11Device> d11device;
@@ -33,10 +33,6 @@ public:
     ComPtr<IDXGIOutputDuplication> pDuplication;
     ComPtr<IDXGIResource> pDesktopResource;
     //ComPtr<ID2D1Bitmap1> pDesktopBitmap;
-
-    Direct2D11() {
-
-    }
 
     bool Init(HWND window, int type);
 
