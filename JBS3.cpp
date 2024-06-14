@@ -10734,19 +10734,24 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
         Isolate* isolate = info.GetIsolate();
         Canvas2DRenderingContext* d2d = (Canvas2DRenderingContext*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
         const char* brush = CStringFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("fillStyle")).ToLocalChecked());
-        d2d->FindOrCreateBrush(brush); //https://html.spec.whatwg.org/multipage/canvas.html#serialisation-of-a-color
+        //d2d->FindOrCreateBrush(brush); //https://html.spec.whatwg.org/multipage/canvas.html#serialisation-of-a-color
+        //wait a sec i wrongly thought that if i changed the color of a brush before EndDraw it wouldn't work (idk why i thought this)
+        //d2d->UpdateFillBrush(brush);
+        d2d->fillBrush->SetColor(d2d->SerializeColor(brush));
         float x = FloatFI(info[0]);
         float y = FloatFI(info[1]);
-        d2d->d2dcontext->FillRectangle(D2D1::RectF(x, y, x + FloatFI(info[2]), y + FloatFI(info[3])), d2d->colorBrushes[brush]);
+        d2d->d2dcontext->FillRectangle(D2D1::RectF(x, y, x + FloatFI(info[2]), y + FloatFI(info[3])), d2d->fillBrush);//d2d->colorBrushes[brush]);
     }));
     js2DRenderingContextCopy->Set(isolate, "strokeRect", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
         Isolate* isolate = info.GetIsolate();
         Canvas2DRenderingContext* d2d = (Canvas2DRenderingContext*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
         const char* brush = CStringFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("strokeStyle")).ToLocalChecked());
-        d2d->FindOrCreateBrush(brush);
+        //d2d->FindOrCreateBrush(brush);
+        //d2d->UpdateStrokeBrush(brush);
+        d2d->strokeBrush->SetColor(d2d->SerializeColor(brush));
         float x = FloatFI(info[0]);
         float y = FloatFI(info[1]);
-        d2d->d2dcontext->DrawRectangle(D2D1::RectF(x, y, x + FloatFI(info[2]), y + FloatFI(info[3])), d2d->colorBrushes[brush]);
+        d2d->d2dcontext->DrawRectangle(D2D1::RectF(x, y, x + FloatFI(info[2]), y + FloatFI(info[3])), d2d->strokeBrush);//d2d->colorBrushes[brush]);
     }));
     js2DRenderingContextCopy->Set(isolate, "EndDraw", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
         Isolate* isolate = info.GetIsolate();

@@ -18,11 +18,18 @@ public:
 
 	std::vector<SaveState> stateStack;
 	D2D1::Matrix3x2F currentTransform;
-	std::map<std::string, ID2D1Brush*> colorBrushes;
+	ID2D1SolidColorBrush* fillBrush;
+	ID2D1SolidColorBrush* strokeBrush;
+	//std::map<std::string, ID2D1Brush*> colorBrushes;
 	void save(const v8::Local<v8::Object>&);
 	void restore(const v8::Local<v8::Object>&);
 	void UpdateTransform();
-	void FindOrCreateBrush(std::string);
+	//void FindOrCreateBrush(std::string);
+	//void UpdateFillBrush(const char*);
+	//void UpdateStrokeBrush(const char*);
+	D2D1_COLOR_F SerializeColor(std::string color);
+
+	bool Init(HWND window);
 
 	~Canvas2DRenderingContext() {
 		for (SaveState& state : stateStack) {
