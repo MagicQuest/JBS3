@@ -56,14 +56,15 @@
             tempo = (1000000*60)/parseInt(str, 16); //https://people.carleton.edu/~jellinge/m108f13/pages/04/04StandardMIDIFiles.html#:~:text=0%20%3D%20major%20key-,Tempo%20Meta%20Event,-Byte%201
             print(`tempo now ${tempo} at ${elapsedTime} ms in`);
         } //handle FF 03 event because it's fucking up on the beach at night (i'd include the midi file im talking about in jbs but im not gonna lie i have no idea where i got it (maybe i converted the starbound *.abc to midi somehow but that was a long time ago (apparently august 28th 2022))) (NOPE WHAT ACTUALLY HAPPENED IS I FOUND IT IN THE DESCRIPTION OF A RANDOM VIDEO! https://www.youtube.com/watch?v=cyxmIXhihg8) 
-        else if(event[2] == "03") {
+        else if(event[2] == "01" || event[2] == "02" || event[2] == "03") {
             let str = "";
             for(let i = 4; i < event.length; i++) { //skip past all the other info
                 str += String.fromCharCode(parseInt(event[i], 16));
             }
-            print(`track ${currentTrackNumber} using instrument ${str}`);
+            eventstr = {"01": "text event ->", "02": "copyright", "03": "name ->", "04": "is using instrument", "05": ""} //oh shoot 03 is actually the track name 04 is the instrument (why is fl studio doing it like that)
+            print(`track ${currentTrackNumber} ${eventstr[event[2]]} ${str}`);
         }else if(event[2] == "58") {
-            print("ignoring key signature event because idk how to handle allathat (basically assuming 4/4 idk)");
+            print("ignoring time signature event because idk how to handle allathat (basically assuming 4/4 idk)");
         }else if(event[2] == "2F") {
             print(`reached track end event of track ${currentTrackNumber}`);
             readingTrack = false;

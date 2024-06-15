@@ -5140,6 +5140,31 @@ V8FUNC(createCanvas) {
     else if (strcmp(contextType, "d3d") == 0 || strcmp(contextType, "direct3d") == 0 || strcmp(contextType, "directx") == 0) {
         print("d3d");
     }
+    else if (strcmp(contextType, "2d") == 0) {
+        Local<Context> c = isolate->GetCurrentContext();
+        Local<Object> renderingContext = js2DRenderingContextCopy->NewInstance(c).ToLocalChecked();
+        Canvas2DRenderingContext* d2d = new Canvas2DRenderingContext();
+
+        d2d->Init((HWND)IntegerFI(info[2]));
+        if (!info[3]->IsNullOrUndefined()) {
+            d2d->wicFactory = ((WICHelper*)IntegerFI(info[3].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()))->wicFactory;
+        }
+
+        renderingContext->Set(c, LITERAL("internalDXPtr"), Number::New(isolate, (LONG_PTR)d2d)); //lowkey should set these private but it PROBABLY doesn't matter just dont change it lol
+        renderingContext->Set(c, LITERAL("renderTarget"), Number::New(isolate, (LONG_PTR)d2d->renderTarget));
+        //context->Set(isolate, "type", info[1]);
+        print("TRENDERTARF< " << d2d->renderTarget);
+        
+        renderingContext->Set(c, LITERAL("backBitmap"), DIRECT2D::getBitmapImpl(isolate, d2d->d2dBackBitmap.Get())->NewInstance(c).ToLocalChecked());
+        renderingContext->Set(c, LITERAL("targetBitmap"), DIRECT2D::getBitmapImpl(isolate, d2d->d2dTargetBitmap.Get())->NewInstance(c).ToLocalChecked());
+
+        renderingContext->Set(c, LITERAL("fillStyle"), LITERAL("black"));
+        renderingContext->Set(c, LITERAL("strokeStyle"), LITERAL("black"));
+        renderingContext->Set(c, LITERAL("lineWidth"), Number::New(isolate, 1.0));
+
+        info.GetReturnValue().Set(renderingContext);
+        return;
+    }
     else if (strcmp(contextType, "gl") == 0 || strcmp(contextType, "webgl") == 0 || strcmp(contextType, "opengl") == 0) {
         HWND window = (HWND)IntegerFI(info[2]);
         //RECT r{}; GetClientRect(window, &r);
@@ -10686,6 +10711,8 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
     }));
 
     DIRECT2D::JSCreateEffect::HandleMyGoofyD2D1EffectsFromAnotherNamespace(isolate, jsEffectOT);
+    
+    Canvas2DRenderingContext::defineTemplates(isolate);
 
     js2DRenderingContextCopy = ObjectTemplate::New(isolate);
     js2DRenderingContextCopy->Set(isolate, "BeginDraw", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
@@ -10715,6 +10742,12 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
         d2d->currentTransform.Translation(FloatFI(info[0]), FloatFI(info[1]));
         d2d->UpdateTransform();
     }));
+    js2DRenderingContextCopy->Set(isolate, "getTransform", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+        Isolate* isolate = info.GetIsolate();
+        Canvas2DRenderingContext* d2d = (Canvas2DRenderingContext*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+        
+        info.GetReturnValue().Set(DIRECT2D::getMatrix3x2FImpl(isolate, d2d->currentTransform));
+    }));
     js2DRenderingContextCopy->Set(isolate, "setTransform", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
         Isolate* isolate = info.GetIsolate();
         Canvas2DRenderingContext* d2d = (Canvas2DRenderingContext*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
@@ -10730,6 +10763,12 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
         d2d->UpdateTransform();
     }));
     //
+    js2DRenderingContextCopy->Set(isolate, "clear", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+        Isolate* isolate = info.GetIsolate();
+        Canvas2DRenderingContext* d2d = (Canvas2DRenderingContext*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+        d2d->d2dcontext->Clear();
+    }));
     js2DRenderingContextCopy->Set(isolate, "fillRect", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
         Isolate* isolate = info.GetIsolate();
         Canvas2DRenderingContext* d2d = (Canvas2DRenderingContext*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
@@ -10751,7 +10790,70 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
         d2d->strokeBrush->SetColor(d2d->SerializeColor(brush));
         float x = FloatFI(info[0]);
         float y = FloatFI(info[1]);
-        d2d->d2dcontext->DrawRectangle(D2D1::RectF(x, y, x + FloatFI(info[2]), y + FloatFI(info[3])), d2d->strokeBrush);//d2d->colorBrushes[brush]);
+        d2d->d2dcontext->DrawRectangle(D2D1::RectF(x, y, x + FloatFI(info[2]), y + FloatFI(info[3])), d2d->strokeBrush, FloatFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("lineWidth")).ToLocalChecked()));//d2d->colorBrushes[brush]);
+    }));
+    js2DRenderingContextCopy->Set(isolate, "beginPath", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+        Isolate* isolate = info.GetIsolate();
+        Canvas2DRenderingContext* d2d = (Canvas2DRenderingContext*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+        /*info.GetReturnValue().Set(*/d2d->beginPath(isolate, D2D1::Point2F(FloatFI(info[0]), FloatFI(info[1])), D2D1_FIGURE_BEGIN_FILLED);//(D2D1_FIGURE_BEGIN)IntegerFI(info[2]));//);
+    }));
+    js2DRenderingContextCopy->Set(isolate, "moveTo", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+        Isolate* isolate = info.GetIsolate();
+        Canvas2DRenderingContext* d2d = (Canvas2DRenderingContext*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+        d2d->sink->EndFigure(D2D1_FIGURE_END_OPEN);
+        d2d->sink->BeginFigure(D2D1::Point2F(FloatFI(info[0]), FloatFI(info[1])), D2D1_FIGURE_BEGIN_FILLED);
+    }));
+    js2DRenderingContextCopy->Set(isolate, "lineTo", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+        Isolate* isolate = info.GetIsolate();
+        Canvas2DRenderingContext* d2d = (Canvas2DRenderingContext*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+        
+        d2d->sink->AddLine(D2D1::Point2F(FloatFI(info[0]), FloatFI(info[1])));
+    }));
+    js2DRenderingContextCopy->Set(isolate, "arc", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+        Isolate* isolate = info.GetIsolate();
+        Canvas2DRenderingContext* d2d = (Canvas2DRenderingContext*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+        float x = FloatFI(info[0]);
+        float y = FloatFI(info[1]);
+        float radius = FloatFI(info[2]);
+        //https://learn.microsoft.com/en-us/windows/win32/direct2d/path-geometries-overview
+        //https://stackoverflow.com/questions/13854168/how-to-draw-a-circle-with-id2d1pathgeometry
+        d2d->sink->AddArc(D2D1::ArcSegment(D2D1::Point2F(x+(radius*2), y), D2D1::SizeF(radius, radius), FloatFI(info[3]), info[5]->BooleanValue(isolate) ? D2D1_SWEEP_DIRECTION_COUNTER_CLOCKWISE : D2D1_SWEEP_DIRECTION_CLOCKWISE, D2D1_ARC_SIZE_SMALL));
+        d2d->sink->AddArc(D2D1::ArcSegment(D2D1::Point2F(x, y), D2D1::SizeF(radius, radius), FloatFI(info[3]), info[5]->BooleanValue(isolate) ? D2D1_SWEEP_DIRECTION_COUNTER_CLOCKWISE : D2D1_SWEEP_DIRECTION_CLOCKWISE, D2D1_ARC_SIZE_SMALL));
+    }));
+    js2DRenderingContextCopy->Set(isolate, "stroke", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+        Isolate* isolate = info.GetIsolate();
+        Canvas2DRenderingContext* d2d = (Canvas2DRenderingContext*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+        const char* brush = CStringFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("strokeStyle")).ToLocalChecked());
+        //d2d->FindOrCreateBrush(brush);
+        //d2d->UpdateStrokeBrush(brush);
+        
+        d2d->strokeBrush->SetColor(d2d->SerializeColor(brush));
+
+        d2d->closePath(D2D1_FIGURE_END_OPEN); //calling stroke leaves the path open
+
+        d2d->d2dcontext->DrawGeometry(d2d->path, d2d->strokeBrush, FloatFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("lineWidth")).ToLocalChecked()));
+    }));
+    js2DRenderingContextCopy->Set(isolate, "fill", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+        Isolate* isolate = info.GetIsolate();
+        Canvas2DRenderingContext* d2d = (Canvas2DRenderingContext*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+        const char* brush = CStringFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("fillStyle")).ToLocalChecked());
+        //d2d->FindOrCreateBrush(brush); //https://html.spec.whatwg.org/multipage/canvas.html#serialisation-of-a-color
+        //wait a sec i wrongly thought that if i changed the color of a brush before EndDraw it wouldn't work (idk why i thought this)
+        //d2d->UpdateFillBrush(brush);
+        d2d->fillBrush->SetColor(d2d->SerializeColor(brush));
+
+        d2d->closePath(D2D1_FIGURE_END_OPEN); //apparently it doesn't really matter how it's closed when drawing the filled version
+
+        d2d->d2dcontext->FillGeometry(d2d->path, d2d->fillBrush);
+    }));
+
+    js2DRenderingContextCopy->Set(isolate, "closePath", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+        Isolate* isolate = info.GetIsolate();
+        Canvas2DRenderingContext* d2d = (Canvas2DRenderingContext*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+        
+        d2d->closePath(D2D1_FIGURE_END_CLOSED);
     }));
     js2DRenderingContextCopy->Set(isolate, "EndDraw", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
         Isolate* isolate = info.GetIsolate();
@@ -10759,6 +10861,17 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
 
         d2d->EndDraw(info[0]->BooleanValue(isolate));
     }));
+    js2DRenderingContextCopy->Set(isolate, "Release", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+        Isolate* isolate = info.GetIsolate();
+        Canvas2DRenderingContext* d2d = (Canvas2DRenderingContext*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+        delete d2d;
+    }));
+
+    setGlobalConst(D2D1_FIGURE_BEGIN_FILLED);
+    setGlobalConst(D2D1_FIGURE_BEGIN_HOLLOW);
+    setGlobalConst(D2D1_FIGURE_END_OPEN);
+    setGlobalConst(D2D1_FIGURE_END_CLOSED);
 
     setGlobal(createCanvas);
 

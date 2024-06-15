@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>canvas 2d testing for jbs because i want to know how it handles stuff</title>
+</head>
+<body>
+    <canvas id="canvas" width="512" height="512" style="box-shadow: 5px 5px 10px red; margin: auto; left: 0; right: 0; position: absolute; cursor: pointer; border: 2px orange dotted">zesty ahh browser</canvas>
+    <script>
+        //elements with ids are defined on the global scope
+        const context = canvas.getContext('2d');
+
+        context.strokeStyle = "orange";
+        context.fillStyle = "purple";
+        context.lineWidth = 10;
+
+        context.beginPath();
+        context.strokeStyle = "red"; //oh ok i thought beginPath would be like save() in that i could change the strokeStyle and have it restore the original value on closePath
+        context.moveTo(100,100);
+        context.lineTo(canvas.width/2, 100);
+        context.lineTo(canvas.width/2, 300);
+        //context.closePath(); //oh shoot calling closePath closes the path
+        context.stroke(); //erm what the s
+        context.fill(); //erm what the s
+
+        context.beginPath();
+        //context.strokeStyle = "orange";
+        context.moveTo(400,400);
+        context.lineTo(canvas.width/2, 400);
+        context.lineTo(canvas.width/2, 500);
+        //context.closePath(); //oh shoot calling closePath closes the path
+        context.stroke(); //erm what the s
+        context.fill(); //erm what the s
+
+        context.beginPath();
+        context.moveTo(0, 300); //a split up path with moveTo won't fill or close
+        context.lineTo(50, 300);
+        context.moveTo(70, 300);
+        context.lineTo(70, 400);
+        context.closePath();
+        context.stroke();
+        context.fill();
+
+        let points = [];
+        let i = 0;
+        for(let j = 0; j < 4; j++) {
+            points.push({x: Math.random()*512, y: Math.random()*512, vx: (Math.random()-.5)*8, vy: (Math.random()-.5)*8});
+        }
+
+        function draw() { //i feel like requestAnimationFrame does a little bit more than schedule calls for drawing (how are you able to draw without having to call beginDraw (im saying that requestAnimationFrame is doing it internally! (but now that you mention it that can't be true, im pretty sure you can draw anytime (which i do right above this line))))
+            //context.clearRect(0, 0, canvas.width, canvas.height); //bruh 
+            context.strokeStyle = `rgb(${Math.abs(Math.sin(i/50))*255}, ${255-Math.abs(Math.sin(i/100))*255}, 255, 0.1)`;
+            context.beginPath();//points[0].x, points[0].y);//, D2D1_FIGURE_BEGIN_FILLED); //defaults to filled (now)
+            context.moveTo(points[0].x, points[0].y); //wait passing nothing for beginPath and immediately using a moveTo still doesn't let the path get filled... erm what the s
+            for(let point of points) {
+                point.x+=point.vx;
+                point.y+=point.vy;
+                if(point.x < 0 || point.x > 512) {
+                    point.vx = -point.vx;
+                    point.x = Math.max(Math.min(point.x, 512), 0);
+                }
+                if(point.y < 0 || point.y > 512) {
+                    point.vy = -point.vy;
+                    point.y = Math.max(Math.min(point.y, 512), 0);
+                }
+                context.lineTo(point.x, point.y);
+                context.arc(point.x, point.y, 5, 0, Math.PI*2);
+            }
+            context.closePath();
+            context.fillStyle = context.strokeStyle; //oops this wasn't working because i was accidently setting the strokeBrush's color instead
+            context.fill();
+            context.stroke();
+            
+            context.beginPath();
+            context.moveTo(64, 256+128);
+            context.arc(128+64, 256+128, 50, 0, Math.PI*2);
+            context.stroke();
+
+            i++;
+            requestAnimationFrame(draw);
+        }
+
+        requestAnimationFrame(draw);
+    </script>
+</body>
+</html>

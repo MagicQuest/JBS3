@@ -17,6 +17,11 @@
 //else { \
 //	MessageBoxA(NULL, msg, "Failed to FormatMessage (sorry man you're just gonna have to google the error code)", MB_OK | MB_SYSTEMMODAL); \
 //}
+#define LITERAL(cstr) String::NewFromUtf8Literal(isolate, cstr)
+#define CStringFI(e) *String::Utf8Value(isolate, e)
+#define WStringFI(e) (const wchar_t*)*String::Value(isolate, e)
+#define IntegerFI(e) e/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust()
+#define FloatFI(e) e.As<Number>()->Value()
 
 #define SusIfFailed(x,y) if(FAILED(x)) {MessageBoxA(NULL, (std::string("[")+std::to_string(x)+"]"+y).c_str(), _bstr_t(_com_error(GetLastError()).ErrorMessage()), MB_OK | MB_SYSTEMMODAL);return false;}
 #define ContIfFailed(x,y) if(FAILED(x)) {MessageBoxA(NULL, (std::string("[")+std::to_string(x)+"]"+y).c_str(), _bstr_t(_com_error(GetLastError()).ErrorMessage()), MB_OK);}

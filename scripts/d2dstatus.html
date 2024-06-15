@@ -127,6 +127,138 @@
             <li>SetTarget</li>
             <li class="NO">SetUnitMode</li>
         </ul>
+        <li>Canvas2DRenderingContext</li>
+        <ul>
+            <li class="NO">alpha</li>
+            <li class="NO">desynchronized</li>
+            <li class="NO">colorSpace</li>
+            <li class="NO">willReadFrequently</li>
+            <li class="NO">getContextAttributes()</li>
+            <li>save()</li>
+            <li>restore()</li>
+            <li class="NO">reset()</li>
+            <li class="NO">isContextLost()</li>
+            <li>scale(unrestricted double x, unrestricted double y)</li>
+            <li>rotate(unrestricted double angle)</li>
+            <li>translate(unrestricted double x, unrestricted double y)</li>
+            <li class="NO">transform(unrestricted double a, unrestricted double b, unrestricted double c, unrestricted double d, unrestricted double e, unrestricted double f)</li>
+            <li>getTransform()</li>
+            <li class="NO">setTransform(unrestricted double a, unrestricted double b, unrestricted double c, unrestricted double d, unrestricted double e, unrestricted double f)</li>
+            <li>setTransform(optional DOMMatrix2DInit transform = {})</li>
+            <li>resetTransform()</li>
+            <li class="NO">globalAlpha</li>
+            <li class="NO">globalCompositeOperation</li>
+            <li class="NO">imageSmoothingEnabled</li>
+            <li class="NO">imageSmoothingQuality</li>
+            <li>fillStyle</li>
+            <li>strokeStyle</li>
+            <li class="NO">createLinearGradient(double x0, double y0, double x1, double y1)</li>
+            <li class="NO">createRadialGradient(double x0, double y0, double r0, double x1, double y1, double r1)</li>
+            <li class="NO">createConicGradient(double startAngle, double x, double y)</li>
+            <li class="NO">createPattern(CanvasImageSource image, [LegacyNullToEmptyString] DOMString repetition)</li>
+            <li class="NO">shadowOffsetX</li>
+            <li class="NO">shadowOffsetY</li>
+            <li class="NO">shadowBlur</li>
+            <li class="NO">shadowColor</li>
+            <li class="NO">filter</li>
+            <li class="NO">clearRect(unrestricted double x, unrestricted double y, unrestricted double w, unrestricted double h)</li>
+            <li>fillRect(unrestricted double x, unrestricted double y, unrestricted double w, unrestricted double h)</li>
+            <li>strokeRect(unrestricted double x, unrestricted double y, unrestricted double w, unrestricted double h)</li>
+            <li>beginPath()</li>
+            <li>fill(optional CanvasFillRule fillRule = "nonzero")</li>
+            <li class="NO">fill(Path2D path, optional CanvasFillRule fillRule = "nonzero")</li>
+            <li>stroke()</li>
+            <li class="NO">stroke(Path2D path)</li>
+            <li class="NO">clip(optional CanvasFillRule fillRule = "nonzero")</li>
+            <li class="NO">clip(Path2D path, optional CanvasFillRule fillRule = "nonzero")</li>
+            <li class="NO">isPointInPath(unrestricted double x, unrestricted double y, optional CanvasFillRule fillRule = "nonzero")</li>
+            <li class="NO">isPointInPath(Path2D path, unrestricted double x, unrestricted double y, optional CanvasFillRule fillRule = "nonzero")</li>
+            <li class="NO">isPointInStroke(unrestricted double x, unrestricted double y)</li>
+            <li class="NO">isPointInStroke(Path2D path, unrestricted double x, unrestricted double y)</li>
+            <li class="NO">drawFocusIfNeeded(Element element)</li>
+            <li class="NO">drawFocusIfNeeded(Path2D path, Element element)</li>
+            <li class="NO">scrollPathIntoView()</li>
+            <li class="NO">scrollPathIntoView(Path2D path)</li>
+            <li class="NO">fillText(DOMString text, unrestricted double x, unrestricted double y, optional unrestricted double maxWidth)</li>
+            <li class="NO">strokeText(DOMString text, unrestricted double x, unrestricted double y, optional unrestricted double maxWidth)</li>
+            <li class="NO">measureText(DOMString text)</li>
+            <li class="NO">drawImage(CanvasImageSource image, unrestricted double dx, unrestricted double dy)</li>
+            <li class="NO">drawImage(CanvasImageSource image, unrestricted double dx, unrestricted double dy, unrestricted double dw, unrestricted double dh)</li>
+            <li class="NO">drawImage(CanvasImageSource image, unrestricted double sx, unrestricted double sy, unrestricted double sw, unrestricted double sh, unrestricted double dx, unrestricted double dy, unrestricted double dw, unrestricted double dh)</li>
+            <li class="NO">createImageData([EnforceRange] long sw, [EnforceRange] long sh, optional ImageDataSettings settings = {})</li>
+            <li class="NO">createImageData(ImageData imagedata)</li>
+            <li class="NO">getImageData([EnforceRange] long sx, [EnforceRange] long sy, [EnforceRange] long sw, [EnforceRange] long sh, optional ImageDataSettings settings = {})</li>
+            <li class="NO">putImageData(ImageData imagedata, [EnforceRange] long dx, [EnforceRange] long dy)</li>
+            <li class="NO">putImageData(ImageData imagedata, [EnforceRange] long dx, [EnforceRange] long dy, [EnforceRange] long dirtyX, [EnforceRange] long dirtyY, [EnforceRange] long dirtyWidth, [EnforceRange] long dirtyHeight)</li>
+            <li>lineWidth</li>
+            <li class="NO">lineCap</li>
+            <li class="NO">lineJoin</li>
+            <li class="NO">miterLimit</li>
+            <li class="NO">setLineDash(sequence<unrestricted double> segments)</li>
+            <li class="NO">getLineDash()</li>
+            <li class="NO">lineDashOffset</li>
+            <li class="NO">font</li>
+            <li class="NO">textAlign</li>
+            <li class="NO">textBaseline</li>
+            <li class="NO">direction</li>
+            <li class="NO">letterSpacing</li>
+            <li class="NO">fontKerning</li>
+            <li class="NO">fontStretch</li>
+            <li class="NO">fontVariantCaps</li>
+            <li class="NO">textRendering</li>
+            <li class="NO">wordSpacing</li>
+            <li>closePath()</li>
+            <li>moveTo(unrestricted double x, unrestricted double y)</li>
+            <li>lineTo(unrestricted double x, unrestricted double y)</li>
+            <li class="NO">quadraticCurveTo(unrestricted double cpx, unrestricted double cpy, unrestricted double x, unrestricted double y)</li>
+            <li class="NO">bezierCurveTo(unrestricted double cp1x, unrestricted double cp1y, unrestricted double cp2x, unrestricted double cp2y, unrestricted double x, unrestricted double y)</li>
+            <li class="NO">arcTo(unrestricted double x1, unrestricted double y1, unrestricted double x2, unrestricted double y2, unrestricted double radius)</li>
+            <li class="NO">rect(unrestricted double x, unrestricted double y, unrestricted double w, unrestricted double h)</li>
+            <li class="NO">roundRect(unrestricted double x, unrestricted double y, unrestricted double w, unrestricted double h, optional (unrestricted double or DOMPointInit or sequence<(unrestricted double or DOMPointInit)>) radii = 0)</li>
+            <li class="UNTESTED">arc(unrestricted double x, unrestricted double y, unrestricted double radius, unrestricted double startAngle, unrestricted double endAngle, optional boolean counterclockwise = false)</li>
+            <li class="NO">ellipse(unrestricted double x, unrestricted double y, unrestricted double radiusX, unrestricted double radiusY, unrestricted double rotation, unrestricted double startAngle, unrestricted double endAngle, optional boolean counterclockwise = false)</li>
+            <li>CanvasGradient</li>
+            <ul>
+                <li class="NO">addColorStop(double offset, DOMString color)</li>
+            </ul>
+            <li>CanvasPattern</li>
+            <ul>
+                <li class="NO">setTransform(optional DOMMatrix2DInit transform = {})</li>
+            </ul>
+            <li>TextMetrics</li>
+            <ul>
+                <li class="NO">width</li>
+                <li class="NO">actualBoundingBoxLeft</li>
+                <li class="NO">actualBoundingBoxRight</li>
+                <li class="NO">fontBoundingBoxAscent</li>
+                <li class="NO">fontBoundingBoxDescent</li>
+                <li class="NO">actualBoundingBoxAscent</li>
+                <li class="NO">actualBoundingBoxDescent</li>
+                <li class="NO">emHeightAscent</li>
+                <li class="NO">emHeightDescent</li>
+                <li class="NO">hangingBaseline</li>
+                <li class="NO">alphabeticBaseline</li>
+                <li class="NO">ideographicBaseline</li>
+            </ul>
+            <li>ImageDataSettings</li>
+            <ul>
+                <li class="NO">colorSpace</li>
+            </ul>
+            <li>ImageData</li>
+            <ul>
+                <li class="NO">constructor(unsigned long sw, unsigned long sh, optional ImageDataSettings settings = {});</li>
+                <li class="NO">constructor(Uint8ClampedArray data, unsigned long sw, optional unsigned long sh, optional ImageDataSettings settings = {});</li>
+                <li class="NO">width</li>
+                <li class="NO">height</li>
+                <li class="NO">data</li>
+                <li class="NO">colorSpace</li>
+            </ul>
+            <li>Path2D</li>
+            <ul>
+                <li class="NO">constructor(optional (Path2D or DOMString) path);</li>
+                <li class="NO">addPath(Path2D path, optional DOMMatrix2DInit transform = {})</li>
+            </ul>
+        </ul>
         <li>ID2D1SolidColorBrush</li>
         <ul>
             <li>SetOpacity</li>

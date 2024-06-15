@@ -3,7 +3,9 @@
 using namespace v8;
 
 bool Canvas2DRenderingContext::Init(HWND window) {
-	((Direct2D11*)this)->Init(window, 3); //lmao
+	((Direct2D11*)this)->Init(window, 3); //lmao (wait is Init virtual?)
+	std::cout << "this trenderf type " << this->type << " " << this->textfactory << std::endl;
+	SusIfFailed(this->factory->CreatePathGeometry(&this->path), "ID2D1Factory7->CreatePathGeometry failed (Canvas2DRenderingContext)");
 	SusIfFailed(this->d2dcontext->CreateSolidColorBrush(D2D1::ColorF(0, 0, 0, 1.0), &this->fillBrush), "Canvas2DRenderingContext failed to create fillStyleBrush");
 	SusIfFailed(this->d2dcontext->CreateSolidColorBrush(D2D1::ColorF(0, 0, 0, 1.0), &this->strokeBrush), "Canvas2DRenderingContext failed to create strokeStyleBrush");
 
@@ -33,4 +35,104 @@ void Canvas2DRenderingContext::restore(const Local<Object>& jsObj) {
 
 D2D1_COLOR_F Canvas2DRenderingContext::SerializeColor(std::string color) {
 	//https://html.spec.whatwg.org/multipage/canvas.html#serialisation-of-a-color
+	//regex for rgb/rgba /[0-9.]+/g
+	D2D1_COLOR_F retColor{0, 0, 0, 1.0};
+	//std::cout << color << " " << color.rfind("rgb", 0) << std::endl;
+	if (color.rfind("rgb", 0) == 0) {
+		//regex time
+		//std::string::const_iterator text_iter = color.cbegin();
+		//std::smatch results; //(wrong)
+		//while (std::regex_search(text_iter, color.end(), results, r)) //wtf is results bruh i don't know
+		//{
+		//	int count = results.size();
+		//	
+		//
+		//	std::cout << std::string(results[0].first, results[0].second) << std::endl;
+		//	text_iter = results[0].second;
+		//}
+
+		std::string color2(color); //(unfortunately)
+		std::smatch m;
+		//std::regex_search(color, m, r);
+		float c[4]{ 0.0, 0.0, 0.0, 1.0 };//{1.0}; //oh i thought this would set every element to 1.0? (damn it just doesn't work like that)
+		int i = 0;
+		//for (std::ssub_match v : m) {
+		while (std::regex_search(color2, m, rgbregex)) {
+			//aw i thought i could access a struct like retColor[0] but nope (but i can cheat with pointers! (but the google says that's a bad idea))
+			float v = std::stof(std::string(m[0].first, m[0].second));
+			if (i < 3) { //4th value is 0 - 1 (for some reason)
+				v /= 255.f;
+			}
+			c[i] = v;
+			//std::cout << v << " ERM" << std::endl;
+			color2 = m.suffix().str();
+			i++;
+		}
+		retColor = {c[0], c[1], c[2], c[3]};
+	}
+	else if (color[0] == '#') {
+		//wow the cppreference for regex dropped the expression for hex color (https://en.cppreference.com/w/cpp/regex/regex_search)
+		//lmao https://puzzling.stackexchange.com/questions/127064/unpaired-socks-in-my-lap
+		std::smatch m;
+		float c[3]{ 0.0, 0.0, 0.0 };
+		if (std::regex_search(color, m, hexregex))
+		{
+			for (std::size_t i = 1; i < m.size(); ++i) {//idgaf about the first element
+				c[i - 1] = ((float)std::stoi(m[i].str(), nullptr, 16)) / 255.f;
+				//std::cout << i << ": " << m[i] << '\n';
+			}
+		}
+		retColor = { c[0], c[1], c[2], 1.0 };
+	}
+	//std::cout << retColor.r << " " << retColor.g << " " << retColor.b << " " << retColor.a << std::endl;
+	return retColor;
+}
+
+Local<ObjectTemplate> Canvas2DRenderingContext::jsPathTemplate;
+void Canvas2DRenderingContext::defineTemplates(Isolate* isolate) {
+	Canvas2DRenderingContext::jsPathTemplate = ObjectTemplate::New(isolate);
+
+	jsPathTemplate->Set(isolate, "Release", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+        Isolate* isolate = info.GetIsolate();
+		ID2D1PathGeometry1* path = (ID2D1PathGeometry1*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+		ID2D1GeometrySink* sink = (ID2D1GeometrySink*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalSinkPtr")).ToLocalChecked());
+		
+		sink->Release();
+		path->Release();
+    }));
+}
+
+Local<Object> Canvas2DRenderingContext::getJSPathImpl(Isolate* isolate, ID2D1PathGeometry1* path, ID2D1GeometrySink* sink) {
+	Local<Context> context = isolate->GetCurrentContext();
+	Local<Object> jsPath = jsPathTemplate->NewInstance(context).ToLocalChecked();
+	jsPath->Set(context, LITERAL("internalPtr"), Number::New(isolate, (LONG_PTR)path));
+	///ID2D1GeometrySink* sink;
+	///ContIfFailed(path->Open(&sink), "ID2D1PathGeometry1->Open failed! Most path functions will not work on this object! (beginPath[->]getJSPathImpl stacktrace)");
+	jsPath->Set(context, LITERAL("internalSinkPtr"), Number::New(isolate, (LONG_PTR)sink));
+
+	return jsPath;
+}
+
+/*Local<Object>*/void Canvas2DRenderingContext::beginPath(Isolate* isolate, D2D1_POINT_2F point, D2D1_FIGURE_BEGIN fill) {
+	//ID2D1PathGeometry1* path;
+	//ID2D1GeometrySink* sink;
+	//aw i thought i didn't have to create them every time
+	SafeRelease(path);
+	SafeRelease(sink);
+
+	RetIfFailed(this->factory->CreatePathGeometry(&this->path), "ID2D1Factory7->CreatePathGeometry failed (beginPath Canvas2DRenderingContext)");
+	//if (this->sink == nullptr) {
+	RetIfFailed(path->Open(&this->sink), "ID2D1PathGeometry1->Open failed! (beginPath Canvas2DRenderingContext)"); //wait can you reopen the same one? (no.)
+	//}
+	sink->BeginFigure(point, fill);
+	//Local<Object> jsPathGeo = Canvas2DRenderingContext::jsPathTemplate->NewInstance(isolate->GetCurrentContext()).ToLocalChecked();
+	//return getJSPathImpl(isolate, path, sink);
+}
+
+void Canvas2DRenderingContext::closePath(D2D1_FIGURE_END end) {
+	if (sink != nullptr) {
+		sink->EndFigure(end);
+		RetIfFailed(sink->Close(), "Failed to Close() ID2D1GeometrySink (closePath)");
+		SafeRelease(sink);
+	}
 }
