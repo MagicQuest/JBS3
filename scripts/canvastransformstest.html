@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>canvas 2d testing for jbs because i want to know how it handles stuff</title>
+</head>
+<body>
+    <canvas id="canvas" width="512" height="512" style="box-shadow: 5px 5px 10px red; margin: auto; left: 0; right: 0; position: absolute; cursor: pointer; border: 2px orange dotted">zesty ahh browser</canvas>
+    <script>
+        //elements with ids are defined on the global scope (window)
+        const context = canvas.getContext('2d');
+
+
+        let i = 0;
+
+        function printTransform(t) {
+            console.log(`m11: ${t.m11} m12: ${t.m12} m13: ${t.m13}\nm21: ${t.m21} m22: ${t.m22} m23: ${t.m23}\nm31: ${t.m31} m32: ${t.m32} m33: ${t.m33}\nm41: ${t.m41} m42: ${t.m42} m43: ${t.m43}`);
+        }
+
+        function draw() {
+            context.fillRect(0, 0, canvas.width, canvas.height); //bruh 
+
+            //beautiful big titty naked women just don't fall out the sky ya know
+            context.save();
+            
+            context.fillStyle = "#00FF00";
+
+            context.scale(2, 2);
+            context.translate(canvas.width/2, canvas.height/2);
+            printTransform(context.getTransform());
+            //context.rotate(i/Math.PI);
+            context.fillRect(25/-2, 25/-2, 25, 25);
+
+            context.save();
+
+            context.translate(50, 0);
+            context.fillRect(25/-2, 25/-2, 25, 25);
+
+            context.restore();
+
+            context.restore();
+
+            i++;
+            requestAnimationFrame(draw);
+        }
+
+        requestAnimationFrame(draw);
+    </script>
+</body>
+</html>

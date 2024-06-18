@@ -8,13 +8,19 @@ bool Canvas2DRenderingContext::Init(HWND window) {
 	SusIfFailed(this->factory->CreatePathGeometry(&this->path), "ID2D1Factory7->CreatePathGeometry failed (Canvas2DRenderingContext)");
 	SusIfFailed(this->d2dcontext->CreateSolidColorBrush(D2D1::ColorF(0, 0, 0, 1.0), &this->fillBrush), "Canvas2DRenderingContext failed to create fillStyleBrush");
 	SusIfFailed(this->d2dcontext->CreateSolidColorBrush(D2D1::ColorF(0, 0, 0, 1.0), &this->strokeBrush), "Canvas2DRenderingContext failed to create strokeStyleBrush");
-
+	this->currentTransform = D2D1::Matrix3x2F::Identity();
 }
 
-void Canvas2DRenderingContext::save(const Local<Object>& jsObj) {
-	SaveState newState{0, };
+void Canvas2DRenderingContext::save(const Local<Object>& info) {
+	SaveState newState{};
+	Isolate* isolate = info->GetIsolate();
 	RetIfFailed(this->factory->CreateDrawingStateBlock(D2D1::DrawingStateDescription(), &newState.realState), "failed to CreateDrawingStateBlock");
 	this->d2dcontext->SaveDrawingState(newState.realState);
+	newState.fillcolor = CStringFI(info->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("fillStyle")).ToLocalChecked());
+	newState.strokecolor = CStringFI(info->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("strokeStyle")).ToLocalChecked());
+	newState.font = CStringFI(info->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("font")).ToLocalChecked());
+	newState.lineWidth = FloatFI(info->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("lineWidth")).ToLocalChecked());
+	//newState.font
 	this->stateStack.push_back(newState);
 }
 
@@ -22,10 +28,19 @@ void Canvas2DRenderingContext::UpdateTransform() {
 	this->d2dcontext->SetTransform(currentTransform);
 }
 
-void Canvas2DRenderingContext::restore(const Local<Object>& jsObj) {
+void Canvas2DRenderingContext::restore(const Local<Object>& info) {
 	//bruh pop_back doesn't return anything i thought it wouold be like js
+	std::cout << this->stateStack.size() - 1 << " stateStack" << std::endl;
 	SaveState state = this->stateStack[this->stateStack.size() - 1];
+	Isolate* isolate = info->GetIsolate();
 	this->d2dcontext->RestoreDrawingState(state.realState);
+	state.realState->Release(); //oops forgot that
+	this->d2dcontext->GetTransform(&this->currentTransform); //oh yeah forgot that too
+	
+	info->Set(isolate->GetCurrentContext(), LITERAL("fillStyle"), String::NewFromOneByte(isolate, (const uint8_t*)state.fillcolor.c_str()).ToLocalChecked());
+	info->Set(isolate->GetCurrentContext(), LITERAL("strokeStyle"), String::NewFromOneByte(isolate, (const uint8_t*)state.strokecolor.c_str()).ToLocalChecked());
+	info->Set(isolate->GetCurrentContext(), LITERAL("font"), String::NewFromOneByte(isolate, (const uint8_t*)state.font.c_str()).ToLocalChecked());
+	info->Set(isolate->GetCurrentContext(), LITERAL("lineWidth"), Number::New(isolate, state.lineWidth));
 	this->stateStack.pop_back();
 }
 
@@ -70,19 +85,27 @@ D2D1_COLOR_F Canvas2DRenderingContext::SerializeColor(std::string color) {
 		}
 		retColor = {c[0], c[1], c[2], c[3]};
 	}
-	else if (color[0] == '#') {
+	else if (color[0] == '#') { //for some reason the spec specifically mentions that the hex should be in lowercase for some reason but in html canvas it actually doesn't matter
+		//here's what the google says for string to lower
+		std::transform(color.begin(), color.end(), color.begin(),
+			[](unsigned char c) { return std::tolower(c); });
+
 		//wow the cppreference for regex dropped the expression for hex color (https://en.cppreference.com/w/cpp/regex/regex_search)
 		//lmao https://puzzling.stackexchange.com/questions/127064/unpaired-socks-in-my-lap
 		std::smatch m;
 		float c[3]{ 0.0, 0.0, 0.0 };
 		if (std::regex_search(color, m, hexregex))
 		{
-			for (std::size_t i = 1; i < m.size(); ++i) {//idgaf about the first element
+			for (std::size_t i = 1; i < m.size(); ++i) {//[idgaf] about the first element
 				c[i - 1] = ((float)std::stoi(m[i].str(), nullptr, 16)) / 255.f;
 				//std::cout << i << ": " << m[i] << '\n';
 			}
 		}
 		retColor = { c[0], c[1], c[2], 1.0 };
+	}
+	else {
+		//imma find a list of the css names for colors or whatever soon
+
 	}
 	//std::cout << retColor.r << " " << retColor.g << " " << retColor.b << " " << retColor.a << std::endl;
 	return retColor;

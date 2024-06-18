@@ -53,8 +53,8 @@ function windowProc(hwnd, msg, wp, lp) {
         //context.fill();
 
         context.strokeStyle = `rgb(${Math.abs(Math.sin(i/50))*255}, ${255-Math.abs(Math.sin(i/100))*255}, 255)`;
-        context.beginPath(points[0].x, points[0].y);//points[0].x, points[0].y);//, D2D1_FIGURE_BEGIN_FILLED); //defaults to filled (now)
-        //context.moveTo(points[0].x, points[0].y); //wait passing nothing for beginPath and immediately using a moveTo still doesn't let the path get filled... erm what the s
+        context.beginPath(points[0].x, points[0].y);//, D2D1_FIGURE_BEGIN_FILLED); //defaults to filled (now)
+        //context.moveTo(points[0].x, points[0].y); //wait passing nothing for beginPath and immediately using a moveTo still doesn't let the path get filled... erm what the s (wait maybe if i use a different d2d1 fill mode)
         for(let point of points) {
             point.x+=point.vx;
             point.y+=point.vy;

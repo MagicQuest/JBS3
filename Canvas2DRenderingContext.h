@@ -15,15 +15,15 @@ static std::regex hexregex("#([a-f0-9]{2})"
 						      "([a-f0-9]{2})"
 							  "([a-f0-9]{2})");
 
-class Canvas2DRenderingContext : public Direct2D11 //wait wtf???
+class Canvas2DRenderingContext : public Direct2D11 //wait wtf public???
 {
 public:
 	struct SaveState {
 		ID2D1DrawingStateBlock* realState;
-		const char* brushcolor;
-		const char* strokecolor;
-		const char* font;
-		int lineWidth;
+		std::string fillcolor; //v8 gets weird when storing c-strings
+		std::string strokecolor;
+		std::string font;
+		float lineWidth;
 	};
 
 	std::vector<SaveState> stateStack;
@@ -53,5 +53,11 @@ public:
 			state.realState->Release();
 		}
 		stateStack.clear();
+		
+		SafeRelease(fillBrush);
+		SafeRelease(strokeBrush);
+
+		SafeRelease(path);
+		SafeRelease(sink);
 	}
 };

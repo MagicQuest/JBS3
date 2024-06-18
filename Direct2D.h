@@ -5,6 +5,7 @@
 #include <wincodec.h>
 #include <dwrite_3.h>
 #include "goodmacrosfordirect2dandwichelper.h"
+//#include <iostream>
 //#include <v8.h>
 
 //using namespace v8;
@@ -44,10 +45,11 @@ public:
 	}
 
 	~Direct2D() {
+		//std::cout << "d2d -> " << factory << " " << renderTarget << " " << textfactory << " " << clearBrush << " " << drawingStateBlock << std::endl;
 		if (factory != nullptr) {
 			factory->Release();
 		}
-		if (renderTarget != nullptr) {
+		if (this->type < 2 && renderTarget != nullptr) { //direct2d11 (ID2D1DeviceContext) and up use com ptrs which get mad when you try to release them (lol i only just now tried to fix this)
 			renderTarget->Release();
 		}
 		if (textfactory != nullptr) {
