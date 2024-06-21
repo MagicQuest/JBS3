@@ -73,10 +73,13 @@ function windowProc(hwnd, msg, wp, lp) {
 
         context.fillStyle = "#00ff00";
         
-        context.scale(2, 2);
+        //context.scale(2, 2);
         context.translate(width/2+i, height/2);
-        //context.rotate(i/(Math.PI*2));
+        context.rotate(i/(Math.PI*2));
 
+        context.fillRect(25/-2, 25/-2, 25, 25);
+
+        context.translate(50, 0);
         context.fillRect(25/-2, 25/-2, 25, 25);
 
         context.restore();

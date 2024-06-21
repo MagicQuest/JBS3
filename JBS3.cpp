@@ -9773,7 +9773,7 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
 
     setGlobal(StringFromPointer);
     setGlobal(WStringFromPointer);
-    setGlobal(spawn);
+    setGlobal(spawn); //gulp
 
 
     setGlobalConst(WICBitmapTransformRotate0);
@@ -9782,7 +9782,7 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     setGlobalConst(WICBitmapTransformRotate270);
     setGlobalConst(WICBitmapTransformFlipHorizontal);
     setGlobalConst(WICBitmapTransformFlipVertical);
-    setGlobalConst(WICBITMAPTRANSFORMOPTIONS_FORCE_DWORD);
+    setGlobalConst(WICBITMAPTRANSFORMOPTIONS_FORCE_DWORD); //i should probably get rid of all the FORCE_DWORDs
 
     setGlobalConst(WICBitmapInterpolationModeNearestNeighbor);
     setGlobalConst(WICBitmapInterpolationModeLinear);
@@ -10860,7 +10860,16 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
         D2D1_POINT_2F tp = d2d->currentTransform.TransformPoint(D2D1_POINT_2F{ 0.0, 0.0 });
         print(tp.x << " " << tp.y << " rotation");
 #define PI 3.14159265358979323846
+        double theta = FloatFI(info[0]);
         d2d->currentTransform = d2d->currentTransform * D2D1::Matrix3x2F::Rotation((FloatFI(info[0])*180)/PI, tp); //d2d rotation is in degrees? html canvas is in radians
+        //d2d->currentTransform._11 = cos(theta); //well if this worked it would've been great but idk how tf they implement these functions https://math.stackexchange.com/questions/2093314/rotation-matrix-of-rotation-around-a-point-other-than-the-origin
+        //d2d->currentTransform._21 = -sin(theta);
+        //d2d->currentTransform._12 = sin(theta);
+        //d2d->currentTransform._22 = cos(theta);
+        ////FLOAT x = tp.x;//d2d->currentTransform._31;
+        ////FLOAT y = tp.y;//d2d->currentTransform._32;
+        ////d2d->currentTransform._31 = -x * cos(theta) + y * sin(theta) + x;
+        ////d2d->currentTransform._32 = -x * sin(theta) - y * cos(theta) + y;
         d2d->UpdateTransform();
     }));
     js2DRenderingContextCopy->Set(isolate, "translate", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
@@ -10879,8 +10888,8 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
         //else {
         //    d2d->currentTransform = d2d->currentTransform * transformation; //aw dammn this is the kinda thing where you'd add the matricies instead of multiply (and there is no overload for that)
         //}
-        d2d->currentTransform._31 += FloatFI(info[0]); //oh god im starting to think i might have to do all this matrix shit myself (i actually might give up)
-        d2d->currentTransform._32 += FloatFI(info[1]);
+        d2d->currentTransform._31 += FloatFI(info[0])*d2d->currentTransform._11; //oh god im starting to think i might have to do all this matrix shit myself (i actually might give up)
+        d2d->currentTransform._32 += FloatFI(info[1])*d2d->currentTransform._22;
         d2d->UpdateTransform();
     }));
     js2DRenderingContextCopy->Set(isolate, "getTransform", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {

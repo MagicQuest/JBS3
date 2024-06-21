@@ -26,23 +26,23 @@
             
             context.fillStyle = "#00FF00";
 
-            context.scale(2, 2);
-            context.translate(canvas.width/2, canvas.height/2);
-            printTransform(context.getTransform());
-            //context.rotate(i/Math.PI);
+            //context.scale(2, 2);
+            context.translate(canvas.width/2/*+i*/, canvas.height/2);
+            context.rotate(i/(Math.PI*2));
             context.fillRect(25/-2, 25/-2, 25, 25);
-
-            context.save();
-
+            
+            //context.save();
+            
             context.translate(50, 0);
+            printTransform(context.getTransform());
             context.fillRect(25/-2, 25/-2, 25, 25);
 
-            context.restore();
+            //context.restore();
 
             context.restore();
 
             i++;
-            requestAnimationFrame(draw);
+            i < 11 && requestAnimationFrame(draw);
         }
 
         requestAnimationFrame(draw);
