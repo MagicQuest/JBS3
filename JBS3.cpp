@@ -9604,6 +9604,62 @@ V8FUNC(spawn) {
     f.detach();
 }
 
+std::map<HWINEVENTHOOK, std::function<void(HWINEVENTHOOK, DWORD, HWND, LONG, LONG, DWORD, DWORD)>> eventProcMap; //thanks chatgpt!!!
+
+void CALLBACK HandleWinEventHookShit(HWINEVENTHOOK hook, DWORD event, HWND hwnd,
+    LONG idObject, LONG idChild,
+    DWORD dwEventThread, DWORD dwmsEventTime)
+{
+    eventProcMap[hook](hook, event, hwnd, idObject, idChild, dwEventThread, dwmsEventTime);
+}
+
+V8FUNC(SetWinEventHookWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    HWINEVENTHOOK g_hook; //OH SHIT HRLL EAH
+
+    g_hook = SetWinEventHook(
+        IntegerFI(info[0]), IntegerFI(info[1]),
+        (HMODULE)IntegerFI(info[2]),
+        HandleWinEventHookShit,
+        IntegerFI(info[4]), IntegerFI(info[5]),
+        IntegerFI(info[6])
+    );
+
+    if (g_hook != 0) {
+        Persistent<Function> func = Persistent<Function>(isolate, info[3].As<Function>());
+
+        eventProcMap[g_hook] = [=](HWINEVENTHOOK hook, DWORD event, HWND hwnd,
+                                                LONG idObject, LONG idChild,
+                                                DWORD dwEventThread, DWORD dwmsEventTime) {
+            //print("within jbs -> " << hook << " " << hwnd << " " << idObject << " " << idChild << " " << dwEventThread << " " << dwmsEventTime);
+            Local<Value> args[] = { Number::New(isolate, (LONG_PTR)hook),  Number::New(isolate, event), Number::New(isolate, (LONG_PTR)hwnd), Number::New(isolate, idObject), Number::New(isolate, idChild), Number::New(isolate, dwEventThread), Number::New(isolate, dwmsEventTime) };
+            v8::TryCatch shit(isolate);
+            
+            func.Get(isolate)->Call(isolate->GetCurrentContext(), isolate->GetCurrentContext()->Global(), 7, args);
+            
+            CHECKEXCEPTIONS(shit);
+        };
+    }
+    else {
+        HANDLE console = GetStdHandle(STD_OUTPUT_HANDLE);
+        SetConsoleTextAttribute(console, 4);
+        print("SetWinEventHook failed for some reason (try GetLastError!)");
+        SetConsoleTextAttribute(console, 7);
+    }
+
+    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)g_hook));
+}
+
+V8FUNC(UnhookWinEventWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    HWINEVENTHOOK g_hook = (HWINEVENTHOOK)IntegerFI(info[0]);
+    eventProcMap.erase(g_hook);
+    info.GetReturnValue().Set(UnhookWinEvent(g_hook));
+}
+
 v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     using namespace v8;
 
@@ -9774,6 +9830,141 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     setGlobal(StringFromPointer);
     setGlobal(WStringFromPointer);
     setGlobal(spawn); //gulp
+    setGlobalWrapper(SetWinEventHook); //    /#define ([A-Z0-9_]+) /g
+    setGlobalWrapper(UnhookWinEvent);
+    setGlobalConst(WINEVENT_OUTOFCONTEXT);
+    setGlobalConst(WINEVENT_SKIPOWNTHREAD);
+    setGlobalConst(WINEVENT_SKIPOWNPROCESS);
+    setGlobalConst(WINEVENT_INCONTEXT);
+    setGlobalConst(CHILDID_SELF);
+    setGlobalConst(INDEXID_OBJECT);
+    setGlobalConst(INDEXID_CONTAINER);
+    setGlobalConst(OBJID_WINDOW);
+    setGlobalConst(OBJID_SYSMENU);
+    setGlobalConst(OBJID_TITLEBAR);
+    setGlobalConst(OBJID_MENU);
+    setGlobalConst(OBJID_CLIENT);
+    setGlobalConst(OBJID_VSCROLL);
+    setGlobalConst(OBJID_HSCROLL);
+    setGlobalConst(OBJID_SIZEGRIP);
+    setGlobalConst(OBJID_CARET);
+    setGlobalConst(OBJID_CURSOR);
+    setGlobalConst(OBJID_ALERT);
+    setGlobalConst(OBJID_SOUND);
+    setGlobalConst(OBJID_QUERYCLASSNAMEIDX);
+    setGlobalConst(OBJID_NATIVEOM);
+    setGlobalConst(EVENT_MIN);
+    setGlobalConst(EVENT_MAX);
+    setGlobalConst(EVENT_SYSTEM_SOUND);
+    setGlobalConst(EVENT_SYSTEM_ALERT);
+    setGlobalConst(EVENT_SYSTEM_FOREGROUND);
+    setGlobalConst(EVENT_SYSTEM_MENUSTART);
+    setGlobalConst(EVENT_SYSTEM_MENUEND);
+    setGlobalConst(EVENT_SYSTEM_MENUPOPUPSTART);
+    setGlobalConst(EVENT_SYSTEM_MENUPOPUPEND);
+    setGlobalConst(EVENT_SYSTEM_CAPTURESTART);
+    setGlobalConst(EVENT_SYSTEM_CAPTUREEND);
+    setGlobalConst(EVENT_SYSTEM_MOVESIZESTART);
+    setGlobalConst(EVENT_SYSTEM_MOVESIZEEND);
+    setGlobalConst(EVENT_SYSTEM_CONTEXTHELPSTART);
+    setGlobalConst(EVENT_SYSTEM_CONTEXTHELPEND);
+    setGlobalConst(EVENT_SYSTEM_DRAGDROPSTART);
+    setGlobalConst(EVENT_SYSTEM_DRAGDROPEND);
+    setGlobalConst(EVENT_SYSTEM_DIALOGSTART);
+    setGlobalConst(EVENT_SYSTEM_DIALOGEND);
+    setGlobalConst(EVENT_SYSTEM_SCROLLINGSTART);
+    setGlobalConst(EVENT_SYSTEM_SCROLLINGEND);
+    setGlobalConst(EVENT_SYSTEM_SWITCHSTART);
+    setGlobalConst(EVENT_SYSTEM_SWITCHEND);
+    setGlobalConst(EVENT_SYSTEM_MINIMIZESTART);
+    setGlobalConst(EVENT_SYSTEM_MINIMIZEEND);
+    setGlobalConst(EVENT_SYSTEM_DESKTOPSWITCH);
+    setGlobalConst(EVENT_SYSTEM_SWITCHER_APPGRABBED);
+    setGlobalConst(EVENT_SYSTEM_SWITCHER_APPOVERTARGET);
+    setGlobalConst(EVENT_SYSTEM_SWITCHER_APPDROPPED);
+    setGlobalConst(EVENT_SYSTEM_SWITCHER_CANCELLED);
+    setGlobalConst(EVENT_SYSTEM_IME_KEY_NOTIFICATION);
+    setGlobalConst(EVENT_SYSTEM_END);
+    setGlobalConst(EVENT_OEM_DEFINED_START);
+    setGlobalConst(EVENT_OEM_DEFINED_END);
+    setGlobalConst(EVENT_UIA_EVENTID_START);
+    setGlobalConst(EVENT_UIA_EVENTID_END);
+    setGlobalConst(EVENT_UIA_PROPID_START);
+    setGlobalConst(EVENT_UIA_PROPID_END);
+    setGlobalConst(EVENT_CONSOLE_CARET);
+    setGlobalConst(EVENT_CONSOLE_UPDATE_REGION);
+    setGlobalConst(EVENT_CONSOLE_UPDATE_SIMPLE);
+    setGlobalConst(EVENT_CONSOLE_UPDATE_SCROLL);
+    setGlobalConst(EVENT_CONSOLE_LAYOUT);
+    setGlobalConst(EVENT_CONSOLE_START_APPLICATION);
+    setGlobalConst(EVENT_CONSOLE_END_APPLICATION);
+    setGlobalConst(CONSOLE_APPLICATION_16BIT);
+    setGlobalConst(CONSOLE_CARET_SELECTION);
+    setGlobalConst(CONSOLE_CARET_VISIBLE);
+    setGlobalConst(EVENT_CONSOLE_END);
+    setGlobalConst(EVENT_OBJECT_CREATE);
+    setGlobalConst(EVENT_OBJECT_DESTROY);
+    setGlobalConst(EVENT_OBJECT_SHOW);
+    setGlobalConst(EVENT_OBJECT_HIDE);
+    setGlobalConst(EVENT_OBJECT_REORDER);
+    setGlobalConst(EVENT_OBJECT_FOCUS);
+    setGlobalConst(EVENT_OBJECT_SELECTION);
+    setGlobalConst(EVENT_OBJECT_SELECTIONADD);
+    setGlobalConst(EVENT_OBJECT_SELECTIONREMOVE);
+    setGlobalConst(EVENT_OBJECT_SELECTIONWITHIN);
+    setGlobalConst(EVENT_OBJECT_STATECHANGE);
+    setGlobalConst(EVENT_OBJECT_LOCATIONCHANGE);
+    setGlobalConst(EVENT_OBJECT_NAMECHANGE);
+    setGlobalConst(EVENT_OBJECT_DESCRIPTIONCHANGE);
+    setGlobalConst(EVENT_OBJECT_VALUECHANGE);
+    setGlobalConst(EVENT_OBJECT_PARENTCHANGE);
+    setGlobalConst(EVENT_OBJECT_HELPCHANGE);
+    setGlobalConst(EVENT_OBJECT_DEFACTIONCHANGE);
+    setGlobalConst(EVENT_OBJECT_ACCELERATORCHANGE);
+    setGlobalConst(EVENT_OBJECT_INVOKED);
+    setGlobalConst(EVENT_OBJECT_TEXTSELECTIONCHANGED);
+    setGlobalConst(EVENT_OBJECT_CONTENTSCROLLED);
+    setGlobalConst(EVENT_SYSTEM_ARRANGMENTPREVIEW);
+    setGlobalConst(EVENT_OBJECT_CLOAKED);
+    setGlobalConst(EVENT_OBJECT_UNCLOAKED);
+    setGlobalConst(EVENT_OBJECT_LIVEREGIONCHANGED);
+    setGlobalConst(EVENT_OBJECT_HOSTEDOBJECTSINVALIDATED);
+    setGlobalConst(EVENT_OBJECT_DRAGSTART);
+    setGlobalConst(EVENT_OBJECT_DRAGCANCEL);
+    setGlobalConst(EVENT_OBJECT_DRAGCOMPLETE);
+    setGlobalConst(EVENT_OBJECT_DRAGENTER);
+    setGlobalConst(EVENT_OBJECT_DRAGLEAVE);
+    setGlobalConst(EVENT_OBJECT_DRAGDROPPED);
+    setGlobalConst(EVENT_OBJECT_IME_SHOW);
+    setGlobalConst(EVENT_OBJECT_IME_HIDE);
+    setGlobalConst(EVENT_OBJECT_IME_CHANGE);
+    setGlobalConst(EVENT_OBJECT_TEXTEDIT_CONVERSIONTARGETCHANGED);
+    setGlobalConst(EVENT_OBJECT_END);
+    setGlobalConst(EVENT_AIA_START);
+    setGlobalConst(EVENT_AIA_END);
+    setGlobalConst(SOUND_SYSTEM_STARTUP);
+    setGlobalConst(SOUND_SYSTEM_SHUTDOWN);
+    setGlobalConst(SOUND_SYSTEM_BEEP);
+    setGlobalConst(SOUND_SYSTEM_ERROR);
+    setGlobalConst(SOUND_SYSTEM_QUESTION);
+    setGlobalConst(SOUND_SYSTEM_WARNING);
+    setGlobalConst(SOUND_SYSTEM_INFORMATION);
+    setGlobalConst(SOUND_SYSTEM_MAXIMIZE);
+    setGlobalConst(SOUND_SYSTEM_MINIMIZE);
+    setGlobalConst(SOUND_SYSTEM_RESTOREUP);
+    setGlobalConst(SOUND_SYSTEM_RESTOREDOWN);
+    setGlobalConst(SOUND_SYSTEM_APPSTART);
+    setGlobalConst(SOUND_SYSTEM_FAULT);
+    setGlobalConst(SOUND_SYSTEM_APPEND);
+    setGlobalConst(SOUND_SYSTEM_MENUCOMMAND);
+    setGlobalConst(SOUND_SYSTEM_MENUPOPUP);
+    setGlobalConst(CSOUND_SYSTEM);
+    setGlobalConst(ALERT_SYSTEM_INFORMATIONAL);
+    setGlobalConst(ALERT_SYSTEM_WARNING);
+    setGlobalConst(ALERT_SYSTEM_ERROR);
+    setGlobalConst(ALERT_SYSTEM_QUERY);
+    setGlobalConst(ALERT_SYSTEM_CRITICAL);
+    setGlobalConst(CALERT_SYSTEM);
 
 
     setGlobalConst(WICBitmapTransformRotate0);
@@ -11418,7 +11609,8 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInstance, char* nCmdList, int
     //1.5.56 because i added the minimum support for d2d11 (that's what im gonna call it) and because directcomposition works (i still need to add effects)
     //1.5.66 because THE BLUR EFFECT WORKS BUDDY NEWDIRECT2D11FUNCS is BEAUTIFUL (i need to figure out resizing and all that BUT IT WORKS)
     //1.5.73 BECAUSE THE DIRECT2D + DXGI SAGA IS OVER! (and because i renamed Matrix3x2 to Matrix3x2F and then renamed Matrix3x2F.SetProduct to Multiply and now finished desktop duplication)
-    print("JBS3 -> Version 1.5.73"); //so idk how normal version things work so the first number will probably stay one --- i will increment the second number if i change an existing function like when i remade the CreateWindowClass and CreateWindow functions --- i might random increment the third number if i feel like it
+    //1.5.74 because i added SetWinEventHook lol
+    print("JBS3 -> Version 1.5.74"); //so idk how normal version things work so the first number will probably stay one --- i will increment the second number if i change an existing function like when i remade the CreateWindowClass and CreateWindow functions --- i might random increment the third number if i feel like it
     print(screenWidth << "x" << screenHeight);
     
 
