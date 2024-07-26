@@ -6617,12 +6617,32 @@ V8FUNC(CreateWindowClass) {
 
 LRESULT CALLBACK WinProc(HWND hWnd, UINT msg, WPARAM wp, LPARAM lp);
 
-v8::Local<v8::Object> wndclass;
+//v8::Local<v8::Object> wndclass;
 
 //struct IsolateAndClazz { //maybe use a tuple? (if i have it imported already im using it)
 //    v8::Isolate* isolate;
 //    v8::Local<v8::Object> wndclass;
 //};
+
+std::map<HWND, std::function<LRESULT(HWND, UINT, WPARAM, LPARAM)>> winProcMap; //thanks chatgpt!!! (ok nah nah bruh this solution did NOT solve basically anything (some win messages aren't sent to the js win proc, you still can't have 2 windows (because the blocking thing)))
+//std::map<HWND, std::vector<std::tuple<UINT, WPARAM, LPARAM>>> nullMsgsMap;
+
+LRESULT CALLBACK WinProc(HWND hWnd, UINT msg, WPARAM wp, LPARAM lp)
+{
+    print(hWnd << "hNWD");
+    if (winProcMap.find(hWnd) != winProcMap.end()) {
+        return winProcMap[hWnd](hWnd, msg, wp, lp);
+    }
+    //else if (msg == WM_CREATE) {
+    //    auto awshitthislooksbad = (std::function<LRESULT(HWND,UINT,WPARAM,LPARAM)>*)(((CREATESTRUCTW*)lp)->lpCreateParams);
+    //    return (*awshitthislooksbad)(hWnd, msg, wp, lp); //oh my god... (yeah that shit didn't work imma do this another way)
+    //}
+    else {
+        print("NULL?" << msg);
+        //nullMsgsMap[hWnd].push_back(std::make_tuple(msg, wp, lp));
+        DefWindowProcW(hWnd, msg, wp, lp);;
+    }
+}
 
 V8FUNC(CreateWindowWrapper) {
     //MessageBoxA(NULL, "aw shit another unfiinished hting", "ok so like no cap the only message you can resieve as of now is WM_PAINT", MB_OK | MB_ICONEXCLAMATION);
@@ -6636,7 +6656,7 @@ V8FUNC(CreateWindowWrapper) {
     int height = IntegerFI(info[7]);
     wprint(WStringFI(info[2]) << " " << x << " " << y << " " << width << " " << height);
 
-
+    v8::Local<v8::Object> wndclass;
     HWND newWindow;// = CreateWindowA(CStringFI(GetProperty("lpszClassName")), CStringFI(info[1]), IntegerFI(info[2]), x, y, width, height, NULL, NULL, hInstance, NULL);
 
     if (!info[1]->IsString()) {
@@ -6707,6 +6727,38 @@ V8FUNC(CreateWindowWrapper) {
         //wchar_t shits[100];
         //wcscpy(shits, WStringFI(info[2]));
         //std::tuple<Isolate*, Local<Object>> iac = std::make_pair(isolate, wndclass);
+        auto newWinProc = [=](HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) -> LRESULT {
+            HandleScope handle_scope(isolate); //slapping this bad boy in here
+            //oof im still mad about this global i gotta fix that at some point (you cannot create 2 main windows (idk when you would want to but))
+            Local<Function> listener = GetProperty("windowProc").As<Function>();
+
+            Local<Value> args[] = { Number::New(isolate, (LONG_PTR)hwnd),  Number::New(isolate, msg), Number::New(isolate, wp), Number::New(isolate, lp) };
+            // Local<Value> result;
+            v8::TryCatch shit(isolate);
+            /*Local<Value> result = */
+            //Local<TryCatch> shit(isolate);
+            MaybeLocal<Value> returnedValue = listener->Call(isolate->GetCurrentContext(), isolate->GetCurrentContext()->Global(), 4, args);
+            //                                   the point of the ToLocal &result thing was because i thought it would do error checking and tell me
+            //if (listener->Call(isolate->GetCurrentContext(), isolate->GetCurrentContext()->Global(), 4, args).ToLocal(&result)) { //   ;/*.ToLocalChecked()*/;
+                //print(CStringFI(result));
+                //print("valid")
+            //}
+            //if (shit.HasCaught()) {
+            //    HANDLE console = GetStdHandle(STD_OUTPUT_HANDLE);
+            //    SetConsoleTextAttribute(console, 4);
+            //    print(CStringFI(shit.Message()->Get()) << "\007"); //ok WAIT in the last push i talked about "performance loss" from using trycatch but apparently since v8 version 6 (im using 11.9.0) try catch doesn't affect performance UNTIL there is an exception https://stackoverflow.com/questions/19727905/in-javascript-is-it-expensive-to-use-try-catch-blocks-even-if-an-exception-is-n
+            //    SetConsoleTextAttribute(console, 7);
+            //    //last time i googled "v8 try catch performance" i saw the first link and it said "there will always be some sort of performance hit" but that was probably written years ago (yeah the <meta> tags say it was published in 2013)
+            //}
+            CHECKEXCEPTIONS(shit);
+            bool def = IntegerFI(GetProperty("DefWindowProc"));
+            if (!def) {
+                return IntegerFI(returnedValue.ToLocalChecked());
+            }
+            else {
+                return DefWindowProcW(hwnd, msg, wp, lp);
+            }
+        };
         newWindow = CreateWindowExW(IntegerFI(info[0]), //HOLY SHIT THIS LINE WAS FAILING EVERYTIME I EVEN USED BREAKPOINTS TO FIND THE ISSUE AND GUESS WHAT
             //THE ERROR WAS ACTUALLY IN THE WINPROC AND I WAS GETTING THE ISOLATE LPARAM WRONG (literally spent at minimum 30 minutes to figure this out (this is why JBS3 has me talking about banning it))
             wc.lpszClassName, //buddy idk what but something around here is KILLING M(Y/E) PROGRAM
@@ -6719,22 +6771,38 @@ V8FUNC(CreateWindowWrapper) {
             (HWND)IntegerFI(info[8]),
             (HMENU)IntegerFI(info[9]),
             (HINSTANCE)IntegerFI(info[10]),
-            (LPVOID)isolate);//(LPVOID)IntegerFI(info[10]));
+            //(LPVOID)isolate);//(LPVOID)IntegerFI(info[10]));
+            //static_cast<void*>(&newWinProc));
+            NULL);
 
-        //https://rave.dj/xXjJ5rcPG5qLcQ (i made this like 4 years ago)
+        winProcMap[newWindow] = newWinProc;
+
+        //for (const std::tuple<UINT, WPARAM, LPARAM>& t : nullMsgsMap[newWindow]) {
+        //    print(shit << " " << std::get<0>(t));
+        //    winProcMap[newWindow](newWindow, std::get<0>(t), std::get<1>(t), std::get<2>(t));
+        //}
+        //
+        //nullMsgsMap[newWindow].clear();
+        //nullMsgsMap.erase(newWindow);
+
+        //yeah that's right im just gonna manually call it
+        winProcMap[newWindow](newWindow, WM_NCCREATE, NULL, NULL); //just both null because WPARAM is not used and LPARAM is a CREATESTRUCT which can't be used in jbs
+        winProcMap[newWindow](newWindow, WM_CREATE, NULL, NULL); //just both null because WPARAM is not used and LPARAM is a CREATESTRUCT which can't be used in jbs
+
+        //https://rave.dj/xXjJ5rcPG5qLcQ (i made this like 4 years ago (wait why tf did i link In For The Detious here bruh ))
 
         if (GetLastError() != 0) {
             //std::string shit = std::string("RESTART JBS because there's a 99% chance that the window was NOT created ") + (const char*)_bstr_t(_com_error(GetLastError()).ErrorMessage()) + ")";
                                 //ahhhhhhh
-            if (MessageBoxA(NULL, /*&shit[0]*/"I'm not gonna lie something when wrong when we tried to create that window", (const char*)_bstr_t(_com_error(GetLastError()).ErrorMessage()), MB_OKCANCEL | MB_ICONWARNING | MB_DEFBUTTON2) == IDCANCEL) {
-                return;
+            if (MessageBoxA(NULL, /*&shit[0]*/"I'm not gonna lie something might have gone wrong when we tried to create that window", (const char*)_bstr_t(_com_error(GetLastError()).ErrorMessage()), MB_OKCANCEL | MB_ICONWARNING | MB_DEFBUTTON2) == IDCANCEL) {
+                //return;
             }
         }
 
 
-        SetWindowLongPtrW(newWindow, GWLP_USERDATA, (LONG_PTR)isolate);//(size_t) & wndclass->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("windowProc")).ToLocalChecked().As<Function>());
+        //SetWindowLongPtrW(newWindow, GWLP_USERDATA, (LONG_PTR)isolate);//(size_t) & wndclass->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("windowProc")).ToLocalChecked().As<Function>());
 
-        ShowWindow(newWindow, SW_SHOW);
+        //ShowWindow(newWindow, SW_SHOW);
 
         //types.d.ts
 
@@ -6752,9 +6820,6 @@ V8FUNC(CreateWindowWrapper) {
         //
         //info.GetReturnValue().Set(result);
 
-        MSG Message;
-        Message.message = ~WM_QUIT;
-
         //Local<Promise::Resolver> uh = Promise::Resolver::New(isolate->GetCurrentContext()).ToLocalChecked();
         //info.GetReturnValue().Set(uh->GetPromise());
         info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)newWindow));
@@ -6768,42 +6833,47 @@ V8FUNC(CreateWindowWrapper) {
         Local<Function> looper = GetProperty("loop").As<Function>();
         print(looper.IsEmpty() << " " << looper->IsUndefined());
 
-        if (!looper->IsUndefined()) {
-            while (Message.message != WM_QUIT)
-            {
-                if (PeekMessage(&Message, NULL, 0, 0, PM_REMOVE))
+        //std::thread f([=] { //well shit if i actually use a new thread nothing is blocking v8 and jbs from just reaching the end of the program
+            MSG Message{};
+            Message.message = ~WM_QUIT;
+
+            if (!looper->IsUndefined()) {
+                while (Message.message != WM_QUIT)
                 {
-                    // If a message was waiting in the message queue, process it
-                    //print("wajt");
-                    TranslateMessage(&Message);
-                    DispatchMessage(&Message);
-                }
-                else
-                {
-                    v8::HandleScope handle_scope(isolate); //apparently i needed this so good to know
-                    v8::TryCatch shit(isolate);
-                    looper->Call(isolate->GetCurrentContext(), isolate->GetCurrentContext()->Global(), 0, nullptr);
-                    //print("LOPER CALLED!");
-                    CHECKEXCEPTIONS(shit);
-                    isolate->PerformMicrotaskCheckpoint();
+                    if (PeekMessage(&Message, NULL, 0, 0, PM_REMOVE))
+                    {
+                        // If a message was waiting in the message queue, process it
+                        //print("wajt");
+                        TranslateMessage(&Message);
+                        DispatchMessage(&Message);
+                    }
+                    else
+                    {
+                        v8::HandleScope handle_scope(isolate); //apparently i needed this so good to know
+                        v8::TryCatch shit(isolate);
+                        looper->Call(isolate->GetCurrentContext(), isolate->GetCurrentContext()->Global(), 0, nullptr);
+                        //print("LOPER CALLED!");
+                        CHECKEXCEPTIONS(shit);
+                        isolate->PerformMicrotaskCheckpoint();
+                    }
                 }
             }
-        }
-        else {
-            while (Message.message != WM_QUIT)
-            {
-                if (GetMessage(&Message, NULL, 0, 0))
+            else {
+                while (Message.message != WM_QUIT)
                 {
-                    // If a message was waiting in the message queue, process it
-                    //print("wajt");
-                    TranslateMessage(&Message);
-                    DispatchMessage(&Message);
+                    if (GetMessage(&Message, NULL, 0, 0))
+                    {
+                        // If a message was waiting in the message queue, process it
+                        //print("wajt");
+                        TranslateMessage(&Message);
+                        DispatchMessage(&Message);
+                    }
                 }
             }
-        }
 
-        print("loop over nigga");
-
+            print("loop over nigga");
+        //});
+        //f.detach();
         //uh->Resolve(isolate->GetCurrentContext(), Undefined(isolate)); //https://gist.github.com/jupp0r/5f11c0ee2b046b0ab89660ce85ea480e
     }
     else {
@@ -6811,6 +6881,7 @@ V8FUNC(CreateWindowWrapper) {
         newWindow = CreateWindowExW(IntegerFI(info[0]), WStringFI(info[1]), WStringFI(info[2]), IntegerFI(info[3]), x, y, width, height, (HWND)IntegerFI(info[8]), (HMENU)IntegerFI(info[9]), (HINSTANCE)IntegerFI(info[10]), NULL);
         info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)newWindow));
     }
+#undef GetProperty
     //MessageBoxA(NULL, (std::string("shit")+std::to_string(GetLastError())).c_str(), "titlke", MB_OKCANCEL); //https://www.youtube.com/watch?v=58OhXFmTUo0
 }
 
@@ -6946,7 +7017,7 @@ V8FUNC(SetRectWrapper) {
     SetProperty("top", r.top);
     SetProperty("right", r.right);
     SetProperty("bottom", r.bottom);
-
+#undef SetProperty
     info.GetReturnValue().SetUndefined();
 }
 
@@ -11876,63 +11947,64 @@ https://forums.codeguru.com/showthread.php?69236-How-to-obtain-HINSTANCE-using-H
 }
 //#include "include/v8-exception.h"
 //#include <windowsx.h>
-LRESULT CALLBACK WinProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
-    using namespace v8;
-    Isolate* isolate = (Isolate*)GetWindowLongPtr(hwnd, GWLP_USERDATA);
-
-    //Local<Function> listener = wndclass->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("windowProc")).ToLocalChecked().As<Function>();
-    //Local<Value> args[] = { Number::New(isolate, (size_t)hwnd), Number::New(isolate, msg) };
-    //Local<Value> result = listener->Call(isolate->GetCurrentContext(), isolate->GetCurrentContext()->Global(), 1, args).ToLocalChecked();
-    //print(CStringFI(result));
-    if (isolate != nullptr || msg == WM_CREATE) {
-        if (msg == WM_CREATE) isolate = (Isolate*)(((CREATESTRUCTW*)lp)->lpCreateParams);  //usually i don't do single line if statements but im feeling quirky
-        //print(isolate << " " << lp << " " << (msg == WM_CREATE));// << " random data " << isolate->GetCurrentContext()->IsContext());
-        HandleScope handle_scope(isolate); //slapping this bad boy in here
-                 //oof im still mad about this global i gotta fix that at some point (you cannot create 2 main windows (idk when you would want to but))
-        Local<Function> listener = wndclass->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("windowProc")).ToLocalChecked().As<Function>();
-        Local<Value> args[] = { Number::New(isolate, (LONG_PTR)hwnd),  Number::New(isolate, msg), Number::New(isolate, wp), Number::New(isolate, lp)};
-       // Local<Value> result;
-        v8::TryCatch shit(isolate);
-        /*Local<Value> result = */
-        //Local<TryCatch> shit(isolate);
-        MaybeLocal<Value> returnedValue = listener->Call(isolate->GetCurrentContext(), isolate->GetCurrentContext()->Global(), 4, args);
-        //                                   the point of the ToLocal &result thing was because i thought it would do error checking and tell me
-        //if (listener->Call(isolate->GetCurrentContext(), isolate->GetCurrentContext()->Global(), 4, args).ToLocal(&result)) { //   ;/*.ToLocalChecked()*/;
-            //print(CStringFI(result));
-            //print("valid")
-        //}
-        //if (shit.HasCaught()) {
-        //    HANDLE console = GetStdHandle(STD_OUTPUT_HANDLE);
-        //    SetConsoleTextAttribute(console, 4);
-        //    print(CStringFI(shit.Message()->Get()) << "\007"); //ok WAIT in the last push i talked about "performance loss" from using trycatch but apparently since v8 version 6 (im using 11.9.0) try catch doesn't affect performance UNTIL there is an exception https://stackoverflow.com/questions/19727905/in-javascript-is-it-expensive-to-use-try-catch-blocks-even-if-an-exception-is-n
-        //    SetConsoleTextAttribute(console, 7);
-        //    //last time i googled "v8 try catch performance" i saw the first link and it said "there will always be some sort of performance hit" but that was probably written years ago (yeah the <meta> tags say it was published in 2013)
-        //}
-        CHECKEXCEPTIONS(shit);
-        bool def = IntegerFI(wndclass->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("DefWindowProc")).ToLocalChecked());
-        if (!def) {
-            return IntegerFI(returnedValue.ToLocalChecked());
-        }
-        else {
-            return DefWindowProcW(hwnd, msg, wp, lp);
-        }
-        //return def ? DefWindowProcW(hwnd, msg, wp, lp) : 0;
-    }
-    //if (msg == WM_PAINT) {
-    //    //PAINTSTRUCT ps;
-    //    //BeginPaint(hwnd, &ps);
-    //    //
-    //    //const char* className = CStringFI(wndclass->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("className")).ToLocalChecked());
-    //    //
-    //    //TextOutA(ps.hdc, 100, 100, className, strlen(className));
-    //    //
-    //    //EndPaint(hwnd, &ps);
-    //}
-    //else 
-    //if (msg == WM_DESTROY) {
-        //DestroyWindow(hwnd);
-    //    PostQuitMessage(0);
-    //}
-    print("NULL?" << msg);
-    return DefWindowProcW(hwnd, msg, wp, lp);; //uh
-}
+// 
+//LRESULT CALLBACK WinProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
+//    using namespace v8;
+//    Isolate* isolate = (Isolate*)GetWindowLongPtr(hwnd, GWLP_USERDATA);
+//
+//    //Local<Function> listener = wndclass->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("windowProc")).ToLocalChecked().As<Function>();
+//    //Local<Value> args[] = { Number::New(isolate, (size_t)hwnd), Number::New(isolate, msg) };
+//    //Local<Value> result = listener->Call(isolate->GetCurrentContext(), isolate->GetCurrentContext()->Global(), 1, args).ToLocalChecked();
+//    //print(CStringFI(result));
+//    if (isolate != nullptr || msg == WM_CREATE) {
+//        if (msg == WM_CREATE) isolate = (Isolate*)(((CREATESTRUCTW*)lp)->lpCreateParams);  //usually i don't do single line if statements but im feeling quirky
+//        //print(isolate << " " << lp << " " << (msg == WM_CREATE));// << " random data " << isolate->GetCurrentContext()->IsContext());
+//        HandleScope handle_scope(isolate); //slapping this bad boy in here
+//                 //oof im still mad about this global i gotta fix that at some point (you cannot create 2 main windows (idk when you would want to but))
+//        Local<Function> listener = wndclass->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("windowProc")).ToLocalChecked().As<Function>();
+//        Local<Value> args[] = { Number::New(isolate, (LONG_PTR)hwnd),  Number::New(isolate, msg), Number::New(isolate, wp), Number::New(isolate, lp)};
+//       // Local<Value> result;
+//        v8::TryCatch shit(isolate);
+//        /*Local<Value> result = */
+//        //Local<TryCatch> shit(isolate);
+//        MaybeLocal<Value> returnedValue = listener->Call(isolate->GetCurrentContext(), isolate->GetCurrentContext()->Global(), 4, args);
+//        //                                   the point of the ToLocal &result thing was because i thought it would do error checking and tell me
+//        //if (listener->Call(isolate->GetCurrentContext(), isolate->GetCurrentContext()->Global(), 4, args).ToLocal(&result)) { //   ;/*.ToLocalChecked()*/;
+//            //print(CStringFI(result));
+//            //print("valid")
+//        //}
+//        //if (shit.HasCaught()) {
+//        //    HANDLE console = GetStdHandle(STD_OUTPUT_HANDLE);
+//        //    SetConsoleTextAttribute(console, 4);
+//        //    print(CStringFI(shit.Message()->Get()) << "\007"); //ok WAIT in the last push i talked about "performance loss" from using trycatch but apparently since v8 version 6 (im using 11.9.0) try catch doesn't affect performance UNTIL there is an exception https://stackoverflow.com/questions/19727905/in-javascript-is-it-expensive-to-use-try-catch-blocks-even-if-an-exception-is-n
+//        //    SetConsoleTextAttribute(console, 7);
+//        //    //last time i googled "v8 try catch performance" i saw the first link and it said "there will always be some sort of performance hit" but that was probably written years ago (yeah the <meta> tags say it was published in 2013)
+//        //}
+//        CHECKEXCEPTIONS(shit);
+//        bool def = IntegerFI(wndclass->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("DefWindowProc")).ToLocalChecked());
+//        if (!def) {
+//            return IntegerFI(returnedValue.ToLocalChecked());
+//        }
+//        else {
+//            return DefWindowProcW(hwnd, msg, wp, lp);
+//        }
+//        //return def ? DefWindowProcW(hwnd, msg, wp, lp) : 0;
+//    }
+//    //if (msg == WM_PAINT) {
+//    //    //PAINTSTRUCT ps;
+//    //    //BeginPaint(hwnd, &ps);
+//    //    //
+//    //    //const char* className = CStringFI(wndclass->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("className")).ToLocalChecked());
+//    //    //
+//    //    //TextOutA(ps.hdc, 100, 100, className, strlen(className));
+//    //    //
+//    //    //EndPaint(hwnd, &ps);
+//    //}
+//    //else 
+//    //if (msg == WM_DESTROY) {
+//        //DestroyWindow(hwnd);
+//    //    PostQuitMessage(0);
+//    //}
+//    print("NULL?" << msg);
+//    return DefWindowProcW(hwnd, msg, wp, lp);; //uh
+//}

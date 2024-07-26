@@ -13,7 +13,7 @@ function winEventProc(hook, event, hwnd, isObject, isChild, dwEventThread, dwmsE
     }
     if(title && isObject == 0 && title != "Navigation Pane" && !playing) {
         //print(hook, event, hwnd+": "+title, isObject, isChild, dwEventThread, dwmsEventTime);
-        let rng = Math.round(Math.random()*10);
+        let rng = Math.round(Math.random()*100);
         print(hwnd+": "+title, rng == 1);
         if(rng == 1) {
             playing = true;
