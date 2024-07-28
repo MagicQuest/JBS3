@@ -23,10 +23,10 @@ print(wiimotes);
 if(wiimotes.length == 0) {
     Msgbox("found NO wiimote guitars bruh", "JBS3 WILL CRASH AFTER THIS MESSAGE (HELP!)", MB_ICONERROR);
 }
-let handle = hid_get_handle_from_info(wiimotes[wiimotes.findIndex(mote => mote.usage>1)]);//wiimotes[1].handle;
+let handle = hid_get_handle_from_info(wiimotes[wiimotes.findIndex(mote => mote.usage>1)]);//wiimotes[1].handle; (write dumb code)
 if(!handle) {
     Msgbox("no handle kys", handle, MB_OK | MB_SYSTEMMODAL);
-    quit; //cheeky reference error because an Illegal Return Statement is an immediate error
+    quit; //cheeky reference error because an Illegal Return Statement is an immediate error (like a parse error or somethung)
 }
 //print("0x"+wiimote.vendor_id.toString(16), "0x"+wiimote.product_id.toString(16));
 print(handle, "handle");
@@ -129,7 +129,7 @@ let keycodes = {GREEN: 0x100, RED: 0x200, YELLOW: 0x400, BLUE: 0x800, ORANGE: 0x
 let bools = {};
 for(let key of Object.keys(keycodes)) bools[key] = false;
 
-let keys = {GREEN: "A", RED: "S", YELLOW: "F", BLUE: "G", ORANGE: "H", START: VK_ESCAPE, STRUM_UP: VK_UP, STRUM_DOWN: VK_DOWN, STARPOWER: VK_RETURN};
+let keys = {GREEN: "A", RED: "S", YELLOW: "F", BLUE: "G", ORANGE: "H", START: VK_ESCAPE, STRUM_UP: VK_UP, STRUM_DOWN: VK_DOWN, STARPOWER: VK_RETURN}; //guitar buttons -> keyboard keys
 //i need to add strumming
 //let keys = {GREEN: "S", RED: "D", YELLOW: "F", BLUE: "J", ORANGE: "K", START: VK_ESCAPE, STRUM_UP: VK_UP, STRUM_DOWN: VK_DOWN, STARPOWER: "L"};
 

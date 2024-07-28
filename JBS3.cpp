@@ -3220,7 +3220,7 @@ V8FUNC(createCanvas) {
         Direct2D* d2d = nullptr;
         if (d2d11) {
             d2d = (Direct2D*)new Direct2D11();
-            //ok bruh v8 is actually dogshit
+            //ok bruh v8 is actually dogshit (ooooor i haven't been using it right...... (where the docs at))
             //i tried setting an array into context (a v8::ObjectTemplate)
             //and i kept getting an error like "a debugbreak has occured here" and it didnt' explain anything
             //i finally googled it and apparently you can't set an array to be one of an ObjectTemplate's properties
@@ -3230,7 +3230,7 @@ V8FUNC(createCanvas) {
             d2d = new Direct2D();
         }
         d2d->Init((HWND)IntegerFI(info[2]), IntegerFI(info[1]));
-        if (!info[3]->IsNullOrUndefined()) {
+        if (!info[3]->IsNullOrUndefined() && info[3]->BooleanValue(isolate)) {
             d2d->wicFactory = ((WICHelper*)IntegerFI(info[3].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()))->wicFactory;
         }
         context->Set(isolate, "internalDXPtr", Number::New(isolate, (LONG_PTR)d2d)); //lowkey should set these private but it PROBABLY doesn't matter just dont change it lol
@@ -6381,6 +6381,13 @@ V8FUNC(IsIconicWrapper) {
     info.GetReturnValue().Set(Number::New(isolate, IsIconic((HWND)IntegerFI(info[0]))));
 }
 
+V8FUNC(IsWindowVisibleWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, IsWindowVisible((HWND)IntegerFI(info[0]))));
+}
+
 V8FUNC(IsChildWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
@@ -6629,7 +6636,7 @@ std::map<HWND, std::function<LRESULT(HWND, UINT, WPARAM, LPARAM)>> winProcMap; /
 
 LRESULT CALLBACK WinProc(HWND hWnd, UINT msg, WPARAM wp, LPARAM lp)
 {
-    print(hWnd << "hNWD");
+    //print(hWnd << "hNWD"); //oops i left that in there
     if (winProcMap.find(hWnd) != winProcMap.end()) {
         return winProcMap[hWnd](hWnd, msg, wp, lp);
     }
@@ -6791,13 +6798,13 @@ V8FUNC(CreateWindowWrapper) {
 
         //https://rave.dj/xXjJ5rcPG5qLcQ (i made this like 4 years ago (wait why tf did i link In For The Detious here bruh ))
 
-        if (GetLastError() != 0) {
-            //std::string shit = std::string("RESTART JBS because there's a 99% chance that the window was NOT created ") + (const char*)_bstr_t(_com_error(GetLastError()).ErrorMessage()) + ")";
-                                //ahhhhhhh
-            if (MessageBoxA(NULL, /*&shit[0]*/"I'm not gonna lie something might have gone wrong when we tried to create that window", (const char*)_bstr_t(_com_error(GetLastError()).ErrorMessage()), MB_OKCANCEL | MB_ICONWARNING | MB_DEFBUTTON2) == IDCANCEL) {
-                //return;
-            }
-        }
+        //if (GetLastError() != 0) { //nah i don't need this anymore plus if there is another error in the queue from something stupid that happened before this it gets called anyways
+        //    //std::string shit = std::string("RESTART JBS because there's a 99% chance that the window was NOT created ") + (const char*)_bstr_t(_com_error(GetLastError()).ErrorMessage()) + ")";
+        //                        //ahhhhhhh
+        //    if (MessageBoxA(NULL, /*&shit[0]*/"I'm not gonna lie something might have gone wrong when we tried to create that window", (const char*)_bstr_t(_com_error(GetLastError()).ErrorMessage()), MB_OKCANCEL | MB_ICONWARNING | MB_DEFBUTTON2) == IDCANCEL) {
+        //        //return;
+        //    }
+        //}
 
 
         //SetWindowLongPtrW(newWindow, GWLP_USERDATA, (LONG_PTR)isolate);//(size_t) & wndclass->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("windowProc")).ToLocalChecked().As<Function>());
@@ -9731,6 +9738,160 @@ V8FUNC(UnhookWinEventWrapper) {
     info.GetReturnValue().Set(UnhookWinEvent(g_hook));
 }
 
+#include <psapi.h>
+
+V8FUNC(EnumProcessesWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    //https://learn.microsoft.com/en-us/windows/win32/psapi/enumerating-all-processes
+    DWORD aProcesses[1024], cbNeeded, cProcesses;
+    unsigned int i;
+
+    if (!EnumProcesses(aProcesses, sizeof(aProcesses), &cbNeeded))
+    {
+        
+    }
+    else {
+        // Calculate how many process identifiers were returned.
+
+        cProcesses = cbNeeded / sizeof(DWORD);
+
+        // Print the name and process identifier for each process.
+
+        //Local<Array> jsArray = Array::New(isolate);
+        
+        for (i = 0; i < cProcesses; i++) {
+            Local<Value> args[] = { Number::New(isolate, aProcesses[i])};
+            info[0].As<Function>()->Call(isolate->GetCurrentContext(), isolate->GetCurrentContext()->Global(), 1, args);
+        }
+
+        //for (i = 0; i < cProcesses; i++)
+        //{
+        //    if (aProcesses[i] != 0)
+        //    {
+        //        PrintProcessNameAndID(aProcesses[i]);
+        //    }
+        //}
+    }
+}
+
+V8FUNC(GetWindowThreadProcessIdWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    Local<Context> context = isolate->GetCurrentContext();
+
+    DWORD pid;
+    DWORD thread = GetWindowThreadProcessId((HWND)IntegerFI(info[0]), &pid);
+    Local<Object> yk = Object::New(isolate);
+    yk->Set(context, LITERAL("processID"), Number::New(isolate, pid));
+    yk->Set(context, LITERAL("thread"), Number::New(isolate, thread));
+    info.GetReturnValue().Set(yk);
+}
+
+V8FUNC(OpenProcessWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)OpenProcess(IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]))));
+}
+
+V8FUNC(EnumProcessModulesWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    HMODULE hMod;
+    DWORD cbNeeded;
+
+    BOOL e = EnumProcessModules((HANDLE)IntegerFI(info[0]), &hMod, sizeof(hMod), &cbNeeded);
+
+    Local<Value> elemid[3] = {
+        Number::New(isolate, (LONG_PTR)hMod),
+        Number::New(isolate, cbNeeded),
+        Number::New(isolate, e),
+    };
+    info.GetReturnValue().Set(Array::New(isolate, elemid, 3));
+    //Local<Array> jsArrid = Array::New(isolate, elemid, sizeof(double)*11);
+}
+
+V8FUNC(EnumProcessModulesExWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    HMODULE hMod;
+    DWORD cbNeeded;
+
+    BOOL e = EnumProcessModulesEx((HANDLE)IntegerFI(info[0]), &hMod, sizeof(hMod), &cbNeeded, IntegerFI(info[1]));
+
+    Local<Value> elemid[3] = {
+        Number::New(isolate, (LONG_PTR)hMod),
+        Number::New(isolate, cbNeeded),
+        Number::New(isolate, e),
+    };
+    info.GetReturnValue().Set(Array::New(isolate, elemid, 3));
+    //Local<Array> jsArrid = Array::New(isolate, elemid, sizeof(double)*11);
+}
+
+V8FUNC(GetModuleBaseNameWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    
+    wchar_t name[MAX_PATH] = TEXT("<unknown>");
+    //print(260 << " " << (sizeof(name) / sizeof(wchar_t))); //bruh this shit the same value dawg just put MAX_PATH msdn
+    /*DWORD len = */GetModuleBaseName((HANDLE)IntegerFI(info[0]), (HMODULE)IntegerFI(info[1]), name, MAX_PATH);//sizeof(name) / sizeof(wchar_t)); //is there a reason why they did the nSize param so weird
+
+    info.GetReturnValue().Set(String::NewFromTwoByte(isolate, (const uint16_t*)name).ToLocalChecked());
+}
+
+V8FUNC(GetModuleFileNameWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    wchar_t path[MAX_PATH];
+    GetModuleFileName((HMODULE)IntegerFI(info[0]), path, MAX_PATH);
+
+    info.GetReturnValue().Set(String::NewFromTwoByte(isolate, (const uint16_t*)path).ToLocalChecked());
+}
+
+V8FUNC(GetModuleFileNameExWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    wchar_t path[MAX_PATH];
+    GetModuleFileNameEx((HANDLE)IntegerFI(info[0]), (HMODULE)IntegerFI(info[1]), path, MAX_PATH);
+
+    info.GetReturnValue().Set(String::NewFromTwoByte(isolate, (const uint16_t*)path).ToLocalChecked());
+}
+
+V8FUNC(GetProcessMemoryInfoWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    Local<Context> context = isolate->GetCurrentContext();
+
+    PROCESS_MEMORY_COUNTERS_EX pmc{};
+    GetProcessMemoryInfo((HANDLE)IntegerFI(info[0]), (PROCESS_MEMORY_COUNTERS*)&pmc, sizeof(pmc));
+    Local<Object> obj = Object::New(isolate);
+    obj->Set(context, LITERAL("cb"), Number::New(isolate, pmc.cb));
+    obj->Set(context, LITERAL("PageFaultCount"), Number::New(isolate, pmc.PageFaultCount));
+    obj->Set(context, LITERAL("PeakWorkingSetSize"), Number::New(isolate, pmc.PeakWorkingSetSize));
+    obj->Set(context, LITERAL("WorkingSetSize"), Number::New(isolate, pmc.WorkingSetSize));
+    obj->Set(context, LITERAL("QuotaPeakPagedPoolUsage"), Number::New(isolate, pmc.QuotaPeakPagedPoolUsage));
+    obj->Set(context, LITERAL("QuotaPagedPoolUsage"), Number::New(isolate, pmc.QuotaPagedPoolUsage));
+    obj->Set(context, LITERAL("QuotaPeakNonPagedPoolUsage"), Number::New(isolate, pmc.QuotaPeakNonPagedPoolUsage));
+    obj->Set(context, LITERAL("QuotaNonPagedPoolUsage"), Number::New(isolate, pmc.QuotaNonPagedPoolUsage));
+    obj->Set(context, LITERAL("PagefileUsage"), Number::New(isolate, pmc.PagefileUsage));
+    obj->Set(context, LITERAL("PeakPagefileUsage"), Number::New(isolate, pmc.PeakPagefileUsage));
+    obj->Set(context, LITERAL("PrivateUsage"), Number::New(isolate, pmc.PrivateUsage));
+    info.GetReturnValue().Set(obj);
+}
+
+V8FUNC(CloseHandleWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, CloseHandle((HANDLE)IntegerFI(info[0]))));
+}
+
 v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     using namespace v8;
 
@@ -10036,6 +10197,69 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     setGlobalConst(ALERT_SYSTEM_QUERY);
     setGlobalConst(ALERT_SYSTEM_CRITICAL);
     setGlobalConst(CALERT_SYSTEM);
+
+    setGlobalWrapper(GetWindowThreadProcessId);
+
+    setGlobalWrapper(GetProcessMemoryInfo);
+
+    setGlobalWrapper(EnumProcesses);
+    setGlobalWrapper(OpenProcess);
+    setGlobalWrapper(EnumProcessModules);
+    setGlobalWrapper(EnumProcessModulesEx);
+    setGlobalWrapper(GetModuleBaseName);
+    setGlobalWrapper(GetModuleFileName);
+    setGlobalWrapper(GetModuleFileNameEx);
+    setGlobalWrapper(CloseHandle);
+    setGlobalConst(PROCESS_TERMINATE);
+    setGlobalConst(PROCESS_CREATE_THREAD);
+    setGlobalConst(PROCESS_SET_SESSIONID);
+    setGlobalConst(PROCESS_VM_OPERATION);
+    setGlobalConst(PROCESS_VM_READ);
+    setGlobalConst(PROCESS_VM_WRITE);
+    setGlobalConst(PROCESS_DUP_HANDLE);
+    setGlobalConst(PROCESS_CREATE_PROCESS);
+    setGlobalConst(PROCESS_SET_QUOTA);
+    setGlobalConst(PROCESS_SET_INFORMATION);
+    setGlobalConst(PROCESS_QUERY_INFORMATION);
+    setGlobalConst(PROCESS_SUSPEND_RESUME);
+    setGlobalConst(PROCESS_QUERY_LIMITED_INFORMATION);
+    setGlobalConst(PROCESS_SET_LIMITED_INFORMATION);
+    setGlobalConst(PROCESS_ALL_ACCESS);
+    setGlobalConst(THREAD_TERMINATE);
+    setGlobalConst(THREAD_SUSPEND_RESUME);
+    setGlobalConst(THREAD_GET_CONTEXT);
+    setGlobalConst(THREAD_SET_CONTEXT);
+    setGlobalConst(THREAD_QUERY_INFORMATION);
+    setGlobalConst(THREAD_SET_INFORMATION);
+    setGlobalConst(THREAD_SET_THREAD_TOKEN);
+    setGlobalConst(THREAD_IMPERSONATE);
+    setGlobalConst(THREAD_DIRECT_IMPERSONATION);
+    setGlobalConst(THREAD_SET_LIMITED_INFORMATION);
+    setGlobalConst(THREAD_QUERY_LIMITED_INFORMATION);
+    setGlobalConst(THREAD_RESUME);
+    setGlobalConst(THREAD_ALL_ACCESS);
+    setGlobalConst(JOB_OBJECT_ASSIGN_PROCESS);
+    setGlobalConst(JOB_OBJECT_SET_ATTRIBUTES);
+    setGlobalConst(JOB_OBJECT_QUERY);
+    setGlobalConst(JOB_OBJECT_TERMINATE);
+    setGlobalConst(JOB_OBJECT_SET_SECURITY_ATTRIBUTES);
+    setGlobalConst(JOB_OBJECT_IMPERSONATE);
+    setGlobalConst(JOB_OBJECT_ALL_ACCESS);
+    setGlobalConst(DELETE);
+    setGlobalConst(READ_CONTROL);
+    setGlobalConst(WRITE_DAC);
+    setGlobalConst(WRITE_OWNER);
+    setGlobalConst(SYNCHRONIZE);
+    setGlobalConst(STANDARD_RIGHTS_REQUIRED);
+    setGlobalConst(STANDARD_RIGHTS_READ);
+    setGlobalConst(STANDARD_RIGHTS_WRITE);
+    setGlobalConst(STANDARD_RIGHTS_EXECUTE);
+    setGlobalConst(STANDARD_RIGHTS_ALL);
+    setGlobalConst(SPECIFIC_RIGHTS_ALL);
+    setGlobalConst(LIST_MODULES_32BIT);
+    setGlobalConst(LIST_MODULES_64BIT);
+    setGlobalConst(LIST_MODULES_ALL);
+    setGlobalConst(LIST_MODULES_DEFAULT);
 
 
     setGlobalConst(WICBitmapTransformRotate0);
@@ -11559,6 +11783,7 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
     setGlobalWrapper(GET_WHEEL_DELTA_WPARAM);
 
     setGlobalWrapper(IsIconic);
+    setGlobalWrapper(IsWindowVisible);
     setGlobalWrapper(IsChild);
     setGlobalWrapper(SetParent);
     setGlobalWrapper(GetParent);
