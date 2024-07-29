@@ -69,7 +69,7 @@ function windowProc(hwnd, msg, wp, lp) {
         BitBlt(ps.hdc, mouse.x+306, mouse.y, 507, 516, memDC, 0, 0, SRCCOPY); //pure gdi
         DeleteDC(memDC);
 
-        memDC = CreateCompatibleDC(ps.hdc);
+        memDC = CreateCompatibleDC(ps.hdc); //do i have to remake the memDC here?
         SelectObject(memDC, patbltBitmap);
         //                (patblt.png is 306, 936)
         BitBlt(ps.hdc, mouse.x, mouse.y, 306, 936, memDC, 0, 0, SRCCOPY); //pure gdi

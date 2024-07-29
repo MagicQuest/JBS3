@@ -2068,17 +2068,23 @@ namespace DIRECT2D {
             D2D1_RECT_U rect = D2D1::RectU(IntegerFI(info[3]), IntegerFI(info[4]), IntegerFI(info[5]), IntegerFI(info[6]));
             
             ID2D1RenderTarget* rt = (ID2D1RenderTarget*)IntegerFI(info[2]);//info[2].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()->IntegerValue(isolate->GetCurrentContext()).FromJust();
-            bmp->CopyFromRenderTarget(&point, rt, &rect);
+            RetIfFailed(bmp->CopyFromRenderTarget(&point, rt, &rect), "CopyFromRenderTarget failed!~");
         }));
-        //jsBitmap->Set(isolate, "CopyFromMemory", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-        //    Isolate* isolate = info.GetIsolate();
-        //    ID2D1Bitmap* bmp = (ID2D1Bitmap*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-        //    
-        //    D2D1_POINT_2U* point = &D2D1::Point2U(IntegerFI(info[0]), IntegerFI(info[1]));
-        //    D2D1_RECT_U* rect = &D2D1::RectU(IntegerFI(info[3]), IntegerFI(info[4]), IntegerFI(info[5]), IntegerFI(info[6]));
-        //    
-        //    bmp->CopyFromMemory(point, (ID2D1Bitmap*)IntegerFI(info[2]), rect);
-        //}));
+        jsBitmap->Set(isolate, "CopyFromMemory", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) { //oops i made this because i wanted to convert HICON to ID2D1Bitmap BUT wic can already basically do that with CreateBitmapFromHICON
+            Isolate* isolate = info.GetIsolate();
+            ID2D1Bitmap* bmp = (ID2D1Bitmap*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            
+            //D2D1_POINT_2U point = D2D1::Point2U(IntegerFI(info[0]), IntegerFI(info[1]));
+            D2D1_RECT_U rect = D2D1::RectU(IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]));
+            
+            DWORD* data = nullptr;//new DWORD[jsBits->Length()];
+            Local<Uint32Array> jsBits = info[4].As<Uint32Array>();
+            data = new DWORD[jsBits->Length()]; //genius code stolen from my StretchDIBits func
+            jsBits->CopyContents(data, jsBits->ByteLength()); //hell yeah (i was using jsBits->Length() instead of ByteLength)
+            
+
+            RetIfFailed(bmp->CopyFromMemory(&rect, data, sizeof(DWORD)*(rect.right-rect.left)), "CopyFromMemory failed!");
+        }));
         //jsBitmap->Set(isolate, "Release", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
         //    Isolate* isolate = info.GetIsolate();
         //    ID2D1Bitmap* bmp = (ID2D1Bitmap*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
@@ -9892,6 +9898,39 @@ V8FUNC(CloseHandleWrapper) {
     info.GetReturnValue().Set(Number::New(isolate, CloseHandle((HANDLE)IntegerFI(info[0]))));
 }
 
+V8FUNC(ExtractAssociatedIconWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    Local<Context> context = isolate->GetCurrentContext();
+    WORD uhidk;
+    Local<Object> yk = Object::New(isolate);
+    yk->Set(context, LITERAL("icon"), Number::New(isolate, (LONG_PTR)ExtractAssociatedIcon((HINSTANCE)IntegerFI(info[0]), (wchar_t*)*String::Value(isolate, info[1]), &uhidk)));
+    yk->Set(context, LITERAL("id"), Number::New(isolate, uhidk));
+    info.GetReturnValue().Set(yk);
+    //print("travago -> " << uhidk);
+}
+
+V8FUNC(GlobalMemoryStatusExWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    Local<Context> context = isolate->GetCurrentContext();
+    MEMORYSTATUSEX msex{};
+    msex.dwLength = sizeof(msex);
+    BOOL shit = GlobalMemoryStatusEx(&msex);
+    Local<Object> yk = Object::New(isolate);
+    yk->Set(context, LITERAL("success"), Number::New(isolate, shit));
+    yk->Set(context, LITERAL("dwLength"), Number::New(isolate, msex.dwLength));
+    yk->Set(context, LITERAL("dwMemoryLoad"), Number::New(isolate, msex.dwMemoryLoad));
+    yk->Set(context, LITERAL("ullTotalPhys"), Number::New(isolate, msex.ullTotalPhys));
+    yk->Set(context, LITERAL("ullAvailPhys"), Number::New(isolate, msex.ullAvailPhys));
+    yk->Set(context, LITERAL("ullTotalPageFile"), Number::New(isolate, msex.ullTotalPageFile));
+    yk->Set(context, LITERAL("ullAvailPageFile"), Number::New(isolate, msex.ullAvailPageFile));
+    yk->Set(context, LITERAL("ullTotalVirtual"), Number::New(isolate, msex.ullTotalVirtual));
+    yk->Set(context, LITERAL("ullAvailVirtual"), Number::New(isolate, msex.ullAvailVirtual));
+    yk->Set(context, LITERAL("ullAvailExtendedVirtual"), Number::New(isolate, msex.ullAvailExtendedVirtual));
+    info.GetReturnValue().Set(yk);
+}
+
 v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     using namespace v8;
 
@@ -10261,6 +10300,7 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     setGlobalConst(LIST_MODULES_ALL);
     setGlobalConst(LIST_MODULES_DEFAULT);
 
+    setGlobalWrapper(GlobalMemoryStatusEx);
 
     setGlobalConst(WICBitmapTransformRotate0);
     setGlobalConst(WICBitmapTransformRotate90);
@@ -11202,6 +11242,7 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
     setGlobalWrapper(DrawIconEx);
     setGlobalWrapper(DrawIcon);
     setGlobalWrapper(LoadIcon);
+    setGlobalWrapper(ExtractAssociatedIcon);
     setGlobalWrapper(HICONFromHBITMAP);
     setGlobalWrapper(GetIconDimensions);
     setGlobal(GetBitmapDimensions);
