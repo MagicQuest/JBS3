@@ -145,6 +145,8 @@
 //#include "JSWindow.h"
 //std::map<int, JSWindow*> JSWindow::jsWindows = {}; //bruh what is this line
 
+#include "Direct2D.h"
+
 int screenWidth, screenHeight;
 
 namespace jsImpl {
@@ -199,6 +201,98 @@ namespace jsImpl {
         return jsArray;
         //aDA(isolate, jsArray, args...);
     }
+
+    Local<ObjectTemplate> JSDWriteFontFamily;
+    Local<ObjectTemplate> JSDWriteFont;
+    void initObjectTemplates(Isolate* isolate) {
+        //https://www.codeproject.com/Articles/5351958/Direct2D-Tutorial-Part-5-Text-Display-and-Font-Enu
+        JSDWriteFont = ObjectTemplate::New(isolate);
+        JSDWriteFont->Set(isolate, "IsSymbolFont", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            IDWriteFont* font = (IDWriteFont*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            info.GetReturnValue().Set(Number::New(isolate, font->IsSymbolFont()));
+        }));
+        JSDWriteFont->Set(isolate, "GetFontFamily", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            IDWriteFont* font = (IDWriteFont*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            IDWriteFontFamily* fontFamily; RetIfFailed(font->GetFontFamily(&fontFamily), "GetFontFamily failed!");
+            //info.GetReturnValue().Set(DIRECT2D::getDWriteFontFamilyImpl(isolate, fontFamily)); //oh boy...
+        }));
+        JSDWriteFont->Set(isolate, "GetSimulations", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            IDWriteFont* font = (IDWriteFont*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            info.GetReturnValue().Set(Number::New(isolate, font->GetSimulations()));
+        }));
+        JSDWriteFont->Set(isolate, "GetStretch", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            IDWriteFont* font = (IDWriteFont*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            info.GetReturnValue().Set(Number::New(isolate, font->GetStretch()));
+        }));
+        JSDWriteFont->Set(isolate, "GetStyle", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            IDWriteFont* font = (IDWriteFont*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            info.GetReturnValue().Set(Number::New(isolate, font->GetStyle()));
+        }));
+        JSDWriteFont->Set(isolate, "GetWeight", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            IDWriteFont* font = (IDWriteFont*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            info.GetReturnValue().Set(Number::New(isolate, font->GetWeight()));
+        }));
+        JSDWriteFont->Set(isolate, "Release", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            IDWriteFont* font = (IDWriteFont*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            info.GetReturnValue().Set(Number::New(isolate, font->Release()));
+        }));
+        JSDWriteFontFamily = ObjectTemplate::New(isolate);
+        JSDWriteFontFamily->Set(isolate, "GetFamilyName", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            IDWriteFontFamily* fontFamily = (IDWriteFontFamily*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+            IDWriteLocalizedStrings* names;
+            RetIfFailed(fontFamily->GetFamilyNames(&names), "GetFamilyNames failed!");
+            wchar_t wname[100];
+            //print(_countof(wname) << " 100"); //of course it's the exact same number (bro just put 100 why the docs tweaking)
+            RetIfFailed(names->GetString(0, wname, 100), "GetString error!"); //wtf is _countof bro
+
+            info.GetReturnValue().Set(String::NewFromTwoByte(isolate, (const uint16_t*)wname).ToLocalChecked());
+        }));
+        JSDWriteFontFamily->Set(isolate, "GetFonts", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            Local<Context> context = isolate->GetCurrentContext();
+            IDWriteFontFamily* fontFamily = (IDWriteFontFamily*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+            std::vector<Local<Value>> jsFonts = std::vector<Local<Value>>();
+            UINT32 fontCount = fontFamily->GetFontCount();
+
+
+            for (UINT32 j = 0; j < fontCount; ++j)
+            {
+                IDWriteFont* font;
+                RetIfFailed(fontFamily->GetFont(j, &font), "GetFont failed! (d2d.GetFonts)");
+                if (!font)
+                    continue;
+
+                Local<Object> jsFont = JSDWriteFont->NewInstance(context).ToLocalChecked();
+                jsFont->Set(context, LITERAL("internalPtr"), Number::New(isolate, (LONG_PTR)font));
+                jsFonts.push_back(jsFont);
+            }
+
+            Local<Array> jsFonts2 = Array::New(isolate, &jsFonts[0], jsFonts.size()); //so many fun ways...
+            info.GetReturnValue().Set(jsFonts2);
+        }));
+        JSDWriteFontFamily->Set(isolate, "GetFontCount", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            IDWriteFontFamily* fontFamily = (IDWriteFontFamily*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            
+            info.GetReturnValue().Set(Number::New(isolate, fontFamily->GetFontCount()));
+        }));
+        JSDWriteFontFamily->Set(isolate, "Release", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            IDWriteFontFamily* fontFamily = (IDWriteFontFamily*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            info.GetReturnValue().Set(Number::New(isolate, fontFamily->Release()));
+        }));
+
+    }
 }
 
 //const char* ToCString(const v8::String::Utf8Value& value) {
@@ -245,17 +339,33 @@ const char* Highlight(v8::Isolate* isolate, HANDLE console, v8::Local<v8::Value>
     return "";
 }
 
+void RawPrint(const v8::FunctionCallbackInfo<v8::Value>& info) {
+    for (int i = 0; i < info.Length(); i++) {
+        v8::HandleScope handle_scope(info.GetIsolate());
+        //if (i > 0) {
+        //    print(" "); 
+        //}
+        v8::String::Utf8Value str(info.GetIsolate(), info[i]);
+        const char* cstr = *str ? *str : "<string conversion failed>";
+        print(cstr);
+        print(" ");
+    }
+}
+
 void Print(const v8::FunctionCallbackInfo<v8::Value>& info) {
-    bool first = true;
+    //bool first = true;
     HANDLE console = GetStdHandle(STD_OUTPUT_HANDLE);
     for (int i = 0; i < info.Length(); i++) {
         v8::HandleScope handle_scope(info.GetIsolate());
-        if (first) {
-            first = false;
-        }
-        else {
-            printf(" ");
-        }
+        //if (i > 0) { //you know what no i don't even have to do THIS
+        //    printf(" ");
+        //}
+        //if (first) { //what the fuck was i on brooooooooooo WHAT THE FUCK
+        //    first = false;
+        //}
+        //else {
+        //    printf(" ");
+        //}
         v8::String::Utf8Value str(info.GetIsolate(), info[i]);
         const char* cstr = *str ? *str: "<string conversion failed>";//ToCString(str);
         printf("%s", Highlight(info.GetIsolate(), console, info[i])); //print syntax colors for the console
@@ -287,6 +397,7 @@ void Print(const v8::FunctionCallbackInfo<v8::Value>& info) {
         //    SetConsoleTextAttribute(console, 3);
         //}
         printf("%s", cstr);
+        printf(" ");
         //printf("%s%s\033[0m",color,cstr);
     }
     printf("\n");
@@ -596,6 +707,20 @@ V8FUNC(clearInterval) {
     }
     delete setIntervalTimer::timers[id];
     setIntervalTimer::timers.erase(id);
+}
+
+V8FUNC(GetStdHandleWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)GetStdHandle(IntegerFI(info[0]))));
+}
+
+V8FUNC(SetConsoleTextAttributeWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, SetConsoleTextAttribute((HANDLE)IntegerFI(info[0]), IntegerFI(info[1]))));
 }
 
 //V8FUNC(nigga) {
@@ -1210,7 +1335,7 @@ V8FUNC(BeepWrapper) {
 
 //weird how defining the macros in goodmacrosfordirect2dandwichelper.h right here caused visual studio to die
 
-#include "Direct2D.h"
+//include Direct2D.h moved above jsImpl (for goodmacrosfordirect2dandwichelper.h)
 #include "Direct2D11.h"
 #include "Canvas2DRenderingContext.h"
 #include "WICHelper.h"
@@ -1801,6 +1926,14 @@ namespace DIRECT2D {
         //    font->Release();
         //}));
         return jsFont;
+    }
+
+    Local<Object> getDWriteFontFamilyImpl(Isolate* isolate, IDWriteFontFamily* fontFamily) {
+        Local<Context> context = isolate->GetCurrentContext();
+        Local<Object> jsFontFamily = jsImpl::JSDWriteFontFamily->NewInstance(isolate->GetCurrentContext()).ToLocalChecked();
+        
+        jsFontFamily->Set(context, LITERAL("internalPtr"), Number::New(isolate, (LONG_PTR)fontFamily));
+        return jsFontFamily;
     }
 
     Local<Object> getWICBitmapImpl(Isolate* isolate, /*IWICBitmapSource*/IWICBitmapSource* wicBitmap, GUID format) {
@@ -4025,6 +4158,32 @@ V8FUNC(createCanvas) {
             }));
 
             info.GetReturnValue().Set(jsLayout->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
+        }));
+        context->Set(isolate, "EnumFonts", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+            IDWriteFontCollection* fontCollection;
+            RetIfFailed(d2d->textfactory->GetSystemFontCollection(&fontCollection, TRUE), "GetSystemFontCollection failed!Q");
+            UINT32 familyCount = fontCollection->GetFontFamilyCount();
+
+            Local<Function> func = info[0].As<Function>();
+
+            for (UINT32 i = 0; i < familyCount; ++i)
+            {
+                IDWriteFontFamily* fontFamily;
+                RetIfFailed(fontCollection->GetFontFamily(i, &fontFamily), "GetFontFamily failed!");
+                if (!fontFamily)
+                    continue;
+
+                Local<Value> args[] = { DIRECT2D::getDWriteFontFamilyImpl(isolate, fontFamily) };
+
+                v8::TryCatch shit(isolate);
+
+                MaybeLocal<Value> returnedValue = func->Call(isolate->GetCurrentContext(), isolate->GetCurrentContext()->Global(), 1, args);
+
+                CHECKEXCEPTIONS(shit);
+            }
         }));
         context->Set(isolate, "DrawText", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
             Isolate* isolate = info.GetIsolate();
@@ -9817,7 +9976,7 @@ V8FUNC(EnumProcessModulesWrapper) {
         Number::New(isolate, e),
     };
     info.GetReturnValue().Set(Array::New(isolate, elemid, 3));
-    //Local<Array> jsArrid = Array::New(isolate, elemid, sizeof(double)*11);
+    //Local<Array> jsArrid = Array::New(isolate, elemid, sizeof(double)*11); //since the last param is a size_t i thought that it wanted the byteLength
 }
 
 V8FUNC(EnumProcessModulesExWrapper) {
@@ -9942,7 +10101,9 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     //
     //global->Set(isolate, "console", console);
 
+
     global->Set(isolate, "print", FunctionTemplate::New(isolate, Print));
+    global->Set(isolate, "printNoHighlight", FunctionTemplate::New(isolate, RawPrint));
     // Bind the global 'read' function to the C++ Read callback.
     // Bind the 'version' function
     global->Set(isolate, "version", FunctionTemplate::New(isolate, Version));
@@ -10009,6 +10170,9 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     setGlobalWrapper(SetTimer);
     setGlobalWrapper(KillTimer);
 
+    setGlobalWrapper(GetStdHandle);
+    setGlobalWrapper(SetConsoleTextAttribute);
+
     setGlobalWrapper(MAKEROP4);
     setGlobalWrapper(CreatePatternBrush);
     setGlobalWrapper(CreateHatchBrush);
@@ -10054,6 +10218,26 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     setGlobalConst(VAR_BOOLEAN);
     setGlobalConst(VAR_CSTRING);
     setGlobalConst(VAR_WSTRING);
+
+    setGlobalConst(FOREGROUND_BLUE); //for SetConsoleTextAttribute i think
+    setGlobalConst(FOREGROUND_GREEN);
+    setGlobalConst(FOREGROUND_RED);
+    setGlobalConst(FOREGROUND_INTENSITY);
+    setGlobalConst(BACKGROUND_BLUE);
+    setGlobalConst(BACKGROUND_GREEN);
+    setGlobalConst(BACKGROUND_RED);
+    setGlobalConst(BACKGROUND_INTENSITY);
+    setGlobalConst(COMMON_LVB_LEADING_BYTE);
+    setGlobalConst(COMMON_LVB_TRAILING_BYTE);
+    setGlobalConst(COMMON_LVB_GRID_HORIZONTAL);
+    setGlobalConst(COMMON_LVB_GRID_LVERTICAL);
+    setGlobalConst(COMMON_LVB_GRID_RVERTICAL);
+    setGlobalConst(COMMON_LVB_REVERSE_VIDEO);
+    setGlobalConst(COMMON_LVB_UNDERSCORE);
+    setGlobalConst(COMMON_LVB_SBCSDBCS);
+    setGlobalConst(STD_INPUT_HANDLE);
+    setGlobalConst(STD_OUTPUT_HANDLE);
+    setGlobalConst(STD_ERROR_HANDLE);
 
 //#define setGlobalGUID(id) { Local<Value> elem##id[] = {Number::New(isolate, id.Data1), Number::New(isolate, id.Data2), Number::New(isolate, id.Data3), Number::New(isolate, id.Data4[0]), Number::New(isolate, id.Data4[1]), Number::New(isolate, id.Data4[2]), Number::New(isolate, id.Data4[3]), Number::New(isolate, id.Data4[4]), Number::New(isolate, id.Data4[5]), Number::New(isolate, id.Data4[6]), Number::New(isolate, id.Data4[7])}; Local<Array> jsArr##id = Array::New(isolate, elem##id, 11); global->Set(isolate, #id, jsArr##id); }
     //setGlobalGUID(GUID_WICPixelFormat32bppPBGRA);
@@ -11335,6 +11519,8 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
     setGlobalWrapper(SetTextColor);
 
     //jsEffectOT = DIRECT2D::getIUnknownImpl(isolate, nullptr);
+    jsImpl::initObjectTemplates(isolate);
+
     jsEffectOT = ObjectTemplate::New(isolate);
 
     jsEffectOT->Set(isolate, "Release", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {

@@ -24,12 +24,33 @@ class Window {
     }
 }
 
+function secondwindowproc(js, hwnd, msg, wp, lp) {
+    if(msg == WM_CREATE) {
+        print("HELLO FROM SECOND WINDOW!");
+        js.hwnd = hwnd;
+        js.d2d = createCanvas("d2d", ID2D1DeviceContextDComposition, hwnd);
+        js.font = js.d2d.CreateFont("comic sans ms", 32);
+        js.brush = js.d2d.CreateSolidColorBrush(0.0, 1.0, 1.0, 1.0);
+        //SetLayeredWindowAttributes(hwnd, RGB(255, 255, 255), 0, LWA_COLORKEY);
+        js.d2d.Commit();
+        SetTimer(hwnd, NULL, 30);
+    }else if(msg == WM_TIMER) {
+        let {d2d, brush, font} = js;
+        d2d.BeginDraw();
+        d2d.Clear(0.0, 0.0, 0.0, 0.0);
+        d2d.DrawText("skibidi babye", font, 0, 0, 256, 256, brush);
+        d2d.EndDraw();
+    }
+}
+
 let d = Date.now();
 new Window(WS_EX_OVERLAPPEDWINDOW, "winjsclazz", Math.random() > .5 ? "https://www.youtube.com/watch?v=EEbZuIFzdb8" : "https://www.youtube.com/watch?v=m91d4ck8tKM", WS_OVERLAPPEDWINDOW | WS_VISIBLE, screenWidth / 2, screenHeight / 2, 512, 512,
 (jswindow, hwnd, msg, wp, lp) => {
     if(msg == WM_CREATE) {
         print("hell yeah");
+        jswindow.hwnd = hwnd;
         SetTimer(hwnd, NULL, 30);
+        new Window(WS_EX_NOREDIRECTIONBITMAP/* | WS_EX_LAYERED*/, "winjsclazz2", "erm... a second window???", WS_POPUP | WS_VISIBLE, 0, 0, 256, 256, secondwindowproc);
     }else if(msg == WM_TIMER) {
         //print(jswindow);
         jswindow.title = Date.now()-d;

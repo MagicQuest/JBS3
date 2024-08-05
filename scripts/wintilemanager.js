@@ -11,12 +11,15 @@ const mw = 16000/res; //mem worth (16000 because i only have 16 gb of memory)
 const wh = Math.round(Math.sqrt(res));
 const space = Math.round(bounds/wh);
 
-let modules = {};
+//let modules = {};
 let windows = {};
 let lastApps = {};
 let apps = {};
+let newapp = 0;
 
 let trans = false; //lol
+
+let textnotificationshit = [];
 
 function findspaceforapp(path, id = undefined) {
     let cell, x, y;
@@ -32,7 +35,37 @@ function findspaceforapp(path, id = undefined) {
         apps[path].center = [x, y];
         cells[x][y].appid = path; //nextcells or just cells we;ll see (nope brainblast it's cells because this function is called before any drawing/logic is done on the cells)
     }else {
-        print("failed to make space for "+apps[path].name);
+        //\033[0m
+        //tried using printNoHighlight but it lowkey also didn't work
+        //for some reason when i added printNoHighlight like the other day i didn't think to add the actual functions i used to color the text
+        let console = GetStdHandle(STD_OUTPUT_HANDLE);
+        SetConsoleTextAttribute(console, 4);
+        printNoHighlight(/*"\x1b[31;1m*/`failed to ${!id ? "make space" : "recenter"} for `+apps[path].name);//+"\x1b[0m");
+        printNoHighlight(/*"\x1b[96m*/"trying again...");//\x1b[0m");
+        printNoHighlight("looking for id "+id);
+        //let b = false; //oh shit labels are a thing like actually (i thought it was an old thing like goto or something that got removed a long time ago)
+        b: for(let j = 0; j < wh; j++) {
+            for(let i = 0; i < wh; i++) {
+                if(cells[i][j].appid == id) {
+                    cell = true;
+                    SetConsoleTextAttribute(console, 7);
+                    printNoHighlight("FOUND!");
+                    //b = true;
+                    break b;
+                }
+            }
+            //if(b) {
+                //break;
+            //}
+        }
+
+        if(cell) {
+            apps[path].center = [x, y];
+            cells[x][y].appid = path;
+        }else {
+            printNoHighlight(/*"\x1b[31;1m*/"absolutely no space left for "+apps[path].name+" (apparently?)");//"\x1b[0m(apparently?)");
+        }
+        SetConsoleTextAttribute(console, 7);
     }
 }
 
@@ -47,6 +80,32 @@ function get_component(color, index) //https://stackoverflow.com/questions/14557
 //    return (w*y-1)+x;
 //}
 
+class Color3 { //that's fun... (roblox lua reference)
+    constructor(r, g, b) {
+        this.r = r;
+        this.g = g;
+        this.b = b;
+    }
+    new(r, g, b) {
+        this.r = r;
+        this.g = g;
+        this.b = b;
+    }
+    rgb() {
+        return [this.r, this.g, this.b];
+    }
+    get magnitude() {
+        return Math.sqrt(this.r**2 + this.g**2 + this.b**2);
+    }
+    set magnitude(value) {
+        let old = this.magnitude;
+        let ratio = value/old;
+        this.r = Math.min(this.r*ratio, 1);
+        this.g = Math.min(this.g*ratio, 1);
+        this.b = Math.min(this.b*ratio, 1);
+    }
+}
+
 function randomcolorandd2dbitmapfromHICON(icon) {
     let wicbmp = wic.CreateBitmapFromHICON(icon, wic.GUID_WICPixelFormat32bppPBGRA); //i thought this would give me transparency but maybe not (oh yeah ID2D1RenderTarget is premultiplied alpha but ID2D1DeviceContext and up is straight or whatever)
     //print(`icon: ${icon}  wic: `, wicbmp);
@@ -56,7 +115,7 @@ function randomcolorandd2dbitmapfromHICON(icon) {
     let pixels = wicbmp.GetPixels(wic);
     d2dicon.CopyFromMemory(0, 0, dim.width, dim.height, pixels);
     //[dim.width/2, dim.height/2]
-    blurRGBA(pixels, dim.width, dim.height, 3);
+    blurRGBA(pixels, dim.width, dim.height, 3); //blur because i wanted like an "average" of all the colors but since it;s "transparent" it just blurs to black so idgaf anymore and im just gonna keep this line anyways
     //let e = xyz(Math.floor(Math.random()*dim.width), Math.floor(Math.random()*dim.height), dim.width, dim.height);
     let rc = pixels[Math.floor(Math.random()*(dim.width*dim.height))];//(dim.width*dim.height)/2];
     //for(let i = 0; i < pixels.length; i++) {
@@ -65,9 +124,21 @@ function randomcolorandd2dbitmapfromHICON(icon) {
     //}
     //print(e, pixels.length, rc, color);
     //apps[path].d2dicon = d2dicon;
+
+    let trc = pixels[Math.floor(Math.random()*(dim.width*dim.height))];
+    let tc3 = new Color3(get_component(trc, 2)/255, get_component(trc, 1)/255, get_component(trc, 0)/255);
+    if(tc3.magnitude < (Math.sqrt(3)/2.0)) {
+        //printNoHighlight(tc3.rgb());
+        tc3.magnitude = 1.2;
+        //printNoHighlight(tc3.rgb());
+    }else {
+        tc3.magnitude+=.2;
+    }
+    let textcolor = tc3.rgb();
+    
     wicbmp.Release();
     DestroyIcon(icon);
-    return {color: [get_component(rc, 2)/255, get_component(rc, 1)/255, get_component(rc, 0)/255], d2dicon};
+    return {color: [get_component(rc, 2)/255, get_component(rc, 1)/255, get_component(rc, 0)/255], d2dicon/*, pixels*/, textcolor};
 }
 
 function updateMemoryShits(pid) {//PrintProcessNameAndID(pid) { //https://learn.microsoft.com/en-us/windows/win32/psapi/enumerating-all-processes
@@ -106,9 +177,12 @@ function updateMemoryShits(pid) {//PrintProcessNameAndID(pid) { //https://learn.
                         if(!apps[path]) {
                             let {icon, id} = ExtractAssociatedIcon(hInstance, path);
                             //print(`travago -> ${id} (${name})`);
-                            let {color, d2dicon} = randomcolorandd2dbitmapfromHICON(icon);
+                            let {color, d2dicon, textcolor/*, pixels*/} = randomcolorandd2dbitmapfromHICON(icon);
                             //quit;
-                            apps[path] = {memTotal: 0, color/*: [Math.random(), Math.random(), Math.random()]*/, d2dicon, name};
+                            //let trc = pixels[Math.floor(Math.random()*(dim.width*dim.height))];
+                            //let textcolor = [get_component(trc, 2)/255, get_component(trc, 1)/255, get_component(trc, 0)/255];
+                    
+                            apps[path] = {memTotal: 0, color/*: [Math.random(), Math.random(), Math.random()]*/, d2dicon, name, textcolor};
                             //honestly it's crazy that this worked
                             //let dim = GetIconDimensions(icon);
                             ////hbm = CreateDIBSection(dc, CreateDIBitmapSimple(220, -183, 32), DIB_RGB_COLORS);
@@ -169,17 +243,19 @@ function initiateimportantstufftogetmemoryusage() {
     EnumProcesses(updateMemoryShits);
     if(Object.keys(lastApps).length == 0) {
         //first run meaning we need to add the "Other" app
-        let {color, d2dicon} = randomcolorandd2dbitmapfromHICON(defaulticon);
+        let {color, d2dicon, textcolor/*, pixels*/} = randomcolorandd2dbitmapfromHICON(defaulticon);
+        //let trc = pixels[Math.floor(Math.random()*(dim.width*dim.height))];
+        //let textcolor = [get_component(trc, 2)/255, get_component(trc, 1)/255, get_component(trc, 0)/255];
                                                             //converting the percentage of how many cells should be used but aren't to the amount of cells that should be taken up to the corresponding size in MB so i can do the memLeft shit you feel me (type shit)
         //if memoryusage is 90% and cellusage is 72.5%
         //we subtract 90 - 72.5 -> 17.5% then divide that (.175) then multiply it by res (32000) to get 5600 (this is the amount of cells that make up 17.5 percent of the window) now we need to figure out how much memory each cell is worth (hey we've got a variable for that!)
         let memTotal = (((memoryusage-cellusage)/100)*res)*mw; //i mean that's probably right idk
-        apps["Other"] = {name: "Other processes idk lol", color, d2dicon, memTotal}; //can't add memLeft yet because uhhhh yk
+        apps["Other"] = {name: "Other processes idk lol", color, d2dicon, memTotal, textcolor}; //can't add memLeft yet because uhhhh yk
     }else {
         let memTotal = (((memoryusage-cellusage)/100)*res)*mw;
         apps["Other"].memTotal = memTotal;
     }
-        
+    
     apps["Other"].fresh = true;
     
     let removedApps = {};
@@ -197,6 +273,8 @@ function initiateimportantstufftogetmemoryusage() {
                 app.memLeft += app.memTotal-lastApps[path].memTotal;
             }else {
                 print("New app found: "+app.name);
+                newapp = 99;
+                textnotificationshit.push({t: 0, text: app.name, color: [Math.random(), Math.random(), Math.random()], x: Math.round(Math.random()*(bounds-200))});
                 app.memLeft = app.memTotal;
             }
             if(app.cells <= 0) {
@@ -231,6 +309,11 @@ function initiateimportantstufftogetmemoryusage() {
             apps[path].cells = 0;
         }
     }
+}
+
+function dotransparency(hwnd,trans) {
+    SetLayeredWindowAttributes(hwnd, NULL, trans ? 51 : 255, LWA_ALPHA);
+    SetWindowLongPtr(hwnd, GWL_EXSTYLE, WS_EX_LAYERED | WS_EX_TOPMOST | WS_EX_OVERLAPPEDWINDOW | (trans ? WS_EX_TRANSPARENT : 0));
 }
 
 function windowProc(hwnd, msg, wp, lp) {
@@ -277,14 +360,39 @@ function windowProc(hwnd, msg, wp, lp) {
         SetTimer(hwnd, NULL, 32);
     }else if(msg == WM_TIMER) {
         //print("tick...");
+        //let d = Date.now();
         initiateimportantstufftogetmemoryusage();
+        //print(`took ${Date.now()-d}ms to update memory usage`); //apparently it normally only takes ~85ms (give or take like 15ms)
         //if(frame % 4 == 0) {
         //    recalcCenters();
         //}
         if(GetKeyDown(VK_TAB)) {
             trans = !trans;
-            SetLayeredWindowAttributes(hwnd, NULL, trans ? 51 : 255, LWA_ALPHA);
-            SetWindowLongPtr(hwnd, GWL_EXSTYLE, WS_EX_LAYERED | WS_EX_TOPMOST | WS_EX_OVERLAPPEDWINDOW | (trans ? WS_EX_TRANSPARENT : 0));
+            dotransparency(hwnd, trans);
+        }
+        if(newapp) { //do blinking effect when new app is added if the window was transparent
+            //print(newapp, trans);
+            if(newapp > 0) { //newapp's value when first set is 99
+                if(trans) { //if the window is currently transparent then this will negate newapp's number (and this if statement will only fire the first time)
+                    newapp = -newapp;
+                }else { //if it wasn't transparent then idgaf
+                    newapp = 0;
+                }
+            }else {
+                //now that we know the window was transparent when newapp was set to 99 we can do the thing
+                let s = -Math.round(newapp/33);
+                if(s == 3) {
+                    dotransparency(hwnd, false);
+                }else if(s == 2) {
+                    dotransparency(hwnd, false);
+                }else if(s == 1) {
+                    dotransparency(hwnd, true);
+                }
+                newapp+=9;
+            }
+            //if(newapp == 0) { //lawl (replace every l with r >:3)
+                //newapp = 0;
+            //}
         }
         d2d.BeginDraw();
         d2d.Clear(0,0,0);
@@ -297,6 +405,7 @@ function windowProc(hwnd, msg, wp, lp) {
                 if(cell.appid) {
                     const app = apps[cell.appid];
                     color = app.color;
+                    if(cell.appid == mouse?.path) color = color.map((w)=>w+.1);
                     app.cells++;
                     //bruh.SetColor(1.0, 1.0, 1.0);
                     //d2d.DrawText(apps[cell.appid].name, font, x, y-space, bounds, bounds, bruh);
@@ -390,28 +499,46 @@ function windowProc(hwnd, msg, wp, lp) {
             if(shownames) {
                 bruh.SetColor(0.0, 0.0, 0.0);
                 d2d.DrawText(`${app.name} (${Math.round(app.memTotal*10)/10} MB)`, font, (x)+1, (y)+17, bounds, bounds, bruh);
-                bruh.SetColor(1.0, 1.0, 1.0);
+                bruh.SetColor(...app.textcolor);
                 d2d.DrawText(`${app.name} (${Math.round(app.memTotal*10)/10} MB)`, font, x, y+16, bounds, bounds, bruh);
             }
-            d2d.DrawBitmap(app.d2dicon, x, y, x+16, y+16, 1.0); //how did this bullshit actually work -> https://www.youtube.com/watch?v=komb7TaF-6o
+            d2d.DrawBitmap(app.d2dicon, x, y, x+16, y+16, 1.0); //<- how did this bullshit actually work -> https://www.youtube.com/watch?v=komb7TaF-6o
             if(path != "Other") {
                 totalCells += app.cells;
             }
             realTotal += app.cells;
             //DrawIcon(dc, app.center[0]*space, app.center[1]*space, app.icon);
         }
-        print(`${Math.floor((totalCells/res)*1000)/10}% memory used according to the cells ${res} ${totalCells}`); //since this isn't equal to the actual memory used i might just make some fake app to take up the space
-        if(mouse) {
+        //print(`${Math.floor((totalCells/res)*1000)/10}% memory used according to the cells ${res} ${totalCells}`); //since this isn't equal to the actual memory used i might just make some fake app to take up the space
+        if(Object.keys(mouse).length) {
             //print(mouse);
             let mx = Math.floor(mouse.x/space);
             let my = Math.floor(mouse.y/space);
             const app = apps[cells[mx][my].appid];
+            mouse.path = cells[mx][my].appid;
             if(app) {
                 //d2d.FillRectangle(mx, my, mx+space, my+space, bruh);
                 bruh.SetColor(0.0, 0.0, 0.0);
                 d2d.DrawText(`${app.name} (${Math.round(app.memTotal*10)/10} MB) (${app.memLeft} MB Left)`, hoverfont, (mx*space)+2, (my*space)+2, bounds, bounds, bruh);
                 bruh.SetColor(Math.random(), Math.random(), Math.random());
                 d2d.DrawText(`${app.name} (${Math.round(app.memTotal*10)/10} MB) (${app.memLeft} MB Left)`, hoverfont, mx*space, my*space, bounds, bounds, bruh);
+            }
+        }
+        if(textnotificationshit.length) {
+            let removed = [];
+            for(let tnshit of textnotificationshit) {
+                tnshit.t+=2;
+                bruh.SetColor(0.0, 0.0, 0.0, 1-(tnshit.t)/100);
+                d2d.DrawText(`New process: ${tnshit.text}`, hoverfont, tnshit.x, (bounds/1.5)-tnshit.t+2,bounds, bounds, bruh);
+                bruh.SetColor(...tnshit.color, 1-(tnshit.t)/100);
+                d2d.DrawText(`New process: ${tnshit.text}`, hoverfont, tnshit.x+2, (bounds/1.5)-tnshit.t,bounds, bounds, bruh);
+                if(1-(tnshit.t)/100 < 0.0) {
+                    //textnotificationshit = undefined;
+                    removed.push(tnshit.text);
+                }
+            }
+            for(let text of removed) {
+                textnotificationshit.splice(textnotificationshit.findIndex((e) => e.text == text), 1); //oh yeah i did this number in TOUHOU.js
             }
         }
         let msex = GlobalMemoryStatusEx();
@@ -426,11 +553,13 @@ function windowProc(hwnd, msg, wp, lp) {
         d2d.EndDraw();
         frame++;
     }else if(msg == WM_MOUSEMOVE) {
-        mouse = MAKEPOINTS(lp);
+        let {x, y} = MAKEPOINTS(lp);
+        mouse.x = x;
+        mouse.y = y;
     }else if(msg == WM_LBUTTONDOWN) {
         shownames = !shownames;
     }else if(msg == WM_MOUSELEAVE) {
-        mouse = undefined;
+        mouse = {};
     }
     else if(msg == WM_DESTROY) {
         PostQuitMessage(0);
