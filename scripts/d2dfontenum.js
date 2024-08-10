@@ -60,8 +60,8 @@ function windowProc(hwnd, msg, wp, lp) {
 
         d2d.EnumFonts((fontFamily) => { //bruhhhh i made enum fonts for taskslifeifoundamongus (which im realizing now that i mispelt like) because CreateFont wasn't working and i thought the fonts were messed up but CreateFont was just geniuinely not working earlier like idk
             print(fontFamily.GetFamilyName(), fontFamily.GetFontCount());
-            fontFamily.Release(); //unfortunately you have to release if you're done with this shit
-        });
+            fontFamily.Release(); //unfortunately (if the second param for EnumFonts is true) you have to release if you're done with this shit
+        }, true); //specifying false only passes the names of the font families and specifiying true passes IDWriteFontFamily objects (which you have to release)
     }
     else if(msg == WM_DESTROY) {
         PostQuitMessage(0);

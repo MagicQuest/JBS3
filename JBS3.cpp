@@ -212,12 +212,12 @@ namespace jsImpl {
             IDWriteFont* font = (IDWriteFont*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
             info.GetReturnValue().Set(Number::New(isolate, font->IsSymbolFont()));
         }));
-        JSDWriteFont->Set(isolate, "GetFontFamily", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            IDWriteFont* font = (IDWriteFont*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-            IDWriteFontFamily* fontFamily; RetIfFailed(font->GetFontFamily(&fontFamily), "GetFontFamily failed!");
-            //info.GetReturnValue().Set(DIRECT2D::getDWriteFontFamilyImpl(isolate, fontFamily)); //oh boy...
-        }));
+        //JSDWriteFont->Set(isolate, "GetFontFamily", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+        //    Isolate* isolate = info.GetIsolate();
+        //    IDWriteFont* font = (IDWriteFont*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+        //    IDWriteFontFamily* fontFamily; RetIfFailed(font->GetFontFamily(&fontFamily), "GetFontFamily failed!");
+        //    //info.GetReturnValue().Set(DIRECT2D::getDWriteFontFamilyImpl(isolate, fontFamily)); //oh boy...
+        //}));
         JSDWriteFont->Set(isolate, "GetSimulations", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
             Isolate* isolate = info.GetIsolate();
             IDWriteFont* font = (IDWriteFont*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
@@ -255,6 +255,7 @@ namespace jsImpl {
             RetIfFailed(names->GetString(0, wname, 100), "GetString error!"); //wtf is _countof bro
 
             info.GetReturnValue().Set(String::NewFromTwoByte(isolate, (const uint16_t*)wname).ToLocalChecked());
+            names->Release();
         }));
         JSDWriteFontFamily->Set(isolate, "GetFonts", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
             Isolate* isolate = info.GetIsolate();
@@ -268,7 +269,11 @@ namespace jsImpl {
             for (UINT32 j = 0; j < fontCount; ++j)
             {
                 IDWriteFont* font;
-                RetIfFailed(fontFamily->GetFont(j, &font), "GetFont failed! (d2d.GetFonts)");
+                //RetIfFailed(fontFamily->GetFont(j, &font), "GetFont failed! (d2d.GetFonts)");
+                HRESULT shit = fontFamily->GetFont(j, &font);
+                if (FAILED(shit)) {
+                    print("GetFont failed! (" << _bstr_t(_com_error(GetLastError()).ErrorMessage()) << ");");
+                }
                 if (!font)
                     continue;
 
@@ -4169,15 +4174,35 @@ V8FUNC(createCanvas) {
 
             Local<Function> func = info[0].As<Function>();
 
+            bool gyatt = info[1].As<Boolean>()->Value(); //suprisingly the only brainrot variable i've used in JBS3.cpp (i think)
+
             for (UINT32 i = 0; i < familyCount; ++i)
             {
                 IDWriteFontFamily* fontFamily;
-                RetIfFailed(fontCollection->GetFontFamily(i, &fontFamily), "GetFontFamily failed!");
+                //ContIfFailed(fontCollection->GetFontFamily(i, &fontFamily), "GetFontFamily failed!");
+                HRESULT shittier = fontCollection->GetFontFamily(i, &fontFamily);
+                if (FAILED(shittier)) {
+                    print("GetFontFamily failed! (" << _bstr_t(_com_error(GetLastError()).ErrorMessage()) << ")");
+                }
                 if (!fontFamily)
                     continue;
 
-                Local<Value> args[] = { DIRECT2D::getDWriteFontFamilyImpl(isolate, fontFamily) };
+                Local<Value> args[1];
+                
+                if (gyatt) {
+                    args[0] = DIRECT2D::getDWriteFontFamilyImpl(isolate, fontFamily); //this is valid right
+                }
+                else {
+                    IDWriteLocalizedStrings* names;
+                    RetIfFailed(fontFamily->GetFamilyNames(&names), "GetFamilyNames failed!");
+                    wchar_t wname[100];
+                    //print(_countof(wname) << " 100"); //of course it's the exact same number (bro just put 100 why the docs tweaking)
+                    RetIfFailed(names->GetString(0, wname, 100), "GetString error!"); //wtf is _countof bro
 
+                    args[0] = String::NewFromTwoByte(isolate, (const uint16_t*)wname).ToLocalChecked();
+                    names->Release();
+                    fontFamily->Release();
+                }
                 v8::TryCatch shit(isolate);
 
                 MaybeLocal<Value> returnedValue = func->Call(isolate->GetCurrentContext(), isolate->GetCurrentContext()->Global(), 1, args);

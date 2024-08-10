@@ -6,13 +6,19 @@ function windowProc(hwnd, msg, wp, lp) {
         brush = d2d.CreateSolidColorBrush(1.0, 1.0, 1.0, 1.0);
         let fontname = "";
         d2d.EnumFonts((fontFamily) => {
-            let name = fontFamily.GetFamilyName();
-            if(name.includes("Operator")) {
-                fontname = name;
+            print(fontFamily);
+            if(fontFamily.includes("Operator")) {
+                fontname = fontFamily;
             }
-            fontFamily.Release(); //unfortunately you have to release if you're done with this shit
-        });
-        print(fontname, "8-bit Operator+ Bold");
+        }, false); //specifying false passes the names of the font families and specifiying true passes IDWriteFontFamily objects (which you have to release)
+        //d2d.EnumFonts((fontFamily) => {
+        //    let name = fontFamily.GetFamilyName();
+        //    if(name.includes("Operator")) {
+        //        fontname = name;
+        //    }
+        //    fontFamily.Release(); //unfortunately you have to release if you're done with this shit
+        //});
+        print(fontname, "8-bit Operator+ Bold"); //yeah lol i've got 8-bit operator (maybe soon i'll add a thing so you can use customfonts like sfml)
         font = d2d.CreateFont(fontname, 32);
         SetTimer(hwnd, NULL, 100);
     }else if(msg == WM_TIMER) {
