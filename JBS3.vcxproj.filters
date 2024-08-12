@@ -109,6 +109,9 @@
     <ClInclude Include="Canvas2DRenderingContext.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="easytab.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Image Include="jbs3.ico">

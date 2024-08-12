@@ -6821,7 +6821,7 @@ LRESULT CALLBACK WinProc(HWND hWnd, UINT msg, WPARAM wp, LPARAM lp);
 //    v8::Local<v8::Object> wndclass;
 //};
 
-std::map<HWND, std::function<LRESULT(HWND, UINT, WPARAM, LPARAM)>> winProcMap; //thanks chatgpt!!! (ok nah nah bruh this solution did NOT solve basically anything (some win messages aren't sent to the js win proc, you still can't have 2 windows (because the blocking thing)))
+std::map<HWND, std::function<LRESULT(HWND, UINT, WPARAM, LPARAM)>> winProcMap; //thanks chatgpt!!! (ok nah nah bruh this solution did NOT solve basically anything (some win messages aren't sent to the js win proc, you still can't have 2 windows (because the blocking thing (ok i was lying))))
 //std::map<HWND, std::vector<std::tuple<UINT, WPARAM, LPARAM>>> nullMsgsMap;
 
 LRESULT CALLBACK WinProc(HWND hWnd, UINT msg, WPARAM wp, LPARAM lp)
@@ -10115,6 +10115,78 @@ V8FUNC(GlobalMemoryStatusExWrapper) {
     info.GetReturnValue().Set(yk);
 }
 
+#define EASYTAB_IMPLEMENTATION
+#include "easytab.h"
+
+V8FUNC(EasyTab_LoadWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    //Local<Context> context = isolate->GetCurrentContext();
+    //Local<Object> jsObj = Object::New(isolate);
+    //jsObj->Set(context, LITERAL("success"), Number::New(isolate, EasyTab_Load((HWND)IntegerFI(info[0]))));
+    info.GetReturnValue().Set(Number::New(isolate, EasyTab_Load((HWND)IntegerFI(info[0]))));
+}
+
+V8FUNC(EasyTab_Load_ExWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    info.GetReturnValue().Set(Number::New(isolate, EasyTab_Load_Ex((HWND)IntegerFI(info[0]), (EasyTabTrackingMode)IntegerFI(info[1]), FloatFI(info[2]), IntegerFI(info[3]))));
+}
+
+V8FUNC(EasyTab_HandleEventWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    info.GetReturnValue().Set(Number::New(isolate, EasyTab_HandleEvent((HWND)IntegerFI(info[0]), (UINT)IntegerFI(info[1]), (LPARAM)IntegerFI(info[2]), (WPARAM)IntegerFI(info[3]))));
+}
+
+V8FUNC(EasyTab_GetPosX) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    info.GetReturnValue().Set(Number::New(isolate, EasyTab->PosX));
+}
+
+V8FUNC(EasyTab_GetPosY) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    info.GetReturnValue().Set(Number::New(isolate, EasyTab->PosY));
+}
+
+V8FUNC(EasyTab_GetPressure) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    info.GetReturnValue().Set(Number::New(isolate, EasyTab->Pressure));
+}
+
+V8FUNC(EasyTab_GetButtons) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    info.GetReturnValue().Set(Number::New(isolate, EasyTab->Buttons));
+}
+
+V8FUNC(EasyTab_GetRangeX) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    info.GetReturnValue().Set(Number::New(isolate, EasyTab->RangeX));
+}
+
+V8FUNC(EasyTab_GetRangeY) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    info.GetReturnValue().Set(Number::New(isolate, EasyTab->RangeY));
+}
+
+V8FUNC(EasyTab_GetMaxPressure) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    info.GetReturnValue().Set(Number::New(isolate, EasyTab->MaxPressure));
+}
+
+V8FUNC(EasyTab_UnloadWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    EasyTab_Unload();
+}
+
 v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     using namespace v8;
 
@@ -10510,6 +10582,30 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     setGlobalConst(LIST_MODULES_DEFAULT);
 
     setGlobalWrapper(GlobalMemoryStatusEx);
+
+    setGlobalWrapper(EasyTab_Load);
+    setGlobalWrapper(EasyTab_Load_Ex);
+    setGlobal(EasyTab_GetPosX);
+    setGlobal(EasyTab_GetPosY);
+    setGlobal(EasyTab_GetPressure);
+    setGlobal(EasyTab_GetButtons);
+    setGlobal(EasyTab_GetRangeX);
+    setGlobal(EasyTab_GetRangeY);
+    setGlobal(EasyTab_GetMaxPressure);
+    setGlobalWrapper(EasyTab_HandleEvent);
+    setGlobalWrapper(EasyTab_Unload);
+    setGlobalConst(EASYTAB_OK);
+    setGlobalConst(EASYTAB_MEMORY_ERROR);
+    setGlobalConst(EASYTAB_X11_ERROR);
+    setGlobalConst(EASYTAB_DLL_LOAD_ERROR);
+    setGlobalConst(EASYTAB_WACOM_WIN32_ERROR);
+    setGlobalConst(EASYTAB_INVALID_FUNCTION_ERROR);
+    setGlobalConst(EASYTAB_EVENT_NOT_HANDLED);
+    setGlobalConst(EASYTAB_TRACKING_MODE_SYSTEM);
+    setGlobalConst(EASYTAB_TRACKING_MODE_RELATIVE);
+    setGlobalConst(EasyTab_Buttons_Pen_Touch);
+    setGlobalConst(EasyTab_Buttons_Pen_Lower);
+    setGlobalConst(EasyTab_Buttons_Pen_Upper);
 
     setGlobalConst(WICBitmapTransformRotate0);
     setGlobalConst(WICBitmapTransformRotate90);

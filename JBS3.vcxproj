@@ -154,6 +154,7 @@
     <ClInclude Include="Direct2D.h" />
     <ClInclude Include="Direct2D11.h" />
     <ClInclude Include="DllCall.h" />
+    <ClInclude Include="easytab.h" />
     <ClInclude Include="GL\eglew.h" />
     <ClInclude Include="GL\glew.h" />
     <ClInclude Include="GL\glxew.h" />

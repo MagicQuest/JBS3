@@ -1,0 +1,5 @@
+well i can't be bothered to get the licenses of all the things I've used so im lowkey just gonna write down the things i have used
+
+EasyTab: https://github.com/ApoorvaJ/EasyTab (for drawing tablet type devices)
+HIDAPI: https://github.com/libusb/hidapi (for HID usb type shit)
+glew v2.1.0: https://glew.sourceforge.net/
