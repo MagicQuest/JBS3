@@ -9175,6 +9175,9 @@ V8FUNC(InitializeWIC) {
             Isolate* isolate = info.GetIsolate();
             Local<Context> context = isolate->GetCurrentContext();
             WICHelper* WICObj = (WICHelper*)info.This()->GetRealNamedProperty(context, LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            if (!info[1]->IsArray()) {
+                MessageBox(NULL, L"yo you forgot to pass a pixel format (jbs will crash now ??)", L"usually you should just use GUID_WICPixelFormat32bppPBGRA", MB_ICONERROR | MB_OK);
+            }
             Local<Array> id = info[1].As<Array>();
             GUID shit = { IntegerFI(id->Get(context, 0).ToLocalChecked()),
                 IntegerFI(id->Get(context, 1).ToLocalChecked()),
