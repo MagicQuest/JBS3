@@ -1338,6 +1338,13 @@ V8FUNC(BeepWrapper) {
     }
 }
 
+V8FUNC(MessageBeepWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(MessageBeep((UINT)IntegerFI(info[0])));
+}
+
 //weird how defining the macros in goodmacrosfordirect2dandwichelper.h right here caused visual studio to die
 
 //include Direct2D.h moved above jsImpl (for goodmacrosfordirect2dandwichelper.h)
@@ -10248,6 +10255,8 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
 
 #define setGlobal(name) global->Set(isolate, #name, FunctionTemplate::New(isolate, name)) //https://stackoverflow.com/questions/10507264/how-to-use-macro-argument-as-string-literal
 #define setGlobalWrapper(name) global->Set(isolate, #name, FunctionTemplate::New(isolate, name####Wrapper)) //https://stackoverflow.com/questions/30113944/how-to-write-a-macro-that-will-append-text-to-a-partial-function-name-to-create
+    
+    setGlobalWrapper(MessageBeep);
 
     global->Set(isolate, "BeginPaint", FunctionTemplate::New(isolate, BeginPaintWrapper));
     global->Set(isolate, "EndPaint", FunctionTemplate::New(isolate, EndPaintWrapper));

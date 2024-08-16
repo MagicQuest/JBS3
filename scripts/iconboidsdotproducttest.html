@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>seeing if i did this dot product shit right</title>
+</head>
+<body>
+    <canvas id="canvas" width="800" height="800" style="box-shadow: 5px 5px 10px red; margin: auto; left: 0; right: 0; position: absolute; cursor: pointer; border: 2px orange dotted">HELP (canvas html5)</canvas>
+    <script>
+        const canvas = document.getElementById("canvas");
+        const context = canvas.getContext('2d');
+
+        let mainicon = {x: 0, y: 100}; //this is its direction vector
+        let othericon = {x: -50, y: -100}; //this is the offset from the main icon
+
+        context.font = "24px times new roman";
+
+        function round2decimals(x) {
+            return Math.round(x*100)/100;
+        }
+                
+        function drawGraph(linesX, linesY) {
+            context.lineWidth = 1;
+            context.fillStyle = "white";
+            context.fillRect(0, 0, canvas.width, canvas.height);
+            context.strokeStyle = "grey";
+            context.beginPath();
+            for(let i = 16; i < canvas.width; i+=canvas.width/linesX) {
+                context.moveTo(0, i);
+                context.lineTo(canvas.width, i);
+            }
+            //context.stroke();
+            for(let i = 16; i < canvas.height; i+=canvas.width/linesY) {
+                //context.beginPath();
+                context.moveTo(i, 0);
+                context.lineTo(i, canvas.height);
+            }
+            context.stroke();
+        }
+
+        function drawVector(v, offsetV = {x: 0, y: 0}) {
+            context.beginPath();
+            const start = {x: canvas.width/2+offsetV.x, y: canvas.height/2-offsetV.y};
+            const realX = (start.x)+v.x;
+            const realY = (start.y)-v.y;
+            context.moveTo(start.x,start.y);
+            context.lineTo(realX, realY);
+            //somehow draw an arrow at the end
+            context.stroke();
+            if(offsetV.x != 0 || offsetV.y != 0) {
+                //let temp = {x: v.x, y: v.y};
+                //setMagnitude(temp, magnitude(temp)/4);
+                //context.fillText(`(${v.x}, ${v.y})`, (start.x)+temp.x, (start.y)-temp.y);
+                //context.fillText(`(${v.x}, ${v.y})`, realX, realY-24);
+            }else {
+                context.fillText(`(${v.x}, ${v.y})`, realX, realY); //how can i draw it 
+            }
+            const yk = magnitude(v);
+            let temp = {x: v.x, y: v.y};
+            setMagnitude(temp, yk/2);
+            context.fillText(round2decimals(yk), start.x+temp.x, start.y-temp.y);
+        }
+
+        function draw() {
+            drawGraph(50, 50);
+        
+            context.lineCap = "round";
+
+            //context-> //wtf why was i c++ pilled for a second
+            context.lineWidth = 6;
+            context.fillStyle = "green";
+            context.strokeStyle = "blue";
+            drawVector(mainicon);
+            context.strokeStyle = "red";
+            drawVector(othericon);
+
+            //console.log(Math.tan(mainicon.y/mainicon.x));
+
+            //context.beginPath();
+            //const r = magnitude(mainicon);
+            //context.arc(canvas.width/2, canvas.height/2, 10, 0, Math.tanh(mainicon.y/mainicon.x)); //BRO I THOUGHT TANH WAS ATAN (IM KILLING MYSELF)
+            //context.stroke();
+            
+            const v3 = {x: mainicon.x-othericon.x, y: mainicon.y-othericon.y};
+            context.strokeStyle = "yellow";
+            drawVector(v3, othericon);
+
+            const a = magnitude(mainicon);
+            const b = magnitude(othericon);
+            const c = magnitude(v3); //Math.sqrt(a**2 + b**2); //why does this not work? (honestly i have no idea why and i wish i could figure that out)
+
+            const Ctheta = Math.acos((a**2 + b**2 - c**2)/(2*a*b)); //https://www.calculatorsoup.com/calculators/geometry-plane/triangle-law-of-cosines.php?given_data=aa&a=207.89&b=147&c=147&units_angle=deg&units_length=&sf=0&given_data_last=aa&action=solve
+
+            //console.log(Btheta, Btheta*(180/Math.PI));
+
+            context.fillText("θ: "+round2decimals(Ctheta*(180/Math.PI)), canvas.width/2+20, canvas.height/2-20);
+            
+            context.fillStyle = "purple";
+            context.fillText("Dot product: "+round2decimals(a*b*Math.cos(Ctheta)), 150, 300);
+
+            requestAnimationFrame(draw);
+        }
+
+        requestAnimationFrame(draw);
+
+        function magnitude(v) {
+            return Math.sqrt(v.x**2 + v.y**2);
+        }
+
+        function setMagnitude(v, nm) {
+            const m = magnitude(v);
+            v.x *= (nm/m);
+            v.y *= (nm/m);
+        }
+
+        function mouseShits(event) {
+            if(event.buttons == 1) {
+                //can't be bothered to store which vector im changing so im calculating it every time (and also i don't have to make 2 different mouse funcs)
+                let mouse = {x: event.offsetX-canvas.width/2, y: canvas.height/2-event.offsetY};
+                if(magnitude({x: mouse.x - mainicon.x, y: mouse.y - mainicon.y}) < magnitude({x: mouse.x - othericon.x, y: mouse.y - othericon.y})) {
+                    mainicon = mouse;
+                }else {
+                    othericon = mouse;
+                }
+            }
+        }
+
+        canvas.addEventListener("mousedown", mouseShits);
+        canvas.addEventListener("mousemove", mouseShits);
+    </script>
+</body>
+</html>

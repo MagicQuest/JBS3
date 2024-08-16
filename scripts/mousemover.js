@@ -9,13 +9,14 @@ let now = Date.now();
 //let activeWindow = GetActiveWindow();
 //let aWDC = GetDC(activeWindow);
 
-const icon = LoadImage(NULL, "E:/CPP/Randumb/cmake-build-debug/troll.ico", IMAGE_ICON, 0, 0, LR_LOADFROMFILE);//LoadImage(NULL, IDI_WINLOGO, IMAGE_ICON, 64, 64, LR_SHARED);//LoadIcon(NULL, IDI_APPLICATION);
+                        //bruh who was gonna tell me i had this hardcoded icon here dawg
+const icon = LoadImage(NULL, __dirname+"/minesweeper/troll.ico"/*"E:/CPP/Randumb/cmake-build-debug/troll.ico"*/, IMAGE_ICON, 0, 0, LR_LOADFROMFILE);//LoadImage(NULL, IDI_WINLOGO, IMAGE_ICON, 64, 64, LR_SHARED);//LoadIcon(NULL, IDI_APPLICATION);
 print(icon, GetLastError());
 
 const console = GetConsoleWindow();
 
 const icons = [icon, LoadIcon(NULL, IDI_APPLICATION),LoadIcon(NULL, IDI_ERROR),LoadIcon(NULL, IDI_INFORMATION),LoadIcon(NULL, IDI_QUESTION),LoadIcon(NULL, IDI_SHIELD),LoadIcon(NULL, IDI_WARNING),LoadIcon(NULL, IDI_WINLOGO)];
-const icons2 = [IDI_APPLICATION, IDI_ERROR, IDI_INFORMATION, IDI_QUESTION, IDI_SHIELD, IDI_WARNING, IDI_WINLOGO];
+//const icons2 = [IDI_APPLICATION, IDI_ERROR, IDI_INFORMATION, IDI_QUESTION, IDI_SHIELD, IDI_WARNING, IDI_WINLOGO];
 
 const iconobjs = [];
 
