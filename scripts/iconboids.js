@@ -1,5 +1,6 @@
 //watching this video https://www.youtube.com/watch?v=6dJlhv3hfQ0
 //about boids and i wanna recreate it here for the lols (ok he barely explained shit after the steering so im looking here https://www.youtube.com/watch?v=mhjuuHl6qHM -> https://www.red3d.com/cwr/boids/)
+//also dropping this here just incase https://www.youtube.com/watch?v=IoKfQrlQ7rA
 
 //const dc = GetDC(NULL);
 //SelectObject(dc, GetStockObject(HOLLOW_BRUSH));
@@ -48,6 +49,8 @@ class Vector2 {
         return a*b*Math.cos(cTheta); //oh boy im hoping that's right
     }
 }
+
+const maxspeed = Math.sqrt((5**2)*2);
 
 class Icon {
     constructor(index, i) {
@@ -98,7 +101,7 @@ class Icon {
         coheredir = new Vector2(coheredir.x-this.x, coheredir.y-this.y);
 
         
-        dir.magnitude = 1;//mousepresent ? 5000 : 1; //amazing...
+        dir.magnitude = 1.05;//mousepresent ? 5000 : 1; //amazing...
         aligndir.magnitude = 1;
         coheredir.magnitude = 1;
 
@@ -141,6 +144,13 @@ class Icon {
         }
         
         d2d.DrawBitmap(iconIcons[this.iconIndex], this.x, this.y, this.x+size, this.y+size);
+        if(this.i == 0) {
+            brush.SetColor(1.0, 1.0, 0.0);
+            d2d.DrawEllipse(this.x, this.y, this.radius, this.radius, brush);
+            brush.SetColor(0.0, 0.2, 1.0);
+            d2d.DrawEllipse(this.x, this.y, separationRadius, separationRadius, brush);
+            brush.SetColor(1.0, 1.0, 1.0);
+        }
         //DrawIconEx(dc, this.x, this.y, this.i == 0 ? troll : iconIcons[this.iconIndex], size, size, 0, NULL, DI_COMPAT | DI_NORMAL);
 
         //if(this.i == 0) {
@@ -161,6 +171,9 @@ class Icon {
                 //MoveTo(dc, this.x, this.y);
                 //LineTo(dc, icon.x, icon.y);
                 iconsInRange.push(icon);
+                if(icon.i == -1) {
+                    d2d.DrawLine(this.x, this.y, icon.x, icon.y, brush);
+                }
             }
         }
         let dir = this.DoAllMyShit(iconsInRange);//SteerMyShit(iconsInRange);
@@ -168,7 +181,10 @@ class Icon {
         //this.CohereMyShit(iconsInRange, dir); //i didn't even know this was a word
         this.velocity.x += dir.x;
         this.velocity.y += dir.y;
-        this.velocity.magnitude = Math.sqrt((5**2)*2); //i thinks
+        if(this.velocity.magnitude > maxspeed) {
+            this.velocity.magnitude = maxspeed;
+        }
+        //this.velocity.magnitude = Math.sqrt((5**2)*2); //i thinks
         //[this.vx, this.vy] = this.SteerMyShit(iconsInRange); //there's no way you can do that (you can!)
     }
 }
@@ -183,7 +199,7 @@ function windowProc(hwnd, msg, lp, wp) {
         window = hwnd;
         const wic = InitializeWIC(); ScopeGUIDs(wic);
         d2d = createCanvas("d2d", ID2D1DeviceContextDComposition, hwnd); //pulling out the big guns
-        brush = d2d.CreateSolidColorBrush(1.0, 1.0, 1.0);
+        brush = d2d.CreateSolidColorBrush(1.0, 1.0, 0.0);
         for(let i = 0; i < iconIcons.length; i++) {
             const icon = iconIcons[i];
             let wicBmp = wic.CreateBitmapFromHICON(iconIcons[i], wic.GUID_WICPixelFormat32bppPBGRA);
@@ -197,9 +213,10 @@ function windowProc(hwnd, msg, lp, wp) {
             DestroyIcon(icon);
             iconIcons[i] = d2dBmp;
         }
+        //iconIcons.push(d2d.CreateBitmapFromWicBitmap(wic.LoadBitmapFromFilename(__dirname+"/ant.png", wic.GUID_WICPixelFormat32bppPBGRA, 0))); //lol i gotta make em rotate
         wic.Release();
 
-        for(let i = 0; i < 1000; i++) {
+        for(let i = 0; i < 500; i++) {
             iconObjs.push(new Icon(random(iconIcons.length), i));
         }
 
@@ -220,9 +237,12 @@ if(GetKey(VK_ESCAPE)) {
     d2d.BeginDraw();
     d2d.Clear(0.0, 0.0, 0.0, 0.0);
     let {x, y} = GetCursorPos();
-    mouse = {x, y, velocity: new Vector2(x-lastMouse.x, y-lastMouse.y)};
+    //mouse = {x, y, velocity: new Vector2(x-lastMouse.x, y-lastMouse.y)}; //oopsies this was causing problems silently for some reason?
+    mouse.x = x;
+    mouse.y = y;
+    mouse.velocity = new Vector2(x-lastMouse.x, y-lastMouse.y);
     //print(mouse.velocity, "mouse velocity");
-    //d2d.DrawBitmap(iconIcons[0], 0, 0, 100, 100, 1.0, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR, 0, 0, 32, 32);
+    //d2d.DrawBitmap(iconIcons[0], x, y, x+32, y+32, 1.0, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR, 0, 0, 32, 32);
     for(let icon of iconObjs) {
         icon.Update();
     }
