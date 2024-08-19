@@ -10,7 +10,7 @@ const iconIcons = [LoadIcon(NULL, IDI_APPLICATION), LoadIcon(NULL, IDI_ERROR), L
 const iconObjs = [];
 
 const size = 16;
-const separationRadius = 10;
+const separationRadius = 10; //not totally sure if this really does anything
 
 let window, d2d;
 
@@ -101,7 +101,7 @@ class Icon {
         coheredir = new Vector2(coheredir.x-this.x, coheredir.y-this.y);
 
         
-        dir.magnitude = 1.05;//mousepresent ? 5000 : 1; //amazing...
+        dir.magnitude = 1;//1.05;//mousepresent ? 5000 : 1; //amazing...
         aligndir.magnitude = 1;
         coheredir.magnitude = 1;
 
@@ -126,7 +126,7 @@ class Icon {
     WithinVision(iconx, icony) {
         //let us = new Vector2(this.vx, this.vy);
         let them = new Vector2(iconx-this.x, icony-this.y);
-        const something = 0;
+        const something = -100;
         //if(this.i == 0) {
         //    print(us, them, Vector2.Dot(us, them));
         //}
