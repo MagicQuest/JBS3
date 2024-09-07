@@ -10197,6 +10197,12 @@ V8FUNC(EasyTab_UnloadWrapper) {
     EasyTab_Unload();
 }
 
+V8FUNC(MAKELPARAMWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    info.GetReturnValue().Set(Number::New(isolate, MAKELPARAM(IntegerFI(info[0]), IntegerFI(info[1]))));
+}
+
 v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     using namespace v8;
 
@@ -10279,6 +10285,8 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     setGlobalWrapper(SetTimer);
     setGlobalWrapper(KillTimer);
 
+    setGlobalWrapper(MAKELPARAM);
+    
     setGlobalWrapper(GetStdHandle);
     setGlobalWrapper(SetConsoleTextAttribute);
 
@@ -11340,6 +11348,32 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     setGlobalConst(PS_DASHDOTDOT);
     setGlobalConst(PS_NULL);
     setGlobalConst(PS_INSIDEFRAME);
+
+    setGlobalConst(PBS_SMOOTH);
+    setGlobalConst(PBS_VERTICAL);
+    setGlobalConst(PBM_SETRANGE);
+    setGlobalConst(PBM_SETPOS);
+    setGlobalConst(PBM_DELTAPOS);
+    setGlobalConst(PBM_SETSTEP);
+    setGlobalConst(PBM_STEPIT);
+    setGlobalConst(PBM_SETRANGE32);
+    setGlobalConst(PBM_GETRANGE);
+    setGlobalConst(PBM_GETPOS);
+    setGlobalConst(PBM_SETBARCOLOR);
+    setGlobalConst(PBM_SETBKCOLOR);
+    setGlobalConst(PBS_MARQUEE);
+    setGlobalConst(PBM_SETMARQUEE);
+    setGlobalConst(PBS_SMOOTHREVERSE);
+    setGlobalConst(PBM_GETSTEP);
+    setGlobalConst(PBM_GETBKCOLOR);
+    setGlobalConst(PBM_GETBARCOLOR);
+    setGlobalConst(PBM_SETSTATE);
+    setGlobalConst(PBM_GETSTATE);
+    setGlobalConst(PBST_NORMAL);
+    setGlobalConst(PBST_ERROR);
+    setGlobalConst(PBST_PAUSED);
+
+    global->Set(isolate, "PROGRESS_CLASS", String::NewFromUtf8(isolate, PROGRESS_CLASSA).ToLocalChecked());
 
 //#define D2D1_EXTEND_MODE_CLAMP D2D1_EXTEND_MODE_CLAMP
 //#define D2D1_EXTEND_MODE_WRAP D2D1_EXTEND_MODE_WRAP

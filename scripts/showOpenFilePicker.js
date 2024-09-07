@@ -20,7 +20,7 @@ function calculateBouncesToMaxWin() {
         return;
     }
     let calcBounces = 0;
-    let cornerHit = false;
+    //let cornerHit = false;
     let tempP = {x: position.x, y: position.y, vx: position.vx, vy: position.vy};
     while(calcBounces < 1000) { //yeah sometimes it just don't get it idk
         tempP.x += tempP.vx;
@@ -45,7 +45,7 @@ function calculateBouncesToMaxWin() {
             calcBounces++;
             //print(calcBounces);
             if(tempOldVel.vx != tempP.vx && tempOldVel.vy != tempP.vy) {
-                cornerHit = true;
+                //cornerHit = true;
                 break;
             }
         }
