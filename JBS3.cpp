@@ -202,9 +202,20 @@ namespace jsImpl {
         //aDA(isolate, jsArray, args...);
     }
 
+
+
     Local<ObjectTemplate> JSDWriteFontFamily;
     Local<ObjectTemplate> JSDWriteFont;
+    //Local<ObjectTemplate> JSRawInputDeviceList;
     void initObjectTemplates(Isolate* isolate) {
+
+        //JSRawInputDeviceList = ObjectTemplate::New(isolate);
+        //JSRawInputDeviceList->Set(isolate, "Release", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+        //    Isolate* isolate = info.GetIsolate();
+        //    PRAWINPUTDEVICELIST deviceList = (PRAWINPUTDEVICELIST)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+        //    delete[] deviceList;
+        //}));
+
         //https://www.codeproject.com/Articles/5351958/Direct2D-Tutorial-Part-5-Text-Display-and-Font-Enu
         JSDWriteFont = ObjectTemplate::New(isolate);
         JSDWriteFont->Set(isolate, "IsSymbolFont", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
@@ -10203,6 +10214,298 @@ V8FUNC(MAKELPARAMWrapper) {
     info.GetReturnValue().Set(Number::New(isolate, MAKELPARAM(IntegerFI(info[0]), IntegerFI(info[1]))));
 }
 
+V8FUNC(MakeRAWINPUTDEVICE) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    Local<Context> context = isolate->GetCurrentContext();
+
+    Local<Object> jsRID = Object::New(isolate);
+    jsRID->Set(context, LITERAL("usUsagePage"), info[0]);
+    jsRID->Set(context, LITERAL("usUsage"), info[1]);
+    jsRID->Set(context, LITERAL("dwFlags"), info[2]);
+    jsRID->Set(context, LITERAL("hwndTarget"), info[3]);
+
+    info.GetReturnValue().Set(jsRID);
+}
+
+V8FUNC(RegisterRawInputDevicesWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    Local<Context> context = isolate->GetCurrentContext();
+    //idk why i barely use vectors in a situation like this
+    std::vector<RAWINPUTDEVICE> vrawshits;
+    if (info[0]->IsArray()) {
+        Local<Array> jsArr = info[0].As<Array>();
+        //info[0].As<Array>()->Iterate(context, [=](uint32_t index, Local<Value> element, void* data) {
+        //    Local<Object> jsRID = element.As<Object>();
+        //    
+        //    ((std::vector<RAWINPUTDEVICE>*)data)->push_back(RAWINPUTDEVICE{
+        //        (USHORT)IntegerFI(jsRID->Get(context, LITERAL("usUsagePage")).ToLocalChecked()),
+        //        (USHORT)IntegerFI(jsRID->Get(context, LITERAL("usUsage")).ToLocalChecked()),
+        //        (DWORD)IntegerFI(jsRID->Get(context, LITERAL("dwFlags")).ToLocalChecked()),
+        //        (HWND)IntegerFI(jsRID->Get(context, LITERAL("hwndTarget")).ToLocalChecked()),
+        //    });
+        //
+        //    return Array::CallbackResult::kContinue;
+        //}, &vrawshits);
+
+        for (int i = 0; i < jsArr->Length(); i++) {
+            Local<Object> jsRID = jsArr->Get(context, i).ToLocalChecked().As<Object>();
+            
+            vrawshits.push_back(RAWINPUTDEVICE{
+                (USHORT)IntegerFI(jsRID->Get(context, LITERAL("usUsagePage")).ToLocalChecked()),
+                (USHORT)IntegerFI(jsRID->Get(context, LITERAL("usUsage")).ToLocalChecked()),
+                (DWORD)IntegerFI(jsRID->Get(context, LITERAL("dwFlags")).ToLocalChecked()),
+                (HWND)IntegerFI(jsRID->Get(context, LITERAL("hwndTarget")).ToLocalChecked()),
+            });
+        }
+    }
+    else {
+        Local<Object> jsRID = info[0].As<Object>();
+        
+        vrawshits.push_back(RAWINPUTDEVICE{
+            (USHORT)IntegerFI(jsRID->Get(context, LITERAL("usUsagePage")).ToLocalChecked()),
+            (USHORT)IntegerFI(jsRID->Get(context, LITERAL("usUsage")).ToLocalChecked()),
+            (DWORD)IntegerFI(jsRID->Get(context, LITERAL("dwFlags")).ToLocalChecked()),
+            (HWND)IntegerFI(jsRID->Get(context, LITERAL("hwndTarget")).ToLocalChecked()),
+        });
+    }
+    info.GetReturnValue().Set(RegisterRawInputDevices(&vrawshits[0], vrawshits.size(), sizeof(RAWINPUTDEVICE)));
+}
+
+V8FUNC(GetRawInputDeviceListLength) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    UINT count = 0;
+    int res = GetRawInputDeviceList(NULL, &count, sizeof(RAWINPUTDEVICELIST));
+    if (res == -1) {
+        HANDLE console = GetStdHandle(STD_OUTPUT_HANDLE);
+        SetConsoleTextAttribute(console, 4);
+        print("oopsie poopsie something went wrong with GetRawInputDeviceList(Length) (returned -1) GetLastError says: (" << GetLastError() << ")");
+        SetConsoleTextAttribute(console, 7);
+    }
+
+    info.GetReturnValue().Set(count);
+}
+
+V8FUNC(GetRawInputDeviceListWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    UINT count = IntegerFI(info[0]);
+    if (IntegerFI(info[0]) <= 0) { //this seems weird but just ignore it teehee
+        int res = GetRawInputDeviceList(NULL, &count, sizeof(RAWINPUTDEVICELIST));
+        if (res == -1) {
+            HANDLE console = GetStdHandle(STD_OUTPUT_HANDLE);
+            SetConsoleTextAttribute(console, 4);
+            print("oopsie poopsie something went wrong with GetRawInputDeviceList (returned -1) GetLastError says: (" << GetLastError() << ")");
+            SetConsoleTextAttribute(console, 7);
+            return;
+        }
+    }
+    PRAWINPUTDEVICELIST deviceList = new RAWINPUTDEVICELIST[count]; //bruh you could totally blow jbs up if you put the wrong number in here
+
+    UINT res = GetRawInputDeviceList(deviceList, &count, sizeof(RAWINPUTDEVICELIST));
+    if (res == (UINT)-1) {
+        HANDLE console = GetStdHandle(STD_OUTPUT_HANDLE);
+        SetConsoleTextAttribute(console, 4);
+        print("oopsie poopsie something went wrong with GetRawInputDeviceList (returned -1) GetLastError says: (" << GetLastError() << ")");
+        SetConsoleTextAttribute(console, 7);
+    }
+    else {
+        Local<Context> context = isolate->GetCurrentContext();
+        //Local<Object> jsRaw = jsImpl::JSRawInputDeviceList->NewInstance(context).ToLocalChecked();
+        Local<Array> jsList = Array::New(isolate, count);
+        for (int i = 0; i < count; i++) {
+            Local<Object> jsdevice = Object::New(isolate);
+            jsdevice->Set(context, LITERAL("hDevice"), Number::New(isolate, (LONG_PTR)deviceList[i].hDevice));
+            jsdevice->Set(context, LITERAL("dwType"), Number::New(isolate, deviceList[i].dwType));
+            jsList->Set(context, i, jsdevice);
+        }
+        //jsRaw->Set(context, LITERAL("internalPtr"), Number::New(isolate, (LONG_PTR)deviceList));
+        info.GetReturnValue().Set(jsList);
+    }
+    delete[] deviceList;
+}
+
+V8FUNC(GetRawInputDeviceInfoWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    //just incase we start having problems https://stackoverflow.com/questions/67028399/getrawinputdeviceinfo-indicates-a-buffer-size-of-1-character-for-ridi-devicename
+    UINT command = IntegerFI(info[1]);
+    if (command == RIDI_PREPARSEDDATA) {
+        //i forgor.
+        print("i forgor. (RIDI_PREPARSEDDATA)");
+    }
+    else if (command == RIDI_DEVICENAME) {
+        wchar_t shit[MAX_PATH]{}; //idk how big i can be so
+        UINT size = MAX_PATH;
+        int res = GetRawInputDeviceInfo((HANDLE)IntegerFI(info[0]), command, &shit, &size);
+        //print(res << " res");
+        if (res <= 0) {
+            HANDLE console = GetStdHandle(STD_OUTPUT_HANDLE);                                                                      
+            SetConsoleTextAttribute(console, 4);                                                                                   
+            print("oopsie poopsie GetRawInputDeviceInfo (uiCommand was RIDI_DEVICENAME) didn't work for some reason (returned "<<res<<") GetLastError says: ("<<GetLastError()<<")");
+            SetConsoleTextAttribute(console, 7);                                                                                   
+        }
+        else {
+            info.GetReturnValue().Set(String::NewFromTwoByte(isolate, (const uint16_t*)shit).ToLocalChecked());
+        }
+    }
+    else if (command == RIDI_DEVICEINFO) {
+        RID_DEVICE_INFO s{0};
+        s.cbSize = sizeof(RID_DEVICE_INFO);
+        UINT size = sizeof(RID_DEVICE_INFO);
+        int res = GetRawInputDeviceInfo((HANDLE)IntegerFI(info[0]), command, &s, &size);
+        if (res <= 0) {
+            HANDLE console = GetStdHandle(STD_OUTPUT_HANDLE);
+            SetConsoleTextAttribute(console, 4);
+            print("oopsie poopsie GetRawInputDeviceInfo (uiCommand was RIDI_DEVICEINFO) didn't work for some reason (returned " << res << ") GetLastError says: (" << GetLastError() << ")");
+            SetConsoleTextAttribute(console, 7);
+        }
+        else {
+            Local<Context> context = isolate->GetCurrentContext();
+            Local<Object> jsriddinfo = Object::New(isolate);
+            jsriddinfo->Set(context, LITERAL("cbSize"), Number::New(isolate, s.cbSize));
+            jsriddinfo->Set(context, LITERAL("dwType"), Number::New(isolate, s.dwType));
+            
+            Local<Object> jsddata = Object::New(isolate);
+            if (s.dwType == RIM_TYPEMOUSE) {
+                jsddata->Set(context, LITERAL("dwId"), Number::New(isolate, s.mouse.dwId));
+                jsddata->Set(context, LITERAL("dwNumberOfButtons"), Number::New(isolate, s.mouse.dwNumberOfButtons));
+                jsddata->Set(context, LITERAL("dwSampleRate"), Number::New(isolate, s.mouse.dwSampleRate));
+                jsddata->Set(context, LITERAL("fHasHorizontalWheel"), Number::New(isolate, s.mouse.fHasHorizontalWheel));
+            }else if (s.dwType == RIM_TYPEKEYBOARD) {
+                jsddata->Set(context, LITERAL("dwType"), Number::New(isolate, s.keyboard.dwType));
+                jsddata->Set(context, LITERAL("dwSubType"), Number::New(isolate, s.keyboard.dwSubType));
+                jsddata->Set(context, LITERAL("dwKeyboardMode"), Number::New(isolate, s.keyboard.dwKeyboardMode));
+                jsddata->Set(context, LITERAL("dwNumberOfFunctionKeys"), Number::New(isolate, s.keyboard.dwNumberOfFunctionKeys));
+                jsddata->Set(context, LITERAL("dwNumberOfIndicators"), Number::New(isolate, s.keyboard.dwNumberOfIndicators));
+                jsddata->Set(context, LITERAL("dwNumberOfKeysTotal"), Number::New(isolate, s.keyboard.dwNumberOfKeysTotal));
+            }else if (s.dwType == RIM_TYPEHID) {
+                jsddata->Set(context, LITERAL("dwProductId"), Number::New(isolate, s.hid.dwProductId));
+                jsddata->Set(context, LITERAL("dwVendorId"), Number::New(isolate, s.hid.dwVendorId));
+                jsddata->Set(context, LITERAL("dwVersionNumber"), Number::New(isolate, s.hid.dwVersionNumber));
+                jsddata->Set(context, LITERAL("usUsage"), Number::New(isolate, s.hid.usUsage));
+                jsddata->Set(context, LITERAL("usUsagePage"), Number::New(isolate, s.hid.usUsagePage));
+            }
+
+            jsriddinfo->Set(context, LITERAL("deviceInfo"), jsddata);
+
+            info.GetReturnValue().Set(jsriddinfo);
+
+            //oopsie i just googled what a union does and realized that i can't read s.hid/s.keyboard/s.mouse all at the same time (undefined behaviorui type shi) good thing i caught that before i was done writing all that (wait nevermind i still gotta write all this)
+            //Local<Object> jshiddinfo = Object::New(isolate);
+            //jshiddinfo->Set(context, LITERAL("dwProductId"), Number::New(isolate, s.hid.dwProductId));
+            //jshiddinfo->Set(context, LITERAL("dwVendorId"), Number::New(isolate, s.hid.dwVendorId));
+            //jshiddinfo->Set(context, LITERAL("dwVersionNumber"), Number::New(isolate, s.hid.dwVersionNumber));
+            //jshiddinfo->Set(context, LITERAL("usUsage"), Number::New(isolate, s.hid.usUsage));
+            //jshiddinfo->Set(context, LITERAL("usUsagePage"), Number::New(isolate, s.hid.usUsagePage));
+            //Local<Object> jsmdinfo = Object::New(isolate);
+            //jsmdinfo->Set(context, LITERAL("usUsagePage"), Number::New(isolate, s.keyboard.));
+            //
+            //jsriddinfo->Set(context, LITERAL("hid"), jshiddinfo);
+        }
+    }
+}
+
+V8FUNC(GET_RAWINPUT_CODE_WPARAMWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, GET_RAWINPUT_CODE_WPARAM(IntegerFI(info[0]))));
+}
+
+V8FUNC(GetRawInputDataWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    UINT command = (UINT)IntegerFI(info[1]);
+
+    UINT size = 0;
+    int res = GetRawInputData((HRAWINPUT)IntegerFI(info[0]), command, NULL, &size, sizeof(RAWINPUTHEADER));
+
+    if (res == -1) {
+        //fucke.
+        HANDLE console = GetStdHandle(STD_OUTPUT_HANDLE);
+        SetConsoleTextAttribute(console, 4);
+        print("oopsie poopsie GetRawInputData (uiCommand was "<<command<<") didn't work for some reason (returned " << res << ") GetLastError says: (" << GetLastError() << ")");
+        SetConsoleTextAttribute(console, 7);
+    }
+    else {
+        //RAWINPUT* input = new RAWINPUT; //a random example used malloc so im using new instead
+        //ok i found an msdn example https://learn.microsoft.com/en-us/windows/win32/inputdev/using-raw-input
+        LPBYTE lpb = new BYTE[size]; //haha lbp(hacker) tpt https://trigraph.net/
+        res = GetRawInputData((HRAWINPUT)IntegerFI(info[0]), command, lpb, &size, sizeof(RAWINPUTHEADER));
+        RAWINPUT* input = (RAWINPUT*)lpb;
+        if (res == -1) {
+            HANDLE console = GetStdHandle(STD_OUTPUT_HANDLE);
+            SetConsoleTextAttribute(console, 4);
+            print("oopsie poopsie GetRawInputData (uiCommand was " << command << ") didn't work for some reason (returned " << res << ") GetLastError says: (" << GetLastError() << ")");
+            SetConsoleTextAttribute(console, 7);
+
+            delete lpb;
+        }
+        else {
+            Local<Context> context = isolate->GetCurrentContext();
+            Local<Object> jsRaw = Object::New(isolate);
+            Local<Object> jsHeader = Object::New(isolate);
+            jsHeader->Set(context, LITERAL("dwType"), Number::New(isolate, input->header.dwType));
+            jsHeader->Set(context, LITERAL("dwSize"), Number::New(isolate, input->header.dwSize));
+            jsHeader->Set(context, LITERAL("hDevice"), Number::New(isolate, (LONG_PTR)input->header.hDevice));
+            jsHeader->Set(context, LITERAL("wParam"), Number::New(isolate, input->header.wParam));
+            jsRaw->Set(context, LITERAL("header"), jsHeader);
+            if (command == RID_INPUT) {
+                Local<Object> jsData = Object::New(isolate);
+                if (input->header.dwType == RIM_TYPEMOUSE) {
+                    jsData->Set(context, LITERAL("usFlags"), Number::New(isolate, input->data.mouse.usFlags));
+
+                    //idk what the unions are saying around ulButtons so im just gonna add them anyways and let undefined behvior undefine it out
+                    jsData->Set(context, LITERAL("ulButtons"), Number::New(isolate, input->data.mouse.ulButtons));
+                    jsData->Set(context, LITERAL("usButtonFlags"), Number::New(isolate, input->data.mouse.usButtonFlags));
+                    jsData->Set(context, LITERAL("usButtonData"), Number::New(isolate, input->data.mouse.usButtonData));
+                    jsData->Set(context, LITERAL("ulRawButtons"), Number::New(isolate, input->data.mouse.ulRawButtons));
+                    jsData->Set(context, LITERAL("lLastX"), Number::New(isolate, input->data.mouse.lLastX));
+                    jsData->Set(context, LITERAL("lLastY"), Number::New(isolate, input->data.mouse.lLastY));
+                    jsData->Set(context, LITERAL("ulExtraInformation"), Number::New(isolate, input->data.mouse.ulExtraInformation));
+                }
+                else if (input->header.dwType == RIM_TYPEKEYBOARD) {
+                    jsData->Set(context, LITERAL("MakeCode"), Number::New(isolate, input->data.keyboard.MakeCode));
+                    jsData->Set(context, LITERAL("Flags"), Number::New(isolate, input->data.keyboard.Flags));
+                    jsData->Set(context, LITERAL("Reserved"), Number::New(isolate, input->data.keyboard.Reserved));
+                    jsData->Set(context, LITERAL("VKey"), Number::New(isolate, input->data.keyboard.VKey));
+                    jsData->Set(context, LITERAL("ExtraInformation"), Number::New(isolate, input->data.keyboard.ExtraInformation));
+                }
+                else if (input->header.dwType == RIM_TYPEHID) {
+                    jsData->Set(context, LITERAL("dwSizeHid"), Number::New(isolate, input->data.hid.dwSizeHid));
+                    jsData->Set(context, LITERAL("dwCount"), Number::New(isolate, input->data.hid.dwCount));
+                    jsData->Set(context, LITERAL("bRawData"), Number::New(isolate, input->data.hid.bRawData[0])); //i gotta investigate this bih tomorrow (i think i gotta use GetRawInputBuffer but idk)
+                }
+                jsRaw->Set(context, LITERAL("data"), jsData);
+            }
+            info.GetReturnValue().Set(jsRaw);
+        }
+
+        delete[] lpb; //oopsies i forgor the []
+    }
+
+}
+
+V8FUNC(GetMessageExtraInfoWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, GetMessageExtraInfo()));
+}
+
+V8FUNC(SetMessageExtraInfoWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, SetMessageExtraInfo((LPARAM)IntegerFI(info[0]))));
+}
+
 v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     using namespace v8;
 
@@ -10626,6 +10929,38 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     setGlobalConst(EasyTab_Buttons_Pen_Touch);
     setGlobalConst(EasyTab_Buttons_Pen_Lower);
     setGlobalConst(EasyTab_Buttons_Pen_Upper);
+
+    setGlobalWrapper(GetMessageExtraInfo);
+    setGlobalWrapper(SetMessageExtraInfo);
+
+    setGlobal(MakeRAWINPUTDEVICE);
+    setGlobalWrapper(RegisterRawInputDevices);
+    setGlobal(GetRawInputDeviceListLength);
+    setGlobalWrapper(GetRawInputDeviceList);
+    setGlobalWrapper(GetRawInputDeviceInfo);
+    setGlobalWrapper(GetRawInputData);
+    setGlobalWrapper(GET_RAWINPUT_CODE_WPARAM);
+    setGlobalConst(RIDI_PREPARSEDDATA);
+    setGlobalConst(RIDI_DEVICENAME);
+    setGlobalConst(RIDI_DEVICEINFO);
+    setGlobalConst(RIM_TYPEMOUSE);
+    setGlobalConst(RIM_TYPEKEYBOARD);
+    setGlobalConst(RIM_TYPEHID);
+    setGlobalConst(RIM_INPUT);
+    setGlobalConst(RIM_INPUTSINK);
+    setGlobalConst(RID_HEADER);
+    setGlobalConst(RID_INPUT);
+    setGlobalConst(RIDEV_REMOVE);
+    setGlobalConst(RIDEV_EXCLUDE);
+    setGlobalConst(RIDEV_PAGEONLY);
+    setGlobalConst(RIDEV_NOLEGACY);
+    setGlobalConst(RIDEV_INPUTSINK);
+    setGlobalConst(RIDEV_CAPTUREMOUSE);
+    setGlobalConst(RIDEV_NOHOTKEYS);
+    setGlobalConst(RIDEV_APPKEYS);
+    setGlobalConst(RIDEV_EXINPUTSINK);
+    setGlobalConst(RIDEV_DEVNOTIFY);
+    setGlobalConst(RIDEV_EXMODEMASK);
 
     setGlobalConst(WICBitmapTransformRotate0);
     setGlobalConst(WICBitmapTransformRotate90);
@@ -12478,17 +12813,17 @@ https://forums.codeguru.com/showthread.php?69236-How-to-obtain-HINSTANCE-using-H
             }
             else {
                 while (true) {
-                    char scriptcstr[256];
+                    wchar_t scriptwstr[256]; //buddy why was i using char (when you tried to use emoji in the terminal it wouldn't go through)
                     std::cout << ">>> ";
-                    std::cin.getline(scriptcstr, 256);
+                    std::wcin.getline(scriptwstr, 256);
 
-                    if (strcmp(scriptcstr, "exit") == 0 || strcmp(scriptcstr, "quit") == 0) {
+                    if (wcscmp(scriptwstr, L"exit") == 0 || wcscmp(scriptwstr, L"quit") == 0) {
                         break;
                     }
 
                     //std::string scriptstring = "try {\n"+std::string(scriptcstr)+"\n}catch(e) {\nprint(e);\n}";
-
-                    v8::Local<v8::String> source = v8::String::NewFromUtf8(isolate, scriptcstr, v8::NewStringType::kNormal, strlen(scriptcstr)).ToLocalChecked();//v8::String::NewFromUtf8(isolate, (const char*)shit, v8::NewStringType::kNormal, strlen(shit)).ToLocalChecked();
+                                                                                                                                                                                    //bruh back in the day i thought i had to fill these out but they're calculated automagically
+                    v8::Local<v8::String> source = v8::String::NewFromTwoByte(isolate, (const uint16_t*)scriptwstr).ToLocalChecked();//v8::String::NewFromUtf8(isolate, scriptcstr, v8::NewStringType::kNormal, strlen(scriptcstr)).ToLocalChecked();//v8::String::NewFromUtf8(isolate, (const char*)shit, v8::NewStringType::kNormal, strlen(shit)).ToLocalChecked();
                     //v8::String::NewFromUtf8Literal(isolate, shit);//"'Hello' + ', World!'");
 
                 // Compile the source code.

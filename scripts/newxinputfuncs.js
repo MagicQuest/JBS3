@@ -86,8 +86,8 @@ function windowProc(hwnd, msg, wp, lp) {
         d2d.BeginDraw();
         d2d.Clear(.8, .8, .8);
 
-        let buttons = undefined;
-        let gamepad = undefined;
+        let buttons = -1;
+        let gamepad = {sThumbLX: 0, sThumbLY: 0, sThumbRX: 0, sThumbRY: 0};
         const controllers = GetControllers();
         if(controllers[0] != undefined) { //using the first controller available
             gamepad = XInputGetState(controllers[0]).Gamepad;
@@ -95,7 +95,7 @@ function windowProc(hwnd, msg, wp, lp) {
         }
 
         let i = 1;
-        d2d.DrawText((buttons == undefined) ? "Unable to find any connected controllers" : `Controller ${controllers[0]}: `, font, 0, 0, 312, 240, brush);
+        d2d.DrawText((buttons == -1) ? "Unable to find any connected controllers" : `Controller ${controllers[0]}: `, font, 0, 0, 312, 240, brush);
         d2d.DrawText(`XINPUT_GAMEPAD_DPAD_UP: ${+((buttons & XINPUT_GAMEPAD_DPAD_UP) == XINPUT_GAMEPAD_DPAD_UP)}`, font, 0, 12*i, 312, 240, brush); i++;
         d2d.DrawText(`XINPUT_GAMEPAD_DPAD_DOWN: ${+((buttons & XINPUT_GAMEPAD_DPAD_DOWN) == XINPUT_GAMEPAD_DPAD_DOWN)}`, font, 0, 12*i, 312, 240, brush); i++;
         d2d.DrawText(`XINPUT_GAMEPAD_DPAD_LEFT: ${+((buttons & XINPUT_GAMEPAD_DPAD_LEFT) == XINPUT_GAMEPAD_DPAD_LEFT)}`, font, 0, 12*i, 312, 240, brush); i++;
