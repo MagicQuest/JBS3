@@ -6757,6 +6757,13 @@ V8FUNC(FillRectWrapper) {
     info.GetReturnValue().Set(Number::New(isolate, FillRect((HDC)IntegerFI(info[0]), &r, (HBRUSH)IntegerFI(info[5]))));
 }
 
+V8FUNC(EllipseWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, Ellipse((HDC)IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]), IntegerFI(info[4]))));
+}
+
 V8FUNC(SetCaptureWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
@@ -10220,10 +10227,10 @@ V8FUNC(MakeRAWINPUTDEVICE) {
     Local<Context> context = isolate->GetCurrentContext();
 
     Local<Object> jsRID = Object::New(isolate);
-    jsRID->Set(context, LITERAL("usUsagePage"), info[0]);
-    jsRID->Set(context, LITERAL("usUsage"), info[1]);
-    jsRID->Set(context, LITERAL("dwFlags"), info[2]);
-    jsRID->Set(context, LITERAL("hwndTarget"), info[3]);
+    jsRID->Set(context, LITERAL("usUsagePage"), info[0].As<Number>()); //just incase you try to pass a string and RegisterRawInputDevices fails and you can't figure out the source of the problem
+    jsRID->Set(context, LITERAL("usUsage"), info[1].As<Number>());
+    jsRID->Set(context, LITERAL("dwFlags"), info[2].As<Number>());
+    jsRID->Set(context, LITERAL("hwndTarget"), info[3].As<Number>());
 
     info.GetReturnValue().Set(jsRID);
 }
@@ -10480,7 +10487,20 @@ V8FUNC(GetRawInputDataWrapper) {
                 else if (input->header.dwType == RIM_TYPEHID) {
                     jsData->Set(context, LITERAL("dwSizeHid"), Number::New(isolate, input->data.hid.dwSizeHid));
                     jsData->Set(context, LITERAL("dwCount"), Number::New(isolate, input->data.hid.dwCount));
-                    jsData->Set(context, LITERAL("bRawData"), Number::New(isolate, input->data.hid.bRawData[0])); //i gotta investigate this bih tomorrow (i think i gotta use GetRawInputBuffer but idk)
+                    //jsData->Set(context, LITERAL("bRawData"), Number::New(isolate, input->data.hid.bRawData[0])); //i gotta investigate this bih tomorrow (i think i gotta use GetRawInputBuffer but idk)
+                    //nah cause why would it work like this and they not even trying to explain it??? (i mean msdn KINDA explains but i need an example, "The size of the bRawData array is dwSizeHid * dwCount." https://learn.microsoft.com/en-us/windows/win32/api/winuser/ns-winuser-rawhid)
+                    //im saying it would make more sense if it wasn't bRawData[1] (why wasn't it just a regular pointer and not a deceptive array of size [1])
+                    int rawsize = input->data.hid.dwCount * input->data.hid.dwSizeHid;
+                    //LPBYTE realdata = new BYTE[rawsize]; //funny enough i found this here: https://stackoverflow.com/a/48794367
+                    //memcpy(realdata, input->data.hid.bRawData, rawsize);
+
+                    Local<ArrayBuffer> ab = ArrayBuffer::New(isolate, rawsize);
+                    memcpy(ab->Data(), input->data.hid.bRawData, rawsize);
+
+                    Local<Int8Array> arr = Int8Array::New(ab, 0, rawsize);
+
+                    jsData->Set(context, LITERAL("bRawData"), arr);
+                    //delete[] realdata;
                 }
                 jsRaw->Set(context, LITERAL("data"), jsData);
             }
@@ -10490,6 +10510,93 @@ V8FUNC(GetRawInputDataWrapper) {
         delete[] lpb; //oopsies i forgor the []
     }
 
+}
+
+V8FUNC(GetRegisteredRawInputDevicesWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    UINT devices = 0;
+    int res = GetRegisteredRawInputDevices(NULL, &devices, sizeof(RAWINPUTDEVICE));
+
+    if (res < 0) { //just remembered is has to BE smaller than 0
+        //goto fail;
+        HANDLE console = GetStdHandle(STD_OUTPUT_HANDLE);
+        SetConsoleTextAttribute(console, 4);
+        print("oopsie poopsie GetRegisteredRawInputDevices didn't work for some reason (returned " << res << ") GetLastError says: (" << GetLastError() << ")");
+        SetConsoleTextAttribute(console, 7);
+        return;
+    }
+
+    RAWINPUTDEVICE* list = new RAWINPUTDEVICE[devices];
+    res = GetRegisteredRawInputDevices(list, &devices, sizeof(RAWINPUTDEVICE));
+
+    if (res < 0) { //i was about to use gotos here but i realized that i have to delete[] list but now im thinking i could just do that in this if and then goto
+        delete[] list;
+        //goto fail;
+        HANDLE console = GetStdHandle(STD_OUTPUT_HANDLE);
+        SetConsoleTextAttribute(console, 4);
+        print("oopsie poopsie GetRegisteredRawInputDevices didn't work for some reason (returned " << res << ") GetLastError says: (" << GetLastError() << ")");
+        SetConsoleTextAttribute(console, 7);
+        return;
+    }
+
+    Local<Context> context = isolate->GetCurrentContext();
+    //Local<Object> jsRaw = jsImpl::JSRawInputDeviceList->NewInstance(context).ToLocalChecked();
+    Local<Array> jsList = Array::New(isolate, devices);
+    for (int i = 0; i < devices; i++) {
+        Local<Object> jsdevice = Object::New(isolate);
+        jsdevice->Set(context, LITERAL("usUsagePage"), Number::New(isolate, list[i].usUsagePage));
+        jsdevice->Set(context, LITERAL("usUsage"), Number::New(isolate, list[i].usUsage));
+        jsdevice->Set(context, LITERAL("dwFlags"), Number::New(isolate, list[i].dwFlags));
+        jsdevice->Set(context, LITERAL("hwndTarget"), Number::New(isolate, (LONG_PTR)list[i].hwndTarget));
+
+        jsList->Set(context, i, jsdevice);
+    }
+
+    info.GetReturnValue().Set(jsList);
+
+    delete[] list;
+
+//fail: //aw damn idk how gotos work bruhh
+//    HANDLE console = GetStdHandle(STD_OUTPUT_HANDLE);
+//    SetConsoleTextAttribute(console, 4);
+//    print("oopsie poopsie GetRegisteredRawInputDevices didn't work for some reason (returned " << res << ") GetLastError says: (" << GetLastError() << ")");
+//    SetConsoleTextAttribute(console, 7);
+//    return;
+    //if (res <= 0) {
+    //    RAWINPUTDEVICE* list = new RAWINPUTDEVICE[devices];
+    //    res = GetRegisteredRawInputDevices(list, &devices, sizeof(RAWINPUTDEVICE));
+    //    if (res <= 0) { //this looks weird with the nested checks so maybe i should just return?
+    //        HANDLE console = GetStdHandle(STD_OUTPUT_HANDLE);
+    //        SetConsoleTextAttribute(console, 4);
+    //        print("oopsie poopsie GetRegisteredRawInputDevices didn't work for some reason (returned " << res << ") GetLastError says: (" << GetLastError() << ")");
+    //        SetConsoleTextAttribute(console, 7);
+    //    }
+    //    else {
+    //        Local<Context> context = isolate->GetCurrentContext();
+    //        //Local<Object> jsRaw = jsImpl::JSRawInputDeviceList->NewInstance(context).ToLocalChecked();
+    //        Local<Array> jsList = Array::New(isolate, devices);
+    //        for (int i = 0; i < devices; i++) {
+    //            Local<Object> jsdevice = Object::New(isolate);
+    //            jsdevice->Set(context, LITERAL("usUsagePage"), Number::New(isolate, list[i].usUsagePage));
+    //            jsdevice->Set(context, LITERAL("usUsage"), Number::New(isolate, list[i].usUsage));
+    //            jsdevice->Set(context, LITERAL("dwFlags"), Number::New(isolate, list[i].dwFlags));
+    //            jsdevice->Set(context, LITERAL("hwndTarget"), Number::New(isolate, (LONG_PTR)list[i].hwndTarget));
+    //
+    //            jsList->Set(context, i, jsdevice);
+    //        }
+    //
+    //        info.GetReturnValue().Set(jsList);
+    //    }
+    //    delete[] list;
+    //}
+    //else {
+    //    HANDLE console = GetStdHandle(STD_OUTPUT_HANDLE);
+    //    SetConsoleTextAttribute(console, 4);
+    //    print("oopsie poopsie GetRegisteredRawInputDevices didn't work for some reason (returned " << res << ") GetLastError says: (" << GetLastError() << ")");
+    //    SetConsoleTextAttribute(console, 7);
+    //}
 }
 
 V8FUNC(GetMessageExtraInfoWrapper) {
@@ -10504,6 +10611,13 @@ V8FUNC(SetMessageExtraInfoWrapper) {
     Isolate* isolate = info.GetIsolate();
 
     info.GetReturnValue().Set(Number::New(isolate, SetMessageExtraInfo((LPARAM)IntegerFI(info[0]))));
+}
+
+V8FUNC(GetCurrentObjectWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)GetCurrentObject((HDC)IntegerFI(info[0]), IntegerFI(info[1]))));
 }
 
 v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
@@ -10585,6 +10699,9 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     setGlobalWrapper(MaskBlt);
     setGlobalWrapper(PlgBlt);
     setGlobal(RotateImage);
+    setGlobalWrapper(FillRect);
+    setGlobalWrapper(Ellipse);
+    setGlobalWrapper(GetCurrentObject);
     setGlobalWrapper(SetTimer);
     setGlobalWrapper(KillTimer);
 
@@ -10638,6 +10755,13 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     setGlobalConst(VAR_BOOLEAN);
     setGlobalConst(VAR_CSTRING);
     setGlobalConst(VAR_WSTRING);
+
+    setGlobalConst(OBJ_BITMAP);
+    setGlobalConst(OBJ_BRUSH);
+    setGlobalConst(OBJ_COLORSPACE);
+    setGlobalConst(OBJ_FONT);
+    setGlobalConst(OBJ_PAL);
+    setGlobalConst(OBJ_PEN);
 
     setGlobalConst(FOREGROUND_BLUE); //for SetConsoleTextAttribute i think
     setGlobalConst(FOREGROUND_GREEN);
@@ -10938,8 +11062,9 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     setGlobal(GetRawInputDeviceListLength);
     setGlobalWrapper(GetRawInputDeviceList);
     setGlobalWrapper(GetRawInputDeviceInfo);
-    setGlobalWrapper(GetRawInputData);
+    setGlobalWrapper(GetRawInputData); //no lie im probably not adding getRawInputBuffer
     setGlobalWrapper(GET_RAWINPUT_CODE_WPARAM);
+    setGlobalWrapper(GetRegisteredRawInputDevices);
     setGlobalConst(RIDI_PREPARSEDDATA);
     setGlobalConst(RIDI_DEVICENAME);
     setGlobalConst(RIDI_DEVICEINFO);
@@ -10961,6 +11086,30 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     setGlobalConst(RIDEV_EXINPUTSINK);
     setGlobalConst(RIDEV_DEVNOTIFY);
     setGlobalConst(RIDEV_EXMODEMASK);
+    setGlobalConst(RI_MOUSE_LEFT_BUTTON_DOWN);
+    setGlobalConst(RI_MOUSE_LEFT_BUTTON_UP);
+    setGlobalConst(RI_MOUSE_RIGHT_BUTTON_DOWN);
+    setGlobalConst(RI_MOUSE_RIGHT_BUTTON_UP);
+    setGlobalConst(RI_MOUSE_MIDDLE_BUTTON_DOWN);
+    setGlobalConst(RI_MOUSE_MIDDLE_BUTTON_UP);
+    setGlobalConst(RI_MOUSE_BUTTON_1_DOWN);
+    setGlobalConst(RI_MOUSE_BUTTON_1_UP);
+    setGlobalConst(RI_MOUSE_BUTTON_2_DOWN);
+    setGlobalConst(RI_MOUSE_BUTTON_2_UP);
+    setGlobalConst(RI_MOUSE_BUTTON_3_DOWN);
+    setGlobalConst(RI_MOUSE_BUTTON_3_UP);
+    setGlobalConst(RI_MOUSE_BUTTON_4_DOWN);
+    setGlobalConst(RI_MOUSE_BUTTON_4_UP);
+    setGlobalConst(RI_MOUSE_BUTTON_5_DOWN);
+    setGlobalConst(RI_MOUSE_BUTTON_5_UP);
+    setGlobalConst(RI_MOUSE_WHEEL);
+    setGlobalConst(RI_MOUSE_HWHEEL);
+    setGlobalConst(MOUSE_MOVE_RELATIVE);
+    setGlobalConst(MOUSE_MOVE_ABSOLUTE);
+    setGlobalConst(MOUSE_VIRTUAL_DESKTOP);
+    setGlobalConst(MOUSE_ATTRIBUTES_CHANGED);
+    setGlobalConst(MOUSE_MOVE_NOCOALESCE);
+
 
     setGlobalConst(WICBitmapTransformRotate0);
     setGlobalConst(WICBitmapTransformRotate90);
@@ -12280,8 +12429,6 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
     setGlobalWrapper(Sleep);
     setGlobalWrapper(GetClientRect);
     setGlobalWrapper(GetWindowRect);
-
-    setGlobalWrapper(FillRect);
 
     setGlobalWrapper(GetConsoleWindow);
     //setGlobalWrapper(GetDesktopWindow);
