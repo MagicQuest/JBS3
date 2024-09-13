@@ -97,7 +97,7 @@ function windowProc(hwnd, msg, wp, lp) {
         //DeleteDC(memDC);
         
         EndPaint(hwnd, ps);
-    }else if(msg == WM_DWMSENDICONICTHUMBNAIL) { //shows when you alt+tab and hover over taskbar icon
+    }else if(msg == WM_DWMSENDICONICTHUMBNAIL) { //shows when you alt+tab or hover over taskbar icon
         mwidth = HIWORD(lp);
         mheight = LOWORD(lp);
         print(mwidth, mheight, wp, "creating iconic thumbnail");

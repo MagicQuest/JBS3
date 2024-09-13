@@ -172,4 +172,4 @@ winclass.hIcon = winclass.hIconSm = LoadIcon(NULL, IDI_APPLICATION);
 winclass.hbrBackground = COLOR_BACKGROUND;
 winclass.hCursor = LoadCursor(NULL, IDC_ARROW);
 
-CreateWindow(WS_EX_OVERLAPPEDWINDOW, winclass, "controller remappningthign (pull triggers or use mouse to change motor speeds)", WS_OVERLAPPEDWINDOW | WS_VISIBLE, CW_USEDEFAULT, CW_USEDEFAULT, 480+20, 240+42, NULL, NULL, hInstance);
+CreateWindow(WS_EX_OVERLAPPEDWINDOW, winclass, "controller remappningthign (pull triggers or use mouse to change motor speeds)", WS_OVERLAPPEDWINDOW | WS_VISIBLE, CW_USEDEFAULT, CW_USEDEFAULT, 480+20, 240+43, NULL, NULL, hInstance);

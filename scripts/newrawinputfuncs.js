@@ -71,7 +71,7 @@ function windowProc(hwnd, msg, wp, lp) {
 
         DeleteDC(memDC);
         //DeleteObject(bmp);
-    }else if(msg == WM_SIZE || msg == WM_SIZING) {
+    }else if(msg == WM_SIZE) {
         w = LOWORD(lp);
         h = HIWORD(lp);
     }
@@ -98,4 +98,4 @@ winclass.hIcon = winclass.hIconSm = LoadIcon(NULL, IDI_APPLICATION);
 winclass.hbrBackground = COLOR_BACKGROUND;
 winclass.hCursor = LoadCursor(NULL, IDC_ARROW);
 
-CreateWindow(WS_EX_OVERLAPPEDWINDOW, winclass, "new raw input funcs because i just learned about raw input when i was trying to make a custom driver for my controller to see if i could 'fake' inputs for roblox because using SendInput doesn't work so im thinking it's deeper than that", WS_OVERLAPPEDWINDOW | WS_VISIBLE, CW_USEDEFAULT, CW_USEDEFAULT, w+20, h+42, NULL, NULL, hInstance);
+CreateWindow(WS_EX_OVERLAPPEDWINDOW, winclass, "new raw input funcs because i just learned about raw input when i was trying to make a custom driver for my controller to see if i could 'fake' inputs for roblox because using SendInput doesn't work so im thinking it's deeper than that", WS_OVERLAPPEDWINDOW | WS_VISIBLE, CW_USEDEFAULT, CW_USEDEFAULT, w+20, h+43, NULL, NULL, hInstance);

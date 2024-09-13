@@ -162,7 +162,7 @@ namespace jsImpl {
         return jsRect;
     }
 
-    template<class T>
+    template<class T> //lmao why is this a template (ok one time i used POINTS instead of POINT so yeagh ok valid)
     Local<Object> createWinPoint(Isolate* isolate, T p) {
         Local<Object> jsPoint = Object::New(isolate);
 
@@ -170,6 +170,15 @@ namespace jsImpl {
         jsPoint->Set(isolate->GetCurrentContext(), LITERAL("y"), Number::New(isolate, p.y));
 
         return jsPoint;
+    }
+
+    Local<Object> createWinSize(Isolate* isolate, SIZE p) {
+        Local<Object> jsSize = Object::New(isolate);
+
+        jsSize->Set(isolate->GetCurrentContext(), LITERAL("width"), Number::New(isolate, p.cx));
+        jsSize->Set(isolate->GetCurrentContext(), LITERAL("height"), Number::New(isolate, p.cy));
+
+        return jsSize;
     }
 
     //template<typename T>
@@ -202,7 +211,27 @@ namespace jsImpl {
         //aDA(isolate, jsArray, args...);
     }
 
-
+    void getVectorFromPointsArray(Isolate* isolate, Local<Array> jsPointsArr, std::vector<POINT>& vpoints) {
+        Local<Context> context = isolate->GetCurrentContext();
+        if (jsPointsArr->Get(context, 0).ToLocalChecked()->IsArray()) { //this points array can be filled with more arrays -> [[10, 20], [20, 30]]
+            for (int i = 0; i < jsPointsArr->Length(); i++) {
+                Local<Array> innerArr = jsPointsArr->Get(context, i).ToLocalChecked().As<Array>();
+                vpoints[i] = POINT{
+                    (long)IntegerFI(innerArr->Get(context, 0).ToLocalChecked()),
+                    (long)IntegerFI(innerArr->Get(context, 1).ToLocalChecked()),
+                };
+            }
+        }
+        else { //or it can be filled with objects -> [{x: 10, y: 20}, {x: 20, y: 30}]
+            for (int i = 0; i < jsPointsArr->Length(); i++) {
+                Local<Object> innerObj = jsPointsArr->Get(context, i).ToLocalChecked().As<Object>();
+                vpoints[i] = POINT{
+                    (long)IntegerFI(innerObj->Get(context, LITERAL("x")).ToLocalChecked()),
+                    (long)IntegerFI(innerObj->Get(context, LITERAL("y")).ToLocalChecked()),
+                };
+            }
+        }
+    }
 
     Local<ObjectTemplate> JSDWriteFontFamily;
     Local<ObjectTemplate> JSDWriteFont;
@@ -1148,21 +1177,81 @@ V8FUNC(MoveToWrapper) {
     //POINT point{IntegerFI(info[3]), IntegerFI(info[4])};
     //point is [out]
 
-    info.GetReturnValue().Set(MoveToEx((HDC)IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), NULL));//&point));
+    info.GetReturnValue().Set(Number::New(isolate, MoveToEx((HDC)IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), NULL)));//&point));
 }
 
 V8FUNC(LineToWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
 
-    info.GetReturnValue().Set(LineTo((HDC)IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2])));
+    info.GetReturnValue().Set(Number::New(isolate, LineTo((HDC)IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]))));
 }
 
 V8FUNC(RectangleWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
 
-    info.GetReturnValue().Set(Rectangle((HDC)IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]), IntegerFI(info[4])));
+    info.GetReturnValue().Set(Number::New(isolate, Rectangle((HDC)IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]), IntegerFI(info[4]))));
+}
+
+V8FUNC(RoundRectWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, RoundRect((HDC)IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]), IntegerFI(info[4]), IntegerFI(info[5]), IntegerFI(info[6]))));
+}
+
+V8FUNC(PieWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, Pie((HDC)IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]), IntegerFI(info[4]), IntegerFI(info[5]), IntegerFI(info[6]), IntegerFI(info[7]), IntegerFI(info[8]))));
+}
+
+V8FUNC(ChordWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Chord((HDC)IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]), IntegerFI(info[4]), IntegerFI(info[5]), IntegerFI(info[6]), IntegerFI(info[7]), IntegerFI(info[8])));
+}
+
+V8FUNC(PolylineWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    //Local<Context> context = isolate->GetCurrentContext();
+
+
+    Local<Array> jsPointsArr = info[1].As<Array>();
+    std::vector<POINT> vpoints(jsPointsArr->Length());
+    jsImpl::getVectorFromPointsArray(isolate, jsPointsArr, vpoints);
+
+    info.GetReturnValue().Set(Polyline((HDC)IntegerFI(info[0]), vpoints.data(), vpoints.size())); //i guess i could use the js array's size but it literally doesn;t matter lo
+}
+
+V8FUNC(PolylineToWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    //Local<Context> context = isolate->GetCurrentContext();
+
+
+    Local<Array> jsPointsArr = info[1].As<Array>();
+    std::vector<POINT> vpoints(jsPointsArr->Length());
+    jsImpl::getVectorFromPointsArray(isolate, jsPointsArr, vpoints);
+
+    info.GetReturnValue().Set(PolylineTo((HDC)IntegerFI(info[0]), vpoints.data(), vpoints.size())); //i guess i could use the js array's size but it literally doesn;t matter lo
+}
+
+V8FUNC(PolygonWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    //Local<Context> context = isolate->GetCurrentContext();
+
+
+    Local<Array> jsPointsArr = info[1].As<Array>();
+    std::vector<POINT> vpoints(jsPointsArr->Length());
+    jsImpl::getVectorFromPointsArray(isolate, jsPointsArr, vpoints);
+
+    info.GetReturnValue().Set(Polygon((HDC)IntegerFI(info[0]), vpoints.data(), vpoints.size())); //i guess i could use the js array's size but it literally doesn;t matter lo
 }
 
 V8FUNC(GetStockObjectWrapper) {
@@ -1188,7 +1277,14 @@ V8FUNC(SetTextColorWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
     //https://learn.microsoft.com/en-us/windows/win32/gdi/drawing-a-minimized-window
-    SetTextColor((HDC)IntegerFI(info[0]), IntegerFI(info[1]));//RGB(IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3])));
+    info.GetReturnValue().Set(Number::New(isolate, SetTextColor((HDC)IntegerFI(info[0]), IntegerFI(info[1]))));//RGB(IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3])));
+}
+
+V8FUNC(GetTextColorWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, GetTextColor((HDC)IntegerFI(info[0]))));//RGB(IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3])));
 }
 
 V8FUNC(CreateFontWrapper) {
@@ -6691,6 +6787,130 @@ V8FUNC(GetBitmapDimensions) {
     info.GetReturnValue().Set(jsSize);
 }
 
+V8FUNC(GetBitmapDimensionExWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    SIZE olddimensions{};
+
+    BOOL res = GetBitmapDimensionEx((HBITMAP)IntegerFI(info[0]), &olddimensions);
+
+    if (res == 0) {
+        info.GetReturnValue().Set(Number::New(isolate, 0));
+    }
+    else {
+        Local<Context> context = isolate->GetCurrentContext();
+        Local<Object> jsDim = Object::New(isolate);
+
+        jsDim->Set(context, LITERAL("width"), Number::New(isolate, olddimensions.cx));
+        jsDim->Set(context, LITERAL("height"), Number::New(isolate, olddimensions.cy));
+
+        info.GetReturnValue().Set(jsDim);
+    }
+}
+
+V8FUNC(SetBitmapDimensionExWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    SIZE olddimensions{};
+
+    BOOL res = SetBitmapDimensionEx((HBITMAP)IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), &olddimensions);
+
+    if (res == 0) {
+        info.GetReturnValue().Set(Number::New(isolate, 0));
+    }
+    else {
+        Local<Context> context = isolate->GetCurrentContext();
+        Local<Object> jsDim = Object::New(isolate);
+
+        jsDim->Set(context, LITERAL("width"), Number::New(isolate, olddimensions.cx));
+        jsDim->Set(context, LITERAL("height"), Number::New(isolate, olddimensions.cy));
+
+        info.GetReturnValue().Set(jsDim);
+    }
+}
+
+V8FUNC(ExtFloodFillWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, ExtFloodFill((HDC)IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]), IntegerFI(info[4]))));
+}
+
+V8FUNC(GetDCPenColorWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, GetDCPenColor((HDC)IntegerFI(info[0]))));
+}
+
+V8FUNC(GetDCBrushColorWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, GetDCBrushColor((HDC)IntegerFI(info[0]))));
+}
+
+V8FUNC(GetCurrentObjectWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)GetCurrentObject((HDC)IntegerFI(info[0]), IntegerFI(info[1]))));
+}
+
+V8FUNC(GetObjectTypeWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, GetObjectType((HGDIOBJ)IntegerFI(info[0]))));
+}
+
+V8FUNC(SetWindowExtExWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    SIZE s{}; SetWindowExtEx((HDC)IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), &s);
+
+    info.GetReturnValue().Set(jsImpl::createWinSize(isolate, s));
+}
+
+V8FUNC(GetWindowExtExWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    SIZE s{}; GetWindowExtEx((HDC)IntegerFI(info[0]), &s);
+
+    info.GetReturnValue().Set(jsImpl::createWinSize(isolate, s));
+}
+
+V8FUNC(SetViewportExtExWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    SIZE s{}; SetViewportExtEx((HDC)IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), &s);
+
+    info.GetReturnValue().Set(jsImpl::createWinSize(isolate, s));
+}
+
+V8FUNC(GetViewportExtExWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    SIZE s{}; GetViewportExtEx((HDC)IntegerFI(info[0]), &s);
+
+    info.GetReturnValue().Set(jsImpl::createWinSize(isolate, s));
+}
+
+V8FUNC(GetDCOrgExWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    POINT p{0, 0}; GetDCOrgEx((HDC)IntegerFI(info[0]), &p);
+
+    info.GetReturnValue().Set(jsImpl::createWinPoint(isolate, p));
+}
+
 V8FUNC(SaveDCWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
@@ -6755,6 +6975,20 @@ V8FUNC(FillRectWrapper) {
     Isolate* isolate = info.GetIsolate();
     RECT r = RECT{ (long)IntegerFI(info[1]) , (long)IntegerFI(info[2]) , (long)IntegerFI(info[3]) , (long)IntegerFI(info[4]) };
     info.GetReturnValue().Set(Number::New(isolate, FillRect((HDC)IntegerFI(info[0]), &r, (HBRUSH)IntegerFI(info[5]))));
+}
+
+V8FUNC(InvertRectWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    RECT r = RECT{ (long)IntegerFI(info[1]) , (long)IntegerFI(info[2]) , (long)IntegerFI(info[3]) , (long)IntegerFI(info[4]) };
+    info.GetReturnValue().Set(Number::New(isolate, InvertRect((HDC)IntegerFI(info[0]), &r)));
+}
+
+V8FUNC(FrameRectWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    RECT r = RECT{ (long)IntegerFI(info[1]) , (long)IntegerFI(info[2]) , (long)IntegerFI(info[3]) , (long)IntegerFI(info[4]) };
+    info.GetReturnValue().Set(Number::New(isolate, FrameRect((HDC)IntegerFI(info[0]), &r, (HBRUSH)IntegerFI(info[5]))));
 }
 
 V8FUNC(EllipseWrapper) {
@@ -7248,6 +7482,13 @@ V8FUNC(SetROP2Wrapper) {
     Isolate* isolate = info.GetIsolate();
 
     info.GetReturnValue().Set(Number::New(isolate, SetROP2((HDC)IntegerFI(info[0]), IntegerFI(info[1]))));
+}
+
+V8FUNC(GetROP2Wrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, GetROP2((HDC)IntegerFI(info[0]))));
 }
 
 V8FUNC(GetSystemMetricsWrapper) {
@@ -10613,11 +10854,18 @@ V8FUNC(SetMessageExtraInfoWrapper) {
     info.GetReturnValue().Set(Number::New(isolate, SetMessageExtraInfo((LPARAM)IntegerFI(info[0]))));
 }
 
-V8FUNC(GetCurrentObjectWrapper) {
+V8FUNC(RegisterHotKeyWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
 
-    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)GetCurrentObject((HDC)IntegerFI(info[0]), IntegerFI(info[1]))));
+    info.GetReturnValue().Set(RegisterHotKey((HWND)IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3])));
+}
+
+V8FUNC(UnregisterHotKeyWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(UnregisterHotKey((HWND)IntegerFI(info[0]), IntegerFI(info[1])));
 }
 
 v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
@@ -10681,6 +10929,10 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     
     setGlobalWrapper(MessageBeep);
 
+    //https://stackoverflow.com/questions/6707148/foreach-macro-on-macros-arguments
+#define setGlobalConst(g) global->Set(isolate, #g, Number::New(isolate, g))
+
+
     global->Set(isolate, "BeginPaint", FunctionTemplate::New(isolate, BeginPaintWrapper));
     global->Set(isolate, "EndPaint", FunctionTemplate::New(isolate, EndPaintWrapper));
 
@@ -10702,6 +10954,13 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     setGlobalWrapper(FillRect);
     setGlobalWrapper(Ellipse);
     setGlobalWrapper(GetCurrentObject);
+    setGlobalWrapper(GetDCOrgEx);
+    setGlobalWrapper(GetObjectType);
+    setGlobalWrapper(GetDCBrushColor);
+    setGlobalWrapper(GetDCPenColor);
+    setGlobalWrapper(ExtFloodFill); setGlobalConst(FLOODFILLBORDER); setGlobalConst(FLOODFILLSURFACE);
+    setGlobalWrapper(GetBitmapDimensionEx);
+    setGlobalWrapper(SetBitmapDimensionEx);
     setGlobalWrapper(SetTimer);
     setGlobalWrapper(KillTimer);
 
@@ -10737,8 +10996,6 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
 
     //setGlobalWrapper(DllCall);
 
-    //https://stackoverflow.com/questions/6707148/foreach-macro-on-macros-arguments
-#define setGlobalConst(g) global->Set(isolate, #g, Number::New(isolate, g))
     setGlobal(DllLoad);
 
 #define RETURN_STRING 0
@@ -10762,6 +11019,14 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     setGlobalConst(OBJ_FONT);
     setGlobalConst(OBJ_PAL);
     setGlobalConst(OBJ_PEN);
+
+    setGlobalWrapper(RegisterHotKey);
+    setGlobalWrapper(UnregisterHotKey);
+    setGlobalConst(MOD_ALT);
+    setGlobalConst(MOD_CONTROL);
+    setGlobalConst(MOD_NOREPEAT);
+    setGlobalConst(MOD_SHIFT);
+    setGlobalConst(MOD_WIN);
 
     setGlobalConst(FOREGROUND_BLUE); //for SetConsoleTextAttribute i think
     setGlobalConst(FOREGROUND_GREEN);
@@ -11544,6 +11809,7 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     setGlobalWrapper(ClientToScreen);
     setGlobalWrapper(SetRect);
     setGlobalWrapper(SetROP2);
+    setGlobalWrapper(GetROP2);
 
     setGlobalConst(SW_HIDE           );
     setGlobalConst(SW_SHOWNORMAL     );
@@ -12138,7 +12404,19 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
     setGlobalWrapper(CreateBitmap);
     setGlobalWrapper(GetClassName);
 
+    setGlobalWrapper(SetWindowExtEx);
+    setGlobalWrapper(GetWindowExtEx);
+    setGlobalWrapper(SetViewportExtEx);
+    setGlobalWrapper(GetViewportExtEx);
+    setGlobalWrapper(Polyline);
+    setGlobalWrapper(PolylineTo);
+    setGlobalWrapper(Polygon);
+    setGlobalWrapper(Chord);
     setGlobalWrapper(Rectangle);
+    setGlobalWrapper(RoundRect);
+    setGlobalWrapper(InvertRect);
+    setGlobalWrapper(FrameRect);
+    setGlobalWrapper(Pie);
 
     global->Set(isolate, "GetDefaultFont", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
         static HFONT defaultfont = NULL; //lowkey still genius
@@ -12168,6 +12446,10 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
     setGlobalWrapper(FindWindow);
 
     setGlobalWrapper(SetTextColor);
+    setGlobalWrapper(GetTextColor);
+
+    setGlobalConst(IDHOT_SNAPDESKTOP); //for WM_HOTKEY's WPARAM value
+    setGlobalConst(IDHOT_SNAPWINDOW);
 
     //jsEffectOT = DIRECT2D::getIUnknownImpl(isolate, nullptr);
     jsImpl::initObjectTemplates(isolate);

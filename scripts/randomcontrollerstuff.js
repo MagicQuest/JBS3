@@ -81,4 +81,4 @@ winclass.hIcon = winclass.hIconSm = LoadIcon(NULL, IDI_APPLICATION);
 winclass.hbrBackground = COLOR_BACKGROUND;
 winclass.hCursor = LoadCursor(NULL, IDC_ARROW);
 
-CreateWindow(WS_EX_OVERLAPPEDWINDOW, winclass, "analog stick view", WS_OVERLAPPEDWINDOW | WS_VISIBLE, CW_USEDEFAULT, CW_USEDEFAULT, 640+20, 480+42, NULL, NULL, hInstance);
+CreateWindow(WS_EX_OVERLAPPEDWINDOW, winclass, "analog stick view", WS_OVERLAPPEDWINDOW | WS_VISIBLE, CW_USEDEFAULT, CW_USEDEFAULT, 640+20, 480+43, NULL, NULL, hInstance);

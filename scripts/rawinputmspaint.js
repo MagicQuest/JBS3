@@ -32,13 +32,23 @@ function windowProc(hwnd, msg, wp, lp) {
 
         SelectObject(memDC, bmp);
         SelectObject(memDC, GetStockObject(DC_BRUSH)); //plus i think i've been using this wrong and kept forgetting to use GetStockObject so i would just pass DC_BRUSH which wouldn't really work (but it would kinda work which is why i didn't realize this until later)
+        SelectObject(memDC, GetStockObject(DC_PEN));
         SetDCBrushColor(memDC, RGB(255, 255, 0));
 
-        FillRect(memDC, 0, 0, 256, 128, NULL);
+        FillRect(memDC, 0, 0, 324, 128, NULL);
 
-        SetDCBrushColor(memDC, RGB(255, 0, 255));
-        SelectObject(memDC, GetStockObject(DC_PEN));
-        SetDCPenColor(memDC, RGB(255, 0, 255));
+        rawmouseinfo.buttons = (GetKey(VK_LBUTTON)!=0) | ((GetKey(VK_RBUTTON)!=0)*2) | ((GetKey(VK_MBUTTON)!=0)*4); //big brain teehee (oops i forgot that GetKey returns big number instead of just 1)
+
+        let color = RGB(255, 0, 255);
+
+        if((rawmouseinfo.buttons & 2) == 2) { //right mouse button
+            color = RGB(0, 0, 0);
+        }
+
+        //print(rawmouseinfo.buttons, GetKey(VK_RBUTTON), color);
+
+        SetDCBrushColor(memDC, color);
+        SetDCPenColor(memDC, color);
 
         i = 1;
         for(const prop in input.data) {
@@ -61,14 +71,23 @@ function windowProc(hwnd, msg, wp, lp) {
         //rawmouseinfo.x = (x/(2**16 - 1))*w; //although this is a cool discovery idrgaf because i just wanted the pressure lol
         //rawmouseinfo.y = (y/(2**16 - 1))*h; //although this is a cool discovery idrgaf because i just wanted the pressure lol
 
-        rawmouseinfo.pressure = input.data.bRawData[7]/2;
+        let lop = input.data.bRawData[6];
+        let hip = input.data.bRawData[7];
 
-        rawmouseinfo.buttons = input.data.bRawData[1]==-95;
+        //input.data.bRawData[7]/2;
+        rawmouseinfo.pressure = (((hip & 0xFF) << 8) | (lop & 0xFF))/500; //my pen's max pressure is 8192 so
+
+        print(rawmouseinfo.pressure);
 
         //print(rawmouseinfo);
 
         if(rawmouseinfo.buttons) {
-            Ellipse(memDC, rawmouseinfo.x-rawmouseinfo.pressure, rawmouseinfo.y-rawmouseinfo.pressure, rawmouseinfo.x+rawmouseinfo.pressure, rawmouseinfo.y+rawmouseinfo.pressure);
+            if((rawmouseinfo.buttons & 4) != 4) { //if not hitting middle mouse
+                Ellipse(memDC, rawmouseinfo.x-rawmouseinfo.pressure, rawmouseinfo.y-rawmouseinfo.pressure, rawmouseinfo.x+rawmouseinfo.pressure, rawmouseinfo.y+rawmouseinfo.pressure);
+            }else if((rawmouseinfo.buttons & 1) == 1){ //left mouse
+                const right = ((rawmouseinfo.buttons & 2) == 2);
+                print(ExtFloodFill(memDC, rawmouseinfo.x, rawmouseinfo.y, !right ? RGB(255, 0, 255) : RGB(0, 0, 0), FLOODFILLBORDER) == 1);
+            }
         }
 
         BitBlt(dc, 0, 0, w, h, memDC, 0, 0, SRCCOPY);
@@ -103,4 +122,4 @@ winclass.hIcon = winclass.hIconSm = LoadIcon(NULL, IDI_APPLICATION);
 winclass.hbrBackground = COLOR_BACKGROUND;
 winclass.hCursor = LoadCursor(NULL, IDC_CROSS);
 
-CreateWindow(WS_EX_OVERLAPPEDWINDOW, winclass, "using raw input to get my drawing pad's pressure", WS_OVERLAPPEDWINDOW | WS_VISIBLE, CW_USEDEFAULT, CW_USEDEFAULT, w+20, h+42, NULL, NULL, hInstance);
+CreateWindow(WS_EX_OVERLAPPEDWINDOW, winclass, "using raw input to get my drawing pad's pressure", WS_OVERLAPPEDWINDOW | WS_VISIBLE, CW_USEDEFAULT, CW_USEDEFAULT, w+20, h+43, NULL, NULL, hInstance);
