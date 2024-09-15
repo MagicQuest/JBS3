@@ -25,6 +25,7 @@ function windowProc(hwnd, msg, wp, lp) {
         //wp is the id of the hotkey hit while the LOWORD of lp is the modifiers and the HIWORD of the lp is the keycode
         print(wp, LOWORD(lp), HIWORD(lp));
         print("Hotkey hit! Deploying payload...");
+        SetForegroundWindow(hwnd);
         if(!trollmode) {
             SetTimer(hwnd, NULL, 32);
             trollmode = 1;

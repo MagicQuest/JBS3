@@ -1,5 +1,6 @@
 #include "Direct2D.h"
 #include <string>
+#include <iostream>
 //#include <typeinfo>
 
 //#define err(shit, cstring) MessageBoxA(NULL, std::to_string(shit).c_str(), cstring, MB_OK | MB_ICONERROR);
@@ -101,5 +102,5 @@ bool Direct2D::Init(HWND window, int type) {
 }
 
 void Direct2D::EndDraw(bool unused) {
-	RetIfFailed(this->renderTarget->EndDraw(), "Direct2D EndDraw failed?");
+	RetPrintIfFailed(this->renderTarget->EndDraw(), "Direct2D EndDraw failed?");
 }

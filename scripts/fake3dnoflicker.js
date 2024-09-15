@@ -75,7 +75,7 @@ function windowProc(hwnd, msg, wp, lp) {
 
         const MMDC = CreateCompatibleDC(ps.hdc); //yo this actually works great BUT for some reason it randomly stops working
         SelectObject(MMDC, backBufferBmp);
-        FillRect(MMDC, 0, 0, width, height, NULL);
+        FillRect(MMDC, 0, 0, width, height, NULL); //i lowkey already had the method
         //print("paint");
 
         //if(windowBmp) {
@@ -160,7 +160,7 @@ function windowProc(hwnd, msg, wp, lp) {
         //PlgBlt(MMDC, [point7, point6, point8, point5], memDC, 0, 0, 256, 256, NULL, 0, 0);
         //BitBlt(MMDC, 256, 256, 256, 256, memDC, 0, 0, SRCCOPY);
         DeleteDC(memDC);
-        const mdc = CreateCompatibleDC(ps.hdc);
+        const mdc = CreateCompatibleDC(ps.hdc); //lowkey at this point it starts getting weirdly complicated so at some point i might try to clear this part up because i think im doing too much here
         SelectObject(mdc, windowBmp);
         SetStretchBltMode(mdc, HALFTONE);
         StretchBlt(mdc, 0, 0, (width-16)/5, (height-39)/5, MMDC, 0, 0, width-16, height-39, SRCCOPY);

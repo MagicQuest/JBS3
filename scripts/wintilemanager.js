@@ -1,4 +1,5 @@
 //let dc;
+//incoming transmission from noah: applications that get swallowed get TERMINATED!
 const blurRGBA = eval(require("fs").read(__dirname+"/fastblur.js"));
 
 let defaulticon = LoadIcon(NULL, IDI_QUESTION);
@@ -20,6 +21,8 @@ let newapp = 0;
 let trans = false; //lol
 
 let textnotificationshit = [];
+
+const DANGEROUSMODE = false; //if you turn this bih on any apps swallowed will just be closed (3 puffs and im gone?)
 
 function findspaceforapp(path, id = undefined) {
     let cell, x, y;
@@ -279,7 +282,13 @@ function initiateimportantstufftogetmemoryusage() {
             }
             if(app.cells <= 0) {
                 print("App "+app.name+" was swallowed ("+app.cells+")");
-                findspaceforapp(path);
+                if(!DANGEROUSMODE) {
+                    findspaceforapp(path);
+                }else {
+                    //🔫
+                    //the lab boys at stackoverflow say an easy way to terminate a process is with good ol' system (plus i don't keep track of the hProcess shit)
+                    print(system(`taskkill /F /T /IM ${app.name}`));
+                }
             }
             if(app.center) {
                 if(cells[app.center[0]][app.center[1]].appid != path) {

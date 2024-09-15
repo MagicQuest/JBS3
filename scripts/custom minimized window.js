@@ -13,7 +13,7 @@ const aptStar = [[50,2], [2,98], [98,33], [2,33], [98,98], [50,2]];
 
 function windowProc(hwnd, msg, wp, lp) {
     if(msg == WM_CREATE) {
-
+        print("yo this lowkey probably doesn't work");
     }else if(msg == WM_PAINT) {
         const paint = BeginPaint(hwnd);
         

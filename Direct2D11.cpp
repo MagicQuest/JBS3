@@ -1,6 +1,6 @@
 #include "Direct2D11.h"
 #include <string>
-//#include <iostream>
+#include <iostream>
 
 using namespace D2D1;
 
@@ -270,10 +270,10 @@ bool Direct2D11::ConvertID3D11Texture2DToID2D1Bitmap(ID3D11DeviceContext* ctx,
 
 void Direct2D11::EndDraw(bool donotpresent) {
     if (!donotpresent) {
-        RetIfFailed(d2dcontext->EndDraw(), "D2D11 EndDraw failed?");
-        RetIfFailed(swapChain->Present(1, 0), "D2D11 swapChain->Present(1, 0) failed?");
+        RetPrintIfFailed(d2dcontext->EndDraw(), "D2D11 EndDraw failed?");
+        RetPrintIfFailed(swapChain->Present(1, 0), "D2D11 swapChain->Present(1, 0) failed?");
     }
     else {
-        RetIfFailed(d2dcontext->EndDraw(), "D2D11 EndDraw (no present) failed?");
+        RetPrintIfFailed(d2dcontext->EndDraw(), "D2D11 EndDraw (no present) failed?");
     }
 }

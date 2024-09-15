@@ -77,7 +77,7 @@ function windowProc(hwnd, msg, wp, lp) {
         //input.data.bRawData[7]/2;
         rawmouseinfo.pressure = (((hip & 0xFF) << 8) | (lop & 0xFF))/500; //my pen's max pressure is 8192 so
 
-        print(rawmouseinfo.pressure);
+        print(rawmouseinfo.pressure, MAKEWORD(lop, hip)/500); //lol the windows macro MAKEWORD is actually useful here (if only i found out about it before)
 
         //print(rawmouseinfo);
 

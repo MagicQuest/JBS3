@@ -211,6 +211,45 @@ namespace jsImpl {
         //aDA(isolate, jsArray, args...);
     }
 
+    template<class T>
+    //aw T can only be regular numbers like floats ints whatever loike that (HWNDs too >:3)
+    void getVectorFromTArray(Isolate* isolate, Local<Array> jsTArr, std::vector<T>& vtints) {
+        Local<Context> context = isolate->GetCurrentContext();
+        for (int i = 0; i < jsTArr->Length(); i++) {
+            vtints[i] = (T)IntegerFI(jsTArr->Get(context, i).ToLocalChecked());
+        }
+    }
+
+    void getVectorFromVertexArray(Isolate* isolate, Local<Array> jsPointsArr, std::vector<TRIVERTEX>& vtris) {
+        Local<Context> context = isolate->GetCurrentContext();
+        if (jsPointsArr->Get(context, 0).ToLocalChecked()->IsArray()) { //this points array can be filled with more arrays -> [[10, 20, 255, 127, 127, 0], [20, 30, 127, 255, 127, 0]]
+            for (int i = 0; i < jsPointsArr->Length(); i++) {
+                Local<Array> innerArr = jsPointsArr->Get(context, i).ToLocalChecked().As<Array>();
+                vtris[i] = TRIVERTEX{
+                    (long)IntegerFI(innerArr->Get(context, 0).ToLocalChecked()),
+                    (long)IntegerFI(innerArr->Get(context, 1).ToLocalChecked()),
+                    (COLOR16)IntegerFI(innerArr->Get(context, 2).ToLocalChecked()),
+                    (COLOR16)IntegerFI(innerArr->Get(context, 3).ToLocalChecked()),
+                    (COLOR16)IntegerFI(innerArr->Get(context, 4).ToLocalChecked()),
+                    (COLOR16)IntegerFI(innerArr->Get(context, 5).ToLocalChecked()),
+                };
+            }
+        }
+        else { //or it can be filled with objects -> [{x: 10, y: 20, r: 255, g: 127, b: 127, a: 0}, {x: 20, y: 30, r: 127, g: 255, b: 127, a: 0}]
+            for (int i = 0; i < jsPointsArr->Length(); i++) {
+                Local<Object> innerObj = jsPointsArr->Get(context, i).ToLocalChecked().As<Object>();
+                vtris[i] = TRIVERTEX{
+                    (long)IntegerFI(innerObj->Get(context, LITERAL("x")).ToLocalChecked()),
+                    (long)IntegerFI(innerObj->Get(context, LITERAL("y")).ToLocalChecked()),
+                    (COLOR16)IntegerFI(innerObj->Get(context, LITERAL("r")).ToLocalChecked()),
+                    (COLOR16)IntegerFI(innerObj->Get(context, LITERAL("g")).ToLocalChecked()),
+                    (COLOR16)IntegerFI(innerObj->Get(context, LITERAL("b")).ToLocalChecked()),
+                    (COLOR16)IntegerFI(innerObj->Get(context, LITERAL("a")).ToLocalChecked()),
+                };
+            }
+        }
+    }
+
     void getVectorFromPointsArray(Isolate* isolate, Local<Array> jsPointsArr, std::vector<POINT>& vpoints) {
         Local<Context> context = isolate->GetCurrentContext();
         if (jsPointsArr->Get(context, 0).ToLocalChecked()->IsArray()) { //this points array can be filled with more arrays -> [[10, 20], [20, 30]]
@@ -1212,7 +1251,7 @@ V8FUNC(ChordWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
 
-    info.GetReturnValue().Set(Chord((HDC)IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]), IntegerFI(info[4]), IntegerFI(info[5]), IntegerFI(info[6]), IntegerFI(info[7]), IntegerFI(info[8])));
+    info.GetReturnValue().Set(Number::New(isolate, Chord((HDC)IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]), IntegerFI(info[4]), IntegerFI(info[5]), IntegerFI(info[6]), IntegerFI(info[7]), IntegerFI(info[8]))));
 }
 
 V8FUNC(PolylineWrapper) {
@@ -1225,7 +1264,7 @@ V8FUNC(PolylineWrapper) {
     std::vector<POINT> vpoints(jsPointsArr->Length());
     jsImpl::getVectorFromPointsArray(isolate, jsPointsArr, vpoints);
 
-    info.GetReturnValue().Set(Polyline((HDC)IntegerFI(info[0]), vpoints.data(), vpoints.size())); //i guess i could use the js array's size but it literally doesn;t matter lo
+    info.GetReturnValue().Set(Number::New(isolate, Polyline((HDC)IntegerFI(info[0]), vpoints.data(), vpoints.size()))); //i guess i could use the js array's size but it literally doesn;t matter lo
 }
 
 V8FUNC(PolylineToWrapper) {
@@ -1238,7 +1277,7 @@ V8FUNC(PolylineToWrapper) {
     std::vector<POINT> vpoints(jsPointsArr->Length());
     jsImpl::getVectorFromPointsArray(isolate, jsPointsArr, vpoints);
 
-    info.GetReturnValue().Set(PolylineTo((HDC)IntegerFI(info[0]), vpoints.data(), vpoints.size())); //i guess i could use the js array's size but it literally doesn;t matter lo
+    info.GetReturnValue().Set(Number::New(isolate, PolylineTo((HDC)IntegerFI(info[0]), vpoints.data(), vpoints.size()))); //i guess i could use the js array's size but it literally doesn;t matter lo
 }
 
 V8FUNC(PolygonWrapper) {
@@ -1251,7 +1290,95 @@ V8FUNC(PolygonWrapper) {
     std::vector<POINT> vpoints(jsPointsArr->Length());
     jsImpl::getVectorFromPointsArray(isolate, jsPointsArr, vpoints);
 
-    info.GetReturnValue().Set(Polygon((HDC)IntegerFI(info[0]), vpoints.data(), vpoints.size())); //i guess i could use the js array's size but it literally doesn;t matter lo
+    info.GetReturnValue().Set(Number::New(isolate, Polygon((HDC)IntegerFI(info[0]), vpoints.data(), vpoints.size()))); //i guess i could use the js array's size but it literally doesn;t matter lo
+}
+
+V8FUNC(PolyPolygonWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    //Local<Context> context = isolate->GetCurrentContext();
+
+
+    Local<Array> jsPointsArr = info[1].As<Array>();
+    std::vector<POINT> vpoints(jsPointsArr->Length());
+    Local<Array> jsIntsArray = info[2].As<Array>();
+    std::vector<INT> vints(jsIntsArray->Length());
+    jsImpl::getVectorFromPointsArray(isolate, jsPointsArr, vpoints);
+    jsImpl::getVectorFromTArray(isolate, jsIntsArray, vints);
+
+    info.GetReturnValue().Set(Number::New(isolate, PolyPolygon((HDC)IntegerFI(info[0]), vpoints.data(), vints.data(), vints.size()))); //i guess i could use the js array's size but it literally doesn;t matter lo
+}
+
+V8FUNC(PolyPolylineWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    //Local<Context> context = isolate->GetCurrentContext();
+
+
+    Local<Array> jsPointsArr = info[1].As<Array>();
+    std::vector<POINT> vpoints(jsPointsArr->Length());
+    Local<Array> jsIntsArray = info[2].As<Array>();
+    std::vector<DWORD> vints(jsIntsArray->Length());
+    jsImpl::getVectorFromPointsArray(isolate, jsPointsArr, vpoints);
+    jsImpl::getVectorFromTArray(isolate, jsIntsArray, vints);
+
+    info.GetReturnValue().Set(Number::New(isolate, PolyPolyline((HDC)IntegerFI(info[0]), vpoints.data(), vints.data(), vints.size()))); //i guess i could use the js array's size but it literally doesn;t matter lo
+}
+
+V8FUNC(PaintDesktopWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, PaintDesktop((HDC)IntegerFI(info[0]))));
+}
+
+V8FUNC(GradientFillWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    Local<Context> context = isolate->GetCurrentContext();
+
+
+    Local<Array> jsPointsArr = info[1].As<Array>();
+    std::vector<TRIVERTEX> vtrivertex(jsPointsArr->Length());
+    jsImpl::getVectorFromVertexArray(isolate, jsPointsArr, vtrivertex);
+
+    ULONG mode = IntegerFI(info[3]);
+
+    void* selecteddata = nullptr;
+    ULONG datalength = 0;
+
+    Local<Array> jsSomethingArr = info[2].As<Array>();
+    if (mode == GRADIENT_FILL_TRIANGLE) {
+        datalength = jsSomethingArr->Length();
+        std::vector<GRADIENT_TRIANGLE> vgtris(datalength);
+
+        for (int i = 0; i < datalength; i++) {
+            Local<Array> innerArr = jsSomethingArr->Get(context, i).ToLocalChecked().As<Array>();
+            vgtris[i] = GRADIENT_TRIANGLE{
+                (ULONG)IntegerFI(innerArr->Get(context, 0).ToLocalChecked()),
+                (ULONG)IntegerFI(innerArr->Get(context, 1).ToLocalChecked()),
+                (ULONG)IntegerFI(innerArr->Get(context, 2).ToLocalChecked()),
+            };
+        }
+
+        selecteddata = &vgtris[0]; //devious work
+    }
+    else {
+        datalength = jsSomethingArr->Length();
+        std::vector<GRADIENT_RECT> vgrects(datalength);
+
+        for (int i = 0; i < datalength; i++) {
+            Local<Array> innerArr = jsSomethingArr->Get(context, i).ToLocalChecked().As<Array>();
+            vgrects[i] = GRADIENT_RECT{
+                (ULONG)IntegerFI(innerArr->Get(context, 0).ToLocalChecked()),
+                (ULONG)IntegerFI(innerArr->Get(context, 1).ToLocalChecked()),
+            };
+        }
+
+        selecteddata = &vgrects[0]; //devious work
+    }
+
+    info.GetReturnValue().Set(Number::New(isolate, GradientFill((HDC)IntegerFI(info[0]), vtrivertex.data(), vtrivertex.size(), selecteddata, datalength, mode))); //i guess i could use the js array's size but it literally doesn;t matter lo
 }
 
 V8FUNC(GetStockObjectWrapper) {
@@ -9250,7 +9377,7 @@ V8FUNC(DllCallWrapper) {
     //        delete alloc;
     //    }
     //}
-    //i might be COOKED, v8 won't give you the pointer to the value of an v8::object because it could be "moved around the heap" (buddy im dying here)
+    //i might be COOKED, v8 won't give you the pointer to the value of an v8::object because it could be "moved around the heap" (buddy im dying here (ok if i looked in the v8 source headers long enough i could probably find it and make it public))
 
 }
 
@@ -9269,6 +9396,7 @@ V8FUNC(DllLoad) {
     
     HMODULE dll = LoadLibrary(WStringFI(info[0]));
     if (!dll || dll == INVALID_HANDLE_VALUE) {
+        print("fuck wtf was dll (" << dll << ") GetLastError: " << GetLastError());
         MessageBoxA(NULL, "unabled to load/find dll", "maybe use get last error or sumth", MB_OK | MB_ICONERROR);
         //info.GetReturnValue().Set(0);
         return;
@@ -10456,6 +10584,12 @@ V8FUNC(EasyTab_UnloadWrapper) {
     EasyTab_Unload();
 }
 
+V8FUNC(MAKEWORDWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    info.GetReturnValue().Set(Number::New(isolate, MAKEWORD(IntegerFI(info[0]), IntegerFI(info[1]))));
+}
+
 V8FUNC(MAKELPARAMWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
@@ -10583,7 +10717,7 @@ V8FUNC(GetRawInputDeviceInfoWrapper) {
     //just incase we start having problems https://stackoverflow.com/questions/67028399/getrawinputdeviceinfo-indicates-a-buffer-size-of-1-character-for-ridi-devicename
     UINT command = IntegerFI(info[1]);
     if (command == RIDI_PREPARSEDDATA) {
-        //i forgor.
+        //i forgor. (idk if i can add this one because i think it starts getting deep into the driver shit)
         print("i forgor. (RIDI_PREPARSEDDATA)");
     }
     else if (command == RIDI_DEVICENAME) {
@@ -10965,6 +11099,7 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     setGlobalWrapper(KillTimer);
 
     setGlobalWrapper(MAKELPARAM);
+    setGlobalWrapper(MAKEWORD);
     
     setGlobalWrapper(GetStdHandle);
     setGlobalWrapper(SetConsoleTextAttribute);
@@ -12410,6 +12545,8 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
     setGlobalWrapper(GetViewportExtEx);
     setGlobalWrapper(Polyline);
     setGlobalWrapper(PolylineTo);
+    setGlobalWrapper(PolyPolyline);
+    setGlobalWrapper(PolyPolygon);
     setGlobalWrapper(Polygon);
     setGlobalWrapper(Chord);
     setGlobalWrapper(Rectangle);
@@ -12417,6 +12554,8 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
     setGlobalWrapper(InvertRect);
     setGlobalWrapper(FrameRect);
     setGlobalWrapper(Pie);
+    setGlobalWrapper(GradientFill); setGlobalConst(GRADIENT_FILL_RECT_H); setGlobalConst(GRADIENT_FILL_RECT_V); setGlobalConst(GRADIENT_FILL_TRIANGLE);
+    setGlobalWrapper(PaintDesktop);
 
     global->Set(isolate, "GetDefaultFont", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
         static HFONT defaultfont = NULL; //lowkey still genius

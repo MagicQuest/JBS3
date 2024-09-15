@@ -1,6 +1,6 @@
-print(`"${__dirname+"/WindowsTools.dll"}"`);
-const WindowsTools = DllLoad(__dirname+"/WindowsTools.dll"); //for some reason this didn't work on the school virtual computer?
-print(_com_error(GetLastError()));
+print(`"${__dirname+"\\WindowsTools.dll"}"`);
+const WindowsTools = DllLoad(__dirname+"\\WindowsTools.dll"); //for some reason this didn't work on the school virtual computer? (oooh i think this might've been a debug build dll (aw shit i'm right this probably has special dependancies and that's why it dont work (ok i got a release build)))
+//print(err = GetLastError(), _com_error(err));
 
 print("oh yeah baby the dll probably loaded ", WindowsTools);
 

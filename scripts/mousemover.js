@@ -4,6 +4,8 @@ let mouse = GetMousePos();
 let velocity = {x: 0, y: 0};
 let now = Date.now();
 
+let hide = false;
+
 //print(GetKeyboardState());
 
 //let activeWindow = GetActiveWindow();
@@ -66,11 +68,14 @@ class IconObj {
             this.y = rect.top;
             this.vy *= -1;
         }
-        DrawIconEx(screen, this.x, this.y, this.icon, this.cx, this.cy, 0, hBrush, DI_NORMAL | DI_COMPAT);
+        !hide && DrawIconEx(screen, this.x, this.y, this.icon, this.cx, this.cy, 0, hBrush, DI_NORMAL | DI_COMPAT);
     }
 }
 
 let window = GetForegroundWindow();
+
+print("PRESS E TO CHANGE TROLLED WINDOW"); //because i keep forgetting
+print("PRESS H TO HIDE ICONS");
 
 while (!GetKey(VK_ESCAPE)) {
     //if(GetKeyDown("e")) {
@@ -132,12 +137,15 @@ while (!GetKey(VK_ESCAPE)) {
         window = WindowFromPoint(mouse.x, mouse.y);
         print(GetWindowText(window));
     }
+    if(GetKeyDown("h")) { //wait you can do that? bruhhhhhhh
+        hide = !hide;
+    }
     if(GetKey(VK_LBUTTON)) {
         iconobjs.push(new IconObj(mouse,velocity, icons[Math.floor(Math.random()*icons.length)]));
         //print(iconobjs);
     }
     //SetMousePos(mouse.x, mouse.y);
-    DrawIconEx(screen, mouse.x, mouse.y, icons[Math.floor(Math.random()*icons.length)], 64, 64, 0, hBrush, DI_NORMAL | DI_COMPAT);
+    !hide && DrawIconEx(screen, mouse.x, mouse.y, icons[Math.floor(Math.random()*icons.length)], 64, 64, 0, hBrush, DI_NORMAL | DI_COMPAT);
     for(let i of iconobjs) {
         i.update(rect, window);
     }
