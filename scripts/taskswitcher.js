@@ -1,3 +1,4 @@
+//(lowkey i don't think this worked when i was on my windows 10 vm so maybe it's called something different idk)
 const ts = FindWindow(NULL, "Task Switching"); //the alt+tab menu
 
 print(ts);

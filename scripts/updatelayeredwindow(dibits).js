@@ -4,13 +4,13 @@ perlin.seed(Math.random());
 
 const screen = GetDC(NULL);
 
-const b = RGB(255,0,0); //stretchdibits is bgr! (red is swapped with blue so RGB(255, 0, 0) is full blue instead of red!) https://stackoverflow.com/questions/12908685/wrong-colors-when-using-stretchdibits
+const b = RGB(255,0,0); //stretchdibits is bgr! (red is swapped with blue so RGB(255, 0, 0) is full blue instead of red!) https://stackoverflow.com/questions/12908685/wrong-colors-when-using-stretchdibits (umm is it???)
 const g = RGB(0,255,0);
 const r = RGB(0,0,255);
 
 const image = new Uint32Array([b, r, b, r, g, r, b, r, b]); //3x3 https://stackoverflow.com/questions/53958727/performance-efficient-way-of-setting-pixels-in-gdi
 
-let hbm;
+let dib;
 
 let windowWidth = 500;
 let windowHeight = 500;
@@ -25,15 +25,15 @@ function paint(dc) {
     StretchDIBits(dc, 100 ,133, 50, 50, 0, 0, 3, 3, image, 3, 3, 32, BI_RGB, SRCCOPY); // wait wtf StretchDIBits is BGR ?????
     TextOut(dc, 150, 158-8, "<- StretchDIBits test");
     const memDC = CreateCompatibleDC(dc);
-    SelectObject(memDC, hbm.bitmap);
+    SelectObject(memDC, dib.bitmap);
     AlphaBlend(dc, 0, 38, 50, 50, memDC, 0, 0, cx, cy, 255, AC_SRC_ALPHA); //oh shit it actuallly worked
     TextOut(dc, 50, 66-8, "<- CreateDIBSection bitmap test");
     DeleteDC(memDC);
 }
 
-function drawHBMToNew(dc, memDC) {
+function drawDIBToNew(dc, memDC) {
     const memDC2 = CreateCompatibleDC(dc);
-    SelectObject(memDC2, hbm.bitmap);
+    SelectObject(memDC2, dib.bitmap);
     let lastFont = SelectObject(memDC2, GetDefaultFont());
     //SelectObject(memDC2, GetStockObject(DC_BRUSH));
     //SetDCBrushColor(memDC2, RGBA(255, 255, 255, 255));
@@ -50,11 +50,11 @@ function ULW(hwnd) { //this revelation of a function comes from (https://stackov
     const dc = GetDC(NULL); //for some reason it doesn't use the hwnd's DC AT ALL?
     const memDC = CreateCompatibleDC(dc);
     //const memDC2 = CreateCompatibleDC(dc);
-    //SelectObject(memDC2, hbm.bitmap);
-    const newBitmap = CreateCompatibleBitmap(dc, windowWidth, windowHeight); //ok i have NO IDEA WHY you have to create a compatible bitmap, draw the real bitmap (hbm.bitmap) into the compatible bitmap and use THAT memDC for UpdateLayeredWindow
+    //SelectObject(memDC2, dib.bitmap);
+    const newBitmap = CreateCompatibleBitmap(dc, windowWidth, windowHeight); //ok i have NO IDEA WHY you have to create a compatible bitmap, draw the real bitmap (dib.bitmap) into the compatible bitmap and use THAT memDC for UpdateLayeredWindow (oh ok i think it's because dib is a dib section and not a regular compatible bitmap lol)
     const oldBitmap = SelectObject(memDC, newBitmap);
     
-    drawHBMToNew(dc, memDC);
+    drawDIBToNew(dc, memDC);
     //TextOut(memDC, 50, 50, "🥴🥴🥴🥴🥴🥴🥴🗣️🧏‍♂️🤫 GYATT");
     paint(memDC); //paint into memDC so it shows up in UpdateLayeredWindow()
 
@@ -77,7 +77,7 @@ function RGBA(r, g, b, a) {
     return (a << 24) | (r * fAlphaFactor) << 16 | (g * fAlphaFactor) << 8 | (b * fAlphaFactor); //from this example https://learn.microsoft.com/en-us/windows/win32/gdi/alpha-blending-a-bitmap
 }
 
-function updateHBM(t) {
+function updateDIB(t) {
     let theorycolors = [];
     for(let y = 0; y < cy; y++) {
         if(y < 33) {
@@ -91,11 +91,11 @@ function updateHBM(t) {
             }else {
                 color = RGBA(Math.abs(Math.sin(x+y*cx))*255, 0, Math.abs(perlin.simplex2(x/200, y/200))*255, Math.abs(perlin.perlin3(x/200, y/200, t/5))*255);
             }
-            hbm.SetBit(x + y * cx, color); //ah shoot remember dibits is bgr
+            dib.SetBit(x + y * cx, color); //ah shoot remember dibits is bgr
         }
     }
 
-    //print(GetRValue(hbm.GetBit(100000)));
+    //print(GetRValue(dib.GetBit(100000)));
 
     let blurSize = 1;//Math.round(t);
     const blurAmount = (Math.abs(-blurSize)*2+1)**2;
@@ -117,7 +117,7 @@ function updateHBM(t) {
                 color = color.map((v) => v/blurAmount);
             }
 
-            hbm.SetBit(x+y*cx, RGBA(...color, 255));
+            dib.SetBit(x+y*cx, RGBA(...color, 255));
         }
     }
 }
@@ -126,21 +126,21 @@ let st = Date.now()/1000;
 
 function windowProc(hwnd, msg, wp, lp) {
     if(msg == WM_CREATE) {
-        hbm = CreateDIBSection(screen, CreateDIBitmapSimple(cx, -cy, 32), DIB_RGB_COLORS);
-        print(hbm);
+        dib = CreateDIBSection(screen, CreateDIBitmapSimple(cx, -cy, 32), DIB_RGB_COLORS); //oh yeah i used a dib section so that in updateDIB i could edit the pixels manually (to add the alpha)
+        print(dib);
 
         //ubRed = 0x00;
         //ubGreen = 0x00;
         //ubBlue = 0xff;    
 
         //entire thing ripped from https://learn.microsoft.com/en-us/shows/pdc-pdc08/pc43 (40:26)
-        updateHBM(0);
+        updateDIB(0);
         //for(let y = 0; y < cy; y++) {
         //    for(let x = 0; x < cx; x++) {
         //        //let alpha = x * x * 255 / cx / cx;
         //        //let alpha = RGB((x/cx)*255, 255, (y/cy)*255); //wtf is happening when you do these lines
         //        //let dw = (alpha << 24) | (alpha << 16) | alpha;
-        //        //hbm.SetBit(y*cx + x, RGB(255, 0, 255)); // HOW TF DOES ALPHA WORK???? (hold on) https://github.com/northern/Win32Bitmaps
+        //        //dib.SetBit(y*cx + x, RGB(255, 0, 255)); // HOW TF DOES ALPHA WORK???? (hold on) https://github.com/northern/Win32Bitmaps
         //        //if(y == 0) {
         //        //    print(dw, GetRValue(dw), GetGValue(dw), GetBValue(dw));
         //        //}
@@ -150,7 +150,7 @@ function windowProc(hwnd, msg, wp, lp) {
         //        //// multiply each pixel by fAlphaFactor, so each component  
         //        //// is less than or equal to the alpha value.
         //        //let color = (ubAlpha << 24) | (ubRed * fAlphaFactor) << 16 | (ubGreen * fAlphaFactor) << 8 | (ubBlue * fAlphaFactor); //from this example https://learn.microsoft.com/en-us/windows/win32/gdi/alpha-blending-a-bitmap
-        //        hbm.SetBit(x + y * cx, RGBA(Math.abs(Math.sin(x+y*cx))*255, 0, 0, Math.abs(perlin.perlin2(x/200, y/200))*255)); //ah shoot remember dibits is bgr
+        //        dib.SetBit(x + y * cx, RGBA(Math.abs(Math.sin(x+y*cx))*255, 0, 0, Math.abs(perlin.perlin2(x/200, y/200))*255)); //ah shoot remember dibits is bgr
         //        //((UINT32 *)pvBits)[x + y * ulBitmapWidth] 
         //        //    = (ubAlpha << 24) |                       //0xaa000000 
         //        //     ((UCHAR)(ubRed * fAlphaFactor) << 16) |  //0x00rr0000 
@@ -161,7 +161,7 @@ function windowProc(hwnd, msg, wp, lp) {
         ULW(hwnd);
         //SetLayeredWindowAttributes(hwnd, RGB(0,255,0), 0, LWA_COLORKEY);
         SetTimer(hwnd, 0, 64);
-        //hbm.SetBit(0, b);
+        //dib.SetBit(0, b);
     }/*else if(msg == WM_PAINT) {
         //const rect = GetWindowRect(hwnd);
         const ps = BeginPaint(hwnd);
@@ -169,7 +169,7 @@ function windowProc(hwnd, msg, wp, lp) {
         StretchDIBits(ps.hdc, 100 ,100, 50, 50, 0, 0, 3, 3, image, 3, 3, 32, BI_RGB, SRCCOPY); // wait wtf StretchDIBits is BGR ?????
         TextOut(ps.hdc, 150, 125-8, "<- StretchDIBits test");
         const memDC = CreateCompatibleDC(ps.hdc);
-        SelectObject(memDC, hbm.bitmap);
+        SelectObject(memDC, dib.bitmap);
         //StretchBlt(ps.hdc, 0, 0, 50, 50, memDC, 0, 0, 32, 32, SRCCOPY);
         AlphaBlend(ps.hdc, 0, 0, 50, 50, memDC, 0, 0, cx, cy, 255, AC_SRC_ALPHA); //oh shit it actuallly worked
         //print(UpdateLayeredWindow(hwnd, screen, {x: rect.left, y: rect.top}, {width: cx, height: cy}, memDC, {x: 0, y: 0}, RGB(0,0,0), 255, AC_SRC_ALPHA, ULW_ALPHA), GetLastError(), _com_error(GetLastError()));
@@ -180,20 +180,20 @@ function windowProc(hwnd, msg, wp, lp) {
         const mouse = GetMousePos();
         const dc = GetDC(hwnd);
         const memDC = CreateCompatibleDC(dc);
-        SelectObject(memDC, hbm.bitmap);
+        SelectObject(memDC, dib.bitmap);
         AlphaBlend(screen, mouse.x, mouse.y, 500, 500, memDC, 0, 0, cx, cy, 255, AC_SRC_ALPHA);
         DeleteDC(memDC);
         ReleaseDC(NULL, dc);
     }*/
-    else if(msg == WM_SIZING || msg == WM_SIZE) {
+    else if(msg == WM_SIZE) {
         const rect = GetWindowRect(hwnd);
         windowWidth = rect.right - rect.left;
         windowHeight = rect.bottom - rect.top;
-        console.log(windowWidth, windowHeight);
+        console.log(windowWidth, windowHeight); //bruh console.log
     }
     else if(msg == WM_TIMER) {
         let t = (Date.now()/1000)-st;
-        updateHBM(t);
+        updateDIB(t);
 
         ULW(hwnd);
     }else if(msg == WM_DESTROY) {

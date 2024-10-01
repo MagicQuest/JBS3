@@ -1,4 +1,5 @@
 //obviously i could've just done with with hidapi but it's easier to get the input of every drawing tablet by using the usages and shit with raw input i think
+//and hey it works with my specific device even when i use it with a virtual machine i thik
 
 let w = 1280;
 let h = 720;

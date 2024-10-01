@@ -6,6 +6,10 @@
 #include <dcomp.h>
 #include <wrl.h>
 
+//https://www.gamedev.net/forums/topic/639578-d2d-d3d11-help-me-to-make-them-work-together/
+//https://www.gamedev.net/forums/topic/650990-transparency-problems-with-d2d-over-d3d/
+//just in case
+
 using namespace Microsoft::WRL;
 
 class Direct2D11 : public Direct2D

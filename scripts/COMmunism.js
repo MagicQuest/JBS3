@@ -234,7 +234,7 @@ function windowProc(hwnd, msg, wp, lp) {
 
         i++;
     }else if(msg == WM_SIZE) {
-        let [width, height] = [LOWORD(lp), HIWORD(lp)];
+        const [width, height] = [LOWORD(lp), HIWORD(lp)];
         d2d.Resize(width, height);
         
         blurBmp.Release();

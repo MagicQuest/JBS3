@@ -145,6 +145,11 @@
 //#include "JSWindow.h"
 //std::map<int, JSWindow*> JSWindow::jsWindows = {}; //bruh what is this line
 
+#include <v8-typed-array.h>  //wtf the one-argument version of static_asert is not enabled in this mode (DO I HAVE TO SWITCH TO C++ 17???)
+//nah what the fuckl one of the lines (Ln: 26) said #if V8_ENABLE_SANDBOX had a weird error so i changed it to #ifdef V8_ENABLE_SANDBOX and it compiled?????
+//yeah watch out my edit is NOT synced to github (oh yeah i think i updated the zip so you straight) so if this is a problem you gotta change v8-typed-array.h yourself (also i think i changed another thing so that setTimeout would work)
+//wtf it's still like that https://github.com/v8/v8/blob/main/include/v8-typed-array.h
+
 #include "Direct2D.h"
 
 int screenWidth, screenHeight;
@@ -274,9 +279,36 @@ namespace jsImpl {
 
     Local<ObjectTemplate> JSDWriteFontFamily;
     Local<ObjectTemplate> JSDWriteFont;
+    Local<ObjectTemplate> JSD2D1MappedRect;
     //Local<ObjectTemplate> JSRawInputDeviceList;
     void initObjectTemplates(Isolate* isolate) {
-
+        JSD2D1MappedRect = ObjectTemplate::New(isolate);
+        JSD2D1MappedRect->Set(isolate, "SetBit", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            BYTE* src = (BYTE*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("_bits")).ToLocalChecked());
+            src[IntegerFI(info[0])] = IntegerFI(info[1]); //this shit fucked
+        }));
+        JSD2D1MappedRect->Set(isolate, "GetBit", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            BYTE* src = (BYTE*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("_bits")).ToLocalChecked());
+            info.GetReturnValue().Set(Number::New(isolate, src[IntegerFI(info[0])]));
+        }));
+        JSD2D1MappedRect->Set(isolate, "GetBits", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            BYTE* src = (BYTE*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("_bits")).ToLocalChecked());
+            //ID2D1Bitmap1* gooder; RetIfFailed(((ID2D1Bitmap*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalBmpPtr")).ToLocalChecked()))->QueryInterface(&gooder), "QueryInterface failed when converting the bmp to ID2D1Bitmap1 (but it shouldn't fail here so...)");
+            ID2D1Bitmap* bmp = (ID2D1Bitmap*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalBmpPtr")).ToLocalChecked());
+            D2D1_SIZE_U size = bmp->GetPixelSize();
+            UINT32 pitch = IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("pitch")).ToLocalChecked());
+            size_t byteLength = (size.height/**4*/) * pitch;//*4; // nah fuck that this shit was recommended by the google ai (size.width*pitch*4)         //size.height*pitch; (wow so my first guess was right the whole time)
+            //print(IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("bits")).ToLocalChecked()));
+            Local<ArrayBuffer> ab = ArrayBuffer::New(isolate, byteLength); //honestly this math is a guess especially the sizeof part
+            memcpy(ab->Data(), src, byteLength); //GULP
+            //delete[] bits;
+            Local<Uint8Array> arr = Uint8Array::New(ab, 0, byteLength); //(size.width*size.height)*4);//size.width*size.height*4); //weird if i multiply this one by sizeof(DWORD) v8 spits out garbage and crashes bad
+            info.GetReturnValue().Set(arr);
+            //bits[IntegerFI(info[0])] = info[1].As<Uint32>()->Value();//IntegerFI(info[1]);
+        }));
         //JSRawInputDeviceList = ObjectTemplate::New(isolate);
         //JSRawInputDeviceList->Set(isolate, "Release", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
         //    Isolate* isolate = info.GetIsolate();
@@ -1118,6 +1150,19 @@ V8FUNC(SetBkModeWrapper) {
     info.GetReturnValue().Set(Number::New(isolate, SetBkMode((HDC)IntegerFI(info[0]), IntegerFI(info[1]))));
 }
 
+V8FUNC(GetBkColorWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    info.GetReturnValue().Set(Number::New(isolate, GetBkColor((HDC)IntegerFI(info[0]))));//RGB(IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3])));
+}
+
+V8FUNC(GetBkModeWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    //SetBkColor((HDC)IntegerFI(info[0]), RGB(IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3])));
+    info.GetReturnValue().Set(Number::New(isolate, GetBkMode((HDC)IntegerFI(info[0]))));
+}
+
 V8FUNC(DrawTextWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
@@ -1171,7 +1216,15 @@ V8FUNC(DeleteObjectWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
 
-    info.GetReturnValue().Set(DeleteObject((HGDIOBJ)IntegerFI(info[0])));
+    HGDIOBJ obj{};
+    if (info[0]->IsObject()) {
+        print("object x3");
+        obj = (HGDIOBJ)IntegerFI(info[0].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("bitmap")).ToLocalChecked());
+    }
+    else {
+        obj = (HGDIOBJ)IntegerFI(info[0]);
+    }
+    info.GetReturnValue().Set(Number::New(isolate, DeleteObject(obj)));
 }
 
 V8FUNC(DestroyCursorWrapper) {
@@ -1597,11 +1650,6 @@ V8FUNC(MessageBeepWrapper) {
 //{
 //    return a * (1.0 - f) + (b * f);
 //}
-
-#include <v8-typed-array.h>  //wtf the one-argument version of static_asert is not enabled in this mode (DO I HAVE TO SWITCH TO C++ 17???)
-//nah what the fuckl one of the lines (Ln: 26) said #if V8_ENABLE_SANDBOX had a weird error so i changed it to #ifdef V8_ENABLE_SANDBOX and it compiled?????
-//yeah watch out my edit is NOT synced to github so if this is a problem you gotta change v8-typed-array.h yourself (also i think i changed another thing so that setTimeout would work)
-//wtf it's still like that https://github.com/v8/v8/blob/main/include/v8-typed-array.h
 
 #include <limits>
 //#include <dxgidebug.h>
@@ -2463,6 +2511,37 @@ namespace DIRECT2D {
             
 
             RetIfFailed(bmp->CopyFromMemory(&rect, data, sizeof(DWORD)*(rect.right-rect.left)), "CopyFromMemory failed!");
+        }));
+        jsBitmap->Set(isolate, "Map", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) { //oops i made this because i wanted to convert HICON to ID2D1Bitmap BUT wic can already basically do that with CreateBitmapFromHICON
+            Isolate* isolate = info.GetIsolate();
+            ID2D1Bitmap* bmp = (ID2D1Bitmap*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            ID2D1Bitmap1* gooder; RetIfFailed(bmp->QueryInterface(&gooder), "i don't REALLY know how QueryInterface works so im assuming it failed because this bitmap wasn't already a ID2D1Bitmap1");
+
+            D2D1_MAPPED_RECT mapped;
+
+            RetIfFailed(gooder->Map((D2D1_MAP_OPTIONS)IntegerFI(info[0]), &mapped), "ID2D1Bitmap1 Map failed bruh what the fuckf,ke,v");
+
+            Local<Context> context = isolate->GetCurrentContext();
+            Local<Object> jsMapped = jsImpl::JSD2D1MappedRect->NewInstance(context).ToLocalChecked();//Object::New(isolate);
+            jsMapped->Set(context, LITERAL("pitch"), Number::New(isolate, mapped.pitch));
+            jsMapped->Set(context, LITERAL("_bits"), Number::New(isolate, (LONG_PTR)mapped.bits)); //i feel like i've done this before but i passed &mapped.bits instead of mapped.bits directly (it's those DAMN pointers)
+            jsMapped->Set(context, LITERAL("internalBmpPtr"), info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+
+            gooder->Release();
+            //D2D1_SIZE_U size = gooder->GetPixelSize();
+            //print("w " << size.width << " h " << size.height);
+            //D2D1_SIZE_F size2 = gooder->GetSize();
+            //print("w " << size2.width << " h " << size2.height);
+
+            info.GetReturnValue().Set(jsMapped);
+        }));
+        jsBitmap->Set(isolate, "Unmap", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) { //oops i made this because i wanted to convert HICON to ID2D1Bitmap BUT wic can already basically do that with CreateBitmapFromHICON
+            Isolate* isolate = info.GetIsolate();
+            ID2D1Bitmap* bmp = (ID2D1Bitmap*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            ID2D1Bitmap1* gooder; RetIfFailed(bmp->QueryInterface(&gooder), "i don't REALLY know how QueryInterface works so im assuming it failed because this bitmap wasn't already a ID2D1Bitmap1");
+
+            RetIfFailed(gooder->Unmap(), "Unmap failed for some reason but maybe because the bitmap wasn't already mapped idk");
+            gooder->Release();
         }));
         //jsBitmap->Set(isolate, "Release", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
         //    Isolate* isolate = info.GetIsolate();
@@ -3721,7 +3800,7 @@ V8FUNC(createCanvas) {
                 D2D1_BITMAP_OPTIONS options = (D2D1_BITMAP_OPTIONS)IntegerFI(info[0]);
                 D2D1_PIXEL_FORMAT format;
                 if (info[1]->IsNullOrUndefined()) {
-                    format = d2d->renderTarget->GetPixelFormat();
+                    format = d2d11->d2dcontext->GetPixelFormat();//d2d->renderTarget->GetPixelFormat();
                     print("getting default format");
                 }
                 else {
@@ -3743,11 +3822,11 @@ V8FUNC(createCanvas) {
                     &target
                 ), "CreateBitmapFromDxgiSurface failed");
                 //  );
-
+                
                 info.GetReturnValue().Set(DIRECT2D::getBitmapImpl(isolate, target)->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
             }
             else {
-                MessageBox(NULL, L"To use CreateBitmapFromDxgiSurface you must create this canvas with ID2D1DeviceContext or ID2D1DeviceContextDComposition", L"Sorry", MB_OK | MB_SYSTEMMODAL);
+                MessageBox(NULL, L"To use CreateBitmapFromDxgiSurface you must create this canvas with ID2D1DeviceContext or ID2D1DeviceContextDComposition (lol regular d2d doesn't even have a dxgi surface so that's why)", L"Sorry", MB_OK | MB_SYSTEMMODAL);
             }
         }));
         context->Set(isolate, "Resize", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
@@ -5284,6 +5363,52 @@ V8FUNC(createCanvas) {
             }
         }));
 
+        context->Set(isolate, "CreateBitmap1", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+        
+            if (d2d->type >= 2) {
+                Direct2D11* d2d11 = (Direct2D11*)d2d;
+                ID2D1Bitmap1* target;
+        
+                D2D1_BITMAP_OPTIONS options = (D2D1_BITMAP_OPTIONS)IntegerFI(info[2]);
+                D2D1_PIXEL_FORMAT format;
+                if (IntegerFI(info[3]) == 0 && IntegerFI(info[4]) == 0) {
+                    format = d2d11->d2dcontext->GetPixelFormat();
+                    print("getting default format as both DXGI_FORMAT and D2D1_ALPHA_MODE are 0 (hopefully you don't even need to actually pass 0 for these for some practical reason)");
+                }
+                else {
+                    format = D2D1::PixelFormat((DXGI_FORMAT)IntegerFI(info[3]), (D2D1_ALPHA_MODE)IntegerFI(info[4]));
+                }
+        
+                D2D1_BITMAP_PROPERTIES1 bitmapProperties =
+                    D2D1::BitmapProperties1(
+                        options,
+                        format,
+                        0,//dpi, //dxgi
+                        0//dpi  //dxgi
+                    );
+
+                void* src = nullptr;
+        
+                if (info[5]->IsArrayBufferView()) {
+                    
+                }
+                else {
+        
+                }
+        
+                /*HRESULT shit = */RetIfFailed(d2d11->d2dcontext->CreateBitmap(D2D1::SizeU(IntegerFI(info[0]), IntegerFI(info[1])), src, IntegerFI(info[6]), &bitmapProperties, &target), "CreateBitmap1 (ID2D1DeviceContext->CreateBitmap) failed big dawg");
+        
+                Local<ObjectTemplate> jsBitmap = DIRECT2D::getBitmapImpl(isolate, target);//DIRECT2D::getIUnknownImpl(isolate, bmp);//ObjectTemplate::New(isolate);
+        
+                info.GetReturnValue().Set(jsBitmap->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
+            }
+            else {
+                MessageBox(NULL, L"you can only use CreateBitmap1 with ID2D1DeviceContext or ID2D1DeviceContextDComposition", L"CreateBitmap1 failed (nah buddy)", MB_OK | MB_SYSTEMMODAL);
+            }
+        }));
+
         context->Set(isolate, "Commit", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
             Isolate* isolate = info.GetIsolate();
             Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
@@ -6742,6 +6867,13 @@ V8FUNC(LoadImageWrapper) { //https://www.youtube.com/watch?v=hNi_MEZ8X10
     info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)LoadImageW((HINSTANCE)IntegerFI(info[0]), WStringFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]), IntegerFI(info[4]), IntegerFI(info[5]))));
 }
 
+V8FUNC(CopyImageWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)CopyImage((HANDLE)IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]), IntegerFI(info[4]))));
+}
+
 V8FUNC(SetCursorWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
@@ -8023,8 +8155,10 @@ V8FUNC(CreateDIBSectionWrapper) {
         DWORD* bits = NULL; //https://learn.microsoft.com/en-us/shows/pdc-pdc08/pc43 (40:26) raymond uses DWORD instead of byte (for 32 bit)
         //SMS* bparent = new SMS;
 
+        UINT usage = IntegerFI(info[2]);
+
         Local<ObjectTemplate> interf = ObjectTemplate::New(isolate);
-        interf->Set(isolate, "bitmap", Number::New(isolate, (LONG_PTR)CreateDIBSection((HDC)IntegerFI(info[0]), &bmi, IntegerFI(info[2]), (void**)&bits, NULL, NULL)));
+        interf->Set(isolate, "bitmap", Number::New(isolate, (LONG_PTR)CreateDIBSection((HDC)IntegerFI(info[0]), &bmi, usage, (void**)&bits, NULL, NULL)));
         
         //Local<ObjectTemplate> jsBobject = ObjectTemplate::New(isolate);
         interf->Set(isolate, "SetBit", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
@@ -8073,11 +8207,64 @@ V8FUNC(CreateDIBSectionWrapper) {
         interf->Set(isolate, "bitCount", Number::New(isolate, bmi.bmiHeader.biBitCount));
         interf->Set(isolate, "width", Number::New(isolate, bmi.bmiHeader.biWidth)); //idk how to make read only lol.
         interf->Set(isolate, "height", Number::New(isolate, abs(bmi.bmiHeader.biHeight)));
+        interf->Set(isolate, "usage", Number::New(isolate, usage));//info[2]);
 
         Local<Object> result = interf->NewInstance(context).ToLocalChecked(); // aw man
+        result->Set(context, LITERAL("BITMAPINFO"), jsBITMAP);
 
         info.GetReturnValue().Set(result);
     }
+}
+
+//V8FUNC(SetDIBitsToDeviceWrapper) { //nah nevermind i can't be bothered to add this one because it's literally BitBlt for DIBits (and we already got StretchDIBits)
+//    using namespace v8;
+//    Isolate* isolate = info.GetIsolate();
+//
+//    SetDIBitsToDevice;
+//}
+
+V8FUNC(SetDIBitsWrapper) { //i wonder why i haven't done SetDIBits yet maybe i forgot
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    Local<Context> context = isolate->GetCurrentContext();
+
+    void* bits = nullptr;
+
+    Local<Object> jsBITMAP = info[5].As<Object>();
+    UINT usage = IntegerFI(info[6]);
+
+    if (info[4]->IsNumber()) {
+        bits = (void*)IntegerFI(info[4]);
+    }
+    else if (info[4]->IsArrayBufferView()) {
+        print("isarraybuffer");
+        Local<ArrayBufferView> jsBits = info[4].As<ArrayBufferView>();
+        bits = jsBits->Buffer()->Data();
+    }
+    else if (info[4]->IsObject()) {
+        Local<Object> JSDIBSection = info[4].As<Object>();
+        bits = (void*)IntegerFI(JSDIBSection->Get(context, LITERAL("_bits")).ToLocalChecked());
+        jsBITMAP = JSDIBSection->Get(context, LITERAL("BITMAPINFO")).ToLocalChecked().As<Object>(); //ohhh im getting a static assert type check here because i forgot to "cast" to an object
+        usage = IntegerFI(JSDIBSection->Get(context, LITERAL("usage")).ToLocalChecked());
+    }
+
+    BITMAPINFO bmi{ 0 };
+    if (jsBITMAP->HasRealNamedProperty(context, LITERAL("dsBmih")).FromJust()) {
+        Local<Object> jsBMIH = jsBITMAP->GetRealNamedProperty(context, LITERAL("dsBmih")).ToLocalChecked().As<Object>();
+        bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);//IntegerFI(jsBMIH->GetRealNamedProperty(context, LITERAL("biSize")).ToLocalChecked());
+        bmi.bmiHeader.biWidth = IntegerFI(jsBMIH->GetRealNamedProperty(context, LITERAL("biWidth")).ToLocalChecked());
+        bmi.bmiHeader.biHeight = IntegerFI(jsBMIH->GetRealNamedProperty(context, LITERAL("biHeight")).ToLocalChecked());
+        bmi.bmiHeader.biPlanes = IntegerFI(jsBMIH->GetRealNamedProperty(context, LITERAL("biPlanes")).ToLocalChecked());
+        bmi.bmiHeader.biBitCount = IntegerFI(jsBMIH->GetRealNamedProperty(context, LITERAL("biBitCount")).ToLocalChecked());
+        bmi.bmiHeader.biCompression = IntegerFI(jsBMIH->GetRealNamedProperty(context, LITERAL("biCompression")).ToLocalChecked());
+        bmi.bmiHeader.biSizeImage = IntegerFI(jsBMIH->GetRealNamedProperty(context, LITERAL("biSizeImage")).ToLocalChecked());
+        bmi.bmiHeader.biXPelsPerMeter = IntegerFI(jsBMIH->GetRealNamedProperty(context, LITERAL("biXPelsPerMeter")).ToLocalChecked());
+        bmi.bmiHeader.biYPelsPerMeter = IntegerFI(jsBMIH->GetRealNamedProperty(context, LITERAL("biYPelsPerMeter")).ToLocalChecked());
+        bmi.bmiHeader.biClrUsed = IntegerFI(jsBMIH->GetRealNamedProperty(context, LITERAL("biClrUsed")).ToLocalChecked());
+        bmi.bmiHeader.biClrImportant = IntegerFI(jsBMIH->GetRealNamedProperty(context, LITERAL("biClrImportant")).ToLocalChecked());
+    }
+
+    info.GetReturnValue().Set(Number::New(isolate, SetDIBits((HDC)IntegerFI(info[0]), (HBITMAP)IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]), bits, &bmi, usage)));
 }
 
 V8FUNC(GetObjectHPALETTE) {
@@ -9050,8 +9237,8 @@ void showFilePicker(const v8::FunctionCallbackInfo<v8::Value>& info, bool saveDi
 
                     for (int j = 0; j < acceptTypes->Length(); j++) {
                         const wchar_t* aTS = WStringFI(acceptTypes->Get(isolate->GetCurrentContext(), j).ToLocalChecked());
-                        if (aTS[0] == '.') {
-                            aTWS += '*'; //gotta add the * because .png wont work but *.png will
+                        if (aTS[0] == L'.') { //bruh i accidently went here and just discovered that i was doing a wchar_t to char comparison why didn't anybody tell me
+                            aTWS += L'*'; //gotta add the * because .png wont work but *.png will
                         }
                         aTWS += aTS;
                         //if (acceptTypes->Length() == 1 || acceptTypes->Length() - 1 == j) {
@@ -9060,11 +9247,11 @@ void showFilePicker(const v8::FunctionCallbackInfo<v8::Value>& info, bool saveDi
                         //else {
                         if(acceptTypes->Length() > 1 && acceptTypes->Length() - 1 != j) {
                             //aTWS += WStringFI(acceptTypes->Get(isolate->GetCurrentContext(), j).ToLocalChecked());
-                            aTWS += L';';
+                            aTWS += L';'; //lmao i remembered that it was a wchar_t here
                         }
                     }
 
-                    c_rgSaveTypes[i] = { WStringFI(desc), aTWS.c_str()}; //lets hope this c_str() keeps working outside this scope
+                    c_rgSaveTypes[i] = { WStringFI(desc), aTWS.c_str()}; //lets hope this c_str() keeps working outside this scope (bruh this shit really running off of duktape (get it) and hopes and dreams (haha get it frisk))
                 }
             }
             if (!excludeAcceptAll) {
@@ -11120,6 +11307,8 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     setGlobalWrapper(CreatePenIndirect);
     setGlobalWrapper(CreateBrushIndirect);
     setGlobalWrapper(CreateDIBSection);
+    setGlobalWrapper(SetDIBits);
+    //setGlobalWrapper(SetDIBitsToDevice);
     setGlobalWrapper(CreateFontIndirect); //bruh i forgot this line and V8 didn't say SHIT   it just started gaining a ton memory and stopped running (ok wait i don't think i was error checking correctly)
     //next update (tomorrow) im adding all indirect funcs
     
@@ -11537,6 +11726,11 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     setGlobalConst(D2D1_BITMAP_OPTIONS_CPU_READ);
     setGlobalConst(D2D1_BITMAP_OPTIONS_GDI_COMPATIBLE);
     setGlobalConst(D2D1_BITMAP_OPTIONS_FORCE_DWORD);
+
+    setGlobalConst(D2D1_MAP_OPTIONS_NONE);
+    setGlobalConst(D2D1_MAP_OPTIONS_READ);
+    setGlobalConst(D2D1_MAP_OPTIONS_WRITE);
+    setGlobalConst(D2D1_MAP_OPTIONS_DISCARD);
 
     Local<ObjectTemplate> matrixhelper = ObjectTemplate::New(isolate);
     matrixhelper->Set(isolate, "Identity", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
@@ -12472,6 +12666,7 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
     setGlobalWrapper(LoadCursor);
     setGlobalWrapper(LoadCursorFromFile);
     setGlobalWrapper(LoadImage);
+    setGlobalWrapper(CopyImage);
     setGlobalWrapper(MAKEINTRESOURCE);
     setGlobalWrapper(SetCursor);
 
@@ -12488,7 +12683,10 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
     setGlobalConst(IMAGE_ICON);
 
     setGlobalConst(LR_CREATEDIBSECTION); setGlobalConst(LR_DEFAULTCOLOR); setGlobalConst(LR_DEFAULTSIZE); setGlobalConst(LR_LOADFROMFILE); setGlobalConst(LR_LOADMAP3DCOLORS); setGlobalConst(LR_LOADTRANSPARENT); setGlobalConst(LR_MONOCHROME); setGlobalConst(LR_SHARED); setGlobalConst(LR_VGACOLOR);
-    
+    setGlobalConst(LR_COPYDELETEORG);
+    setGlobalConst(LR_COPYFROMRESOURCE);
+    setGlobalConst(LR_COPYRETURNORG);
+
     setGlobalConst(DI_COMPAT);
     setGlobalConst(DI_DEFAULTSIZE);
     setGlobalConst(DI_IMAGE);
@@ -12504,7 +12702,9 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
     setGlobalConst(IDC_HANDWRITING);
 
     setGlobalWrapper(SetBkColor);
+    setGlobalWrapper(GetBkColor);
     setGlobalWrapper(SetBkMode);
+    setGlobalWrapper(GetBkMode);
     
     setGlobalWrapper(EnumFontFamilies);
     setGlobalWrapper(CreateFont);
@@ -13203,7 +13403,8 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInstance, char* nCmdList, int
     //1.5.66 because THE BLUR EFFECT WORKS BUDDY NEWDIRECT2D11FUNCS is BEAUTIFUL (i need to figure out resizing and all that BUT IT WORKS)
     //1.5.73 BECAUSE THE DIRECT2D + DXGI SAGA IS OVER! (and because i renamed Matrix3x2 to Matrix3x2F and then renamed Matrix3x2F.SetProduct to Multiply and now finished desktop duplication)
     //1.5.74 because i added SetWinEventHook lol
-    print("JBS3 -> Version 1.5.74"); //so idk how normal version things work so the first number will probably stay one --- i will increment the second number if i change an existing function like when i remade the CreateWindowClass and CreateWindow functions --- i might random increment the third number if i feel like it
+    //1.5.76 idk bruh i added a lot of random stuff for gdi
+    print("JBS3 -> Version 1.5.76"); //so idk how normal version things work so the first number will probably stay one --- i will increment the second number if i change an existing function like when i remade the CreateWindowClass and CreateWindow functions --- i might random increment the third number if i feel like it
     print(screenWidth << "x" << screenHeight);
     
 
