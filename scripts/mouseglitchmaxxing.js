@@ -1,4 +1,4 @@
-//aw i thought that when i moved my mouse it would keep shaking but it stops ;(
+//aw i thought that when i moved my mouse it would keep shaking but it stops ;(  (OHHHH printing the input data was slowing my shit down nevermind!)
 
 let mouse = GetCursorPos();
 
@@ -20,12 +20,15 @@ function windowProc(hwnd, msg, wp, lp) {
     }else if(msg == WM_INPUT) {
         const input = GetRawInputData(lp, RID_INPUT);
 
-        if(input.data.usFlags == 0) {
+        if((input.data.usFlags & MOUSE_MOVE_RELATIVE) == MOUSE_MOVE_RELATIVE) { //lol i left this one as if(input.data.usFlags & MOUSE_MOVE_RELATIVE) {} but since MOUSE_MOVE_RELATIVE is 0 this was falsy
             mouse.x += input.data.lLastX;
             mouse.y += input.data.lLastY;
+        }else if(input.data.usFlags & MOUSE_MOVE_ABSOLUTE) {
+            mouse.x = (input.data.lLastX/65535)*screenWidth; //for some reason absolute movements are mapped from 0-65535 https://learn.microsoft.com/en-us/windows/win32/api/winuser/ns-winuser-rawmouse#remarks
+            mouse.y = (input.data.lLastY/65535)*screenHeight;
         }
 
-        print(input.data);
+        //print(input.data); //logging is SLOW! (seriously i think logging is one of the most common slowest things to do)
     }
     else if(msg == WM_DESTROY) {
         print(GetRegisteredRawInputDevices());
@@ -38,7 +41,7 @@ function windowProc(hwnd, msg, wp, lp) {
             device.dwFlags = flag;
             device.hwndTarget = NULL;
         }
-        print(RegisterRawInputDevices(rawinputdevicelist) == 1); //wait how do i unregister PAGEONLY shits
+        print(RegisterRawInputDevices(rawinputdevicelist) == 1); //wait how do i unregister PAGEONLY shits (i got over it)
 
         PostQuitMessage(0);
     }
@@ -48,4 +51,4 @@ const wc = CreateWindowClass("winclass", windowProc);
 wc.hbrBackground = COLOR_BACKGROUND;
 wc.hCursor = LoadCursor(NULL, IDC_ARROW);
 
-window = CreateWindow(WS_EX_OVERLAPPEDWINDOW, wc, "random idea i had", WS_OVERLAPPEDWINDOW, 500, 500, 100, 100, NULL, NULL, hInstance);
+window = CreateWindow(WS_EX_OVERLAPPEDWINDOW, wc, "random idea i had", WS_OVERLAPPEDWINDOW, 500, 500, 100, 100, NULL, NULL, hInstance); //im not using WS_VISIBLE because you need the window for WM_INPUT events but im not using the window for anything else so off you pop

@@ -105,6 +105,7 @@ function windowProc(hwnd, msg, wp, lp) {
         //SelectObject(memDC, GetStockObject(DC_BRUSH));
         ////SetDCBrushColor(memDC, RGBA(0, 255, 0, 128)); //honestly idk if you can use rgba here lol (ok suprisingly it worked (ok well idk it's not working working but sorta (ok final note it only works sometimes because it isn't supposed to work ;(    (anybody feel free to prove me wrong tho just in case)    ))))
 //
+        //ohhhh i wanted to get the COLORREF of COLOR_BACKGROUND and (if i implemented GetSysColor) i would be able to (but most colors don't work past windows 10? (actually im not sure how true this is)) https://stackoverflow.com/questions/75042403/win32-getsyscolor-many-colours-now-say-windows-10-or-greater-this-value-is https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getsyscolor 
         //FillRect(memDC, 0, 0, cx, cy, COLOR_BACKGROUND); //using fill rect because i don't want an outline
 
         const memDC2 = CreateCompatibleDC(screen);

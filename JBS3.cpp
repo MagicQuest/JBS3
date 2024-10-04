@@ -150,6 +150,9 @@
 //yeah watch out my edit is NOT synced to github (oh yeah i think i updated the zip so you straight) so if this is a problem you gotta change v8-typed-array.h yourself (also i think i changed another thing so that setTimeout would work)
 //wtf it's still like that https://github.com/v8/v8/blob/main/include/v8-typed-array.h
 
+
+#include <v8-proxy.h>
+
 #include "Direct2D.h"
 
 int screenWidth, screenHeight;
@@ -165,6 +168,17 @@ namespace jsImpl {
         jsRect->Set(isolate->GetCurrentContext(), LITERAL("bottom"), Number::New(isolate, r.bottom));
 
         return jsRect;
+    }
+
+    RECT fromJSRect(Isolate* isolate, Local<Object> jsRect) {
+        Local<Context> context = isolate->GetCurrentContext();
+        RECT r{
+            (LONG)IntegerFI(jsRect->Get(context, LITERAL("left")).ToLocalChecked()),
+            (LONG)IntegerFI(jsRect->Get(context, LITERAL("top")).ToLocalChecked()),
+            (LONG)IntegerFI(jsRect->Get(context, LITERAL("right")).ToLocalChecked()),
+            (LONG)IntegerFI(jsRect->Get(context, LITERAL("bottom")).ToLocalChecked()),
+        };
+        return r;
     }
 
     template<class T> //lmao why is this a template (ok one time i used POINTS instead of POINT so yeagh ok valid)
@@ -184,6 +198,53 @@ namespace jsImpl {
         jsSize->Set(isolate->GetCurrentContext(), LITERAL("height"), Number::New(isolate, p.cy));
 
         return jsSize;
+    }
+
+    Local<Object> createWinMENUITEMINFOW(Isolate* isolate, MENUITEMINFOW menuiinfo) {
+        Local<Context> context = isolate->GetCurrentContext();
+        Local<Object> jsMII = Object::New(isolate);
+
+        jsMII->Set(context, LITERAL("fMask"), Number::New(isolate, menuiinfo.fMask));
+        jsMII->Set(context, LITERAL("fType"), Number::New(isolate, menuiinfo.fType));
+        jsMII->Set(context, LITERAL("fState"), Number::New(isolate, menuiinfo.fState));
+        jsMII->Set(context, LITERAL("wID"), Number::New(isolate, menuiinfo.wID));
+        jsMII->Set(context, LITERAL("hSubMenu"), Number::New(isolate, (LONG_PTR)menuiinfo.hSubMenu));
+        jsMII->Set(context, LITERAL("hbmpChecked"), Number::New(isolate, (LONG_PTR)menuiinfo.hbmpChecked));
+        jsMII->Set(context, LITERAL("hbmpUnchecked"), Number::New(isolate, (LONG_PTR)menuiinfo.hbmpUnchecked));
+        jsMII->Set(context, LITERAL("dwItemData"), Number::New(isolate, menuiinfo.dwItemData));
+        Local<String> jsDwTypeData;
+        if (menuiinfo.dwTypeData != nullptr) {
+            jsDwTypeData = String::NewFromTwoByte(isolate, (const uint16_t*)menuiinfo.dwTypeData, v8::NewStringType::kNormal, menuiinfo.cch).ToLocalChecked();
+        }
+        else {
+            jsDwTypeData = LITERAL("");
+        }
+        jsMII->Set(context, LITERAL("dwTypeData"), jsDwTypeData);
+        jsMII->Set(context, LITERAL("cch"), Number::New(isolate, menuiinfo.cch));
+        jsMII->Set(context, LITERAL("hbmpItem"), Number::New(isolate, (LONG_PTR)menuiinfo.hbmpItem));
+        
+        return jsMII;
+    }
+
+    MENUITEMINFOW fromJSMENUITEMINFOW(Isolate* isolate, Local<Object> jsMII) {
+        Local<Context> context = isolate->GetCurrentContext();
+
+        MENUITEMINFOW menuiinfo{};
+
+        menuiinfo.cbSize = sizeof(MENUITEMINFOW); //alsmost forgot
+        menuiinfo.fMask = IntegerFI(jsMII->Get(context, LITERAL("fMask")).ToLocalChecked());
+        menuiinfo.fType = IntegerFI(jsMII->Get(context, LITERAL("fType")).ToLocalChecked());
+        menuiinfo.fState = IntegerFI(jsMII->Get(context, LITERAL("fState")).ToLocalChecked());
+        menuiinfo.wID = IntegerFI(jsMII->Get(context, LITERAL("wID")).ToLocalChecked());
+        menuiinfo.hSubMenu = (HMENU)IntegerFI(jsMII->Get(context, LITERAL("hSubMenu")).ToLocalChecked());
+        menuiinfo.hbmpChecked = (HBITMAP)IntegerFI(jsMII->Get(context, LITERAL("hbmpChecked")).ToLocalChecked());
+        menuiinfo.hbmpUnchecked = (HBITMAP)IntegerFI(jsMII->Get(context, LITERAL("hbmpUnchecked")).ToLocalChecked());
+        menuiinfo.dwItemData = IntegerFI(jsMII->Get(context, LITERAL("dwItemData")).ToLocalChecked());
+        menuiinfo.dwTypeData = (wchar_t*)*String::Value(isolate, jsMII->Get(context, LITERAL("dwTypeData")).ToLocalChecked());
+        menuiinfo.cch = IntegerFI(jsMII->Get(context, LITERAL("cch")).ToLocalChecked());
+        menuiinfo.hbmpItem = (HBITMAP)IntegerFI(jsMII->Get(context, LITERAL("hbmpItem")).ToLocalChecked());
+
+        return menuiinfo;
     }
 
     //template<typename T>
@@ -220,7 +281,7 @@ namespace jsImpl {
     //aw T can only be regular numbers like floats ints whatever loike that (HWNDs too >:3)
     void getVectorFromTArray(Isolate* isolate, Local<Array> jsTArr, std::vector<T>& vtints) {
         Local<Context> context = isolate->GetCurrentContext();
-        for (int i = 0; i < jsTArr->Length(); i++) {
+        for (size_t i = 0; i < jsTArr->Length(); i++) {
             vtints[i] = (T)IntegerFI(jsTArr->Get(context, i).ToLocalChecked());
         }
     }
@@ -280,8 +341,105 @@ namespace jsImpl {
     Local<ObjectTemplate> JSDWriteFontFamily;
     Local<ObjectTemplate> JSDWriteFont;
     Local<ObjectTemplate> JSD2D1MappedRect;
+    Local<ObjectTemplate> MeasureItemStruct;
+    //Local<ObjectTemplate> MeasureItemHandler;
     //Local<ObjectTemplate> JSRawInputDeviceList;
     void initObjectTemplates(Isolate* isolate) {
+        //MeasureItemHandler = ObjectTemplate::New(isolate);
+        //MeasureItemHandler->Set(isolate, "set", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+        //    //as the handler object this function fires when i try to set the original object's shit (wait why am i trying to explain this v8/js shit) https://www.youtube.com/watch?v=lV3WWT608FE RAINBOWS MAKE ME!
+        //    //args are object, propertyname, newvalue
+        //    //UH OH i just remembered that this is NOT js and so how am i supposed to access a pointer's data with a string?
+        //    //lpmis[string] like nah idk if you can do allat (i could make a map or something for the string to the pointer but fuck nah how should i actually do tihs?)
+        //    //well shit that just killed the proxy idea
+        //    //im just gonna have to go back to the solution i had before the proxies
+        //}));
+        MeasureItemStruct = ObjectTemplate::New(isolate); //welcome back MeasureItemStruct
+        MeasureItemStruct->SetAccessor(LITERAL("CtlType"), [](v8::Local<v8::String> property, const v8::PropertyCallbackInfo<Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            LPMEASUREITEMSTRUCT lpmis = (LPMEASUREITEMSTRUCT)IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+
+            info.GetReturnValue().Set(lpmis->CtlType);
+        }, [](v8::Local<v8::String> property, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info) {
+            Isolate* isolate = info.GetIsolate();
+            LPMEASUREITEMSTRUCT lpmis = (LPMEASUREITEMSTRUCT)IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+            //print(CStringFI(property) << " " << IntegerFI(value));
+            lpmis->CtlType = IntegerFI(value);
+        });
+        MeasureItemStruct->SetAccessor(LITERAL("CtlID"), [](v8::Local<v8::String> property, const v8::PropertyCallbackInfo<Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            LPMEASUREITEMSTRUCT lpmis = (LPMEASUREITEMSTRUCT)IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+
+            info.GetReturnValue().Set(lpmis->CtlID);
+        }, [](v8::Local<v8::String> property, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info) {
+            Isolate* isolate = info.GetIsolate();
+            LPMEASUREITEMSTRUCT lpmis = (LPMEASUREITEMSTRUCT)IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+            //print(CStringFI(property) << " " << IntegerFI(value));
+            lpmis->CtlID = IntegerFI(value);
+        });
+        MeasureItemStruct->SetAccessor(LITERAL("itemID"), [](v8::Local<v8::String> property, const v8::PropertyCallbackInfo<Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            LPMEASUREITEMSTRUCT lpmis = (LPMEASUREITEMSTRUCT)IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+
+            info.GetReturnValue().Set(lpmis->itemID);
+        }, [](v8::Local<v8::String> property, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info) {
+            Isolate* isolate = info.GetIsolate();
+            LPMEASUREITEMSTRUCT lpmis = (LPMEASUREITEMSTRUCT)IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+            //print(CStringFI(property) << " " << IntegerFI(value));
+            lpmis->itemID = IntegerFI(value);
+        });
+        MeasureItemStruct->SetAccessor(LITERAL("itemWidth"), [](v8::Local<v8::String> property, const v8::PropertyCallbackInfo<Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            LPMEASUREITEMSTRUCT lpmis = (LPMEASUREITEMSTRUCT)IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+
+            info.GetReturnValue().Set(lpmis->itemWidth);
+        }, [](v8::Local<v8::String> property, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info) {
+            Isolate* isolate = info.GetIsolate();
+            LPMEASUREITEMSTRUCT lpmis = (LPMEASUREITEMSTRUCT)IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+            //print(CStringFI(property) << " " << IntegerFI(value));
+            lpmis->itemWidth = IntegerFI(value);
+        });
+        MeasureItemStruct->SetAccessor(LITERAL("itemHeight"), [](v8::Local<v8::String> property, const v8::PropertyCallbackInfo<Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            LPMEASUREITEMSTRUCT lpmis = (LPMEASUREITEMSTRUCT)IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+
+            info.GetReturnValue().Set(lpmis->itemHeight);
+        }, [](v8::Local<v8::String> property, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info) {
+            Isolate* isolate = info.GetIsolate();
+            LPMEASUREITEMSTRUCT lpmis = (LPMEASUREITEMSTRUCT)IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+            //print(CStringFI(property) << " " << IntegerFI(value));
+            lpmis->itemHeight = IntegerFI(value);
+        });
+        MeasureItemStruct->SetAccessor(LITERAL("itemData"), [](v8::Local<v8::String> property, const v8::PropertyCallbackInfo<Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            LPMEASUREITEMSTRUCT lpmis = (LPMEASUREITEMSTRUCT)IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+
+            info.GetReturnValue().Set(Number::New(isolate, lpmis->itemData));
+        }, [](v8::Local<v8::String> property, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info) {
+            Isolate* isolate = info.GetIsolate();
+            LPMEASUREITEMSTRUCT lpmis = (LPMEASUREITEMSTRUCT)IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+            //print(CStringFI(property) << " " << IntegerFI(value));
+            lpmis->itemData = IntegerFI(value);
+        });
+        //this long regex solution is the quickest shit i got for now (it';s like 3 am so maybe i'll think of a better way later) also i think that using proxies might make this a little better but idk
+        //MeasureItemStruct->SetAccessor(LITERAL("$1"), [](v8::Local<v8::String> property, const v8::PropertyCallbackInfo<Value>& info) {
+        //    Isolate* isolate = info.GetIsolate();
+        //    LPMEASUREITEMSTRUCT lpmis = (LPMEASUREITEMSTRUCT)IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+        //
+        //    info.GetReturnValue().Set(lpmis->$1);
+        //}, [](v8::Local<v8::String> property, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info) {
+        //    Isolate* isolate = info.GetIsolate();
+        //    LPMEASUREITEMSTRUCT lpmis = (LPMEASUREITEMSTRUCT)IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+        //    //print(CStringFI(property) << " " << IntegerFI(value));
+        //    lpmis->$1 = IntegerFI(value);
+        //});
+        //MeasureItemStruct->SetAccessorProperty(LITERAL("x"),
+        //    /*FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) { //getter
+        //
+        //})*/Local<FunctionTemplate>(), FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) { //setter
+        //        Print();
+        //}));
+
         JSD2D1MappedRect = ObjectTemplate::New(isolate);
         JSD2D1MappedRect->Set(isolate, "SetBit", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
             Isolate* isolate = info.GetIsolate();
@@ -307,6 +465,18 @@ namespace jsImpl {
             //delete[] bits;
             Local<Uint8Array> arr = Uint8Array::New(ab, 0, byteLength); //(size.width*size.height)*4);//size.width*size.height*4); //weird if i multiply this one by sizeof(DWORD) v8 spits out garbage and crashes bad
             info.GetReturnValue().Set(arr);
+            //bits[IntegerFI(info[0])] = info[1].As<Uint32>()->Value();//IntegerFI(info[1]);
+        }));
+        JSD2D1MappedRect->Set(isolate, "SetBits", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            BYTE* src = (BYTE*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("_bits")).ToLocalChecked());
+            //print(IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("bits")).ToLocalChecked()));
+            UINT32 pitch = IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("pitch")).ToLocalChecked());
+            ID2D1Bitmap* bmp = (ID2D1Bitmap*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalBmpPtr")).ToLocalChecked());
+            D2D1_SIZE_U size = bmp->GetPixelSize();
+
+            Local<Uint8Array> jsBits = info[0].As<Uint8Array>();
+            jsBits->CopyContents(src, size.height*pitch);
             //bits[IntegerFI(info[0])] = info[1].As<Uint32>()->Value();//IntegerFI(info[1]);
         }));
         //JSRawInputDeviceList = ObjectTemplate::New(isolate);
@@ -2519,7 +2689,7 @@ namespace DIRECT2D {
 
             D2D1_MAPPED_RECT mapped;
 
-            RetIfFailed(gooder->Map((D2D1_MAP_OPTIONS)IntegerFI(info[0]), &mapped), "ID2D1Bitmap1 Map failed bruh what the fuckf,ke,v");
+            RetIfFailed(gooder->Map((D2D1_MAP_OPTIONS)IntegerFI(info[0]), &mapped), "ID2D1Bitmap1 Map failed (probably because you used something other than D2D1_MAP_OPTIONS_READ but don't worry you can still write to it with only D2D1_MAP_OPTIONS_READ (i think, check DIBitsToD2D.js))");
 
             Local<Context> context = isolate->GetCurrentContext();
             Local<Object> jsMapped = jsImpl::JSD2D1MappedRect->NewInstance(context).ToLocalChecked();//Object::New(isolate);
@@ -3756,7 +3926,7 @@ V8FUNC(createCanvas) {
                 D2D1_POINT_2F point = D2D1::Point2F(FloatFI(info[1]), FloatFI(info[2]));
                 D2D1_RECT_F rect = D2D1::RectF(FloatFI(info[3]), FloatFI(info[4]), FloatFI(info[5]), FloatFI(info[6]));
 
-                Local<Value> diddydidit;
+                Local<Value> diddydidit; //lmao
 
                 info[0].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("effect")).ToLocal(&diddydidit); //i think this is the first time im using ToLocal (without commenting it out)
 
@@ -4507,10 +4677,10 @@ V8FUNC(createCanvas) {
                 if (!fontFamily)
                     continue;
 
-                Local<Value> args[1];
+                Local<Value> args;
                 
                 if (gyatt) {
-                    args[0] = DIRECT2D::getDWriteFontFamilyImpl(isolate, fontFamily); //this is valid right
+                    args = DIRECT2D::getDWriteFontFamilyImpl(isolate, fontFamily); //this is valid right
                 }
                 else {
                     IDWriteLocalizedStrings* names;
@@ -4519,13 +4689,13 @@ V8FUNC(createCanvas) {
                     //print(_countof(wname) << " 100"); //of course it's the exact same number (bro just put 100 why the docs tweaking)
                     RetIfFailed(names->GetString(0, wname, 100), "GetString error!"); //wtf is _countof bro
 
-                    args[0] = String::NewFromTwoByte(isolate, (const uint16_t*)wname).ToLocalChecked();
+                    args = String::NewFromTwoByte(isolate, (const uint16_t*)wname).ToLocalChecked();
                     names->Release();
                     fontFamily->Release();
                 }
                 v8::TryCatch shit(isolate);
 
-                MaybeLocal<Value> returnedValue = func->Call(isolate->GetCurrentContext(), isolate->GetCurrentContext()->Global(), 1, args);
+                MaybeLocal<Value> returnedValue = func->Call(isolate->GetCurrentContext(), isolate->GetCurrentContext()->Global(), 1, &args); //since i only have one value for args instead of making it a one element array i'll just pass the address of args
 
                 CHECKEXCEPTIONS(shit);
             }
@@ -4688,6 +4858,17 @@ V8FUNC(createCanvas) {
         
             info.GetReturnValue().Set(jsBitmap->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
         }));
+        //lowkey impatientmaxxing right now but good god i can't be bothered to comb through sparse documents to understand how loading a font works with DirectWrite
+        //https://learn.microsoft.com/en-us/windows/win32/directwrite/custom-font-collections?redirectedfrom=MSDN
+        //oh FUCK NO im not doing all this shit bruh fuck DirectWrite -> https://stackoverflow.com/questions/37572961/c-directwrite-load-font-from-file-at-runtime (https://stackoverflow.com/a/37645622)
+        //i gotta basically implement these fuckass interfaces myself? (sorry d2d but there will be NO font loading if that's the case)
+        //context->Set(isolate, "LoadFontFromFilename", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+        //    Isolate* isolate = info.GetIsolate();
+        //    Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+        //    IDWriteFontCollectionLoader* collectionLoader; //how do i create this object? im i supposed too?
+        //    d2d->textfactory->RegisterFontCollectionLoader(collectionLoader);
+        //    d2d->textfactory->CreateCustomFontCollection(collectionLoader, ); //what is the void* collectionKey?  
+        //}));
         context->Set(isolate, "DrawBitmap", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
             Isolate* isolate = info.GetIsolate();
             Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
@@ -5391,11 +5572,9 @@ V8FUNC(createCanvas) {
 
                 void* src = nullptr;
         
-                if (info[5]->IsArrayBufferView()) {
-                    
-                }
-                else {
-        
+                if (info[5]->IsUint8Array()) {
+                    //#error oops i forgot to implement this hoe
+                    src = info[5].As<Uint8Array>()->Buffer()->Data(); //ok this is really sketchy idk man i might have to make a copy
                 }
         
                 /*HRESULT shit = */RetIfFailed(d2d11->d2dcontext->CreateBitmap(D2D1::SizeU(IntegerFI(info[0]), IntegerFI(info[1])), src, IntegerFI(info[6]), &bitmapProperties, &target), "CreateBitmap1 (ID2D1DeviceContext->CreateBitmap) failed big dawg");
@@ -7639,6 +7818,124 @@ V8FUNC(DeleteMenuWrapper) {
     info.GetReturnValue().Set(Number::New(isolate, DeleteMenu((HMENU)IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]))));
 }
 
+V8FUNC(DrawMenuBarWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    info.GetReturnValue().Set(Number::New(isolate, DrawMenuBar((HWND)IntegerFI(info[0]))));
+}
+
+V8FUNC(CreatePopupMenuWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)CreatePopupMenu()));
+}
+
+V8FUNC(InsertMenuWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    UINT flags = IntegerFI(info[2]);
+
+    wchar_t* data = nullptr;
+
+    if ((flags & MF_BITMAP) == MF_BITMAP || (flags & MF_OWNERDRAW) == MF_OWNERDRAW) {
+        data = (wchar_t*)IntegerFI(info[4]);
+    }
+    else if ((flags & MF_STRING) == MF_STRING) {
+        data = (wchar_t*)*String::Value(isolate, info[4]);
+    }
+
+    info.GetReturnValue().Set(Number::New(isolate, InsertMenuW((HMENU)IntegerFI(info[0]), IntegerFI(info[1]), flags, (UINT_PTR)IntegerFI(info[3]), data)));
+}
+
+V8FUNC(ModifyMenuWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    UINT flags = IntegerFI(info[2]);
+
+    wchar_t* data = nullptr;
+
+    if ((flags & MF_BITMAP) == MF_BITMAP || (flags & MF_OWNERDRAW) == MF_OWNERDRAW) {
+        data = (wchar_t*)IntegerFI(info[4]);
+    }
+    else if ((flags & MF_STRING) == MF_STRING) {
+        data = (wchar_t*)*String::Value(isolate, info[4]);
+    }
+
+    info.GetReturnValue().Set(Number::New(isolate, ModifyMenuW((HMENU)IntegerFI(info[0]), IntegerFI(info[1]), flags, (UINT_PTR)IntegerFI(info[3]), data)));
+}
+
+V8FUNC(GET_MEASURE_ITEM_STRUCT_LPARAM) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    
+    LPMEASUREITEMSTRUCT lpmis = (LPMEASUREITEMSTRUCT)IntegerFI(info[0]);
+    //lpmis->
+    Local<Object> jsMIS = jsImpl::MeasureItemStruct->NewInstance(isolate->GetCurrentContext()).ToLocalChecked();
+    jsMIS->Set(isolate->GetCurrentContext(), LITERAL("internalPtr"), Number::New(isolate, (LONG_PTR)lpmis));
+    info.GetReturnValue().Set(jsMIS);
+}
+
+V8FUNC(GetMenuItemInfoWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    MENUITEMINFOW pmi = jsImpl::fromJSMENUITEMINFOW(isolate, info[3].As<Object>());
+    GetMenuItemInfoW((HMENU)IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), &pmi);
+    Local<Object> jsMII = jsImpl::createWinMENUITEMINFOW(isolate, pmi);
+
+    info.GetReturnValue().Set(jsMII);
+}
+
+V8FUNC(SetMenuItemInfoWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    MENUITEMINFOW pmi = jsImpl::fromJSMENUITEMINFOW(isolate, info[3].As<Object>());
+
+    info.GetReturnValue().Set(Number::New(isolate, SetMenuItemInfoW((HMENU)IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), &pmi)));
+}
+
+V8FUNC(InsertMenuItemWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    MENUITEMINFOW pmi = jsImpl::fromJSMENUITEMINFOW(isolate, info[3].As<Object>());
+    info.GetReturnValue().Set(Number::New(isolate, InsertMenuItemW((HMENU)IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), &pmi)));
+}
+
+V8FUNC(TrackPopupMenuWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    //bool rect = !info[5]->IsNumber() && info[5]->IsObject(); //seriously. i just read the docs and close to the bottom they slip in the fact that the RECT param is ignored
+    //if (rect) {
+    //    RECT r = jsImpl::fromJSRect(isolate, info[5].As<Object>());
+    //    info.GetReturnValue().Set(Number::New(isolate, TrackPopupMenu((HMENU)IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]), 0, (HWND)IntegerFI(info[4]), &r)));
+    //}
+    //else {
+    //    info.GetReturnValue().Set(Number::New(isolate, TrackPopupMenu((HMENU)IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]), 0, (HWND)IntegerFI(info[4]), NULL)));
+    //}
+    info.GetReturnValue().Set(Number::New(isolate, TrackPopupMenu((HMENU)IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]), 0, (HWND)IntegerFI(info[4]), NULL)));
+}
+
+V8FUNC(TrackPopupMenuExWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    bool rect = !info[5]->IsNumber() && info[5]->IsObject();
+
+    TPMPARAMS pmparams{};
+    pmparams.cbSize = sizeof(TPMPARAMS);
+
+    if (rect) {
+        pmparams.rcExclude = jsImpl::fromJSRect(isolate, info[5].As<Object>());
+        info.GetReturnValue().Set(Number::New(isolate, TrackPopupMenuEx((HMENU)IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]), (HWND)IntegerFI(info[4]), &pmparams)));
+    }
+    else {
+        info.GetReturnValue().Set(Number::New(isolate, TrackPopupMenuEx((HMENU)IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]), (HWND)IntegerFI(info[4]), NULL)));
+    }
+}
+
 V8FUNC(RedrawWindowWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
@@ -8222,6 +8519,24 @@ V8FUNC(CreateDIBSectionWrapper) {
 //
 //    SetDIBitsToDevice;
 //}
+
+V8FUNC(GetSysColorWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, GetSysColor(IntegerFI(info[0]))));
+}
+
+V8FUNC(GetTextExtentPoint32Wrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    Local<String> strang = info[1].As<String>();
+
+    SIZE s{}; GetTextExtentPoint32W((HDC)IntegerFI(info[0]), WStringFI(strang), strang->Length(), &s);
+
+    info.GetReturnValue().Set(jsImpl::createWinSize(isolate, s));
+}
 
 V8FUNC(SetDIBitsWrapper) { //i wonder why i haven't done SetDIBits yet maybe i forgot
     using namespace v8;
@@ -11308,6 +11623,8 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     setGlobalWrapper(CreateBrushIndirect);
     setGlobalWrapper(CreateDIBSection);
     setGlobalWrapper(SetDIBits);
+    setGlobalWrapper(GetSysColor);
+    setGlobalWrapper(GetTextExtentPoint32);
     //setGlobalWrapper(SetDIBitsToDevice);
     setGlobalWrapper(CreateFontIndirect); //bruh i forgot this line and V8 didn't say SHIT   it just started gaining a ton memory and stopped running (ok wait i don't think i was error checking correctly)
     //next update (tomorrow) im adding all indirect funcs
@@ -12065,6 +12382,16 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     global->Set(isolate, "AppendMenu", FunctionTemplate::New(isolate, AppendMenuWrapper));
     global->Set(isolate, "DestroyMenu", FunctionTemplate::New(isolate, DestroyMenuWrapper));
     global->Set(isolate, "DeleteMenu", FunctionTemplate::New(isolate, DeleteMenuWrapper));
+    setGlobalWrapper(DrawMenuBar);
+
+    setGlobalWrapper(CreatePopupMenu);
+    setGlobalWrapper(InsertMenu);
+    setGlobalWrapper(ModifyMenu);
+    setGlobalWrapper(InsertMenuItem);
+    setGlobalWrapper(GetMenuItemInfo);
+    setGlobalWrapper(SetMenuItemInfo);
+    setGlobalWrapper(TrackPopupMenu);
+    setGlobalWrapper(TrackPopupMenuEx);
 
     setGlobalConst(MF_INSERT);
     setGlobalConst(MF_CHANGE);
@@ -12128,7 +12455,69 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     setGlobalConst(ES_WANTRETURN);
     setGlobalConst(ES_NUMBER);
 
+    setGlobalConst(TPM_LEFTBUTTON);
+    setGlobalConst(TPM_RIGHTBUTTON);
+    setGlobalConst(TPM_LEFTALIGN);
+    setGlobalConst(TPM_CENTERALIGN);
+    setGlobalConst(TPM_RIGHTALIGN);
+    setGlobalConst(TPM_TOPALIGN);
+    setGlobalConst(TPM_VCENTERALIGN);
+    setGlobalConst(TPM_BOTTOMALIGN);
+    setGlobalConst(TPM_HORIZONTAL);
+    setGlobalConst(TPM_VERTICAL);
+    setGlobalConst(TPM_NONOTIFY);
+    setGlobalConst(TPM_RETURNCMD);
+    setGlobalConst(TPM_RECURSE);
+    setGlobalConst(TPM_HORPOSANIMATION);
+    setGlobalConst(TPM_HORNEGANIMATION);
+    setGlobalConst(TPM_VERPOSANIMATION);
+    setGlobalConst(TPM_VERNEGANIMATION);
+    setGlobalConst(TPM_NOANIMATION);
+    setGlobalConst(TPM_LAYOUTRTL);
+    setGlobalConst(TPM_WORKAREA);
+
+    setGlobalConst(MND_CONTINUE);
+    setGlobalConst(MND_ENDMENU);
+    setGlobalConst(MNGOF_TOPGAP);
+    setGlobalConst(MNGOF_BOTTOMGAP);
+    setGlobalConst(MNGO_NOINTERFACE);
+    setGlobalConst(MNGO_NOERROR);
+    setGlobalConst(MIIM_STATE);
+    setGlobalConst(MIIM_ID);
+    setGlobalConst(MIIM_SUBMENU);
+    setGlobalConst(MIIM_CHECKMARKS);
+    setGlobalConst(MIIM_TYPE);
+    setGlobalConst(MIIM_DATA);
+    setGlobalConst(MIIM_STRING);
+    setGlobalConst(MIIM_BITMAP);
+    setGlobalConst(MIIM_FTYPE);
+
+    //setGlobalConst((LONG_PTR)HBMMENU_CALLBACK); //lol (wait oops this was adding the (LONG_PTR) part)
+
+#define setGlobalConstLONGPTR(g) global->Set(isolate, #g, Number::New(isolate, (LONG_PTR)g))
+
+    setGlobalConstLONGPTR(HBMMENU_CALLBACK); //lol
+    setGlobalConstLONGPTR(HBMMENU_SYSTEM);
+    setGlobalConstLONGPTR(HBMMENU_MBAR_RESTORE);
+    setGlobalConstLONGPTR(HBMMENU_MBAR_MINIMIZE);
+    setGlobalConstLONGPTR(HBMMENU_MBAR_CLOSE);
+    setGlobalConstLONGPTR(HBMMENU_MBAR_CLOSE_D);
+    setGlobalConstLONGPTR(HBMMENU_MBAR_MINIMIZE_D);
+    setGlobalConstLONGPTR(HBMMENU_POPUP_CLOSE);
+    setGlobalConstLONGPTR(HBMMENU_POPUP_RESTORE);
+    setGlobalConstLONGPTR(HBMMENU_POPUP_MAXIMIZE);
+    setGlobalConstLONGPTR(HBMMENU_POPUP_MINIMIZE);
+
+#undef setGlobalConstLONGPTR
+
+    setGlobal(GET_MEASURE_ITEM_STRUCT_LPARAM);
+
     setGlobalConst(CW_USEDEFAULT);
+
+    setGlobalConst(MNC_IGNORE);
+    setGlobalConst(MNC_CLOSE);
+    setGlobalConst(MNC_EXECUTE);
+    setGlobalConst(MNC_SELECT);
 
     setGlobalWrapper(RedrawWindow);
     setGlobalWrapper(InvalidateRect);
@@ -13544,7 +13933,7 @@ https://forums.codeguru.com/showthread.php?69236-How-to-obtain-HINSTANCE-using-H
             //allow me to pull a node.js
             if (strlen(nCmdList) != 0) {
 
-                v8::Local<v8::String> source = v8::String::NewFromUtf8(isolate, shit.c_str(), v8::NewStringType::kNormal, shit.length()).ToLocalChecked();//v8::String::NewFromUtf8(isolate, (const char*)shit, v8::NewStringType::kNormal, strlen(shit)).ToLocalChecked();
+                v8::Local<v8::String> source = v8::String::NewFromUtf8(isolate, shit.c_str()).ToLocalChecked(); //, v8::NewStringType::kNormal, shit.length()).ToLocalChecked();//v8::String::NewFromUtf8(isolate, (const char*)shit, v8::NewStringType::kNormal, strlen(shit)).ToLocalChecked();
                 //v8::String::NewFromUtf8Literal(isolate, shit);//"'Hello' + ', World!'");
 
             // Compile the source code.

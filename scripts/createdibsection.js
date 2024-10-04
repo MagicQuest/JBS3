@@ -8,7 +8,7 @@ const dib = CreateDIBSection(dc, CreateDIBitmapSimple(width, -height), DIB_RGB_C
 print(dib);
 const bits = wicBitmap.GetPixels(wic);
 dib.SetBits(bits);
-//wait instead of DIBSection i can just directly use CreateBitmap
+//wait instead of DIBSection i can just directly use CreateBitmap (YOU CAN?)
 //const hbm = CreateBitmap(width, height, 32, bits);
 //print(width, height, hbm);
 wic.Release();

@@ -86,11 +86,13 @@ while(!GetKey(VK_ESCAPE)) {
 
     oldBrush = SelectObject(dc, missingTextureBrush);
     PatBlt(dc, mouse.x-150,mouse.y-150,300,300,PATCOPY);
-    SelectObject(oldBrush);
+    SelectObject(dc, oldBrush); //oops i somehow forgot dc as the first argument
 
     oldBrush = SelectObject(dc, textBmpBrush);
     PatBlt(dc, mouse.x-100,mouse.y-100,200,200,PATCOPY);
-    SelectObject(oldBrush);
+    SelectObject(dc, oldBrush);
+
+    //if you drew both of these PatBlts into a memDC and then drew that onto the screen there would be no flicker! (just fyi)
 }
 
 //DeleteObject(bitmap);

@@ -1,4 +1,5 @@
 //based off a similar c++ program i made in SFML (minus the minimap and ifoundamongus)
+//bruh i just realized i included deez.TTF but i didn't use it because you can't load fonts and after trying to figure out how i learned it was lowkey way too hard and stupid i ain't doiong all that nananana 
 
 let window;
 let windowDC;

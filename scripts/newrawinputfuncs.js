@@ -35,8 +35,8 @@ function windowProc(hwnd, msg, wp, lp) {
     }else if(msg == WM_INPUT) {
         const inputinfo = GET_RAWINPUT_CODE_WPARAM(wp); //https://learn.microsoft.com/en-us/windows/win32/inputdev/wm-input
         const hRawInput = lp;
-        print("input info: ", inputinfo);
-        print("extra info? ", GetMessageExtraInfo());
+        //print("input info: ", inputinfo);
+        //print("extra info? ", GetMessageExtraInfo());
         //const header = GetRawInputData(hRawInput, RID_HEADER); //no need to specify size
         //print("header: ", header);
         const input = GetRawInputData(hRawInput, RID_INPUT);
@@ -59,9 +59,14 @@ function windowProc(hwnd, msg, wp, lp) {
             i++;
         }
 
-        if(input.header.dwType == RIM_TYPEMOUSE) {
-            rawmouseinfo.x = Math.min(w, Math.max(0, rawmouseinfo.x+input.data.lLastX));
-            rawmouseinfo.y = Math.min(h, Math.max(0, rawmouseinfo.y+input.data.lLastY));
+        if(input.header.dwType == RIM_TYPEMOUSE) { //https://learn.microsoft.com/en-us/windows/win32/api/winuser/ns-winuser-rawmouse#members
+            if((input.data.usFlags & MOUSE_MOVE_RELATIVE) == MOUSE_MOVE_RELATIVE) {
+                rawmouseinfo.x = Math.min(w, Math.max(0, rawmouseinfo.x+input.data.lLastX)); //when the relative flag is set, lLastX and lLastY contains the distance the mouse (in pixels) from the last mouse position
+                rawmouseinfo.y = Math.min(h, Math.max(0, rawmouseinfo.y+input.data.lLastY));
+            }else if((input.data.usFlags & MOUSE_MOVE_ABSOLUTE) == MOUSE_MOVE_ABSOLUTE) {
+                rawmouseinfo.x = Math.min(w, Math.max(0, input.data.lLastX)); //when the absolute flag is sent, lLastX and lLastY contain the mouse's position on the screen from 0-65535
+                rawmouseinfo.y = Math.min(h, Math.max(0, input.data.lLastY));
+            }
         }//else if(input.header.dwType == RIM_TYPEHID) {
             //print(input.data);
         //}
