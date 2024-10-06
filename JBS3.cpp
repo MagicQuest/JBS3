@@ -157,6 +157,8 @@
 
 int screenWidth, screenHeight;
 
+void Print(const v8::FunctionCallbackInfo<v8::Value>&info);
+
 namespace jsImpl {
     using namespace v8;
     Local<Object> createWinRect(Isolate* isolate, RECT r) {
@@ -191,6 +193,16 @@ namespace jsImpl {
         return jsPoint;
     }
 
+    template<class T>
+    T fromJSPoint(Isolate* isolate, Local<Object> jsPoint) {
+        T point{};
+
+        point.x = IntegerFI(jsPoint->Get(isolate->GetCurrentContext(), LITERAL("x")).ToLocalChecked());
+        point.y = IntegerFI(jsPoint->Get(isolate->GetCurrentContext(), LITERAL("y")).ToLocalChecked());
+
+        return point;
+    }
+
     Local<Object> createWinSize(Isolate* isolate, SIZE p) {
         Local<Object> jsSize = Object::New(isolate);
 
@@ -213,8 +225,10 @@ namespace jsImpl {
         jsMII->Set(context, LITERAL("hbmpUnchecked"), Number::New(isolate, (LONG_PTR)menuiinfo.hbmpUnchecked));
         jsMII->Set(context, LITERAL("dwItemData"), Number::New(isolate, menuiinfo.dwItemData));
         Local<String> jsDwTypeData;
-        if (menuiinfo.dwTypeData != nullptr) {
-            jsDwTypeData = String::NewFromTwoByte(isolate, (const uint16_t*)menuiinfo.dwTypeData, v8::NewStringType::kNormal, menuiinfo.cch).ToLocalChecked();
+        if (menuiinfo.dwTypeData != nullptr && menuiinfo.cch != 0) {
+            //aw shit when you ask for MIIM_STRING you place the pointer of a buffer YOU made into dwTypeData 
+            //wchar_t* name = new wchar_t[menuiinfo.cch];
+            jsDwTypeData = String::NewFromTwoByte(isolate, (const uint16_t*)menuiinfo.dwTypeData).ToLocalChecked(); //, v8::NewStringType::kNormal, menuiinfo.cch).ToLocalChecked();
         }
         else {
             jsDwTypeData = LITERAL("");
@@ -341,86 +355,214 @@ namespace jsImpl {
     Local<ObjectTemplate> JSDWriteFontFamily;
     Local<ObjectTemplate> JSDWriteFont;
     Local<ObjectTemplate> JSD2D1MappedRect;
-    Local<ObjectTemplate> MeasureItemStruct;
-    //Local<ObjectTemplate> MeasureItemHandler;
+    //Local<ObjectTemplate> MeasureItemStruct;
+    Local<ObjectTemplate> MeasureItemHandler;
+    Local<ObjectTemplate> DrawItemHandler;
+    Local<ObjectTemplate> DIBSection; //interf
     //Local<ObjectTemplate> JSRawInputDeviceList;
     void initObjectTemplates(Isolate* isolate) {
-        //MeasureItemHandler = ObjectTemplate::New(isolate);
-        //MeasureItemHandler->Set(isolate, "set", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-        //    //as the handler object this function fires when i try to set the original object's shit (wait why am i trying to explain this v8/js shit) https://www.youtube.com/watch?v=lV3WWT608FE RAINBOWS MAKE ME!
-        //    //args are object, propertyname, newvalue
-        //    //UH OH i just remembered that this is NOT js and so how am i supposed to access a pointer's data with a string?
-        //    //lpmis[string] like nah idk if you can do allat (i could make a map or something for the string to the pointer but fuck nah how should i actually do tihs?)
-        //    //well shit that just killed the proxy idea
-        //    //im just gonna have to go back to the solution i had before the proxies
-        //}));
-        MeasureItemStruct = ObjectTemplate::New(isolate); //welcome back MeasureItemStruct
-        MeasureItemStruct->SetAccessor(LITERAL("CtlType"), [](v8::Local<v8::String> property, const v8::PropertyCallbackInfo<Value>& info) {
+        DIBSection = ObjectTemplate::New(isolate);
+        //Local<ObjectTemplate> jsBobject = ObjectTemplate::New(isolate);
+        DIBSection->Set(isolate, "SetBit", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
             Isolate* isolate = info.GetIsolate();
-            LPMEASUREITEMSTRUCT lpmis = (LPMEASUREITEMSTRUCT)IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+            //print(IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("bits")).ToLocalChecked()));
+            DWORD* bits = (DWORD*)IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("_bits")).ToLocalChecked()); // -///-
+            bits[IntegerFI(info[0])] = info[1].As<Uint32>()->Value();//IntegerFI(info[1]);
+        }));
+        DIBSection->Set(isolate, "GetBit", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            //print(IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("bits")).ToLocalChecked()));
+            DWORD* bits = (DWORD*)IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("_bits")).ToLocalChecked()); // -///-
+            info.GetReturnValue().Set(Number::New(isolate, bits[IntegerFI(info[0])]));
+            //bits[IntegerFI(info[0])] = info[1].As<Uint32>()->Value();//IntegerFI(info[1]);
+        }));
+        DIBSection->Set(isolate, "GetBits", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            LONG width = IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("width")).ToLocalChecked());
+            LONG height = IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("height")).ToLocalChecked());
+            int bitCount = IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("bitCount")).ToLocalChecked());
+            auto stride = ((((width * bitCount) + 31) & ~31) >> 3);
+            //print(IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("bits")).ToLocalChecked()));
+            DWORD* bits = (DWORD*)IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("_bits")).ToLocalChecked()); // -///-
+            Local<ArrayBuffer> ab = ArrayBuffer::New(isolate, height*stride); //honestly this math is a guess especially the sizeof part
+            memcpy(ab->Data(), bits, height*stride); //GULP
+            //delete[] bits;
+            Local<Uint32Array> arr = Uint32Array::New(ab, 0, width*height); //weird if i multiply this one by sizeof(DWORD) v8 spits out garbage and crashes bad
+            info.GetReturnValue().Set(arr);
+            //bits[IntegerFI(info[0])] = info[1].As<Uint32>()->Value();//IntegerFI(info[1]);
+        }));
+        DIBSection->Set(isolate, "SetBits", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            LONG width = IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("width")).ToLocalChecked());
+            LONG height = IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("height")).ToLocalChecked());
+            int bitCount = IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("bitCount")).ToLocalChecked());
+            auto stride = ((((width * bitCount) + 31) & ~31) >> 3);
+            
+            //print(IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("bits")).ToLocalChecked()));
+            DWORD* bits = (DWORD*)IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("_bits")).ToLocalChecked()); // -///-
+            Local<Uint32Array> jsBits = info[0].As<Uint32Array>();
+            jsBits->CopyContents(bits, height * stride);
+            //bits[IntegerFI(info[0])] = info[1].As<Uint32>()->Value();//IntegerFI(info[1]);
+        }));
 
-            info.GetReturnValue().Set(lpmis->CtlType);
-        }, [](v8::Local<v8::String> property, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info) {
+        MeasureItemHandler = ObjectTemplate::New(isolate); //welcome back MeasureItemHandler
+        MeasureItemHandler->Set(isolate, "set", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            //as the handler object this function fires when i try to set the original object's shit (wait why am i trying to explain this v8/js shit) https://www.youtube.com/watch?v=lV3WWT608FE RAINBOWS MAKE ME!
+            //args are object, propertyname, newvalue
+            //UH OH i just remembered that this is NOT js and so how am i supposed to access a pointer's data with a string?
+            //lpmis[string] like nah idk if you can do allat (i could make a map or something for the string to the pointer but fuck nah how should i actually do tihs?)
+            //well shit that just killed the proxy idea
+            //im just gonna have to go back to the solution i had before the proxies
+            //ok nevermind im back on the proxies because i thought the latter would be easier/smaller but now i see [with the eyes wide open] and i've realized that using the proxy will definitely be smaller
             Isolate* isolate = info.GetIsolate();
-            LPMEASUREITEMSTRUCT lpmis = (LPMEASUREITEMSTRUCT)IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
-            //print(CStringFI(property) << " " << IntegerFI(value));
-            lpmis->CtlType = IntegerFI(value);
-        });
-        MeasureItemStruct->SetAccessor(LITERAL("CtlID"), [](v8::Local<v8::String> property, const v8::PropertyCallbackInfo<Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            LPMEASUREITEMSTRUCT lpmis = (LPMEASUREITEMSTRUCT)IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+            Local<Object> jsMIS = info[0].As<Object>();
+            LPMEASUREITEMSTRUCT lpmis = (LPMEASUREITEMSTRUCT)IntegerFI(jsMIS->Get(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+            const char* prop = CStringFI(info[1]); //nothing special
+            
+            //if (strcmp(prop, "$1") == 0) { //i could lowkey override the array index operator of LPMEASUREITEMSTRUCT and move the if statement there but it might be a little harder than that to and i might have to make a custom wrapper class or something so obcivopuisly im not donig that
+            //    lpmis->$1 = IntegerFI(info[2]);
+            //}else 
+            //print("changing {" << prop << "} to " << IntegerFI(info[2]));
+            if (strcmp(prop, "CtlType") == 0) {
+                lpmis->CtlType = IntegerFI(info[2]);
+            }
+            else if (strcmp(prop, "CtlID") == 0) {
+                lpmis->CtlID = IntegerFI(info[2]);
+            }
+            else if (strcmp(prop, "itemID") == 0) {
+                lpmis->itemID = IntegerFI(info[2]);
+            }
+            else if (strcmp(prop, "itemWidth") == 0) {
+                lpmis->itemWidth = IntegerFI(info[2]);
+            }
+            else if (strcmp(prop, "itemHeight") == 0) {
+                lpmis->itemHeight = IntegerFI(info[2]);
+            }
+            else if (strcmp(prop, "itemData") == 0) {
+                lpmis->itemData = (ULONG_PTR)IntegerFI(info[2]);
+            }
+            //well here's the part where i'd add a quick little return Reflect.get(...arguments) on the js side so where is that (ok it's a builtin object like math so im not totally sure i can use it like that)
+            //i might have to do the lazy way
+            //oh wait i forgot this is set not get nevermind idgaf
+            jsMIS->Set(isolate->GetCurrentContext(), info[1], info[2].As<Number>()); //just making sure...
+        }));
 
-            info.GetReturnValue().Set(lpmis->CtlID);
-        }, [](v8::Local<v8::String> property, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info) {
+        DrawItemHandler = ObjectTemplate::New(isolate); //welcome back MeasureItemHandler
+        DrawItemHandler->Set(isolate, "set", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
             Isolate* isolate = info.GetIsolate();
-            LPMEASUREITEMSTRUCT lpmis = (LPMEASUREITEMSTRUCT)IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
-            //print(CStringFI(property) << " " << IntegerFI(value));
-            lpmis->CtlID = IntegerFI(value);
-        });
-        MeasureItemStruct->SetAccessor(LITERAL("itemID"), [](v8::Local<v8::String> property, const v8::PropertyCallbackInfo<Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            LPMEASUREITEMSTRUCT lpmis = (LPMEASUREITEMSTRUCT)IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+            Local<Object> jsDIS = info[0].As<Object>();
+            //Print(info);
+            LPDRAWITEMSTRUCT lpdis = (LPDRAWITEMSTRUCT)IntegerFI(jsDIS->Get(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+            const char* prop = CStringFI(info[1]); //nothing special
+            
+            //if (strcmp(prop, "$1") == 0) { //i could lowkey override the array index operator of LPMEASUREITEMSTRUCT and move the if statement there but it might be a little harder than that to and i might have to make a custom wrapper class or something so obcivopuisly im not donig that
+            //    lpmis->$1 = IntegerFI(info[2]);
+            //}else 
+            //print("changing {" << prop << "} to " << IntegerFI(info[2]));
+            //bool number = true;
+            if (strcmp(prop, "CtlType") == 0) {
+                lpdis->CtlType = IntegerFI(info[2]);
+            }
+            else if (strcmp(prop, "CtlID") == 0) {
+                lpdis->CtlID = IntegerFI(info[2]);
+            }
+            else if (strcmp(prop, "itemID") == 0) {
+                lpdis->itemID = IntegerFI(info[2]);
+            }
+            else if (strcmp(prop, "itemAction") == 0) {
+                lpdis->itemAction = IntegerFI(info[2]);
+            }
+            else if (strcmp(prop, "itemState") == 0) {
+                lpdis->itemState = IntegerFI(info[2]);
+            }
+            else if (strcmp(prop, "hwndItem") == 0) {
+                lpdis->hwndItem = (HWND)IntegerFI(info[2]);
+            }
+            else if (strcmp(prop, "hDC") == 0) {
+                lpdis->hDC = (HDC)IntegerFI(info[2]);
+            }
+            else if (strcmp(prop, "rcItem") == 0) {
+                lpdis->rcItem = jsImpl::fromJSRect(isolate, info[2].As<Object>());
+                //number = false;
+            }
+            else if (strcmp(prop, "itemData") == 0) {
+                lpdis->itemData = IntegerFI(info[2]);
+            }
 
-            info.GetReturnValue().Set(lpmis->itemID);
-        }, [](v8::Local<v8::String> property, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info) {
-            Isolate* isolate = info.GetIsolate();
-            LPMEASUREITEMSTRUCT lpmis = (LPMEASUREITEMSTRUCT)IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
-            //print(CStringFI(property) << " " << IntegerFI(value));
-            lpmis->itemID = IntegerFI(value);
-        });
-        MeasureItemStruct->SetAccessor(LITERAL("itemWidth"), [](v8::Local<v8::String> property, const v8::PropertyCallbackInfo<Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            LPMEASUREITEMSTRUCT lpmis = (LPMEASUREITEMSTRUCT)IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+            jsDIS->Set(isolate->GetCurrentContext(), info[1], info[2]);//number ? info[2].As<Number>() : info[2]);
+        }));
+        
 
-            info.GetReturnValue().Set(lpmis->itemWidth);
-        }, [](v8::Local<v8::String> property, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info) {
-            Isolate* isolate = info.GetIsolate();
-            LPMEASUREITEMSTRUCT lpmis = (LPMEASUREITEMSTRUCT)IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
-            //print(CStringFI(property) << " " << IntegerFI(value));
-            lpmis->itemWidth = IntegerFI(value);
-        });
-        MeasureItemStruct->SetAccessor(LITERAL("itemHeight"), [](v8::Local<v8::String> property, const v8::PropertyCallbackInfo<Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            LPMEASUREITEMSTRUCT lpmis = (LPMEASUREITEMSTRUCT)IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
-
-            info.GetReturnValue().Set(lpmis->itemHeight);
-        }, [](v8::Local<v8::String> property, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info) {
-            Isolate* isolate = info.GetIsolate();
-            LPMEASUREITEMSTRUCT lpmis = (LPMEASUREITEMSTRUCT)IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
-            //print(CStringFI(property) << " " << IntegerFI(value));
-            lpmis->itemHeight = IntegerFI(value);
-        });
-        MeasureItemStruct->SetAccessor(LITERAL("itemData"), [](v8::Local<v8::String> property, const v8::PropertyCallbackInfo<Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            LPMEASUREITEMSTRUCT lpmis = (LPMEASUREITEMSTRUCT)IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
-
-            info.GetReturnValue().Set(Number::New(isolate, lpmis->itemData));
-        }, [](v8::Local<v8::String> property, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info) {
-            Isolate* isolate = info.GetIsolate();
-            LPMEASUREITEMSTRUCT lpmis = (LPMEASUREITEMSTRUCT)IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
-            //print(CStringFI(property) << " " << IntegerFI(value));
-            lpmis->itemData = IntegerFI(value);
-        });
+        //MeasureItemStruct = ObjectTemplate::New(isolate); //welcome back MeasureItemStruct
+        ////https://stackoverflow.com/questions/57686545/setaccessor-and-setaccessorproperty-any-difference
+        ////https://v8.dev/docs/embed#accessing-static-global-variables
+        //MeasureItemStruct->SetAccessor(LITERAL("$1"), [](v8::Local<v8::String> property, const v8::PropertyCallbackInfo<Value>& info) {\n    Isolate* isolate = info.GetIsolate();\n    LPMEASUREITEMSTRUCT lpmis = (LPMEASUREITEMSTRUCT)IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());\n\n    info.GetReturnValue().Set(lpmis->$1);\n}, [](v8::Local<v8::String> property, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info) {\n    Isolate* isolate = info.GetIsolate();\n    LPMEASUREITEMSTRUCT lpmis = (LPMEASUREITEMSTRUCT)IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());\n    //print(CStringFI(property) << " " << IntegerFI(value));\n    lpmis->$1 = IntegerFI(value);\n});\n
+        //MeasureItemStruct->SetAccessor(LITERAL("CtlType"), [](v8::Local<v8::String> property, const v8::PropertyCallbackInfo<Value>& info) {
+        //    Isolate* isolate = info.GetIsolate();
+        //    LPMEASUREITEMSTRUCT lpmis = (LPMEASUREITEMSTRUCT)IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+        //
+        //    info.GetReturnValue().Set(lpmis->CtlType);
+        //}, [](v8::Local<v8::String> property, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info) {
+        //    Isolate* isolate = info.GetIsolate();
+        //    LPMEASUREITEMSTRUCT lpmis = (LPMEASUREITEMSTRUCT)IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+        //    //print(CStringFI(property) << " " << IntegerFI(value));
+        //    lpmis->CtlType = IntegerFI(value);
+        //});
+        //MeasureItemStruct->SetAccessor(LITERAL("CtlID"), [](v8::Local<v8::String> property, const v8::PropertyCallbackInfo<Value>& info) {
+        //    Isolate* isolate = info.GetIsolate();
+        //    LPMEASUREITEMSTRUCT lpmis = (LPMEASUREITEMSTRUCT)IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+        //
+        //    info.GetReturnValue().Set(lpmis->CtlID);
+        //}, [](v8::Local<v8::String> property, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info) {
+        //    Isolate* isolate = info.GetIsolate();
+        //    LPMEASUREITEMSTRUCT lpmis = (LPMEASUREITEMSTRUCT)IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+        //    //print(CStringFI(property) << " " << IntegerFI(value));
+        //    lpmis->CtlID = IntegerFI(value);
+        //});
+        //MeasureItemStruct->SetAccessor(LITERAL("itemID"), [](v8::Local<v8::String> property, const v8::PropertyCallbackInfo<Value>& info) {
+        //    Isolate* isolate = info.GetIsolate();
+        //    LPMEASUREITEMSTRUCT lpmis = (LPMEASUREITEMSTRUCT)IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+        //
+        //    info.GetReturnValue().Set(lpmis->itemID);
+        //}, [](v8::Local<v8::String> property, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info) {
+        //    Isolate* isolate = info.GetIsolate();
+        //    LPMEASUREITEMSTRUCT lpmis = (LPMEASUREITEMSTRUCT)IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+        //    //print(CStringFI(property) << " " << IntegerFI(value));
+        //    lpmis->itemID = IntegerFI(value);
+        //});
+        //MeasureItemStruct->SetAccessor(LITERAL("itemWidth"), [](v8::Local<v8::String> property, const v8::PropertyCallbackInfo<Value>& info) {
+        //    Isolate* isolate = info.GetIsolate();
+        //    LPMEASUREITEMSTRUCT lpmis = (LPMEASUREITEMSTRUCT)IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+        //
+        //    info.GetReturnValue().Set(lpmis->itemWidth);
+        //}, [](v8::Local<v8::String> property, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info) {
+        //    Isolate* isolate = info.GetIsolate();
+        //    LPMEASUREITEMSTRUCT lpmis = (LPMEASUREITEMSTRUCT)IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+        //    //print(CStringFI(property) << " " << IntegerFI(value));
+        //    lpmis->itemWidth = IntegerFI(value);
+        //});
+        //MeasureItemStruct->SetAccessor(LITERAL("itemHeight"), [](v8::Local<v8::String> property, const v8::PropertyCallbackInfo<Value>& info) {
+        //    Isolate* isolate = info.GetIsolate();
+        //    LPMEASUREITEMSTRUCT lpmis = (LPMEASUREITEMSTRUCT)IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+        //
+        //    info.GetReturnValue().Set(lpmis->itemHeight);
+        //}, [](v8::Local<v8::String> property, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info) {
+        //    Isolate* isolate = info.GetIsolate();
+        //    LPMEASUREITEMSTRUCT lpmis = (LPMEASUREITEMSTRUCT)IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+        //    //print(CStringFI(property) << " " << IntegerFI(value));
+        //    lpmis->itemHeight = IntegerFI(value);
+        //});
+        //MeasureItemStruct->SetAccessor(LITERAL("itemData"), [](v8::Local<v8::String> property, const v8::PropertyCallbackInfo<Value>& info) {
+        //    Isolate* isolate = info.GetIsolate();
+        //    LPMEASUREITEMSTRUCT lpmis = (LPMEASUREITEMSTRUCT)IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+        //
+        //    info.GetReturnValue().Set(Number::New(isolate, lpmis->itemData));
+        //}, [](v8::Local<v8::String> property, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info) {
+        //    Isolate* isolate = info.GetIsolate();
+        //    LPMEASUREITEMSTRUCT lpmis = (LPMEASUREITEMSTRUCT)IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+        //    //print(CStringFI(property) << " " << IntegerFI(value));
+        //    lpmis->itemData = IntegerFI(value);
+        //});
         //this long regex solution is the quickest shit i got for now (it';s like 3 am so maybe i'll think of a better way later) also i think that using proxies might make this a little better but idk
         //MeasureItemStruct->SetAccessor(LITERAL("$1"), [](v8::Local<v8::String> property, const v8::PropertyCallbackInfo<Value>& info) {
         //    Isolate* isolate = info.GetIsolate();
@@ -773,12 +915,13 @@ namespace fs {
     }
 
     void write(const v8::FunctionCallbackInfo<v8::Value>& info) {
-        using v8::String;
-        std::wofstream file((wchar_t*)*String::Value(info.GetIsolate(), info[0]));
+        using namespace v8;//::String;
+        Isolate* isolate = info.GetIsolate();
+        std::wofstream file(WStringFI(info[0])); //(wchar_t*)*String::Value(info.GetIsolate(), info[0]));
 
         if (file.is_open()) {
             //file.write(*String::Utf8Value(info.GetIsolate(), info[1]), );
-            file << (wchar_t*)*String::Value(info.GetIsolate(), info[1]);
+            file << WStringFI(info[1]);//(wchar_t*)*String::Value(info.GetIsolate(), info[1]);
             info.GetReturnValue().Set(true);
         }
         else {
@@ -1409,6 +1552,13 @@ V8FUNC(DestroyIconWrapper) {
     Isolate* isolate = info.GetIsolate();
 
     info.GetReturnValue().Set(DestroyIcon((HICON)IntegerFI(info[0])));
+}
+
+V8FUNC(DuplicateIconWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)DuplicateIcon((HINSTANCE)IntegerFI(info[0]), (HICON)IntegerFI(info[1]))));
 }
 
 V8FUNC(SetDCPenColorWrapper) {
@@ -7755,7 +7905,7 @@ V8FUNC(CreateWindowWrapper) {
             else {
                 while (Message.message != WM_QUIT)
                 {
-                    if (GetMessage(&Message, NULL, 0, 0))
+                    if (GetMessage(&Message, NULL, 0, 0)) //uh oh when testing customcontextmenu.js i keep getting debugbreaks here but i can still continue execution?
                     {
                         // If a message was waiting in the message queue, process it
                         //print("wajt");
@@ -7869,21 +8019,59 @@ V8FUNC(ModifyMenuWrapper) {
 V8FUNC(GET_MEASURE_ITEM_STRUCT_LPARAM) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
-    
+    Local<Context> context = isolate->GetCurrentContext();
+
     LPMEASUREITEMSTRUCT lpmis = (LPMEASUREITEMSTRUCT)IntegerFI(info[0]);
     //lpmis->
-    Local<Object> jsMIS = jsImpl::MeasureItemStruct->NewInstance(isolate->GetCurrentContext()).ToLocalChecked();
-    jsMIS->Set(isolate->GetCurrentContext(), LITERAL("internalPtr"), Number::New(isolate, (LONG_PTR)lpmis));
-    info.GetReturnValue().Set(jsMIS);
+    Local<Object> jsMIS = Object::New(isolate);//jsImpl::MeasureItemStruct->NewInstance(isolate->GetCurrentContext()).ToLocalChecked();
+    jsMIS->Set(context, LITERAL("CtlType"), Number::New(isolate, lpmis->CtlType));
+    jsMIS->Set(context, LITERAL("CtlID"), Number::New(isolate, lpmis->CtlID));
+    jsMIS->Set(context, LITERAL("itemID"), Number::New(isolate, lpmis->itemID));
+    jsMIS->Set(context, LITERAL("itemWidth"), Number::New(isolate, lpmis->itemWidth));
+    jsMIS->Set(context, LITERAL("itemHeight"), Number::New(isolate, lpmis->itemHeight));
+    jsMIS->Set(context, LITERAL("itemData"), Number::New(isolate, lpmis->itemData));
+    jsMIS->Set(context, LITERAL("internalPtr"), Number::New(isolate, (LONG_PTR)lpmis)); //i should actually switch all of these internalPtrs to ACTUAL internal fields (but don't wanna)
+    Local<Proxy> proxy = Proxy::New(context, jsMIS, jsImpl::MeasureItemHandler->NewInstance(context).ToLocalChecked()).ToLocalChecked(); //double to local checked teehee
+    info.GetReturnValue().Set(proxy);
+}
+
+V8FUNC(GET_DRAW_ITEM_STRUCT_LPARAM) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    Local<Context> context = isolate->GetCurrentContext();
+
+    LPDRAWITEMSTRUCT lpdis = (LPDRAWITEMSTRUCT)IntegerFI(info[0]);
+    //lpmis->
+    Local<Object> jsDIS = Object::New(isolate);//jsImpl::MeasureItemStruct->NewInstance(isolate->GetCurrentContext()).ToLocalChecked();
+    jsDIS->Set(context, LITERAL("CtlType"), Number::New(isolate, lpdis->CtlType));
+    jsDIS->Set(context, LITERAL("CtlID"), Number::New(isolate, lpdis->CtlID));
+    jsDIS->Set(context, LITERAL("itemID"), Number::New(isolate, lpdis->itemID));
+    jsDIS->Set(context, LITERAL("itemAction"), Number::New(isolate, lpdis->itemAction));
+    jsDIS->Set(context, LITERAL("itemState"), Number::New(isolate, lpdis->itemState));
+    jsDIS->Set(context, LITERAL("hwndItem"), Number::New(isolate, (LONG_PTR)lpdis->hwndItem));
+    jsDIS->Set(context, LITERAL("hDC"), Number::New(isolate, (LONG_PTR)lpdis->hDC));
+    jsDIS->Set(context, LITERAL("rcItem"), jsImpl::createWinRect(isolate, lpdis->rcItem));
+    jsDIS->Set(context, LITERAL("itemData"), Number::New(isolate, lpdis->itemData));
+    jsDIS->Set(context, LITERAL("internalPtr"), Number::New(isolate, (LONG_PTR)lpdis));
+
+    Local<Proxy> proxy = Proxy::New(context, jsDIS, jsImpl::DrawItemHandler->NewInstance(context).ToLocalChecked()).ToLocalChecked(); //double to local checked teehee
+    info.GetReturnValue().Set(proxy);
 }
 
 V8FUNC(GetMenuItemInfoWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
     MENUITEMINFOW pmi = jsImpl::fromJSMENUITEMINFOW(isolate, info[3].As<Object>());
+    wchar_t* tacobell = nullptr;
+    if (pmi.cch != 0 && ((pmi.fMask & MIIM_STRING) == MIIM_STRING || (pmi.fType & MFT_STRING) == MFT_STRING)) {
+        tacobell = new wchar_t[pmi.cch]; //Markiplier said tacobell when i was naming this variable.
+        pmi.dwTypeData = tacobell;
+    }
     GetMenuItemInfoW((HMENU)IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), &pmi);
     Local<Object> jsMII = jsImpl::createWinMENUITEMINFOW(isolate, pmi);
-
+    if (tacobell != nullptr) {
+        delete[] tacobell;
+    }
     info.GetReturnValue().Set(jsMII);
 }
 
@@ -7901,6 +8089,13 @@ V8FUNC(InsertMenuItemWrapper) {
 
     MENUITEMINFOW pmi = jsImpl::fromJSMENUITEMINFOW(isolate, info[3].As<Object>());
     info.GetReturnValue().Set(Number::New(isolate, InsertMenuItemW((HMENU)IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), &pmi)));
+}
+
+V8FUNC(CheckMenuItemWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, CheckMenuItem((HMENU)IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]))));
 }
 
 V8FUNC(TrackPopupMenuWrapper) {
@@ -8454,62 +8649,23 @@ V8FUNC(CreateDIBSectionWrapper) {
 
         UINT usage = IntegerFI(info[2]);
 
-        Local<ObjectTemplate> interf = ObjectTemplate::New(isolate);
-        interf->Set(isolate, "bitmap", Number::New(isolate, (LONG_PTR)CreateDIBSection((HDC)IntegerFI(info[0]), &bmi, usage, (void**)&bits, NULL, NULL)));
+        //Local<ObjectTemplate> interf = ObjectTemplate::New(isolate);
+        Local<Context> context = isolate->GetCurrentContext();
+        Local<Object> interf = jsImpl::DIBSection->NewInstance(context).ToLocalChecked();
+        interf->Set(context, LITERAL("bitmap"), Number::New(isolate, (LONG_PTR)CreateDIBSection((HDC)IntegerFI(info[0]), &bmi, usage, (void**)&bits, NULL, NULL)));
         
-        //Local<ObjectTemplate> jsBobject = ObjectTemplate::New(isolate);
-        interf->Set(isolate, "SetBit", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            //print(IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("bits")).ToLocalChecked()));
-            DWORD* bits = (DWORD*)IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("_bits")).ToLocalChecked()); // -///-
-            bits[IntegerFI(info[0])] = info[1].As<Uint32>()->Value();//IntegerFI(info[1]);
-        }));
-        interf->Set(isolate, "GetBit", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            //print(IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("bits")).ToLocalChecked()));
-            DWORD* bits = (DWORD*)IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("_bits")).ToLocalChecked()); // -///-
-            info.GetReturnValue().Set(Number::New(isolate, bits[IntegerFI(info[0])]));
-            //bits[IntegerFI(info[0])] = info[1].As<Uint32>()->Value();//IntegerFI(info[1]);
-        }));
-        interf->Set(isolate, "GetBits", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            LONG width = IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("width")).ToLocalChecked());
-            LONG height = IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("height")).ToLocalChecked());
-            int bitCount = IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("bitCount")).ToLocalChecked());
-            auto stride = ((((width * bitCount) + 31) & ~31) >> 3);
-            //print(IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("bits")).ToLocalChecked()));
-            DWORD* bits = (DWORD*)IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("_bits")).ToLocalChecked()); // -///-
-            Local<ArrayBuffer> ab = ArrayBuffer::New(isolate, height*stride); //honestly this math is a guess especially the sizeof part
-            memcpy(ab->Data(), bits, height*stride); //GULP
-            //delete[] bits;
-            Local<Uint32Array> arr = Uint32Array::New(ab, 0, width*height); //weird if i multiply this one by sizeof(DWORD) v8 spits out garbage and crashes bad
-            info.GetReturnValue().Set(arr);
-            //bits[IntegerFI(info[0])] = info[1].As<Uint32>()->Value();//IntegerFI(info[1]);
-        }));
-        interf->Set(isolate, "SetBits", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            LONG width = IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("width")).ToLocalChecked());
-            LONG height = IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("height")).ToLocalChecked());
-            int bitCount = IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("bitCount")).ToLocalChecked());
-            auto stride = ((((width * bitCount) + 31) & ~31) >> 3);
-            
-            //print(IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("bits")).ToLocalChecked()));
-            DWORD* bits = (DWORD*)IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("_bits")).ToLocalChecked()); // -///-
-            Local<Uint32Array> jsBits = info[0].As<Uint32Array>();
-            jsBits->CopyContents(bits, height * stride);
-            //bits[IntegerFI(info[0])] = info[1].As<Uint32>()->Value();//IntegerFI(info[1]);
-        }));
+        
 
-        interf->Set(isolate, "_bits", Number::New(isolate, (LONG_PTR)bits)); //oops i forgot how pointers worked and passed the pointer to bits (&bits) instead of just the pointer itself
-        interf->Set(isolate, "bitCount", Number::New(isolate, bmi.bmiHeader.biBitCount));
-        interf->Set(isolate, "width", Number::New(isolate, bmi.bmiHeader.biWidth)); //idk how to make read only lol.
-        interf->Set(isolate, "height", Number::New(isolate, abs(bmi.bmiHeader.biHeight)));
-        interf->Set(isolate, "usage", Number::New(isolate, usage));//info[2]);
+        interf->Set(context, LITERAL("_bits"), Number::New(isolate, (LONG_PTR)bits)); //oops i forgot how pointers worked and passed the pointer to bits (&bits) instead of just the pointer itself
+        interf->Set(context, LITERAL("bitCount"), Number::New(isolate, bmi.bmiHeader.biBitCount));
+        interf->Set(context, LITERAL("width"), Number::New(isolate, bmi.bmiHeader.biWidth)); //idk how to make read only lol.
+        interf->Set(context, LITERAL("height"), Number::New(isolate, abs(bmi.bmiHeader.biHeight)));
+        interf->Set(context, LITERAL("usage"), Number::New(isolate, usage));//info[2]);
 
-        Local<Object> result = interf->NewInstance(context).ToLocalChecked(); // aw man
-        result->Set(context, LITERAL("BITMAPINFO"), jsBITMAP);
+        //Local<Object> result = interf->NewInstance(context).ToLocalChecked(); // aw man
+        /*result*/interf->Set(context, LITERAL("BITMAPINFO"), jsBITMAP);
 
-        info.GetReturnValue().Set(result);
+        info.GetReturnValue().Set(interf); //result);
     }
 }
 
@@ -9753,6 +9909,48 @@ void showDirectoryPicker(const v8::FunctionCallbackInfo<v8::Value>& info) {
     }
 }
 
+V8FUNC(DragAcceptFilesWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    DragAcceptFiles((HWND)IntegerFI(info[0]), IntegerFI(info[1]));
+}
+
+V8FUNC(DragQueryPointWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    POINT ppt{}; DragQueryPoint((HDROP)IntegerFI(info[0]), &ppt);
+    info.GetReturnValue().Set(jsImpl::createWinPoint(isolate, ppt));
+}
+
+V8FUNC(DragQueryFileWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    if ((UINT)-1 == (UINT)IntegerFI(info[1])) {
+        info.GetReturnValue().Set(DragQueryFileW((HDROP)IntegerFI(info[0]), (UINT)IntegerFI(info[1]), nullptr, NULL));
+    }
+    else {
+        wchar_t* name = new wchar_t[MAX_PATH];
+        DragQueryFileW((HDROP)IntegerFI(info[0]), (UINT)IntegerFI(info[1]), name, MAX_PATH);
+        info.GetReturnValue().Set(String::NewFromTwoByte(isolate, (const uint16_t*)name).ToLocalChecked());
+        delete[] name;
+    }
+}
+
+V8FUNC(DragFinishWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    DragFinish((HDROP)IntegerFI(info[0]));
+}
+
+V8FUNC(DragDetectWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, DragDetect((HWND)IntegerFI(info[0]), jsImpl::fromJSPoint<POINT>(isolate, info[1].As<Object>()))));
+}
+
 V8FUNC(GetClassNameWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
@@ -10093,7 +10291,13 @@ V8FUNC(InitializeWIC) {
 
             IWICFormatConverter* wicConverter = WICObj->LoadBitmapFromFilename(WStringFI(info[0]), shit, IntegerFI(info[2]));
 
-            info.GetReturnValue().Set(DIRECT2D::getWICBitmapImpl(isolate, wicConverter, shit));//Number::New(isolate, (LONG_PTR)wicConverter));
+            if (wicConverter != nullptr) {
+                info.GetReturnValue().Set(DIRECT2D::getWICBitmapImpl(isolate, wicConverter, shit));//Number::New(isolate, (LONG_PTR)wicConverter));
+            }
+            else {
+                isolate->ThrowError("LoadBitmapFromFilename failed...");
+                //info.GetReturnValue().Set(Exception::CreateMessage(isolate, Exception::Error(LITERAL("LoadBitmapFromFilename failed..."))));
+            }
         }));
         wic->Set(isolate, "LoadBitmapFromBinaryData", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
             Isolate* isolate = info.GetIsolate();
@@ -10757,6 +10961,62 @@ void WStringFromPointer(const v8::FunctionCallbackInfo<v8::Value>& info) {
     Isolate* isolate = info.GetIsolate();
 
     info.GetReturnValue().Set(String::NewFromTwoByte(isolate, (const uint16_t*)IntegerFI(info[0])).ToLocalChecked());
+}
+
+V8FUNC(ArrayBufferFromPointer) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    //const char* type = CStringFI(info[0]); //fuck these damn string comparisons in c++ im not doing all that lmao
+    int type = IntegerFI(info[0]);
+    int bits = IntegerFI(info[1]);
+    size_t byteLength = IntegerFI(info[3]);
+    void* data = (void*)IntegerFI(info[2]);
+
+    Local<ArrayBuffer> ab = ArrayBuffer::New(isolate, byteLength); //honestly this math is a guess especially the sizeof part
+    memcpy(ab->Data(), data, byteLength); //GULP
+
+    Local<TypedArray> arr;
+
+    if (type == 0) { //Integer
+        if (bits == 8) {
+            //delete[] bits;
+            arr = Int8Array::New(ab, 0, byteLength);
+        }
+        else if (bits == 16) {
+            arr = Int16Array::New(ab, 0, byteLength/2);
+        }
+        else if (bits == 32) {
+            arr = Int32Array::New(ab, 0, byteLength/4);
+        }
+        else if (bits == 64) {
+            arr = BigInt64Array::New(ab, 0, byteLength/8);
+        }
+    }
+    else if(type == 1) { //Uint
+        if (bits == 8) {
+            //delete[] bits;
+            arr = Uint8Array::New(ab, 0, byteLength);
+        }
+        else if (bits == 16) {
+            arr = Uint16Array::New(ab, 0, byteLength / 2);
+        }
+        else if (bits == 32) {
+            arr = Uint32Array::New(ab, 0, byteLength / 4);
+        }
+        else if (bits == 64) {
+            arr = BigUint64Array::New(ab, 0, byteLength / 8);
+        }
+    }
+    else if (type == 2) { //Float
+        if (bits == 32) {
+            arr = Float32Array::New(ab, 0, byteLength/4);
+        }
+        else if (bits == 64) {
+            arr = Float64Array::New(ab, 0, byteLength/8);
+        }
+    }
+    info.GetReturnValue().Set(arr);
 }
 
 V8FUNC(spawn) {
@@ -11504,7 +11764,7 @@ V8FUNC(UnregisterHotKeyWrapper) {
     info.GetReturnValue().Set(UnregisterHotKey((HWND)IntegerFI(info[0]), IntegerFI(info[1])));
 }
 
-v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
+v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const wchar_t* filename) {
     using namespace v8;
 
     Local<ObjectTemplate> global = ObjectTemplate::New(isolate);
@@ -11533,21 +11793,21 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     global->Set(isolate, "hInstance", Number::New(isolate, (LONG_PTR)hInstance));
 
     Local<ObjectTemplate> file = ObjectTemplate::New(isolate);
-    file->Set(isolate, "name", String::NewFromUtf8(isolate, filename).ToLocalChecked());
+    file->Set(isolate, "name", String::NewFromTwoByte(isolate, (const uint16_t*)filename).ToLocalChecked());
 
     global->Set(isolate, "file", file);
 
     {
-        std::string tempStr(filename);
-        std::string strFileName = tempStr.substr(0, tempStr.find_last_of('\\'));
+        std::wstring tempStr(filename);
+        std::wstring strFileName = tempStr.substr(0, tempStr.find_last_of(L'\\'));
         //print(tempStr << " " << strFileName);
-        if (strFileName[0] == '"') {
-            strFileName = strFileName.substr(1, strFileName.find('"', 1) - 1); //sounds right
-            print("STRFILENAME::" << strFileName);
+        if (strFileName[0] == L'"') {
+            strFileName = strFileName.substr(1, strFileName.find(L'"', 1) - 1); //sounds right
+            wprint(L"STRFILENAME::" << strFileName);
         }
-        global->Set(isolate, "__dirname", String::NewFromUtf8(isolate, strFileName.c_str()).ToLocalChecked());
+        global->Set(isolate, "__dirname", String::NewFromTwoByte(isolate, (const uint16_t*)strFileName.c_str()).ToLocalChecked());
         
-        global->Set(isolate, "args", String::NewFromUtf8(isolate, filename).ToLocalChecked());
+        global->Set(isolate, "args", String::NewFromTwoByte(isolate, (const uint16_t*)filename).ToLocalChecked());
         //tempStr
     }
 
@@ -11734,6 +11994,7 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
 
     setGlobal(StringFromPointer);
     setGlobal(WStringFromPointer);
+    setGlobal(ArrayBufferFromPointer);
     setGlobal(spawn); //gulp
     setGlobalWrapper(SetWinEventHook); //    /#define ([A-Z0-9_]+) /g
     setGlobalWrapper(UnhookWinEvent);
@@ -12350,6 +12611,12 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     setGlobal(showSaveFilePicker);
     setGlobal(showDirectoryPicker);
 
+    setGlobalWrapper(DragAcceptFiles);
+    setGlobalWrapper(DragQueryPoint);
+    setGlobalWrapper(DragQueryFile);
+    setGlobalWrapper(DragFinish);
+    setGlobalWrapper(DragDetect);
+
     setGlobalConst(DWM_BB_BLURREGION); setGlobalConst(DWM_BB_ENABLE); setGlobalConst(DWM_BB_TRANSITIONONMAXIMIZED);
 
     setGlobalConst(DIB_RGB_COLORS);
@@ -12387,6 +12654,7 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
     setGlobalWrapper(CreatePopupMenu);
     setGlobalWrapper(InsertMenu);
     setGlobalWrapper(ModifyMenu);
+    setGlobalWrapper(CheckMenuItem);
     setGlobalWrapper(InsertMenuItem);
     setGlobalWrapper(GetMenuItemInfo);
     setGlobalWrapper(SetMenuItemInfo);
@@ -12511,6 +12779,27 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const char* filename) {
 #undef setGlobalConstLONGPTR
 
     setGlobal(GET_MEASURE_ITEM_STRUCT_LPARAM);
+    setGlobal(GET_DRAW_ITEM_STRUCT_LPARAM);
+
+    setGlobalConst(ODT_MENU);
+    setGlobalConst(ODT_LISTBOX);
+    setGlobalConst(ODT_COMBOBOX);
+    setGlobalConst(ODT_BUTTON);
+    setGlobalConst(ODT_STATIC);
+    setGlobalConst(ODA_DRAWENTIRE);
+    setGlobalConst(ODA_SELECT);
+    setGlobalConst(ODA_FOCUS);
+    setGlobalConst(ODS_SELECTED);
+    setGlobalConst(ODS_GRAYED);
+    setGlobalConst(ODS_DISABLED);
+    setGlobalConst(ODS_CHECKED);
+    setGlobalConst(ODS_FOCUS);
+    setGlobalConst(ODS_DEFAULT);
+    setGlobalConst(ODS_COMBOBOXEDIT);
+    setGlobalConst(ODS_HOTLIGHT);
+    setGlobalConst(ODS_INACTIVE);
+    setGlobalConst(ODS_NOACCEL);
+    setGlobalConst(ODS_NOFOCUSRECT);
 
     setGlobalConst(CW_USEDEFAULT);
 
@@ -13111,6 +13400,7 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
     setGlobalWrapper(DeleteObject);
     setGlobalWrapper(DestroyCursor);
     setGlobalWrapper(DestroyIcon);
+    setGlobalWrapper(DuplicateIcon);
     setGlobalWrapper(SetDCPenColor);
     setGlobalWrapper(SetDCBrushColor);
     setGlobalWrapper(CreateSolidBrush);
@@ -13742,7 +14032,9 @@ public:
     }
 };
 
-int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInstance, char* nCmdList, int nCmdShow)
+//int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInstance, char* nCmdList, int nCmdShow)
+
+int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrevInstance, PWSTR nCmdList, int nCmdShow)
 {
     hInstance = hInst;
     screenWidth = GetSystemMetrics(SM_CXSCREEN); //only used for SendInput
@@ -13846,17 +14138,17 @@ https://forums.codeguru.com/showthread.php?69236-How-to-obtain-HINSTANCE-using-H
 
     //std::cout.rdbuf(sb);
     //return 0;
-    print("CMDS-> [" << nCmdList);
+    wprint("CMDS-> [" << nCmdList);
 
 
     // Initialize V8.
-    if (strlen(nCmdList) == 0) {
+    if (wcslen(nCmdList) == 0) {
         std::cout << "PATH, NIGGA! (bellunicode\x07)" << std::endl;
         print("but wait a minute, lemme pull out that node.js");
         //system("pause");
         //return -1;
     }
-    else if (strcmp(nCmdList,"--help")==0) {
+    else if (wcscmp(nCmdList,L"--help")==0) {
         print("yo we got functions like require and and child_process and and uhhh setBackground idk man just do for in globalThis :sob:");
         system("pause");
         return -1;
@@ -13897,21 +14189,21 @@ https://forums.codeguru.com/showthread.php?69236-How-to-obtain-HINSTANCE-using-H
             //std::cin >> shit;
             //
             //std::cout << shit << std::endl;
-            std::stringstream buffer;
+            std::wstringstream buffer;
     
-            std::string shit;
+            std::wstring shit;
     
-            std::string args(nCmdList);
-            if (args[0] == '"') {
-                args = args.substr(1, args.find('"', 1)-1); //sounds right
-                print("ARGS::" << args);
+            std::wstring args(nCmdList);
+            if (args[0] == L'"') {
+                args = args.substr(1, args.find(L'"', 1)-1); //sounds right
+                wprint(L"ARGS::" << args);
             }
 
 
-            std::ifstream file(args);//argv[1]);
+            std::wifstream file(args);//argv[1]);
     
             if (file.is_open()) {
-                print("working file ok good " << args << " ;");
+                wprint(L"working file ok good " << args << L" ;");
                 //i hate reading files in c++
                 buffer << file.rdbuf();
                 shit = buffer.str();
@@ -13923,17 +14215,17 @@ https://forums.codeguru.com/showthread.php?69236-How-to-obtain-HINSTANCE-using-H
                 //print(shit);
             }
             else {
-                print("ok buddy what is this file dumb nass nigasg " << nCmdList);
-                print("lemme hear you out tho for a second");
+                wprint(L"ok buddy what is this file dumb nass nigasg " << nCmdList);
+                wprint(L"lemme hear you out tho for a second");
                 shit = nCmdList; //i did not know that equals sign was overloaded
             }
     
             file.close();
 
             //allow me to pull a node.js
-            if (strlen(nCmdList) != 0) {
-
-                v8::Local<v8::String> source = v8::String::NewFromUtf8(isolate, shit.c_str()).ToLocalChecked(); //, v8::NewStringType::kNormal, shit.length()).ToLocalChecked();//v8::String::NewFromUtf8(isolate, (const char*)shit, v8::NewStringType::kNormal, strlen(shit)).ToLocalChecked();
+            if (wcslen(nCmdList) != 0) {
+                ///wprint(shit);
+                v8::Local<v8::String> source = v8::String::NewFromTwoByte(isolate, (const uint16_t*)shit.c_str()).ToLocalChecked(); //, v8::NewStringType::kNormal, shit.length()).ToLocalChecked();//v8::String::NewFromUtf8(isolate, (const char*)shit, v8::NewStringType::kNormal, strlen(shit)).ToLocalChecked();
                 //v8::String::NewFromUtf8Literal(isolate, shit);//"'Hello' + ', World!'");
 
             // Compile the source code.
@@ -13972,7 +14264,7 @@ https://forums.codeguru.com/showthread.php?69236-How-to-obtain-HINSTANCE-using-H
             else {
                 while (true) {
                     wchar_t scriptwstr[256]; //buddy why was i using char (when you tried to use emoji in the terminal it wouldn't go through)
-                    std::cout << ">>> ";
+                    std::wcout << L">>> ";
                     std::wcin.getline(scriptwstr, 256);
 
                     if (wcscmp(scriptwstr, L"exit") == 0 || wcscmp(scriptwstr, L"quit") == 0) {

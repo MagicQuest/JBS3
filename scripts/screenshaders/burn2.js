@@ -1,7 +1,7 @@
 //based on my https://magicquest.github.io/ca/webgl/burn2.html
 
 const vertex_shader = `#version 300 es
-    precision mediump float;
+    precision highp float;
 
     in vec2 vertPosition;
 
@@ -13,7 +13,7 @@ const vertex_shader = `#version 300 es
 `;
 
 const cnn_shader = `#version 300 es
-    precision mediump float;
+    precision highp float;
 
     uniform vec2 iResolution;
 
@@ -75,7 +75,7 @@ const cnn_shader = `#version 300 es
 `;
 
 const blur_fshader = `#version 300 es
-    precision mediump float;
+    precision highp float;
 
     uniform vec2 iResolution;
 
@@ -124,7 +124,7 @@ const blur_fshader = `#version 300 es
 `;
 
 const burning_shader = `#version 300 es
-    precision mediump float;
+    precision highp float; //the google says this don't even matter on pc https://www.reddit.com/r/GraphicsProgramming/comments/104q9ww/precision_highp_mediump_lowp_in_webglopengl/
 
     uniform vec2 iResolution;
 
@@ -138,12 +138,20 @@ const burning_shader = `#version 300 es
 
     uniform int bAlpha;
 
+    //uniform float fTime;
+    uniform int fInc;
+
     void main() {
         vec2 uv = gl_FragCoord.xy / iResolution.xy;
 
         vec4 allow = texture(iChannel2, uv);
 
         float fire = texture(iChannel0, uv).x;
+
+        //if(fInc % 8 == 0) {
+        //    allow = min(allow+vec4(.005,.005,.005,0.0), vec4(1.0,1.0,1.0,1.0));
+        //}
+        //allow = min(allow+vec4(.005,.005,.005,0.0), vec4(1.0,1.0,1.0,1.0)); //.005 is still too high but this shit is not precise enough (hold on) 
 
         if(fire > 0.05) {
             allow -= vec4(fire/fFireDamage);
@@ -157,6 +165,7 @@ let programs = [];
 let screenBmp;
 let white, black;
 let cycleDraws = 0;
+let i = 0;
 
 const uniformLocations = {};
 const uniformLocations2 = {};
@@ -410,21 +419,23 @@ function windowProc(hwnd, msg, wp, lp) {
         setUniform("1i", "iChannel0", 0, 1);
         setUniform("1i", "iChannel1", 1, 1);
         setUniform("1i", "iChannel2", 2, 1);
-        registerUniform2("1i", "iBlur", 1, 1);
-        registerUniform2("1i", "bAlpha", false, 1);
+        registerUniform2("1i", "iBlur", 1); //, 1); //oops i left the parameters on
+        registerUniform2("1i", "bAlpha", false);
 
         gl.useProgram(programs[2]);
 
         setUniform("1i", "iChannel0", 0, 2);
         setUniform("1i", "iChannel2", 2, 2);
-        registerUniform3("1f", "fFireDamage", 25.5, 2);
-        registerUniform3("1i", "bAlpha", false, 2);
+        registerUniform3("1f", "fFireDamage", 25.5);
+        registerUniform3("1i", "bAlpha", false); //, 2);
+        registerUniform3("1i", "fInc", 0);
 
         gl.useProgram(programs[0]);
 
         //gl.drawArrays(gl.TRIANGLE_FAN, 0, 4); //4 verts
 
         time = Date.now();
+        i = 0;
 
         //RedrawWindow(hwnd, 0, 0, windowcx, windowcy, NULL, RDW_INVALIDATE | RDW_UPDATENOW);
         SetTimer(hwnd, 0, 16);
@@ -453,7 +464,7 @@ function windowProc(hwnd, msg, wp, lp) {
         gl.activeTexture(gl.TEXTURE1);
         gl.bindTexture(gl.TEXTURE_2D, iChannel1);
 
-        const dc = GetDC(NULL);
+        const dc = GetDC(NULL); //wait why do i get the dc everytime instead of just getting it once? (idk it's probably not that bad)
         const memDC = CreateCompatibleDC(dc);
         SelectObject(memDC, screenBmp.bitmap);
         BitBlt(memDC, 0, 0, screenWidth, screenHeight, dc, 0, 0, SRCCOPY); //copy screen into screenBmp
@@ -470,6 +481,8 @@ function windowProc(hwnd, msg, wp, lp) {
         gl.copyTexImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 0, 0, screenWidth, screenHeight, 0);
 
         gl.useProgram(programs[2]);
+
+        gl.uniform1i(uniformLocations3["fInc"], i); //only dividing by 100 on purpose
 
         if(cycleDraws == 0 || cycleDraws == 2) {
             gl.drawArrays(gl.TRIANGLE_FAN, 0, 4, true); //4 verts
@@ -489,6 +502,7 @@ function windowProc(hwnd, msg, wp, lp) {
         gl.useProgram(programs[0]);
 
         gl.swapBuffers(); //erm
+        i++;
     }/*else if(msg == WM_KEYDOWN) { //oh yeah oops WS_EX_LAYERED and WS_EX_TRANSPARENT stop this window from receiving this event
         if(wp == "T".charCodeAt(0)) {
             cycleDraws = (cycleDraws + 1) % 3;
