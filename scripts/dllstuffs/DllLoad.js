@@ -14,11 +14,11 @@ while(!GetKey(VK_ESCAPE)) {
     if(GetKey('T'.charAt(0))) {
         let shit = GetMousePos();
         print(shit.x, shit.y);
-        WindowsTools("newWord", 3, [200.5, 200.5, "oops bruh there is some garbage shits happening hee"], [/*VAR_FLOAT, VAR_FLOAT*/VAR_INT, VAR_INT, VAR_CSTRING], RETURN_NUMBER, false); //newWord in WindowsTools take float, float, const char* (and returns void)
+        WindowsTools("newWord", 3, [200.5, 200.5, "oops bruh there is some garbage shits happening hee"], [/*VAR_FLOAT, VAR_FLOAT*/VAR_INT, VAR_INT, VAR_CSTRING], RETURN_NUMBER); //newWord in WindowsTools take float, float, const char* (and returns void)
     }else if(GetKey('C'.charAt(0))) {
-        WindowsTools("clearWords", 0, [], [], RETURN_NUMBER, false);
+        WindowsTools("clearWords", 0, [], [], RETURN_NUMBER);
     }
-    WindowsTools("drawToScreen", 0, [], [], RETURN_NUMBER, false);
+    WindowsTools("drawToScreen", 0, [], [], RETURN_NUMBER);
     lastT = Date.now();
     Sleep(10);
 }

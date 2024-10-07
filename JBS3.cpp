@@ -8694,6 +8694,28 @@ V8FUNC(GetTextExtentPoint32Wrapper) {
     info.GetReturnValue().Set(jsImpl::createWinSize(isolate, s));
 }
 
+V8FUNC(SetBitmapBitsWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    void* bits = nullptr; //le bits
+
+    if (info[2]->IsNumber()) {
+        bits = (void*)IntegerFI(info[2]);
+    }
+    else if (info[2]->IsArrayBufferView()) {
+        //print("isarraybufferview");
+        Local<ArrayBufferView> jsBits = info[2].As<ArrayBufferView>();
+        bits = jsBits->Buffer()->Data();
+    }
+    else if (info[2]->IsObject()) {
+        Local<Object> JSDIBSection = info[2].As<Object>();
+        bits = (void*)IntegerFI(JSDIBSection->Get(isolate->GetCurrentContext(), LITERAL("_bits")).ToLocalChecked());
+    }
+
+    info.GetReturnValue().Set(Number::New(isolate, SetBitmapBits((HBITMAP)IntegerFI(info[0]), IntegerFI(info[1]), bits)));
+}
+
 V8FUNC(SetDIBitsWrapper) { //i wonder why i haven't done SetDIBits yet maybe i forgot
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
@@ -8708,7 +8730,7 @@ V8FUNC(SetDIBitsWrapper) { //i wonder why i haven't done SetDIBits yet maybe i f
         bits = (void*)IntegerFI(info[4]);
     }
     else if (info[4]->IsArrayBufferView()) {
-        print("isarraybuffer");
+        //print("isarraybufferview");
         Local<ArrayBufferView> jsBits = info[4].As<ArrayBufferView>();
         bits = jsBits->Buffer()->Data();
     }
@@ -8911,7 +8933,7 @@ V8FUNC(PlaySoundWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
 
-    info.GetReturnValue().Set(Number::New(isolate, PlaySoundA(CStringFI(info[0]), (HINSTANCE)IntegerFI(info[1]), IntegerFI(info[2]))));
+    info.GetReturnValue().Set(Number::New(isolate, PlaySoundW(WStringFI(info[0]), (HINSTANCE)IntegerFI(info[1]), IntegerFI(info[2]))));
 }
 
 V8FUNC(PlaySoundSpecial) {
@@ -9963,6 +9985,15 @@ V8FUNC(GetClassNameWrapper) {
 #include "DllCall.h" //oh yeah DLLCALL COMING THROUGH
 #include "v8-external.h"
 
+#define RETURN_CSTRING 0
+#define RETURN_WSTRING 1
+#define RETURN_NUMBER 2
+#define VAR_INT 0
+//#define VAR_FLOAT 1
+#define VAR_BOOLEAN VAR_INT
+#define VAR_CSTRING 2
+#define VAR_WSTRING 3
+
 V8FUNC(DllCallWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
@@ -10034,18 +10065,18 @@ V8FUNC(DllCallWrapper) {
         else {
             int type = IntegerFI(types->Get(context, i).ToLocalChecked());
             //int,float,---,cstring,wstring
-            if (type == 0) {
+            if (type == VAR_INT) {
                 value = (void*)IntegerFI(element);
             }
-            else if (type == 1) {
-                //uhoh how to send float?
-                //allocatedFloats[i] = new double(FloatFI(element));
-                //value = (void*)allocatedFloats[i];//(void*)FloatFI(element);
-            }
-            else if (type == 2) {
+            //else if (type == VAR_FLOAT) {
+            //    //uhoh how to send float?
+            //    //allocatedFloats[i] = new double(FloatFI(element));
+            //    //value = (void*)allocatedFloats[i];//(void*)FloatFI(element);
+            //}
+            else if (type == VAR_CSTRING) {
                 value = (void*)CStringFI(element);
             }
-            else if (type == 3) {
+            else if (type == VAR_WSTRING) {
                 value = (void*)WStringFI(element);
             }
         }
@@ -10056,22 +10087,22 @@ V8FUNC(DllCallWrapper) {
     //    FreeLibrary(dll);
     //}
     int returnType = IntegerFI(info[4]);
-    if (returnType == 0) {
-        if (info[5]->BooleanValue(isolate)) {
+    if (returnType == RETURN_CSTRING || returnType == RETURN_WSTRING) {
+        if (returnType == RETURN_WSTRING) {    //info[5]->BooleanValue(isolate)) {
             info.GetReturnValue().Set(String::NewFromTwoByte(isolate, (const uint16_t*)returned).ToLocalChecked());
         }
         else {
             info.GetReturnValue().Set(String::NewFromUtf8(isolate, (const char*)returned).ToLocalChecked());
         }
     }
-    else if (returnType == 1) {
+    else if (returnType == RETURN_NUMBER) {
         info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)returned));
     }
-    else if (returnType == 2) {
-        //uh oh it might be hard to express a double as void* (in fact idk what it's returning)
-        //info.GetReturnValue().Set(Number::New(isolate, *(double*)returned))
-    }
-    print(returned);
+    //else if (returnType == RETURN_FLOAT) {
+    //    //uh oh it might be hard to express a double as void* (in fact idk what it's returning)
+    //    //info.GetReturnValue().Set(Number::New(isolate, *(double*)returned))
+    //}
+    //print(returned);
     //for (double* alloc : allocatedFloats) {
     //    if (alloc) {
     //        delete alloc;
@@ -10974,7 +11005,7 @@ V8FUNC(ArrayBufferFromPointer) {
     void* data = (void*)IntegerFI(info[2]);
 
     Local<ArrayBuffer> ab = ArrayBuffer::New(isolate, byteLength); //honestly this math is a guess especially the sizeof part
-    memcpy(ab->Data(), data, byteLength); //GULP
+    memcpy(ab->Data(), data, byteLength); //GULP (yeah when testing opencv.js if the image is too big it seemingly gets harder to correctly read the memory (i think that i might have to put the data into a new (emphasis on new) chunk of memory (using the new keyword) but hold on because i was returning frame.data which was a uchar* but frame.datastart is const uchar* so maybe that's working better idk))
 
     Local<TypedArray> arr;
 
@@ -11883,6 +11914,7 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const wchar_t* filename
     setGlobalWrapper(CreateBrushIndirect);
     setGlobalWrapper(CreateDIBSection);
     setGlobalWrapper(SetDIBits);
+    setGlobalWrapper(SetBitmapBits);
     setGlobalWrapper(GetSysColor);
     setGlobalWrapper(GetTextExtentPoint32);
     //setGlobalWrapper(SetDIBitsToDevice);
@@ -11899,14 +11931,8 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const wchar_t* filename
 
     setGlobal(DllLoad);
 
-#define RETURN_STRING 0
-#define RETURN_NUMBER 1
-#define VAR_INT 0
-//#define VAR_FLOAT 1
-#define VAR_BOOLEAN VAR_INT
-#define VAR_CSTRING 2
-#define VAR_WSTRING 3
-    setGlobalConst(RETURN_STRING);
+    setGlobalConst(RETURN_CSTRING);
+    setGlobalConst(RETURN_WSTRING);
     setGlobalConst(RETURN_NUMBER);
     setGlobalConst(VAR_INT);
 //    setGlobalConst(VAR_FLOAT);
