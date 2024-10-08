@@ -29,6 +29,7 @@ function BGR_To_ARGB(data, w, h) {
     return bitmapBits;
 }
 
+//you have to load these dlls BEFORE opencvhelper because windows can't find these because of the dll search order (it searches through the PATH and where the JBS3.exe is)
 const opencv_ffmpeg = DllLoad(__dirname+"/opencv_videoio_ffmpeg4100_64.dll"); //oh i have to use this dll too if i want to load an mp4 
 
 const opencv_world = DllLoad(__dirname+"/opencv_world4100.dll"); //oh hell yeah no searching needed if i load opencv_world myself first it doesn't have to search for my shiat and it works!

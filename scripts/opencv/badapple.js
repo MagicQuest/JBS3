@@ -2,16 +2,6 @@ let opencv_ffmpeg, opencv_world, opencvhelper, cap; //lol im letting this up her
 let fps, vwidth, vheight, start;
 let dc, tempBmp, DDB;
 
-function releaseMyShit(hwnd) {
-    print(call("releaseVideoCapture", cap));
-
-    print(opencvhelper("__FREE"));
-    print(opencv_world("__FREE"));
-    print(opencv_ffmpeg("__FREE"));
-
-    ReleaseDC(hwnd, dc);
-}
-
 function call(name, ...args) {
     const types = {"boolean": VAR_BOOLEAN, "number": VAR_INT, "string": VAR_CSTRING}; //cstring probably
     let argTypes = [];
@@ -23,6 +13,16 @@ function call(name, ...args) {
     return opencvhelper(name, args.length, args, argTypes, RETURN_NUMBER);
 }
 
+function releaseMyShit(hwnd) {
+    print(call("releaseVideoCapture", cap));
+
+    print(opencvhelper("__FREE")); //returns 1 if success
+    print(opencv_world("__FREE"));
+    print(opencv_ffmpeg("__FREE"));
+
+    ReleaseDC(hwnd, dc);
+}
+
 function BGR_To_ARGB(data, w, h) {
     let addr = 0;
 
@@ -30,11 +30,12 @@ function BGR_To_ARGB(data, w, h) {
 
     for(let i = 0; i < h; i++) {
         for(let j = 0; j < w*3; j+=3) { //since the data from opencv uses 3 individual values to represent a pixel i add 3 here
-            //well since this is bad apple i knew it should be monochromatic so fuck all these im just checking b (actually it looks kinda better if there's still a little white)
+            //well since this is bad apple i know it should be monochromatic so fuck all these im just checking b (actually it looks kinda better if there's still a little white (maybe i'll gl some shit together so it can have a better outline))
             const b = data[addr];
             //const g = data[addr+1];
             //const r = data[addr+2];
-            bitmapBits[(j/3) + (i*w)] = b > 220 ? RGB(b, b, b) : RGB(0,0,0); //RGB(b, g, r); //i think?
+            bitmapBits[(j/3) + (i*w)] = b > 220 ? RGB(b, b, b) : RGB(0,0,0); //i think?
+            //bitmapBits[(j/3) + (i*w)] = RGB(b, g, r); //compresssion be fucking my boy up
             addr+=3;
         }
     }
@@ -87,21 +88,24 @@ function windowProc(hwnd, msg, wp, lp) {
     }else if(msg == WM_TIMER) {
         
         const framenumber = Math.floor(((Date.now()/1000.0)-(start/1000.0))*fps);
+        //let t = Date.now();
         const dataptr = call("getFrameDataFromCapture", cap, framenumber, false); //you gotta free the data returned from both getFrameDatas
-        print(framenumber, dataptr);
-        const rgbdata = BGR_To_ARGB(ArrayBufferFromPointer(1, 8, dataptr, vwidth*vheight*3), vwidth, vheight);
+        //print(framenumber, dataptr);
+        const rgbdata = BGR_To_ARGB(ArrayBufferFromPointer(1, 8, dataptr, vwidth*vheight*3), vwidth, vheight); //this is probably kinda slow so maybe i should cache the frames into an array of Uint32Array([bits]) or into an array of compatible bitmaps (when i ran a test apparently it usually only took like .016 seconds to do all this shit so IT AIN'T THAT SLOW)
         call("freeData", dataptr); //internally delete[]s thatt shit
         SetBitmapBits(DDB, rgbdata.byteLength, rgbdata); //width*height*4 is bytelength i think
+        //print(`it took ${Date.now()/1000 - t/1000} seconds`); //to get the frame data, convert it into usable js data, then convert it into a format that gdi likes, then set the bits into a bitmap
+        //performance.now()
         
         const memDC = CreateCompatibleDC(dc);
         SelectObject(memDC, tempBmp);
         SelectObject(memDC, GetStockObject(DC_BRUSH));
         SetDCBrushColor(memDC, RGB(255,255,255));
-        FillRect(memDC, 0, 0, vwidth, vheight, NULL);
+        FillRect(memDC, 0, 0, vwidth, vheight, NULL); //clear background (tempBmp) to white so i can SRCAND BitBlt bad apple onto the bitmap 
         
         const memDC2 = CreateCompatibleDC(dc);
         SelectObject(memDC2, DDB);
-        BitBlt(memDC, 0, 0, vwidth, vheight, memDC2, 0, 0, SRCAND);
+        BitBlt(memDC, 0, 0, vwidth, vheight, memDC2, 0, 0, SRCAND); //bad apple incoming
         DeleteDC(memDC2);
         //BitBlt(screen, mouse.x, mouse.y, width, height, memDC, 0, 0, SRCCOPY);
         //well since im doing bad apple i might as well do it funny

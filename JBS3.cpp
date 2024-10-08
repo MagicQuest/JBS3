@@ -8210,6 +8210,23 @@ V8FUNC(ClientToScreenWrapper) {
     //info.GetReturnValue().Set(jsImpl::createWinPoint<POINT>(isolate, p));
 }
 
+V8FUNC(ScreenToClientWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    Local<Object> jsPoint = info[1].As<Object>();
+
+    POINT p = POINT{ (long)jsPoint->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("x")).ToLocalChecked()->IntegerValue(isolate->GetCurrentContext()).FromJust(), (long)jsPoint->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("y")).ToLocalChecked()->IntegerValue(isolate->GetCurrentContext()).FromJust() };
+
+    ScreenToClient((HWND)IntegerFI(info[0]), &p);
+
+    jsPoint->Set(isolate->GetCurrentContext(), LITERAL("x"), Number::New(isolate, p.x));
+    jsPoint->Set(isolate->GetCurrentContext(), LITERAL("y"), Number::New(isolate, p.y));
+
+    info.GetReturnValue().SetUndefined();
+    //info.GetReturnValue().Set(jsImpl::createWinPoint<POINT>(isolate, p));
+}
+
 V8FUNC(SetRectWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
@@ -12839,6 +12856,7 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const wchar_t* filename
     setGlobalWrapper(ShowWindow);
     setGlobalWrapper(UpdateWindow);
     setGlobalWrapper(EnableWindow);
+    setGlobalWrapper(ScreenToClient);
     setGlobalWrapper(ClientToScreen);
     setGlobalWrapper(SetRect);
     setGlobalWrapper(SetROP2);
