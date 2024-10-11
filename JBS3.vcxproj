@@ -131,6 +131,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>$(ProjectDir)v8\out\x64.release\d8.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <DelayLoadDLLs>comctl32.dll</DelayLoadDLLs>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>

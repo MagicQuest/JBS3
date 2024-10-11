@@ -59,6 +59,12 @@ if(!call("isVideoCaptureOpened", cap)) {
 }
 //Sleep(5000);
 //const cap = opencvhelper("getVideoCapture", 2, [0, 0], [VAR_INT, VAR_INT], RETURN_NUMBER, false);
+
+//bro though he could bring RETURN_FLOAT back (the cheating, is too hard! (wait nobody would get this reference because i haven't made a repo for my r/place recreation))
+//const fps = opencvhelper("getCapProp", 2, [cap, 5], [VAR_INT, VAR_INT], RETURN_FLOAT);//call("getCapProp", cap, 5) || 60; //when using getVideoCapture, fps is 0    //opencvhelper("getCapProp", 2, [cap, 5], [VAR_INT, VAR_INT], RETURN_NUMBER); //5 is the CAP_PROP_FPS enum value (https://docs.opencv.org/4.10.0/d4/d15/group__videoio__flags__base.html)
+//const width = opencvhelper("getCapProp", 2, [cap, 3], [VAR_INT, VAR_INT], RETURN_FLOAT);//call("getCapProp", cap, 3);
+//const height = opencvhelper("getCapProp", 2, [cap, 4], [VAR_INT, VAR_INT], RETURN_FLOAT);//call("getCapProp", cap, 4);
+
 const fps = call("getCapProp", cap, 5) || 60; //when using getVideoCapture, fps is 0    //opencvhelper("getCapProp", 2, [cap, 5], [VAR_INT, VAR_INT], RETURN_NUMBER); //5 is the CAP_PROP_FPS enum value (https://docs.opencv.org/4.10.0/d4/d15/group__videoio__flags__base.html)
 const width = call("getCapProp", cap, 3);
 const height = call("getCapProp", cap, 4);

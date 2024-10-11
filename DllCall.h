@@ -6,6 +6,9 @@
 //https://github.com/AutoHotkey/AutoHotkey/tree/alpha/source/libx64call
 //im just writing these links down just incase i need them LO!
 
+//just learned about std::variant so lets see? (oh wait im not using c++17)
+//ok nah lets see if i can't get these unions to work... (nevermind)
+
 typedef void* (__stdcall* g_func_ptr_0)();
 typedef void* (__stdcall* g_func_ptr_1)(void*); //generic function pointer 1
 typedef void* (__stdcall* g_func_ptr_2)(void*, void*);

@@ -342,6 +342,8 @@ function windowProc(hwnd, msg, wp, lp) {
                     video.start = Date.now();
 
                     images.push(video);
+
+                    cap.release(); //oops i forgot this...
                 }
 
                 //since im using images/videos i will draw all of them in WM_PAINT (so that i can animate the videos) (ok i think using RedrawWindow and WM_PAINT was lagging my computer so imma use a regular function)

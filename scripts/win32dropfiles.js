@@ -88,7 +88,7 @@ function windowProc(hwnd, msg, wp, lp) {
     }else if(msg == WM_SIZE) {
         const [width, height] = [LOWORD(lp), HIWORD(lp)];
         actualSize = {width, height};
-        RedrawWindow(hwnd, 0, 0, actualSize.width, actualSize.height, NULL, RDW_INVALIDATE | RDW_UPDATENOW); //apparently i don't need updatenow?
+        //RedrawWindow(hwnd, 0, 0, actualSize.width, actualSize.height, NULL, RDW_INVALIDATE | RDW_UPDATENOW); //apparently i don't need updatenow?
     }
     else if(msg == WM_DESTROY) {
         PostQuitMessage(0); //but it refused.
@@ -99,6 +99,7 @@ function windowProc(hwnd, msg, wp, lp) {
 const wc = CreateWindowClass("winclass", windowProc);
 wc.hbrBackground = COLOR_BACKGROUND;
 wc.hCursor = LoadCursor(NULL, IDC_ARROW);
+//wc.style = CS_HREDRAW | CS_VREDRAW;
 
 window = CreateWindow(WS_EX_OVERLAPPEDWINDOW | WS_EX_ACCEPTFILES, wc, "classic drop files (WM_DROPFILES) | drag and drop images onto the canvas!", WS_OVERLAPPEDWINDOW | WS_VISIBLE, CW_USEDEFAULT, CW_USEDEFAULT, w+20, h+43, NULL, NULL, hInstance);
 

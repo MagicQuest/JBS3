@@ -8863,7 +8863,7 @@ V8FUNC(GetObjectHBRUSH) {
     Isolate* isolate = info.GetIsolate();
 
     LOGBRUSH brush; GetObject((HANDLE)IntegerFI(info[0]), sizeof(LOGBRUSH), &brush);
-
+    
     Local<Object> jsBRUSH = Object::New(isolate);
 
     jsBRUSH->Set(isolate->GetCurrentContext(), LITERAL("lbStyle"), Number::New(isolate, brush.lbStyle));
@@ -9999,12 +9999,19 @@ V8FUNC(GetClassNameWrapper) {
     delete[] className;
 }
 
+//union DLLRETURN { //wait no.
+//    void* maybe;
+//    float real;
+//}
+//#include <variant>
 #include "DllCall.h" //oh yeah DLLCALL COMING THROUGH
 #include "v8-external.h"
 
 #define RETURN_CSTRING 0
 #define RETURN_WSTRING 1
 #define RETURN_NUMBER 2
+//ok that shit didn't work AGAIN
+//#define RETURN_FLOAT 3
 #define VAR_INT 0
 //#define VAR_FLOAT 1
 #define VAR_BOOLEAN VAR_INT
@@ -10111,13 +10118,16 @@ V8FUNC(DllCallWrapper) {
         else {
             info.GetReturnValue().Set(String::NewFromUtf8(isolate, (const char*)returned).ToLocalChecked());
         }
-    }
-    else if (returnType == RETURN_NUMBER) {
+    //}
+    //else if(returnType == RETURN_FLOAT) {
+    //    print(returned);
+    //    info.GetReturnValue().Set(Number::New(isolate, *(float *)&returned)); //yeahhhh https://stackoverflow.com/a/15313677 (well i was about to archive this but the internet archive is still down)
+    }else if (returnType == RETURN_NUMBER) {
         info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)returned));
     }
     //else if (returnType == RETURN_FLOAT) {
     //    //uh oh it might be hard to express a double as void* (in fact idk what it's returning)
-    //    //info.GetReturnValue().Set(Number::New(isolate, *(double*)returned))
+    //    //info.GetReturnValue().Set(Number::New(isolate, *(double*)returned)) //wait fuck i already tried that LMAO
     //}
     //print(returned);
     //for (double* alloc : allocatedFloats) {
@@ -10128,6 +10138,9 @@ V8FUNC(DllCallWrapper) {
     //i might be COOKED, v8 won't give you the pointer to the value of an v8::object because it could be "moved around the heap" (buddy im dying here (ok if i looked in the v8 source headers long enough i could probably find it and make it public))
 
 }
+
+//something cool i learned about dlls -> https://learn.microsoft.com/en-us/windows/win32/dlls/using-shared-memory-in-a-dynamic-link-library
+//https://stackoverflow.com/questions/17700409/create-a-dll-to-share-memory-between-two-processes
 
 //V8FUNC(DllCallWrapper) {
 V8FUNC(DllLoad) {
@@ -11812,6 +11825,69 @@ V8FUNC(UnregisterHotKeyWrapper) {
     info.GetReturnValue().Set(UnregisterHotKey((HWND)IntegerFI(info[0]), IntegerFI(info[1])));
 }
 
+//https://stackoverflow.com/questions/4308503/how-to-enable-visual-styles-without-a-manifest
+// NOTE: It is recommended that you delay-load ComCtl32.dll (/DelayLoad:ComCtl32.dll)
+// and that you ensure this code runs before GUI components are loaded.
+// Otherwise, you may get weird issues, like black backgrounds in icons in image lists.
+//ULONG_PTR EnableVisualStyles(VOID) //apparently this is the same as using the second pragma below
+V8FUNC(EnableVisualStyles)
+{
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    TCHAR dir[MAX_PATH];
+    ULONG_PTR ulpActivationCookie = FALSE;
+    ACTCTX actCtx =
+    {
+        sizeof(actCtx),
+        ACTCTX_FLAG_RESOURCE_NAME_VALID
+            | ACTCTX_FLAG_SET_PROCESS_DEFAULT
+            | ACTCTX_FLAG_ASSEMBLY_DIRECTORY_VALID,
+        TEXT("shell32.dll"), 0, 0, dir, (LPCTSTR)124
+    };
+    UINT cch = GetSystemDirectory(dir, sizeof(dir) / sizeof(*dir));
+    if (cch >= sizeof(dir) / sizeof(*dir)) { return; /*shouldn't happen*/ }
+    dir[cch] = TEXT('\0');
+    HANDLE val = CreateActCtx(&actCtx);
+    print(val << " nigga what " << GetLastError());
+    print(ActivateActCtx(val, &ulpActivationCookie) << "bruh adin on this shit");
+    print("getting taht shit own " << GetLastError());
+    info.GetReturnValue().Set(Number::New(isolate, ulpActivationCookie));
+    //return ulpActivationCookie;
+}
+
+#pragma comment(lib, "Comctl32.lib")
+//i want this to be optional...
+//#pragma comment(linker,"\"/manifestdependency:type='win32' \
+//name='Microsoft.Windows.Common-Controls' version='6.0.0.0' \
+//processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
+
+V8FUNC(PointerFromArrayBuffer) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    Local<TypedArray> arr = info[0].As<TypedArray>();
+    
+    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)arr->Buffer()->Data()));
+}
+
+V8FUNC(InitCommonControlsExWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    
+    INITCOMMONCONTROLSEX icex{};
+    icex.dwSize = sizeof(INITCOMMONCONTROLSEX);
+    icex.dwICC = IntegerFI(info[0]);
+    info.GetReturnValue().Set(Number::New(isolate, InitCommonControlsEx(&icex)));
+}
+
+V8FUNC(SoundSentryWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, SoundSentry()));
+}
+
 v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const wchar_t* filename) {
     using namespace v8;
 
@@ -11944,13 +12020,66 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const wchar_t* filename
     setGlobalWrapper(InitiateSystemShutdown);
     setGlobalWrapper(AbortSystemShutdown);
 
+    setGlobalWrapper(SoundSentry);
+
+    setGlobal(EnableVisualStyles);
+    setGlobalWrapper(InitCommonControlsEx);
+    setGlobalConst(ICC_LISTVIEW_CLASSES);
+    setGlobalConst(ICC_TREEVIEW_CLASSES);
+    setGlobalConst(ICC_BAR_CLASSES);
+    setGlobalConst(ICC_TAB_CLASSES);
+    setGlobalConst(ICC_UPDOWN_CLASS);
+    setGlobalConst(ICC_PROGRESS_CLASS);
+    setGlobalConst(ICC_HOTKEY_CLASS);
+    setGlobalConst(ICC_ANIMATE_CLASS);
+    setGlobalConst(ICC_WIN95_CLASSES);
+    setGlobalConst(ICC_DATE_CLASSES);
+    setGlobalConst(ICC_USEREX_CLASSES);
+    setGlobalConst(ICC_COOL_CLASSES);
+    setGlobalConst(ICC_INTERNET_CLASSES);
+    setGlobalConst(ICC_PAGESCROLLER_CLASS);
+    setGlobalConst(ICC_NATIVEFNTCTL_CLASS);
+    setGlobalConst(ICC_STANDARD_CLASSES);
+    setGlobalConst(ICC_LINK_CLASS);
+
+    global->Set(isolate, "ANIMATE_CLASS", String::NewFromTwoByte(isolate, (const uint16_t*)ANIMATE_CLASS).ToLocalChecked());
+    global->Set(isolate, "DATETIMEPICK_CLASS", String::NewFromTwoByte(isolate, (const uint16_t*)DATETIMEPICK_CLASS).ToLocalChecked());
+    global->Set(isolate, "HOTKEY_CLASS", String::NewFromTwoByte(isolate, (const uint16_t*)HOTKEY_CLASS).ToLocalChecked());
+    //global->Set(isolate, "LINK_CLASS", String::NewFromTwoByte(isolate, (const uint16_t*)LINK_CLASS).ToLocalChecked());
+    global->Set(isolate, "MONTHCAL_CLASS", String::NewFromTwoByte(isolate, (const uint16_t*)MONTHCAL_CLASS).ToLocalChecked());
+    //global->Set(isolate, "NATIVEFNTCTL_CLASS", String::NewFromTwoByte(isolate, (const uint16_t*)NATIVEFNTCTL_CLASS).ToLocalChecked());
+    global->Set(isolate, "PROGRESS_CLASS", String::NewFromTwoByte(isolate, (const uint16_t*)PROGRESS_CLASS).ToLocalChecked());
+    global->Set(isolate, "REBARCLASSNAME", String::NewFromTwoByte(isolate, (const uint16_t*)REBARCLASSNAME).ToLocalChecked());
+    //global->Set(isolate, "STANDARD_CLASSES", String::NewFromTwoByte(isolate, (const uint16_t*)STANDARD_CLASSES).ToLocalChecked());
+    global->Set(isolate, "STATUSCLASSNAME", String::NewFromTwoByte(isolate, (const uint16_t*)STATUSCLASSNAME).ToLocalChecked());
+    global->Set(isolate, "TOOLBARCLASSNAME", String::NewFromTwoByte(isolate, (const uint16_t*)TOOLBARCLASSNAME).ToLocalChecked());
+    global->Set(isolate, "TOOLTIPS_CLASS", String::NewFromTwoByte(isolate, (const uint16_t*)TOOLTIPS_CLASS).ToLocalChecked());
+    global->Set(isolate, "TRACKBAR_CLASS", String::NewFromTwoByte(isolate, (const uint16_t*)TRACKBAR_CLASS).ToLocalChecked());
+    global->Set(isolate, "UPDOWN_CLASS", String::NewFromTwoByte(isolate, (const uint16_t*)UPDOWN_CLASS).ToLocalChecked());
+    global->Set(isolate, "WC_BUTTON", String::NewFromTwoByte(isolate, (const uint16_t*)WC_BUTTON).ToLocalChecked());
+    global->Set(isolate, "WC_COMBOBOX", String::NewFromTwoByte(isolate, (const uint16_t*)WC_COMBOBOX).ToLocalChecked());
+    global->Set(isolate, "WC_COMBOBOXEX", String::NewFromTwoByte(isolate, (const uint16_t*)WC_COMBOBOXEX).ToLocalChecked());
+    global->Set(isolate, "WC_EDIT", String::NewFromTwoByte(isolate, (const uint16_t*)WC_EDIT).ToLocalChecked());
+    global->Set(isolate, "WC_HEADER", String::NewFromTwoByte(isolate, (const uint16_t*)WC_HEADER).ToLocalChecked());
+    global->Set(isolate, "WC_LISTBOX", String::NewFromTwoByte(isolate, (const uint16_t*)WC_LISTBOX).ToLocalChecked());
+    global->Set(isolate, "WC_IPADDRESS", String::NewFromTwoByte(isolate, (const uint16_t*)WC_IPADDRESS).ToLocalChecked());
+    global->Set(isolate, "WC_LINK", String::NewFromTwoByte(isolate, (const uint16_t*)WC_LINK).ToLocalChecked());
+    global->Set(isolate, "WC_LISTVIEW", String::NewFromTwoByte(isolate, (const uint16_t*)WC_LISTVIEW).ToLocalChecked());
+    global->Set(isolate, "WC_NATIVEFONTCTL", String::NewFromTwoByte(isolate, (const uint16_t*)WC_NATIVEFONTCTL).ToLocalChecked());
+    global->Set(isolate, "WC_PAGESCROLLER", String::NewFromTwoByte(isolate, (const uint16_t*)WC_PAGESCROLLER).ToLocalChecked());
+    global->Set(isolate, "WC_SCROLLBAR", String::NewFromTwoByte(isolate, (const uint16_t*)WC_SCROLLBAR).ToLocalChecked());
+    global->Set(isolate, "WC_STATIC", String::NewFromTwoByte(isolate, (const uint16_t*)WC_STATIC).ToLocalChecked());
+    global->Set(isolate, "WC_TABCONTROL", String::NewFromTwoByte(isolate, (const uint16_t*)WC_TABCONTROL).ToLocalChecked());
+    global->Set(isolate, "WC_TREEVIEW", String::NewFromTwoByte(isolate, (const uint16_t*)WC_TREEVIEW).ToLocalChecked());
+
     //setGlobalWrapper(DllCall);
 
     setGlobal(DllLoad);
-
+    
     setGlobalConst(RETURN_CSTRING);
     setGlobalConst(RETURN_WSTRING);
     setGlobalConst(RETURN_NUMBER);
+    //setGlobalConst(RETURN_FLOAT);
     setGlobalConst(VAR_INT);
 //    setGlobalConst(VAR_FLOAT);
     setGlobalConst(VAR_BOOLEAN);
@@ -12038,6 +12167,7 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const wchar_t* filename
     setGlobal(StringFromPointer);
     setGlobal(WStringFromPointer);
     setGlobal(ArrayBufferFromPointer);
+    setGlobal(PointerFromArrayBuffer);
     setGlobal(spawn); //gulp
     setGlobalWrapper(SetWinEventHook); //    /#define ([A-Z0-9_]+) /g
     setGlobalWrapper(UnhookWinEvent);
@@ -13174,7 +13304,7 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const wchar_t* filename
     setGlobalConst(PBST_ERROR);
     setGlobalConst(PBST_PAUSED);
 
-    global->Set(isolate, "PROGRESS_CLASS", String::NewFromUtf8(isolate, PROGRESS_CLASSA).ToLocalChecked());
+    //global->Set(isolate, "PROGRESS_CLASS", String::NewFromUtf8(isolate, PROGRESS_CLASSA).ToLocalChecked());
 
 //#define D2D1_EXTEND_MODE_CLAMP D2D1_EXTEND_MODE_CLAMP
 //#define D2D1_EXTEND_MODE_WRAP D2D1_EXTEND_MODE_WRAP
@@ -14080,6 +14210,8 @@ public:
 
 int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrevInstance, PWSTR nCmdList, int nCmdShow)
 {
+    //cool debug shit i just learned about https://stackoverflow.com/questions/4790564/finding-memory-leaks-in-a-c-application-with-visual-studio
+
     hInstance = hInst;
     screenWidth = GetSystemMetrics(SM_CXSCREEN); //only used for SendInput
     screenHeight = GetSystemMetrics(SM_CYSCREEN); //only used for SendInput
