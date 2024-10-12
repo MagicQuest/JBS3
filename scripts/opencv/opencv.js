@@ -43,8 +43,10 @@ let p = Date.now()/1000;
             //get video capture uses a camera for the video (the first parameter is which camera to use)
 const cap = call("getVideoCapture", 0, 0); //opencvhelper("getVideoCaptureFromFilename", 1, ["E:/KoolStuff/parkour/Download (73).mp4"], [VAR_CSTRING], RETURN_NUMBER);
 //const cap = call("getVideoCaptureFromFilename", __dirname+"/badapple.mp4"); //"E:/KoolStuff/parkour/Download (73).mp4"); //cloud119112!
-print((Date.now()/1000)-p);
+print((Date.now()/1000)-p, cap);
 //call("skibidi", cap);
+print(opencvhelper("WHATHELPME", 2, [cap, 21.505], [VAR_INT, VAR_FLOAT], RETURN_FLOAT), "this better not be that dawmn float is it?");
+//print(opencvhelper("WHATHELPME", 2, [cap, 0x0021B1D1], [VAR_INT, VAR_FLOAT], RETURN_FLOAT), "this better not be that dawmn float is it?");
 print("sigma,",call("isVideoCaptureOpened", cap));
 if(!call("isVideoCaptureOpened", cap)) {
     print("failed to open the video");
@@ -61,13 +63,14 @@ if(!call("isVideoCaptureOpened", cap)) {
 //const cap = opencvhelper("getVideoCapture", 2, [0, 0], [VAR_INT, VAR_INT], RETURN_NUMBER, false);
 
 //bro though he could bring RETURN_FLOAT back (the cheating, is too hard! (wait nobody would get this reference because i haven't made a repo for my r/place recreation))
-//const fps = opencvhelper("getCapProp", 2, [cap, 5], [VAR_INT, VAR_INT], RETURN_FLOAT);//call("getCapProp", cap, 5) || 60; //when using getVideoCapture, fps is 0    //opencvhelper("getCapProp", 2, [cap, 5], [VAR_INT, VAR_INT], RETURN_NUMBER); //5 is the CAP_PROP_FPS enum value (https://docs.opencv.org/4.10.0/d4/d15/group__videoio__flags__base.html)
-//const width = opencvhelper("getCapProp", 2, [cap, 3], [VAR_INT, VAR_INT], RETURN_FLOAT);//call("getCapProp", cap, 3);
-//const height = opencvhelper("getCapProp", 2, [cap, 4], [VAR_INT, VAR_INT], RETURN_FLOAT);//call("getCapProp", cap, 4);
+//nah FUCK that RETURN_FLOAT MIGHT BE CCOMING bACK
+const fps = opencvhelper("getCapProp", 2, [cap, 5], [VAR_INT, VAR_INT], RETURN_FLOAT) || 60.0;//call("getCapProp", cap, 5) || 60; //when using getVideoCapture, fps is 0    //opencvhelper("getCapProp", 2, [cap, 5], [VAR_INT, VAR_INT], RETURN_NUMBER); //5 is the CAP_PROP_FPS enum value (https://docs.opencv.org/4.10.0/d4/d15/group__videoio__flags__base.html)
+const width = opencvhelper("getCapProp", 2, [cap, 3], [VAR_INT, VAR_INT], RETURN_FLOAT);//call("getCapProp", cap, 3);
+const height = opencvhelper("getCapProp", 2, [cap, 4], [VAR_INT, VAR_INT], RETURN_FLOAT);//call("getCapProp", cap, 4);
 
-const fps = call("getCapProp", cap, 5) || 60; //when using getVideoCapture, fps is 0    //opencvhelper("getCapProp", 2, [cap, 5], [VAR_INT, VAR_INT], RETURN_NUMBER); //5 is the CAP_PROP_FPS enum value (https://docs.opencv.org/4.10.0/d4/d15/group__videoio__flags__base.html)
-const width = call("getCapProp", cap, 3);
-const height = call("getCapProp", cap, 4);
+//const fps = call("getCapProp", cap, 5) || 60; //when using getVideoCapture, fps is 0    //opencvhelper("getCapProp", 2, [cap, 5], [VAR_INT, VAR_INT], RETURN_NUMBER); //5 is the CAP_PROP_FPS enum value (https://docs.opencv.org/4.10.0/d4/d15/group__videoio__flags__base.html)
+//const width = call("getCapProp", cap, 3);
+//const height = call("getCapProp", cap, 4);
 print(fps, "fps"); //oouuuuuhhhhhh getCapProp returns a float my shit can't handle allat (yeah i had to change that shit so if the CAP_PROP you looking for actually returns a float you're cooked (that shit gets TRUNCATED))
 print(width, height, "dim");
 //oh wait i could've calculated the byteLength using width*height*3

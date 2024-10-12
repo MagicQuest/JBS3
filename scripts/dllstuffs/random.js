@@ -1,3 +1,7 @@
+//lmao this file isn't so random anymore
+
+//https://github.com/malortie/Tutorials/blob/master/tutorials/cpp/win32/controls/progressbar/ProgressBar.cpp
+
 print(EnableVisualStyles(), "visual styles", gl=GetLastError(), _com_error(gl));
 
 const w = 800;

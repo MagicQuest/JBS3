@@ -1,3 +1,5 @@
+//ayo what??? https://wiki.mozilla.org/JSctypes
+
 const user32 = DllLoad("user32.dll");
 print(user32);
 const hwnd = GetConsoleWindow();

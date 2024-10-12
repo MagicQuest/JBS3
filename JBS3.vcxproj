@@ -120,9 +120,9 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;_CONSOLE;V8_COMPRESS_POINTERS;V8_31BIT_SMIS_ON_64BIT_ARCH;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;V8_COMPRESS_POINTERS;V8_31BIT_SMIS_ON_64BIT_ARCH;FFI_BUILDING;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(ProjectDir)v8\include;$(ProjectDir)v8\;$(ProjectDir)libuv\include;$(ProjectDir)libuv\src</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)v8\include;$(ProjectDir)v8\;$(ProjectDir)libuv\include;$(ProjectDir)libuv\src;$(ProjectDir)libffi;$(ProjectDir)libffi\include;$(ProjectDir)libffi\src\x86</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
     <Link>
@@ -133,6 +133,26 @@
       <AdditionalDependencies>$(ProjectDir)v8\out\x64.release\d8.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <DelayLoadDLLs>comctl32.dll</DelayLoadDLLs>
     </Link>
+    <PostBuildEvent>
+      <Command>
+      </Command>
+    </PostBuildEvent>
+    <PreLinkEvent>
+      <Command>
+      </Command>
+    </PreLinkEvent>
+    <PreLinkEvent>
+      <Message>
+      </Message>
+    </PreLinkEvent>
+    <PreBuildEvent>
+      <Command>
+      </Command>
+    </PreBuildEvent>
+    <PreBuildEvent>
+      <Message>
+      </Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Canvas2DRenderingContext.cpp" />
@@ -144,6 +164,12 @@
     <ClCompile Include="guicon.cpp" />
     <ClCompile Include="hidapi\hid.c" />
     <ClCompile Include="JBS3.cpp" />
+    <ClCompile Include="libffi\src\closures.c" />
+    <ClCompile Include="libffi\src\prep_cif.c" />
+    <ClCompile Include="libffi\src\raw_api.c" />
+    <ClCompile Include="libffi\src\types.c" />
+    <ClCompile Include="libffi\src\x86\ffi.c" />
+    <ClCompile Include="libffi\src\x86\ffiw64.c" />
     <ClCompile Include="WICHelper.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -166,11 +192,24 @@
     <ClInclude Include="hidapi\hidapi_winapi.h" />
     <ClInclude Include="JSTimer.h" />
     <ClInclude Include="JSWindow.h" />
+    <ClInclude Include="libffi\fficonfig.h" />
+    <ClInclude Include="libffi\include\ffi.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="WICHelper.h" />
   </ItemGroup>
   <ItemGroup>
     <Image Include="jbs3.ico" />
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="libffi\src\x86\win64_intel.S">
+      <FileType>Document</FileType>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">cl.exe /EP /I . /I $(ProjectDir)libffi /I $(ProjectDir)libffi\include /I $(ProjectDir)libffi\src\x86 $(ProjectDir)libffi\src\x86\win64_intel.S &gt; Release/win64_plain.asm
+
+ml64.exe /c /Cx /Fo Release/win64.obj Release/win64_plain.asm</Command>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(Configuration)/win64.obj</Outputs>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">building win64_intel.S for libffi</Message>
+    </CustomBuild>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

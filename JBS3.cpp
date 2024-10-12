@@ -9,6 +9,14 @@
 
 //hopefully my INSANE use of macros doesn't hurt your mind
 
+//nevermind i don't know how to make it consider the old obj so i might have to build it every time :(
+//copying the old obj into $(SolutionDir)$(Platform)\$(Configuration)
+
+                                                //oh wait i doesn't rebuild EVERY time (we straight nvm)
+//#pragma message("!!!win64_intel.S is excluded from the build because it would rebuild every time and i don't wanna do all that (so im copying the old obj from $(ProjectDir)Release)")
+//#pragma message("!!!win64_intel.S is excluded from the build because it would rebuild every time and i don't wanna do all that (so im copying the old obj from $(ProjectDir)Release)")
+//#pragma message("!!!win64_intel.S is excluded from the build because it would rebuild every time and i don't wanna do all that (so im copying the old obj from $(ProjectDir)Release)")
+#define USING_FFI
 #define V8_ENABLE_SANDBOX
 #define _CRT_SECURE_NO_WARNINGS
 
@@ -50,7 +58,7 @@
 // the v8_base_without_compiler.lib was corrupt everytime i built it and i KEPT TRYING and eventually found out i had to build v8_monolith.lib (ninja -C out/x64.release v8_monolith)
 //hopefully you can use my precompiled libs or figure out to build v8 for yourself because this was basically as hard as opencv
 //speaking of opencv i had this strange error when i ran my opencv projects outside of CLion/mingw that said -> [The procedure entry point _ZNSt18condition_variable10notify_allEv could not be located in the dynamic link library libopencv_core452.dll]
-//anyways i googled for a while and somebody said to use dependancy walker to see what it is missing and sure enough -> https://stackoverflow.com/questions/42438790/visual-studio-c-based-exe-doesnt-do-nothing
+//anyways i googled for a while and somebody said to use dependancy walker (or watch the process with procmon!) to see what it is missing and sure enough -> https://stackoverflow.com/questions/42438790/visual-studio-c-based-exe-doesnt-do-nothing
 //i needed libstdc++-6.dll in the same folder as my exe and i guess CLion would automatically run with the dll loaded (IDK)
 
 //#pragma comment(lib, "v8_base.lib")
@@ -10005,19 +10013,24 @@ V8FUNC(GetClassNameWrapper) {
 //}
 //#include <variant>
 #include "DllCall.h" //oh yeah DLLCALL COMING THROUGH
-#include "v8-external.h"
 
 #define RETURN_CSTRING 0
 #define RETURN_WSTRING 1
 #define RETURN_NUMBER 2
+#define RETURN_FLOAT 3
+#define RETURN_DOUBLE 4
 //ok that shit didn't work AGAIN
 //#define RETURN_FLOAT 3
 #define VAR_INT 0
-//#define VAR_FLOAT 1
+#define VAR_FLOAT 1
 #define VAR_BOOLEAN VAR_INT
 #define VAR_CSTRING 2
 #define VAR_WSTRING 3
+#define VAR_DOUBLE 4
 
+#include "v8-external.h"
+
+#ifndef USING_FFI
 V8FUNC(DllCallWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
@@ -10138,6 +10151,141 @@ V8FUNC(DllCallWrapper) {
     //i might be COOKED, v8 won't give you the pointer to the value of an v8::object because it could be "moved around the heap" (buddy im dying here (ok if i looked in the v8 source headers long enough i could probably find it and make it public))
 
 }
+#else
+#include <ffi.h>
+
+V8FUNC(DllCallWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    Local<Context> context = isolate->GetCurrentContext();
+
+    //if (CStringFI(info[0]) == "__FREE") { //LO! //oops i forgot that c strings are angry
+    if (strcmp(CStringFI(info[0]), "__FREE") == 0) {
+        info.GetReturnValue().Set(FreeLibrary((HMODULE)info.Data().As<External>()->Value()));
+        //somehow forgot to return
+        return;
+    }
+
+    //https://stackoverflow.com/questions/6886995/calling-windows-api-with-libffi-on-mingw
+
+    ffi_type* ffi_argTypes[10];
+    void* argv[10]{}; //ffi man's method
+
+    Local<Array> args = info[2].As<Array>();
+    Local<Array> types = info[3].As<Array>();
+
+    for (int i = 0; i < args->Length(); i++) { //well idk if this knowledge does anything but there is a private field in v8::IndirectHandleBase that holds a location_ ptr (but idk if that would work as void* because i would be passing for example, an int* to a function that expects int (so the address is used as the number))
+        Local<Value> element = args->Get(context, i).ToLocalChecked();
+        void* value = nullptr;
+        //float floatvaluejustincase;
+        ffi_type* argtype = &ffi_type_pointer;
+        //if (element->IsString()) {
+        //    if (info[3]->BooleanValue(isolate)) {
+        //        value = (void*)WStringFI(element);
+        //    }
+        //    else {
+        //        value = (void*)CStringFI(element);
+        //    }
+        //}
+        //else if (element->IsNumber()) {
+        //    value = (void*)IntegerFI(element);
+        //}
+        //if (types->Length() == 0) { //im just interpreting them all as ints
+        //    value = (void*)IntegerFI(element);
+        //}
+        //else {
+            int type = IntegerFI(types->Get(context, i).ToLocalChecked()); //lowkey you gotta specify the types
+            //int,float,---,cstring,wstring
+            if (type == VAR_INT) {
+                value = new void*((void*)IntegerFI(element)); //oh boy i think i need to use the new keyword here
+            }
+            //else if (type == VAR_FLOAT) {
+            //    //uhoh how to send float?
+            //    //allocatedFloats[i] = new double(FloatFI(element));
+            //    //value = (void*)allocatedFloats[i];//(void*)FloatFI(element);
+            //}
+            else if (type == VAR_CSTRING) {
+                value = new void*(CStringFI(element));
+            }
+            else if (type == VAR_WSTRING) {
+                value = new void*(*String::Value(isolate, element));
+            }
+            else //if (type == VAR_FLOAT || type == VAR_DOUBLE) {
+                if (type == VAR_FLOAT) {
+                    //floatvaluejustincase = FloatFI(element);
+                    value = new float(FloatFI(element));
+                    argtype = &ffi_type_float;
+                }
+                else {
+                    value = new double(FloatFI(element));
+                    argtype = &ffi_type_double;
+                }
+            //}
+        //}
+        argv[i] = value;//new void*(value);//VAR_FLOAT ? (void*) & floatvaluejustincase : &value;
+        ffi_argTypes[i] = argtype;
+        //print(argv[i]);
+    }
+    int returnType = IntegerFI(info[4]);
+
+    static ffi_type* returntypesffi[4] = { &ffi_type_pointer, &ffi_type_pointer, &ffi_type_pointer, &ffi_type_float };
+    
+    ffi_type* c_retType = returntypesffi[returnType];
+    //ffi_type rc; // return value    
+    ///*void**/LONG_PTR returned = 0;//nullptr;
+    void* returned = new void*(); //honestly not sure at all about this one
+
+    ffi_cif cif;
+    if (ffi_prep_cif(&cif, FFI_DEFAULT_ABI, IntegerFI(info[1]), c_retType, ffi_argTypes) == FFI_OK) {
+
+        FARPROC fn = GetProcAddress((HMODULE)info.Data().As<External>()->Value(), CStringFI(info[0])); //i had to separate GetProcAddress and FFI_FN because it wouldn't build for some reason
+        //ffi_call(&cif, FFI_FN(GetProcAddress((HMODULE)info.Data().As<External>()->Value(), CStringFI(info[0]))), &returned, argv);
+        ffi_call(&cif, FFI_FN(fn), /*&*/returned, argv);
+    }
+    //if (!data->Get(context, 1).ToLocalChecked()->BooleanValue(isolate)) {
+    //    FreeLibrary(dll);
+    //}
+    if (returnType == RETURN_CSTRING || returnType == RETURN_WSTRING) {
+        if (returnType == RETURN_WSTRING) {    //info[5]->BooleanValue(isolate)) {
+            info.GetReturnValue().Set(String::NewFromTwoByte(isolate, (const uint16_t*)returned).ToLocalChecked());
+        }
+        else {
+            info.GetReturnValue().Set(String::NewFromUtf8(isolate, (const char*)returned).ToLocalChecked());
+        }
+        //}
+        //else if(returnType == RETURN_FLOAT) {
+        //    print(returned);
+        //    info.GetReturnValue().Set(Number::New(isolate, *(float *)&returned)); //yeahhhh https://stackoverflow.com/a/15313677 (well i was about to archive this but the internet archive is still down)
+    }
+    else if (returnType == RETURN_NUMBER) {
+        //print(returned << " reterend");
+        info.GetReturnValue().Set(Number::New(isolate, *(LONG_PTR*)returned));
+    }
+    else if (returnType == RETURN_FLOAT) {
+        //uh oh it might be hard to express a double as void* (in fact idk what it's returning)
+        info.GetReturnValue().Set(Number::New(isolate, *(float*)returned)); //wait fuck i already tried that LMAO
+    }
+    else if (returnType == RETURN_DOUBLE) {
+        //uh oh it might be hard to express a double as void* (in fact idk what it's returning)
+        info.GetReturnValue().Set(Number::New(isolate, *(double*)returned)); //wait fuck i already tried that LMAO
+    }
+
+    for (int i = 0; i < args->Length(); i++) {
+        //delete (*(void**)argv[i]);
+        delete argv[i];
+    }
+
+    delete returned;
+    //print(returned);
+    //for (double* alloc : allocatedFloats) {
+    //    if (alloc) {
+    //        delete alloc;
+    //    }
+    //}
+    //i might be COOKED, v8 won't give you the pointer to the value of an v8::object because it could be "moved around the heap" (buddy im dying here (ok if i looked in the v8 source headers long enough i could probably find it and make it public))
+
+}
+#endif
 
 //something cool i learned about dlls -> https://learn.microsoft.com/en-us/windows/win32/dlls/using-shared-memory-in-a-dynamic-link-library
 //https://stackoverflow.com/questions/17700409/create-a-dll-to-share-memory-between-two-processes
@@ -10205,6 +10353,13 @@ V8FUNC(DllLoad) {
     //func->Set(isolate->GetCurrentContext(), LITERAL("data"), info[0]);
 
     info.GetReturnValue().Set(func);//closure->InstanceTemplate()->NewInstance(isolate->GetCurrentContext()).ToLocalChecked()); //ohj
+}
+
+V8FUNC(LoadLibraryExWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    
+    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)LoadLibraryExW(WStringFI(info[0]), NULL, IntegerFI(info[1]))));
 }
 
 V8FUNC(InitializeWIC) {
@@ -11650,7 +11805,7 @@ V8FUNC(GetRawInputDataWrapper) {
             print("oopsie poopsie GetRawInputData (uiCommand was " << command << ") didn't work for some reason (returned " << res << ") GetLastError says: (" << GetLastError() << ")");
             SetConsoleTextAttribute(console, 7);
 
-            delete lpb;
+            delete[] lpb; //OOPS!
         }
         else {
             Local<Context> context = isolate->GetCurrentContext();
@@ -11888,6 +12043,13 @@ V8FUNC(SoundSentryWrapper) {
     info.GetReturnValue().Set(Number::New(isolate, SoundSentry()));
 }
 
+//V8FUNC(Animate_OpenWrapper) {
+//    using namespace v8;
+//    Isolate* isolate = info.GetIsolate();
+//
+//    Animate_Open((HWND)IntegerFI(info[0]), CStringFI(info[1])); //wait this shit is just a macro hell nah
+//}
+
 v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const wchar_t* filename) {
     using namespace v8;
 
@@ -12043,6 +12205,17 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const wchar_t* filename
     setGlobalConst(ICC_LINK_CLASS);
 
     global->Set(isolate, "ANIMATE_CLASS", String::NewFromTwoByte(isolate, (const uint16_t*)ANIMATE_CLASS).ToLocalChecked());
+    setGlobalConst(ACS_CENTER);
+    setGlobalConst(ACS_TRANSPARENT);
+    setGlobalConst(ACS_AUTOPLAY);
+    setGlobalConst(ACS_TIMER);
+    setGlobalConst(ACM_OPEN);
+    setGlobalConst(ACM_PLAY);
+    setGlobalConst(ACM_STOP);
+    setGlobalConst(ACM_ISPLAYING);
+    setGlobalConst(ACN_START);
+    setGlobalConst(ACN_STOP);
+
     global->Set(isolate, "DATETIMEPICK_CLASS", String::NewFromTwoByte(isolate, (const uint16_t*)DATETIMEPICK_CLASS).ToLocalChecked());
     global->Set(isolate, "HOTKEY_CLASS", String::NewFromTwoByte(isolate, (const uint16_t*)HOTKEY_CLASS).ToLocalChecked());
     //global->Set(isolate, "LINK_CLASS", String::NewFromTwoByte(isolate, (const uint16_t*)LINK_CLASS).ToLocalChecked());
@@ -12079,12 +12252,35 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const wchar_t* filename
     setGlobalConst(RETURN_CSTRING);
     setGlobalConst(RETURN_WSTRING);
     setGlobalConst(RETURN_NUMBER);
-    //setGlobalConst(RETURN_FLOAT);
+#ifdef USING_FFI
+    setGlobalConst(RETURN_FLOAT);
+    setGlobalConst(RETURN_DOUBLE);
+    setGlobalConst(VAR_FLOAT);
+    setGlobalConst(VAR_DOUBLE);
+#endif
     setGlobalConst(VAR_INT);
-//    setGlobalConst(VAR_FLOAT);
     setGlobalConst(VAR_BOOLEAN);
     setGlobalConst(VAR_CSTRING);
     setGlobalConst(VAR_WSTRING);
+
+    setGlobalWrapper(LoadLibraryEx);
+
+    setGlobalConst(DONT_RESOLVE_DLL_REFERENCES);
+    setGlobalConst(LOAD_LIBRARY_AS_DATAFILE);
+    //setGlobalConst(LOAD_PACKAGED_LIBRARY);
+    setGlobalConst(LOAD_WITH_ALTERED_SEARCH_PATH);
+    setGlobalConst(LOAD_IGNORE_CODE_AUTHZ_LEVEL);
+    setGlobalConst(LOAD_LIBRARY_AS_IMAGE_RESOURCE);
+    setGlobalConst(LOAD_LIBRARY_AS_DATAFILE_EXCLUSIVE);
+    setGlobalConst(LOAD_LIBRARY_REQUIRE_SIGNED_TARGET);
+    setGlobalConst(LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR);
+    setGlobalConst(LOAD_LIBRARY_SEARCH_APPLICATION_DIR);
+    setGlobalConst(LOAD_LIBRARY_SEARCH_USER_DIRS);
+    setGlobalConst(LOAD_LIBRARY_SEARCH_SYSTEM32);
+    setGlobalConst(LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
+    setGlobalConst(LOAD_LIBRARY_SAFE_CURRENT_DIRS);
+    setGlobalConst(LOAD_LIBRARY_SEARCH_SYSTEM32_NO_FORWARDER);
+    setGlobalConst(LOAD_LIBRARY_OS_INTEGRITY_CONTINUITY);
 
     setGlobalConst(OBJ_BITMAP);
     setGlobalConst(OBJ_BRUSH);

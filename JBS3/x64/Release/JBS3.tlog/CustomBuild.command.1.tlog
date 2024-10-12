@@ -1,0 +1,4 @@
+^E:\USERS\MEGAL\SOURCE\REPOS\JBS3\LIBFFI\SRC\X86\WIN64_INTEL.S
+cl.exe /EP /I . /I E:\Users\megal\source\repos\JBS3\libffi /I E:\Users\megal\source\repos\JBS3\libffi\include /I E:\Users\megal\source\repos\JBS3\libffi\src\x86 E:\Users\megal\source\repos\JBS3\libffi\src\x86\win64_intel.S > Release/win64_plain.asm
+
+ml64.exe /c /Cx /Fo Release/win64.obj Release/win64_plain.asm

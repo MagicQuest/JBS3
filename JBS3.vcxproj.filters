@@ -19,6 +19,12 @@
     <Filter Include="Source Files\GL">
       <UniqueIdentifier>{6782fb05-3faa-480c-a185-9e813a67a045}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\libffi">
+      <UniqueIdentifier>{ffe03922-bf6a-4406-8b15-d749d97f0e0b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\libffi">
+      <UniqueIdentifier>{3f401c71-3b76-414f-8d78-3bebca3eb395}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="JBS3.cpp">
@@ -50,6 +56,24 @@
     </ClCompile>
     <ClCompile Include="Canvas2DRenderingContext.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="libffi\src\raw_api.c">
+      <Filter>Source Files\libffi</Filter>
+    </ClCompile>
+    <ClCompile Include="libffi\src\types.c">
+      <Filter>Source Files\libffi</Filter>
+    </ClCompile>
+    <ClCompile Include="libffi\src\closures.c">
+      <Filter>Source Files\libffi</Filter>
+    </ClCompile>
+    <ClCompile Include="libffi\src\prep_cif.c">
+      <Filter>Source Files\libffi</Filter>
+    </ClCompile>
+    <ClCompile Include="libffi\src\x86\ffiw64.c">
+      <Filter>Source Files\libffi</Filter>
+    </ClCompile>
+    <ClCompile Include="libffi\src\x86\ffi.c">
+      <Filter>Source Files\libffi</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -112,10 +136,21 @@
     <ClInclude Include="easytab.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="libffi\fficonfig.h">
+      <Filter>Header Files\libffi</Filter>
+    </ClInclude>
+    <ClInclude Include="libffi\include\ffi.h">
+      <Filter>Header Files\libffi</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Image Include="jbs3.ico">
       <Filter>Resource Files</Filter>
     </Image>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="libffi\src\x86\win64_intel.S">
+      <Filter>Source Files\libffi</Filter>
+    </CustomBuild>
   </ItemGroup>
 </Project>

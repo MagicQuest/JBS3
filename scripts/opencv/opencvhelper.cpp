@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "opencvhelper.h"
 #include <iostream>
+#include <string>
 
 //this nigga got my shit right https://www.youtube.com/watch?v=YUjamcyuKT4
 
@@ -124,11 +125,11 @@ OPENCVHELPER_API void* getNextFrameDataFromCapture(void* ptr, bool length) {
 	}
 }
 
-OPENCVHELPER_API int setCapProp(void* cap, int propId, int/*double*/ value) { //as a limitation of jbs's DllCall i can't have NO floats or doubles
+OPENCVHELPER_API int setCapProp(void* cap, int propId, float/*double*/ value) { //as a limitation of jbs's DllCall i can't have NO floats or doubles
 	return ((VideoCapture*)cap)->set(propId, value);
 }
 
-OPENCVHELPER_API int/*double*/ getCapProp(void* cap, int propId) { //as a limitation of jbs's DllCall i can't have NO floats or doubles
+OPENCVHELPER_API float/*double*/ getCapProp(void* cap, int propId) { //as a limitation of jbs's DllCall i can't have NO floats or doubles
 	return (int)((VideoCapture*)cap)->get(propId);
 }
 
@@ -141,4 +142,9 @@ OPENCVHELPER_API void releaseVideoCapture(void* ptr) {
 	VideoCapture* cap = (VideoCapture*)ptr;
 	cap->release();
 	delete cap;
+}
+
+OPENCVHELPER_API float WHATHELPME(void* ptr, float whatever) {
+	MessageBoxA(NULL, std::to_string((LONG_PTR)ptr).c_str(), std::to_string(whatever).c_str(), MB_OK);
+	return whatever;//21.0;
 }

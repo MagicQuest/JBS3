@@ -54,7 +54,15 @@ class memoobjectidk {
     }
 }
 
+//typedef struct tagLOGBRUSH (as defined in wingdi.h line 1358)
+//  {
+//    UINT        lbStyle;
+//    COLORREF    lbColor;
+//    ULONG_PTR   lbHatch;
+//  } LOGBRUSH, *PLOGBRUSH, NEAR *NPLOGBRUSH, FAR *LPLOGBRUSH;
+
 class LOGBRUSH extends memoobjectidk { //this shit just like c#'s marshalling (without the offsets)
+                //oh shoot these types have to be in the right order
     static types = {lbStyle: "UINT", lbColor: "COLORREF", lbHatch: "ULONG_PTR"}; //strings because i want to know if they are unsigned (when the first letter is U (i can't be bothered to make each key in sizeof an object))
     constructor(data) { //data must be a Uint8Array
         super()
@@ -79,3 +87,4 @@ const log = new LOGBRUSH(data);
 print(log, log.lbColor, 0x0021B1D1);
 
 print(Gdi32("__FREE"));
+DeleteObject(brush);

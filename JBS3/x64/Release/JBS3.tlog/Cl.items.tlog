@@ -7,4 +7,10 @@ E:\Users\megal\source\repos\JBS3\goodmacrosfordirect2dandwichelper.h;E:\Users\me
 E:\Users\megal\source\repos\JBS3\guicon.cpp;E:\Users\megal\source\repos\JBS3\JBS3\x64\Release\guicon.obj
 E:\Users\megal\source\repos\JBS3\hidapi\hid.c;E:\Users\megal\source\repos\JBS3\JBS3\x64\Release\hid.obj
 E:\Users\megal\source\repos\JBS3\JBS3.cpp;E:\Users\megal\source\repos\JBS3\JBS3\x64\Release\JBS3.obj
+E:\Users\megal\source\repos\JBS3\libffi\src\closures.c;E:\Users\megal\source\repos\JBS3\JBS3\x64\Release\closures.obj
+E:\Users\megal\source\repos\JBS3\libffi\src\prep_cif.c;E:\Users\megal\source\repos\JBS3\JBS3\x64\Release\prep_cif.obj
+E:\Users\megal\source\repos\JBS3\libffi\src\raw_api.c;E:\Users\megal\source\repos\JBS3\JBS3\x64\Release\raw_api.obj
+E:\Users\megal\source\repos\JBS3\libffi\src\types.c;E:\Users\megal\source\repos\JBS3\JBS3\x64\Release\types.obj
+E:\Users\megal\source\repos\JBS3\libffi\src\x86\ffi.c;E:\Users\megal\source\repos\JBS3\JBS3\x64\Release\ffi.obj
+E:\Users\megal\source\repos\JBS3\libffi\src\x86\ffiw64.c;E:\Users\megal\source\repos\JBS3\JBS3\x64\Release\ffiw64.obj
 E:\Users\megal\source\repos\JBS3\WICHelper.cpp;E:\Users\megal\source\repos\JBS3\JBS3\x64\Release\WICHelper.obj

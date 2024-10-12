@@ -1,12 +1,13 @@
 //well since i want to use this js file with other files i gotta eval it but since you can't declare new variables with eval im using globalThis
 globalThis.sizeof = {
     CHAR : 1,
-    UCHAR : 1,
+    UCHAR : 1, //BYTE is UCHAR
     UINT : 4,
     INT : 4,
     DWORD : 4,
     COLORREF : 4, //same as DWORD
     LONG : 4,
+    ULONG : 4,
     ULONG_PTR : 8,
     LONG_PTR : 8,
     HANDLE : 8,
