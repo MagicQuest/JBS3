@@ -1929,7 +1929,7 @@ V8FUNC(_com_errorWrapper) {
 #include <thread>
 #include <v8-locker.h>
 
-V8FUNC(BeepWrapper) {
+V8FUNC(BeepWrapper) { //https://stackoverflow.com/questions/5814869/playing-an-arbitrary-sound-on-windows
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
 
@@ -7676,6 +7676,7 @@ LRESULT CALLBACK WinProc(HWND hWnd, UINT msg, WPARAM wp, LPARAM lp);
 //    v8::Local<v8::Object> wndclass;
 //};
 
+#define SKIBIDI_CHECK 0x0021B1D1
 std::map<HWND, std::function<LRESULT(HWND, UINT, WPARAM, LPARAM)>> winProcMap; //thanks chatgpt!!! (ok nah nah bruh this solution did NOT solve basically anything (some win messages aren't sent to the js win proc, you still can't have 2 windows (because the blocking thing (ok i was lying))))
 //std::map<HWND, std::vector<std::tuple<UINT, WPARAM, LPARAM>>> nullMsgsMap;
 
@@ -7683,6 +7684,11 @@ LRESULT CALLBACK WinProc(HWND hWnd, UINT msg, WPARAM wp, LPARAM lp)
 {
     //print(hWnd << "hNWD"); //oops i left that in there
     if (winProcMap.find(hWnd) != winProcMap.end()) {
+        //LRESULT lres = winProcMap[hWnd](hWnd, msg, wp, lp);
+        //if (lres != SKIBIDI_CHECK) {
+        //    //DefWindowProcW(hWnd, msg, wp, lp);
+        //    return lres;
+        //}
         return winProcMap[hWnd](hWnd, msg, wp, lp);
     }
     //else if (msg == WM_CREATE) {
@@ -7695,6 +7701,8 @@ LRESULT CALLBACK WinProc(HWND hWnd, UINT msg, WPARAM wp, LPARAM lp)
         DefWindowProcW(hWnd, msg, wp, lp);;
     }
 }
+
+//just in case i wanna do some dialogbox stuff https://learn.microsoft.com/en-us/windows/win32/dlgbox/using-dialog-boxes#creating-a-template-in-memory https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-dialogboxindirectw https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-dialogboxindirectparamw https://learn.microsoft.com/en-us/windows/win32/dlgbox/dlgtemplateex https://learn.microsoft.com/en-us/windows/win32/dlgbox/about-dialog-boxes#templates-in-memory
 
 V8FUNC(CreateWindowWrapper) {
     //MessageBoxA(NULL, "aw shit another unfiinished hting", "ok so like no cap the only message you can resieve as of now is WM_PAINT", MB_OK | MB_ICONEXCLAMATION);
@@ -7805,10 +7813,21 @@ V8FUNC(CreateWindowWrapper) {
             CHECKEXCEPTIONS(shit);
             bool def = IntegerFI(GetProperty("DefWindowProc"));
             if (!def) {
-                return IntegerFI(returnedValue.ToLocalChecked());
+                LRESULT lres = IntegerFI(returnedValue.ToLocalChecked());
+                //print(lres << " what");
+                //return lres != 0 ? lres : SKIBIDI_CHECK;
+                //if (lres != 0) {
+                //    return lres;
+                //}
+                //else {
+                //    DefWindowProcW(hwnd, msg, wp, lp);
+                //    return SKIBIDI_CHECK; 
+                //}
+                return lres;
             }
             else {
                 return DefWindowProcW(hwnd, msg, wp, lp);
+                //return SKIBIDI_CHECK;
             }
         };
         newWindow = CreateWindowExW(IntegerFI(info[0]), //HOLY SHIT THIS LINE WAS FAILING EVERYTIME I EVEN USED BREAKPOINTS TO FIND THE ISSUE AND GUESS WHAT
@@ -8706,6 +8725,66 @@ V8FUNC(GetSysColorWrapper) {
     Isolate* isolate = info.GetIsolate();
 
     info.GetReturnValue().Set(Number::New(isolate, GetSysColor(IntegerFI(info[0]))));
+}
+
+//template <typename T>
+//struct MANGOMANGOMNAOGJONFVMSK {
+//    v8::Isolate* isolate;
+//    std::vector<T>* t;
+//};
+
+V8FUNC(SetSysColorsWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    Local<Context> context = isolate->GetCurrentContext();
+
+    int elements = IntegerFI(info[0]);
+    std::vector<INT> mangomangomangothosewhoknow(elements);
+
+    //i wanted to actually attempt to use v8::Array->Iterate but seriously i have no idea how to use this lmao lemme try to see the docs again (they did NOT have an example on Iterate)
+    //i think my really weird solution was actually working but i don't wanna do it like that lol
+
+    for (int i = 0; i < elements; i++) {
+        mangomangomangothosewhoknow[i] = IntegerFI(info[1].As<Array>()->Get(context, i).ToLocalChecked());
+    }
+
+    ////template <class T>
+    //MANGOMANGOMNAOGJONFVMSK<INT> shit{};
+    //shit.isolate = isolate;
+    //shit.t = &mangomangomangothosewhoknow;
+    ////mangomangomangothosewhoknow[0] = 2;
+    //info[1].As<Array>()->Iterate(context, [](uint32_t index,
+    //    Local<Value> element,
+    //    void* data) -> v8::Array::CallbackResult {
+    //        MANGOMANGOMNAOGJONFVMSK<INT>* shit = (MANGOMANGOMNAOGJONFVMSK<INT>*)(data);
+    //        Isolate* isolate = shit->isolate;
+    //        print("MANGO " << shit);
+    //        shit->t->operator[](index) = IntegerFI(element); //why did i have to directly call the operator lol (oh wait t is the pointer to a vector)
+    //        return v8::Array::CallbackResult::kContinue;
+    //}, &shit);
+    std::vector<COLORREF> stillwater(elements);
+    //MANGOMANGOMNAOGJONFVMSK<COLORREF> shitagain{};
+    //shitagain.isolate = isolate;
+    //shitagain.t = &stillwater;
+    //
+    //info[2].As<Array>()->Iterate(context, [](uint32_t index,
+    //    Local<Value> element,
+    //    void* data) -> v8::Array::CallbackResult {
+    //        MANGOMANGOMNAOGJONFVMSK<COLORREF>* shitagain = (MANGOMANGOMNAOGJONFVMSK<COLORREF>*)(data);
+    //        Isolate* isolate = shitagain->isolate;
+    //        print("COLORREF " << shitagain);
+    //        shitagain->t->operator[](index) = IntegerFI(element); //why did i have to directly call the operator lol (oh wait t is the pointer to a vector)
+    //        return v8::Array::CallbackResult::kContinue;
+    //}, & shitagain);
+    //
+    //print("mmmtwk " << mangomangomangothosewhoknow.data());
+    //print("sw " << stillwater.data());
+
+    for (int i = 0; i < elements; i++) {
+        stillwater[i] = IntegerFI(info[2].As<Array>()->Get(context, i).ToLocalChecked());
+    }
+
+    info.GetReturnValue().Set(Number::New(isolate, SetSysColors(elements, &mangomangomangothosewhoknow[0], &stillwater[0])));
 }
 
 V8FUNC(GetTextExtentPoint32Wrapper) {
@@ -9687,7 +9766,7 @@ V8FUNC(DefWindowProcWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
 
-    info.GetReturnValue().Set(Number::New(isolate, DefWindowProcW((HWND)IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]))));
+    info.GetReturnValue().Set(Number::New(isolate, DefWindowProcW((HWND)IntegerFI(info[0]), (UINT)IntegerFI(info[1]), (WPARAM)IntegerFI(info[2]), (LPARAM)IntegerFI(info[3]))));
 }
 
 V8FUNC(SwitchToThisWindowWrapper) {
@@ -12170,6 +12249,7 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const wchar_t* filename
     setGlobalWrapper(CreateDIBSection);
     setGlobalWrapper(SetDIBits);
     setGlobalWrapper(SetBitmapBits);
+    setGlobalWrapper(SetSysColors);
     setGlobalWrapper(GetSysColor);
     setGlobalWrapper(GetTextExtentPoint32);
     //setGlobalWrapper(SetDIBitsToDevice);
