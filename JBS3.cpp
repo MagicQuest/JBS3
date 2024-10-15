@@ -7180,28 +7180,37 @@ V8FUNC(MAKEINTRESOURCEWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
 
-    info.GetReturnValue().Set(Number::New(isolate, (ULONG_PTR)MAKEINTRESOURCEA(IntegerFI(info[0]))));
+    info.GetReturnValue().Set(Number::New(isolate, (ULONG_PTR)MAKEINTRESOURCE(IntegerFI(info[0]))));
 }
 
 V8FUNC(LoadCursorWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
 
-    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)LoadCursorA((HINSTANCE)IntegerFI(info[0]), (LPCSTR)IntegerFI(info[1]))));
+    LPWSTR shit;
+
+    if (info[1]->IsString()) {
+        shit = LPWSTR(WStringFI(info[1])); //haha i forgot you could cast like this (and it looks really weird)
+    }
+    else {
+        shit = (LPWSTR)IntegerFI(info[1]);
+    }
+
+    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)LoadCursor((HINSTANCE)IntegerFI(info[0]), shit)));
 }
 
 V8FUNC(LoadCursorFromFileWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
 
-    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)LoadCursorFromFileA((LPCSTR)IntegerFI(info[0]))));
+    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)LoadCursorFromFile((LPWSTR)WStringFI(info[0]))));
 }
 
 V8FUNC(LoadImageWrapper) { //https://www.youtube.com/watch?v=hNi_MEZ8X10
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
 
-    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)LoadImageW((HINSTANCE)IntegerFI(info[0]), WStringFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]), IntegerFI(info[4]), IntegerFI(info[5]))));
+    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)LoadImage((HINSTANCE)IntegerFI(info[0]), WStringFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]), IntegerFI(info[4]), IntegerFI(info[5]))));
 }
 
 V8FUNC(CopyImageWrapper) {
@@ -7264,7 +7273,16 @@ V8FUNC(LoadIconWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
 
-    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)LoadIconA((HINSTANCE)IntegerFI(info[0]), (LPCSTR)IntegerFI(info[1]))));
+    LPWSTR shit;
+
+    if (info[1]->IsString()) {
+        shit = LPWSTR(WStringFI(info[1])); //haha i forgot you could cast like this (and it looks really weird)
+    }
+    else {
+        shit = (LPWSTR)IntegerFI(info[1]);
+    }
+
+    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)LoadIcon((HINSTANCE)IntegerFI(info[0]), shit)));
 }
 
 V8FUNC(GetLastErrorWrapper) {
@@ -10086,6 +10104,33 @@ V8FUNC(GetClassNameWrapper) {
     delete[] className;
 }
 
+V8FUNC(AddDllDirectoryWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)AddDllDirectory(WStringFI(info[0]))));
+}
+
+V8FUNC(SetDllDirectoryWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    LPWSTR shit;
+    if (info[0]->IsString()) {
+        shit = (LPWSTR)WStringFI(info[0]);
+    }
+    else {
+        shit = (LPWSTR)IntegerFI(info[0]);
+    }
+
+    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)SetDllDirectory(shit)));
+}
+
+V8FUNC(RemoveDllDirectoryWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    info.GetReturnValue().Set(Number::New(isolate, RemoveDllDirectory((DLL_DIRECTORY_COOKIE)IntegerFI(info[0]))));
+}
+
 //union DLLRETURN { //wait no.
 //    void* maybe;
 //    float real;
@@ -10098,6 +10143,7 @@ V8FUNC(GetClassNameWrapper) {
 #define RETURN_NUMBER 2
 #define RETURN_FLOAT 3
 #define RETURN_DOUBLE 4
+#define RETURN_VOID 5
 //ok that shit didn't work AGAIN
 //#define RETURN_FLOAT 3
 #define VAR_INT 0
@@ -10307,7 +10353,7 @@ V8FUNC(DllCallWrapper) {
     }
     int returnType = IntegerFI(info[4]);
 
-    static ffi_type* returntypesffi[4] = { &ffi_type_pointer, &ffi_type_pointer, &ffi_type_pointer, &ffi_type_float };
+    static ffi_type* returntypesffi[6] = { &ffi_type_pointer, &ffi_type_pointer, &ffi_type_pointer, &ffi_type_float, &ffi_type_double, &ffi_type_void }; //oh shit i didn't even add double?!
     
     ffi_type* c_retType = returntypesffi[returnType];
     //ffi_type rc; // return value    
@@ -10326,10 +10372,10 @@ V8FUNC(DllCallWrapper) {
     //}
     if (returnType == RETURN_CSTRING || returnType == RETURN_WSTRING) {
         if (returnType == RETURN_WSTRING) {    //info[5]->BooleanValue(isolate)) {
-            info.GetReturnValue().Set(String::NewFromTwoByte(isolate, (const uint16_t*)returned).ToLocalChecked());
+            info.GetReturnValue().Set(String::NewFromTwoByte(isolate, *(const uint16_t**)returned).ToLocalChecked()); //OOPS you couldn't return a valid string this whole time lmao
         }
         else {
-            info.GetReturnValue().Set(String::NewFromUtf8(isolate, (const char*)returned).ToLocalChecked());
+            info.GetReturnValue().Set(String::NewFromUtf8(isolate, *(const char**)returned).ToLocalChecked()); //OOPS you couldn't return a valid string this whole time lmao
         }
         //}
         //else if(returnType == RETURN_FLOAT) {
@@ -10382,7 +10428,7 @@ V8FUNC(DllLoad) {
     //maybe i'll return a closure (HOLD)
     //honestly i guess you could use a closure or an object
     
-    HMODULE dll = LoadLibrary(WStringFI(info[0]));
+    HMODULE dll = LoadLibraryEx(WStringFI(info[0]), NULL, IntegerFI(info[1]));
     if (!dll || dll == INVALID_HANDLE_VALUE) {
         print("fuck wtf was dll (" << dll << ") GetLastError: " << GetLastError());
         MessageBoxA(NULL, "unabled to load/find dll", "maybe use get last error or sumth", MB_OK | MB_ICONERROR);
@@ -12122,6 +12168,17 @@ V8FUNC(SoundSentryWrapper) {
     info.GetReturnValue().Set(Number::New(isolate, SoundSentry()));
 }
 
+V8FUNC(getlineWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    wchar_t wstr[256];
+    std::wcout << WStringFI(info[0]);
+    std::wcin.getline(wstr, 256);
+
+    info.GetReturnValue().Set(String::NewFromTwoByte(isolate, (const uint16_t*)wstr).ToLocalChecked());
+}
+
 //V8FUNC(Animate_OpenWrapper) {
 //    using namespace v8;
 //    Isolate* isolate = info.GetIsolate();
@@ -12189,6 +12246,8 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const wchar_t* filename
 #define setGlobalWrapper(name) global->Set(isolate, #name, FunctionTemplate::New(isolate, name####Wrapper)) //https://stackoverflow.com/questions/30113944/how-to-write-a-macro-that-will-append-text-to-a-partial-function-name-to-create
     
     setGlobalWrapper(MessageBeep);
+
+    setGlobalWrapper(getline);
 
     //https://stackoverflow.com/questions/6707148/foreach-macro-on-macros-arguments
 #define setGlobalConst(g) global->Set(isolate, #g, Number::New(isolate, g))
@@ -12327,6 +12386,9 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const wchar_t* filename
 
     //setGlobalWrapper(DllCall);
 
+    setGlobalWrapper(AddDllDirectory);
+    setGlobalWrapper(SetDllDirectory);
+    setGlobalWrapper(RemoveDllDirectory);
     setGlobal(DllLoad);
     
     setGlobalConst(RETURN_CSTRING);
@@ -12335,6 +12397,7 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const wchar_t* filename
 #ifdef USING_FFI
     setGlobalConst(RETURN_FLOAT);
     setGlobalConst(RETURN_DOUBLE);
+    setGlobalConst(RETURN_VOID);
     setGlobalConst(VAR_FLOAT);
     setGlobalConst(VAR_DOUBLE);
 #endif
