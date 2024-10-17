@@ -1,6 +1,12 @@
 //lmao this file isn't so random anymore
 
 //https://github.com/malortie/Tutorials/blob/master/tutorials/cpp/win32/controls/progressbar/ProgressBar.cpp
+//https://www.codeproject.com/Articles/620045/Custom-Controls-in-Win-API-Visual-Styles
+//https://stackoverflow.com/questions/39319441/parts-drawn-with-drawthemebackground-on-windows-10-are-not-correct
+//https://stackoverflow.com/questions/34004819/windows-10-close-minimize-and-maximize-buttons
+//https://stackoverflow.com/questions/2841180/how-to-add-an-extra-button-to-the-windows-title-bar/2841197#2841197
+//https://learn.microsoft.com/en-us/windows/win32/controls/using-visual-styles
+//https://learn.microsoft.com/en-us/windows/win32/controls/uxctl-ref
 
 print(EnableVisualStyles(), "visual styles", gl=GetLastError(), _com_error(gl));
 

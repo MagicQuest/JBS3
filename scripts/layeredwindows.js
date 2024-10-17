@@ -2,19 +2,21 @@
 //const sides = LoadImage(NULL, __dirname+"/boxside.bmp", IMAGE_BITMAP, 0, 0, LR_SHARED | LR_LOADFROMFILE);
 
 let mouse = GetMousePos();
-
+let dc;
 let d2d, brush, font;
 
 let stats = {mouse: {left: 0 , right: 0, middle: 0}};
 
 function windowProc(hwnd, msg, wp, lp) {
     if(msg == WM_CREATE) {
+        //dc = GetDC(hwnd);
         //SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE);
-        SetLayeredWindowAttributes(hwnd, RGB(0,255,0), 5, LWA_COLORKEY);
+        SetLayeredWindowAttributes(hwnd, RGB(0,255,0), NULL, LWA_COLORKEY);
         //SetCapture(hwnd);
         //SetTimer(hwnd, 1, 16);
 
-        d2d = createCanvas("d2d", ID2D1DCRenderTarget, hwnd);
+        d2d = createCanvas("d2d", ID2D1DCRenderTarget, hwnd, NULL);
+        //d2d.BindDC(hwnd, dc); //you can't release dc or else EndDraw will fail!
         brush = d2d.CreateSolidColorBrush(1.0,1.0,0.0,1.0);
         font = d2d.CreateFont("Consolas", 40); //lol impact is just the best default one
         
@@ -39,6 +41,7 @@ function windowProc(hwnd, msg, wp, lp) {
         }
     }else if(msg == WM_DESTROY) {
         PostQuitMessage(0);
+        ReleaseDC(hwnd, dc);
     }//else if(msg == WM_MOUSEMOVE) {
         //mouse = GetMousePos();
         //print("mouse move");
@@ -79,12 +82,12 @@ function loop() {
         d2d.BeginDraw();
         //d2d.Clear(0, 1, 0, .5);
         brush.SetColor(.25,.25,.25, 0.1);
-        d2d.FillRectangle(0, 1080/1.25, 400, 1080/1.25+120, brush);
+        d2d.FillRectangle(0, screenHeight/1.25, 400, screenHeight/1.25+120, brush);
         brush.SetColor(1, 1, 0);
         //d2d.FillEllipse(mouse.x, mouse.y, 2, 2, brush); //this is evil
-        d2d.DrawText("left clicks: "+stats.mouse.left, font, 0, 1080/1.25, 1920, 1080, brush);
-        d2d.DrawText("right clicks: "+stats.mouse.right, font, 0, 1080/1.25+40, 1920, 1080, brush);
-        d2d.DrawText("middle clicks: "+stats.mouse.middle, font, 0, 1080/1.25+80, 1920, 1080, brush);
+        d2d.DrawText("left clicks: "+stats.mouse.left, font, 0, screenHeight/1.25, screenWidth, screenHeight, brush);
+        d2d.DrawText("right clicks: "+stats.mouse.right, font, 0, screenHeight/1.25+40, screenWidth, screenHeight, brush);
+        d2d.DrawText("middle clicks: "+stats.mouse.middle, font, 0, screenHeight/1.25+80, screenWidth, screenHeight, brush);
 
         d2d.EndDraw();
         //const ps = BeginPaint(hwnd);
@@ -98,7 +101,7 @@ const winclass = CreateWindowClass("WinClass", /*init, */windowProc, loop); //i 
 winclass.hIcon = winclass.hIconSm = LoadIcon(NULL, IDI_APPLICATION);
 winclass.hbrBackground = CreateSolidBrush(RGB(0,255,0));
 winclass.hCursor = LoadCursor(NULL, IDC_HANDWRITING);
-winclass.style = CS_HREDRAW | CS_VREDRAW;
+//winclass.style = CS_HREDRAW | CS_VREDRAW;
 print(winclass);        //toolwindow to hide it from alt+tab ;)
-CreateWindow(WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_TOPMOST, winclass, "", WS_POPUP | WS_VISIBLE, 0,0,1920,1080, NULL, NULL, hInstance);
+CreateWindow(WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_TOPMOST, winclass, "", WS_POPUP | WS_VISIBLE, 0,0,screenWidth,screenHeight, NULL, NULL, hInstance);
 ReleaseCapture();

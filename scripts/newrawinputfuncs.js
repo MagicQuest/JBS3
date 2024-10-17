@@ -60,16 +60,17 @@ function windowProc(hwnd, msg, wp, lp) {
         }
 
         if(input.header.dwType == RIM_TYPEMOUSE) { //https://learn.microsoft.com/en-us/windows/win32/api/winuser/ns-winuser-rawmouse#members
-            if((input.data.usFlags & MOUSE_MOVE_RELATIVE) == MOUSE_MOVE_RELATIVE) {
+            if((input.data.usFlags & MOUSE_MOVE_ABSOLUTE) == MOUSE_MOVE_ABSOLUTE) {
+                rawmouseinfo.x = (input.data.lLastX/65535)*w; //Math.min(w, Math.max(0, input.data.lLastX)); //when the absolute flag is sent, lLastX and lLastY contain the mouse's position on the screen from 0-65535
+                rawmouseinfo.y = (input.data.lLastY/65535)*h; //Math.min(h, Math.max(0, input.data.lLastY));
+            }else if((input.data.usFlags & MOUSE_MOVE_RELATIVE) == MOUSE_MOVE_RELATIVE) { //oops since MOUSE_MOVE_RELATIVE == 0 this shit is always true
                 rawmouseinfo.x = Math.min(w, Math.max(0, rawmouseinfo.x+input.data.lLastX)); //when the relative flag is set, lLastX and lLastY contains the distance the mouse (in pixels) from the last mouse position
                 rawmouseinfo.y = Math.min(h, Math.max(0, rawmouseinfo.y+input.data.lLastY));
-            }else if((input.data.usFlags & MOUSE_MOVE_ABSOLUTE) == MOUSE_MOVE_ABSOLUTE) {
-                rawmouseinfo.x = Math.min(w, Math.max(0, input.data.lLastX)); //when the absolute flag is sent, lLastX and lLastY contain the mouse's position on the screen from 0-65535
-                rawmouseinfo.y = Math.min(h, Math.max(0, input.data.lLastY));
-            }
+            } 
         }//else if(input.header.dwType == RIM_TYPEHID) {
             //print(input.data);
         //}
+        //print(rawmouseinfo);
         DrawIcon(memDC, rawmouseinfo.x, rawmouseinfo.y, rawmouseinfo.cursor);
 
         StretchBlt(dc, 0, 0, w, h, memDC, 0, 0, 800, 252, SRCCOPY); //now that feels just right

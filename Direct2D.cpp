@@ -56,11 +56,12 @@ bool Direct2D::Init(HWND window, int type) {
 		//	return false;
 		//}
 
-		HDC dc = GetDC(window);
+		//HDC dc = GetDC(window);
+		tempDC = GetDC(window);
 
-		HRESULT shit = ((ID2D1DCRenderTarget*)renderTarget)->BindDC(dc, &rect); //yo i forgot to release it
+		HRESULT shit = ((ID2D1DCRenderTarget*)renderTarget)->BindDC(tempDC, &rect); //yo i forgot to release it (no way this is the reason why layeredwindow.js stopped working! i released the dc and EndDraw failed!)
 
-		ReleaseDC(window, dc);
+		//ReleaseDC(window, dc); //yeah nah you can't release it after binding it you gotta keep that shit
 
 		//if (shit != S_OK) {
 			//err(shit, "Graphics Bind DC");

@@ -118,13 +118,14 @@ function parseNotes() {
     let key = parseInt(midinote[j+2], 16);
     updateStatus(`parsing note ${musicnotes[key%12]}${Math.floor(key/12)}`);
     if(midinote[j+1][0] == "9") { //if the second byte of midinote starts with 9 it's a note on event
-        print(`hit ${musicnotes[key%12]}${Math.floor(key/12)} at ${elapsedTime}ms in`);
-        holdingNotes[key] = elapsedTime;
+        const vel = parseInt(midinote[j+3], 16);
+        print(`hit ${musicnotes[key%12]}${Math.floor(key/12)} at ${elapsedTime}ms in (${vel} velocity)`);
+        holdingNotes[key] = {time: elapsedTime, vel};
     }else if(midinote[j+1][0] == "8") { //if the second byte of midinote starts with 8 it's a note off event
         if(holdingNotes[key] == undefined) { //bruh i had this as !holdingNotes[key] and it falsely accused the first note of being a glitch
             print(`not holding key but released anyways? (${key} -> ${musicnotes[key%12]}${Math.floor(key/12)})`);
         }else {
-            realNotes.push({key, duration: elapsedTime-holdingNotes[key], start: holdingNotes[key], beats: /*parseInt(note[0], 16)/divisions*/(elapsedTime-holdingNotes[key])/(60000/tempo), channel: parseInt(midinote[j+1][1], 16)}); //x 500 tempo 60 = .5
+            realNotes.push({key, duration: elapsedTime-holdingNotes[key].time, start: holdingNotes[key].time, beats: /*parseInt(note[0], 16)/divisions*/(elapsedTime-holdingNotes[key].time)/(60000/tempo), channel: parseInt(midinote[j+1][1], 16), vel: holdingNotes[key].vel}); //x 500 tempo 60 = .5
             //key == 0 && print(midinote, "midinote"); //uh one of my test midis is kinda weird and keeps "releasing" a key that wasn't pressed
             delete holdingNotes[key];
             print(`released ${musicnotes[key%12]}${Math.floor(key/12)} after ${i == 0 ? (parseInt(time, 16)/divisions)*(60/tempo)*(1000) : "variable"} ms`);

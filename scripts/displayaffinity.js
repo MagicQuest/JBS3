@@ -1,4 +1,5 @@
 //im bout to CHANGE THE GAME with this one (NO WAY IT ACTUALLY WORKED)
+//i think i should move the drawing outside of WM_PAINT because dwm doesn't like when you call RedrawWindow a lot
 
 const blurRGBA = eval(require("fs").read(__dirname+"/fastblur.js"));
 

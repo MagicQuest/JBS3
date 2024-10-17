@@ -1,4 +1,9 @@
 //damn this is crazy maybe at some point i'll investigate: https://parnassus.co/transparent-graphics-with-pure-gdi-part-1/
+//https://stefanwick.com/2018/12/19/creating-chromeless-non-rectangular-windows-from-uwp/
+//https://www.codeproject.com/Articles/251892/Guide-to-Image-Composition-with-Win32-MsImg32-dll
+//https://learn.microsoft.com/en-us/windows/win32/dwm/customframe?redirectedfrom=MSDN
+//https://stackoverflow.com/questions/7773771/how-do-i-implement-dragging-a-window-using-its-client-area
+//http://www.winprog.org/tutorial/transparency.html
 
 let windowWidth = 512; //current width (for when you resize it)
 let windowHeight = 512;

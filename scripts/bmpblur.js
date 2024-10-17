@@ -6,8 +6,8 @@ let tobject = GetObjectHBITMAP(troll)
 let hbm;
 let trollDIB = [];
 
-let cx = 640;
-let cy = 360;
+let cx = screenWidth/3;
+let cy = screenHeight/3;
 
 function random(max) {
     let sign = Math.random() > .5 ? 1 : -1;
@@ -103,7 +103,7 @@ function windowProc(hwnd, msg, wp, lp) {
         const memDC = CreateCompatibleDC(dc);
         SelectObject(memDC, hbm.bitmap);
         SetStretchBltMode(memDC, HALFTONE)
-        StretchBlt(memDC, 0, 0, cx, cy, screen, 0, 0, 1920, 1080, SRCCOPY);
+        StretchBlt(memDC, 0, 0, cx, cy, screen, 0, 0, screenWidth, screenHeight, SRCCOPY);
         DeleteDC(memDC);
 
         blurHBM(5);
@@ -124,4 +124,4 @@ const wc = CreateWindowClass("winclass", windowProc);
 wc.hbrBackground = COLOR_WINDOW+1;
 wc.hCursor = LoadCursor(NULL, IDC_HAND);
 
-window = CreateWindow(WS_EX_OVERLAPPEDWINDOW, wc, "dibits2.js - click to blur screen!", WS_OVERLAPPEDWINDOW | WS_VISIBLE, (1920-cx)/2, (1080-cy)/2, cx+16, cy+39, NULL, NULL, hInstance);
+window = CreateWindow(WS_EX_OVERLAPPEDWINDOW, wc, "dibits2.js - click to blur screen!", WS_OVERLAPPEDWINDOW | WS_VISIBLE, (screenWidth-cx)/2, (screenHeight-cy)/2, cx+16, cy+39, NULL, NULL, hInstance);

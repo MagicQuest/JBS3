@@ -40,7 +40,9 @@ function windowProc(hwnd, msg, wp, lp) {
         print(uxtheme("IsThemeActive", 0, [], [], RETURN_NUMBER));
         let result = uxtheme("SetWindowTheme", 3, [hwnd, NULL, NULL], [VAR_INT, VAR_WSTRING, VAR_WSTRING], RETURN_NUMBER); //NO FUCKING WAY?!
         print(result, "result");
-        DwmSetWindowAttribute(hwnd, DWMWA_CAPTION_COLOR, RGB(24, 24, 24)); //hell yeah this shit tuff asf (dark title bar)
+        DwmSetWindowAttribute(hwnd, DWMWA_CAPTION_COLOR, RGB(24, 24, 24)); //hell yeah this shit tuff asf (dark title bar)[doesn't work if you get rid of the window theme tho]
+        
+        otherwnd = CreateWindow(WS_EX_OVERLAPPEDWINDOW, NULL, NULL, WS_POPUP | WS_CHILD, 0, 0, 100, 100, hwnd, NULL, hInstance);
     }else if(msg == WM_PAINT) {
         const ps = BeginPaint(hwnd);
         StretchDIBits(ps.hdc, 0, 0, w, h, 0, 0, w, h, drawing, w, h, 32, BI_RGB, SRCCOPY); //using stretchdibits because i didn't add SetDIBitsToDevice lol

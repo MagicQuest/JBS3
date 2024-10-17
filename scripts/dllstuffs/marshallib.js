@@ -8,10 +8,59 @@ globalThis.sizeof = {
     COLORREF : 4, //same as DWORD
     LONG : 4,
     ULONG : 4,
+    UINT_PTR: 8,
     ULONG_PTR : 8,
     LONG_PTR : 8,
     HANDLE : 8,
+    HWND : 8,
 };
+
+function defineProps(obj, data, key, i, datatype, bytes) {
+    const reg = /([A-Za-z0-9]{2})/g;
+    Object.defineProperty(obj, key, {
+        get() {
+            let fulltype = 0n;
+            //wait i can automate all this
+            for(let j = 0; j < bytes; j++){
+                //print(i, j, bytes, data[i+j], key, datatype);
+                //oh windows is little esndian
+                //fulltype |= data[i+j] << (bytes-1-j)*8; //oh hell yeah this shit looks good :drooling: (whatchu you know about rolling dowjn in the deep when your brain goes numb (another medium: https://www.youtube.com/watch?v=DXuOAWnuMVY))
+                fulltype |= BigInt(data[i+j]) << BigInt(j)*8n; //ok here we go (oops when the numbers go too big js couldn't keep up and would fuck em up i gotta use bigint)
+            }
+
+            fulltype = Number(fulltype);
+
+            if(datatype[0] == "U") {
+                return fulltype < 0 ? (2**(bytes*8))-fulltype : fulltype; //checking if it's unsigned and flipping it 
+            }else {
+                return fulltype >= (2**(bytes*8)) ? fulltype-(2**(bytes*8)) : fulltype;
+            }        
+        },
+        set(newValue) {
+            let hex = newValue.toString(16);
+            //for(let j = 0; j < hex.length; j++) { //bruh i accidently was creating an infinite loop here but for some reason v8 would instantly crash (i had to test this hoe on another website bruh)
+            //    hex = "00"+hex;
+            //}
+            if(hex.length % 2 == 1) {
+                hex = "0"+hex;
+            }
+            const hl = hex.length;
+            for(let j = 0; j < bytes-(hl/2); j++) {
+                hex = "00"+hex;
+            }
+            //print(bytes, hex, i);
+
+            const hexBytes = hex.match(reg);
+            for(let j = 0; j < bytes; j++) {
+                //data[i+j] = parseInt(hexBytes[j], 16);
+                //console.log(i, j, hexBytes[bytes-1-j])
+                data[i+j] = parseInt(hexBytes[bytes-1-j], 16); //swizzle
+            }
+        },
+        enumerable: true,
+        configurable: true,
+    });
+}
 
 //class memoobjectidk { //i was really trying to make this inheritance work but i just can't seem to modify the child and read this.types from it
 globalThis.objFromTypes = (obj, data) => { //replacing every this. with obj.
@@ -21,23 +70,27 @@ globalThis.objFromTypes = (obj, data) => { //replacing every this. with obj.
         for(const key in obj.constructor.types) { //using constructor now because types is static
             const datatype = obj.constructor.types[key];
             const bytes = sizeof[datatype];
-            let fulltype = 0;
-            //wait i can automate all this
-            for(let j = 0; j < bytes; j++){
-                //oh windows is little esndian
-                //fulltype |= data[i+j] << (bytes-1-j)*8; //oh hell yeah this shit looks good :drooling: (whatchu you know about rolling dowjn in the deep when your brain goes numb (another medium: https://www.youtube.com/watch?v=DXuOAWnuMVY))
-                fulltype |= data[i+j] << (j)*8; //ok here we go
+            if(bytes == undefined) {
+                print(key, datatype, ":fucked up");
             }
-            //if(bytes == 1) { //CHAR/UCHAR
-            //    fulltype = data[i];
-            //}else if(bytes == 4) { //INT/UINT
-            //    fulltype = (data[i] << 24) | (data[i+1] << 16) | (data[i+2] << 8) | (data[i+3]); //i think?
+            //let fulltype = 0;
+            ////wait i can automate all this
+            //for(let j = 0; j < bytes; j++){
+            //    //oh windows is little esndian
+            //    //fulltype |= data[i+j] << (bytes-1-j)*8; //oh hell yeah this shit looks good :drooling: (whatchu you know about rolling dowjn in the deep when your brain goes numb (another medium: https://www.youtube.com/watch?v=DXuOAWnuMVY))
+            //    fulltype |= data[i+j] << (j)*8; //ok here we go
             //}
-            if(datatype[0] == "U") {
-                obj[key] = fulltype < 0 ? (2**(bytes*8))-fulltype : fulltype; //checking if it's unsigned and flipping it 
-            }else {
-                obj[key] = fulltype >= (2**(bytes*8)) ? fulltype-(2**(bytes*8)) : fulltype;
-            }
+            ////if(bytes == 1) { //CHAR/UCHAR
+            ////    fulltype = data[i];
+            ////}else if(bytes == 4) { //INT/UINT
+            ////    fulltype = (data[i] << 24) | (data[i+1] << 16) | (data[i+2] << 8) | (data[i+3]); //i think?
+            ////}
+            //if(datatype[0] == "U") {
+            //    obj[key] = fulltype < 0 ? (2**(bytes*8))-fulltype : fulltype; //checking if it's unsigned and flipping it 
+            //}else {
+            //    obj[key] = fulltype >= (2**(bytes*8)) ? fulltype-(2**(bytes*8)) : fulltype;
+            //}
+            defineProps(obj, data, key, i, datatype, bytes);
             i += bytes; //i guess you could call this addr too
         }
     //}
@@ -53,4 +106,18 @@ class memoobjectidk {
         return Object.values(this.types).reduce((a, b) => a+sizeof[b], 0); //oh yeah
     }
 }
+class CString {
+    constructor(string) {
+        this._data = new Uint8Array([...string.split("").map(e => e.charCodeAt(0)), 0x00]);
+        this.ptr = PointerFromArrayBuffer(this._data);
+    }
+}
+class WString {
+    constructor(wstring) {
+        this._data = new Uint8Array([...wstring.split("").map(e => e+"\0").join("").split("").map(e => e.charCodeAt(0)), 0x00, 0x00]) //now that LoadIcon takes wchar_t i gotta add zeros because wchar is 2 bytes
+        this.ptr = PointerFromArrayBuffer(this._data);
+    }
+}
 globalThis.memoobjectidk = memoobjectidk;
+globalThis.CString = CString;
+globalThis.WString = WString;

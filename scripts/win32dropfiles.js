@@ -38,7 +38,7 @@ function windowProc(hwnd, msg, wp, lp) {
         print(wp, lp); //wp is the HDROP parameter we're looking for 👀
         const pt = DragQueryPoint(wp);
         print(pt);
-        const files = DragQueryFile(wp, -1); //oh hell yeah'
+        const files = DragQueryFile(wp, -1); //oh hell yeah' (using -1 (0xFFFFFFFF) as the last parameter to get the NUMBER of files that were dropped)
         print(files);
         //const filenames = [];
         const dc = GetDC(hwnd);

@@ -22,7 +22,7 @@ function setWindow(hwnd) {
 
 class D2D {
     constructor() {
-        this.direct2d = createCanvas("d2d", ID2D1DCRenderTarget, FindWindow(NULL, "osu!"));
+        this.direct2d = createCanvas("d2d", ID2D1DCRenderTarget, FindWindow(NULL, "osu!")); //um why was i trying to draw over osu??
         this.font = this.direct2d.CreateFont("Consolas", 50);
         this.brush = this.direct2d.CreateSolidColorBrush(1.0, 1.0, 1.0, 0.0);
         this.white = this.direct2d.CreateSolidColorBrush(.5,.5,.5,.9);

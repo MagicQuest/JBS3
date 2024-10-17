@@ -1159,6 +1159,49 @@ V8FUNC(SetConsoleTextAttributeWrapper) {
 
     info.GetReturnValue().Set(Number::New(isolate, SetConsoleTextAttribute((HANDLE)IntegerFI(info[0]), IntegerFI(info[1]))));
 }
+//#pragma comment(linker, "\"/manifestdependency:type='win32' \
+//name='Microsoft.Windows.Common-Controls' version='6.0.0.0' \
+//processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
+//
+//V8FUNC(TaskDialogWrapper) {
+//    using namespace v8;
+//    Isolate* isolate = info.GetIsolate();
+//    HandleScope handle_scope(isolate);
+//
+//    PCWSTR pszWindowTitle;
+//    PCWSTR pszMainInstruction;
+//    PCWSTR pszContent;
+//    PCWSTR pszIcon;
+//
+//    if (info[2]->IsString()) {
+//        pszWindowTitle = WStringFI(info[2]);
+//    }
+//    else {
+//        pszWindowTitle = (PCWSTR)IntegerFI(info[2]);
+//    }
+//    if (info[3]->IsString()) {
+//        pszMainInstruction = WStringFI(info[3]);
+//    }
+//    else {
+//        pszMainInstruction = (PCWSTR)IntegerFI(info[3]);
+//    }
+//    if (info[4]->IsString()) {
+//        pszContent = WStringFI(info[4]);
+//    }
+//    else {
+//        pszContent = (PCWSTR)IntegerFI(info[4]);
+//    }
+//    if (info[6]->IsString()) {
+//        pszIcon = WStringFI(info[6]);
+//    }
+//    else {
+//        pszIcon = (PCWSTR)IntegerFI(info[6]);
+//    }
+//
+//    int pnButton = 0; TaskDialog((HWND)IntegerFI(info[0]), (HINSTANCE)IntegerFI(info[1]), pszWindowTitle, pszMainInstruction, pszContent, IntegerFI(info[5]), pszIcon, &pnButton);
+//
+//    info.GetReturnValue().Set(Number::New(isolate, pnButton));
+//}
 
 //V8FUNC(nigga) {
 //    
@@ -1937,15 +1980,16 @@ V8FUNC(BeepWrapper) { //https://stackoverflow.com/questions/5814869/playing-an-a
         int freq = IntegerFI(info[0]);
         int ms = IntegerFI(info[1]);
 
-        Persistent<Promise::Resolver> pp = Persistent<Promise::Resolver>(isolate, v8::Promise::Resolver::New(isolate->GetCurrentContext()).ToLocalChecked()); //ok so i think this should be persistent then instaed of local
+        Persistent<Promise::Resolver>* pp = new Persistent<Promise::Resolver>(isolate, v8::Promise::Resolver::New(isolate->GetCurrentContext()).ToLocalChecked()); //ok so i think this should be persistent then instaed of local
         std::thread f([=] { //uhoh something keeps crashing around here
-            //print(freq << " FREQ " << ms);
+            print(&pp << " " << isolate << " " << freq << " FREQ " << ms);
             BOOL val = Beep(freq, ms);
-            pp.Get(isolate)->Resolve(isolate->GetCurrentContext(), Number::New(isolate, val));
+            pp->Get(isolate)->Resolve(isolate->GetCurrentContext(), Number::New(isolate, val)); //hmm it only crashes when i include this line so idk where in v8 this is failing
             //print("promise should'v ereturned with " << val << " (but didn't?)");
+            delete pp;
         });
         //std::thread thread_object(f);//, info, isolate, notify, wait, pp);
-        info.GetReturnValue().Set(pp.Get(isolate)->GetPromise());
+        info.GetReturnValue().Set(pp->Get(isolate)->GetPromise());
         f.detach();
     }
     else {
@@ -11307,7 +11351,7 @@ void WStringFromPointer(const v8::FunctionCallbackInfo<v8::Value>& info) {
 V8FUNC(ArrayBufferFromPointer) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
-
+    
     //const char* type = CStringFI(info[0]); //fuck these damn string comparisons in c++ im not doing all that lmao
     int type = IntegerFI(info[0]);
     int bits = IntegerFI(info[1]);
@@ -12139,8 +12183,8 @@ V8FUNC(EnableVisualStyles)
 #pragma comment(lib, "Comctl32.lib")
 //i want this to be optional...
 //#pragma comment(linker,"\"/manifestdependency:type='win32' \
-//name='Microsoft.Windows.Common-Controls' version='6.0.0.0' \
-//processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
+name='Microsoft.Windows.Common-Controls' version='6.0.0.0' \
+processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
 
 V8FUNC(PointerFromArrayBuffer) {
     using namespace v8;
@@ -12185,6 +12229,101 @@ V8FUNC(getlineWrapper) {
 //
 //    Animate_Open((HWND)IntegerFI(info[0]), CStringFI(info[1])); //wait this shit is just a macro hell nah
 //}
+
+BOOL EnumPropsExProc(HWND hwnd, LPWSTR key, HANDLE value, ULONG_PTR iptr) {
+    using namespace v8;
+    v8::FunctionCallbackInfo<v8::Value> info = *(v8::FunctionCallbackInfo<v8::Value>*)iptr;
+    Isolate* isolate = info.GetIsolate();
+
+    //if (key == (LPWSTR)0x000000000000a911) {
+    if((LONG_PTR)key < 50000) { //lowkey random
+        return FALSE;
+    }
+    
+    //std::wcout << key << " idk " << std::endl;
+    Local<Value> args[] = { String::NewFromTwoByte(isolate, (const uint16_t*)key).ToLocalChecked(), Number::New(isolate, (LONG_PTR)value)};
+    info[1].As<Function>()->Call(isolate->GetCurrentContext(), isolate->GetCurrentContext()->Global(), 2, args);
+    
+    return TRUE;
+}
+
+V8FUNC(EnumPropsExWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    EnumPropsEx((HWND)IntegerFI(info[0]), EnumPropsExProc, (LPARAM)&info);
+}
+
+V8FUNC(NewCharStrPtr) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    Local<String> cstr = info[0].As<String>();
+    //print(cstr->Length() << " " << cstr->Utf8Length(isolate)); //bruh they were the same size
+    char* shit = new char[cstr->Utf8Length(isolate)];
+    memcpy(shit, CStringFI(cstr), cstr->Utf8Length(isolate));
+
+    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)shit));
+}
+
+V8FUNC(NewWCharStrPtr) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    Local<String> wstr = info[0].As<String>();
+    //print(cstr->Length() << " " << cstr->Utf8Length(isolate)); //bruh they were the same size
+    wchar_t* shit = new wchar_t[wstr->Length()];
+    memcpy(shit, WStringFI(wstr), wstr->Length());
+
+    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)shit));
+}
+
+V8FUNC(DeletePtr) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    delete (void*)IntegerFI(info[0]);
+}
+
+V8FUNC(DeleteArrayPtr) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    delete[] (void*)IntegerFI(info[0]);
+}
+
+V8FUNC(ImageList_CreateWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)ImageList_Create(IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]), IntegerFI(info[4]))));
+}
+
+V8FUNC(ImageList_DestroyWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, ImageList_Destroy((HIMAGELIST)IntegerFI(info[0]))));
+}
+
+V8FUNC(ImageList_ReplaceIconWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, ImageList_ReplaceIcon((HIMAGELIST)IntegerFI(info[0]), IntegerFI(info[1]), (HICON)IntegerFI(info[2]))));
+}
+
+V8FUNC(ImageList_AddIconWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    ImageList_AddIcon((HIMAGELIST)IntegerFI(info[0]), (HICON)IntegerFI(info[1]));
+}
+
+V8FUNC(GetDlgItemWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)GetDlgItem((HWND)IntegerFI(info[0]), IntegerFI(info[1]))));
+}
 
 v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const wchar_t* filename) {
     using namespace v8;
@@ -12252,6 +12391,10 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const wchar_t* filename
     //https://stackoverflow.com/questions/6707148/foreach-macro-on-macros-arguments
 #define setGlobalConst(g) global->Set(isolate, #g, Number::New(isolate, g))
 
+    setGlobal(NewCharStrPtr);
+    setGlobal(NewWCharStrPtr);
+    setGlobal(DeletePtr);
+    setGlobal(DeleteArrayPtr);
 
     global->Set(isolate, "BeginPaint", FunctionTemplate::New(isolate, BeginPaintWrapper));
     global->Set(isolate, "EndPaint", FunctionTemplate::New(isolate, EndPaintWrapper));
@@ -12362,6 +12505,132 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const wchar_t* filename
     //global->Set(isolate, "NATIVEFNTCTL_CLASS", String::NewFromTwoByte(isolate, (const uint16_t*)NATIVEFNTCTL_CLASS).ToLocalChecked());
     global->Set(isolate, "PROGRESS_CLASS", String::NewFromTwoByte(isolate, (const uint16_t*)PROGRESS_CLASS).ToLocalChecked());
     global->Set(isolate, "REBARCLASSNAME", String::NewFromTwoByte(isolate, (const uint16_t*)REBARCLASSNAME).ToLocalChecked());
+    setGlobalConst(RBIM_IMAGELIST);
+    setGlobalConst(RBS_TOOLTIPS);
+    setGlobalConst(RBS_VARHEIGHT);
+    setGlobalConst(RBS_BANDBORDERS);
+    setGlobalConst(RBS_FIXEDORDER);
+    setGlobalConst(RBS_REGISTERDROP);
+    setGlobalConst(RBS_AUTOSIZE);
+    setGlobalConst(RBS_VERTICALGRIPPER);
+    setGlobalConst(RBS_DBLCLKTOGGLE);
+    setGlobalConst(CCS_TOP);
+    setGlobalConst(CCS_NOMOVEY);
+    setGlobalConst(CCS_BOTTOM);
+    setGlobalConst(CCS_NORESIZE);
+    setGlobalConst(CCS_NOPARENTALIGN);
+    setGlobalConst(CCS_ADJUSTABLE);
+    setGlobalConst(CCS_NODIVIDER);
+    setGlobalConst(CCS_VERT);
+    setGlobalConst(CCS_LEFT);
+    setGlobalConst(CCS_RIGHT);
+    setGlobalConst(CCS_NOMOVEX);
+    setGlobalConst(ILC_MASK);
+    setGlobalConst(ILC_COLOR);
+    setGlobalConst(ILC_COLORDDB);
+    setGlobalConst(ILC_COLOR4);
+    setGlobalConst(ILC_COLOR8);
+    setGlobalConst(ILC_COLOR16);
+    setGlobalConst(ILC_COLOR24);
+    setGlobalConst(ILC_COLOR32);
+    setGlobalConst(ILC_PALETTE);
+    setGlobalConst(ILC_MIRROR);
+    setGlobalConst(ILC_PERITEMMIRROR);
+    setGlobalConst(ILC_ORIGINALSIZE);
+    setGlobalConst(ILC_HIGHQUALITYSCALE);
+    setGlobalConst(RB_INSERTBANDA);
+    setGlobalConst(RB_DELETEBAND);
+    setGlobalConst(RB_GETBARINFO);
+    setGlobalConst(RB_SETBARINFO);
+    setGlobalConst(RB_SETBANDINFOA);
+    setGlobalConst(RB_SETPARENT);
+    setGlobalConst(RB_HITTEST);
+    setGlobalConst(RB_GETRECT);
+    setGlobalConst(RB_INSERTBANDW);
+    setGlobalConst(RB_SETBANDINFOW);
+    setGlobalConst(RB_GETBANDCOUNT);
+    setGlobalConst(RB_GETROWCOUNT);
+    setGlobalConst(RB_GETROWHEIGHT);
+    setGlobalConst(RB_IDTOINDEX);
+    setGlobalConst(RB_GETTOOLTIPS);
+    setGlobalConst(RB_SETTOOLTIPS);
+    setGlobalConst(RB_SETBKCOLOR);
+    setGlobalConst(RB_GETBKCOLOR);
+    setGlobalConst(RB_SETTEXTCOLOR);
+    setGlobalConst(RB_GETTEXTCOLOR);
+    setGlobalConst(RBSTR_CHANGERECT);
+    setGlobalConst(RB_SIZETORECT);
+    setGlobalConst(RB_SETCOLORSCHEME);
+    setGlobalConst(RB_GETCOLORSCHEME);
+    setGlobalConst(RB_INSERTBAND);
+    setGlobalConst(RB_SETBANDINFO);
+    setGlobalConst(RB_BEGINDRAG);
+    setGlobalConst(RB_ENDDRAG);
+    setGlobalConst(RB_DRAGMOVE);
+    setGlobalConst(RB_GETBARHEIGHT);
+    setGlobalConst(RB_GETBANDINFOW);
+    setGlobalConst(RB_GETBANDINFOA);
+    setGlobalConst(RB_GETBANDINFO);
+    setGlobalConst(RB_MINIMIZEBAND);
+    setGlobalConst(RB_MAXIMIZEBAND);
+    setGlobalConst(RB_GETDROPTARGET);
+    setGlobalConst(RB_GETBANDBORDERS);
+    setGlobalConst(RB_SHOWBAND);
+    setGlobalConst(RB_SETPALETTE);
+    setGlobalConst(RB_GETPALETTE);
+    setGlobalConst(RB_MOVEBAND);
+    setGlobalConst(RB_SETUNICODEFORMAT);
+    setGlobalConst(RB_GETUNICODEFORMAT);
+    setGlobalConst(RB_GETBANDMARGINS);
+    setGlobalConst(RB_SETWINDOWTHEME);
+    setGlobalConst(RB_SETEXTENDEDSTYLE);
+    setGlobalConst(RB_GETEXTENDEDSTYLE);
+    setGlobalConst(RB_PUSHCHEVRON);
+    setGlobalConst(RB_SETBANDWIDTH);
+    setGlobalConst(RBN_HEIGHTCHANGE);
+    setGlobalConst(RBN_GETOBJECT);
+    setGlobalConst(RBN_LAYOUTCHANGED);
+    setGlobalConst(RBN_AUTOSIZE);
+    setGlobalConst(RBN_BEGINDRAG);
+    setGlobalConst(RBN_ENDDRAG);
+    setGlobalConst(RBN_DELETINGBAND);
+    setGlobalConst(RBN_DELETEDBAND);
+    setGlobalConst(RBN_CHILDSIZE);
+    setGlobalConst(RBN_CHEVRONPUSHED);
+    setGlobalConst(RBN_SPLITTERDRAG);
+    setGlobalConst(RBN_MINMAX);
+    setGlobalConst(RBN_AUTOBREAK);
+    setGlobalConst(RBBS_BREAK);
+    setGlobalConst(RBBS_FIXEDSIZE);
+    setGlobalConst(RBBS_CHILDEDGE);
+    setGlobalConst(RBBS_HIDDEN);
+    setGlobalConst(RBBS_NOVERT);
+    setGlobalConst(RBBS_FIXEDBMP);
+    setGlobalConst(RBBS_VARIABLEHEIGHT);
+    setGlobalConst(RBBS_GRIPPERALWAYS);
+    setGlobalConst(RBBS_NOGRIPPER);
+    setGlobalConst(RBBS_USECHEVRON);
+    setGlobalConst(RBBS_HIDETITLE);
+    setGlobalConst(RBBS_TOPALIGN);
+    setGlobalConst(RBBIM_STYLE);
+    setGlobalConst(RBBIM_COLORS);
+    setGlobalConst(RBBIM_TEXT);
+    setGlobalConst(RBBIM_IMAGE);
+    setGlobalConst(RBBIM_CHILD);
+    setGlobalConst(RBBIM_CHILDSIZE);
+    setGlobalConst(RBBIM_SIZE);
+    setGlobalConst(RBBIM_BACKGROUND);
+    setGlobalConst(RBBIM_ID);
+    setGlobalConst(RBBIM_IDEALSIZE);
+    setGlobalConst(RBBIM_LPARAM);
+    setGlobalConst(RBBIM_HEADERSIZE);
+    setGlobalConst(RBBIM_CHEVRONLOCATION);
+    setGlobalConst(RBBIM_CHEVRONSTATE);
+    setGlobalWrapper(ImageList_Create);
+    setGlobalWrapper(ImageList_Destroy);
+    setGlobalWrapper(ImageList_AddIcon);
+    setGlobalWrapper(ImageList_ReplaceIcon);
+    setGlobalWrapper(GetDlgItem);
     //global->Set(isolate, "STANDARD_CLASSES", String::NewFromTwoByte(isolate, (const uint16_t*)STANDARD_CLASSES).ToLocalChecked());
     global->Set(isolate, "STATUSCLASSNAME", String::NewFromTwoByte(isolate, (const uint16_t*)STATUSCLASSNAME).ToLocalChecked());
     global->Set(isolate, "TOOLBARCLASSNAME", String::NewFromTwoByte(isolate, (const uint16_t*)TOOLBARCLASSNAME).ToLocalChecked());
@@ -12373,6 +12642,79 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const wchar_t* filename
     global->Set(isolate, "WC_COMBOBOXEX", String::NewFromTwoByte(isolate, (const uint16_t*)WC_COMBOBOXEX).ToLocalChecked());
     global->Set(isolate, "WC_EDIT", String::NewFromTwoByte(isolate, (const uint16_t*)WC_EDIT).ToLocalChecked());
     global->Set(isolate, "WC_HEADER", String::NewFromTwoByte(isolate, (const uint16_t*)WC_HEADER).ToLocalChecked());
+    setGlobalConst(HDI_WIDTH);
+    setGlobalConst(HDI_HEIGHT);
+    setGlobalConst(HDI_TEXT);
+    setGlobalConst(HDI_FORMAT);
+    setGlobalConst(HDI_LPARAM);
+    setGlobalConst(HDI_BITMAP);
+    setGlobalConst(HDI_IMAGE);
+    setGlobalConst(HDI_DI_SETITEM);
+    setGlobalConst(HDI_ORDER);
+    setGlobalConst(HDI_FILTER);
+    setGlobalConst(HDI_STATE);
+    setGlobalConst(HDF_LEFT);
+    setGlobalConst(HDF_RIGHT);
+    setGlobalConst(HDF_CENTER);
+    setGlobalConst(HDF_JUSTIFYMASK);
+    setGlobalConst(HDF_RTLREADING);
+    setGlobalConst(HDF_BITMAP);
+    setGlobalConst(HDF_STRING);
+    setGlobalConst(HDF_OWNERDRAW);
+    setGlobalConst(HDF_IMAGE);
+    setGlobalConst(HDF_BITMAP_ON_RIGHT);
+    setGlobalConst(HDF_SORTUP);
+    setGlobalConst(HDF_SORTDOWN);
+    setGlobalConst(HDF_CHECKBOX);
+    setGlobalConst(HDF_CHECKED);
+    setGlobalConst(HDF_FIXEDWIDTH);
+    setGlobalConst(HDF_SPLITBUTTON);
+    setGlobalConst(HDIS_FOCUSED);
+    setGlobalConst(HDM_GETITEMCOUNT);
+    setGlobalConst(HDM_INSERTITEMA);
+    setGlobalConst(HDM_INSERTITEMW);
+    setGlobalConst(HDM_INSERTITEM);
+    setGlobalConst(HDM_GETITEM);
+    setGlobalConst(HDM_SETITEM);
+    setGlobalConst(HHT_NOWHERE);
+    setGlobalConst(HHT_ONHEADER);
+    setGlobalConst(HHT_ONDIVIDER);
+    setGlobalConst(HHT_ONDIVOPEN);
+    setGlobalConst(HHT_ONFILTER);
+    setGlobalConst(HHT_ONFILTERBUTTON);
+    setGlobalConst(HHT_ABOVE);
+    setGlobalConst(HHT_BELOW);
+    setGlobalConst(HHT_TORIGHT);
+    setGlobalConst(HHT_TOLEFT);
+    setGlobalConst(HHT_ONITEMSTATEICON);
+    setGlobalConst(HHT_ONDROPDOWN);
+    setGlobalConst(HHT_ONOVERFLOW);
+    setGlobalConst(HDS_HORZ);
+    setGlobalConst(HDS_BUTTONS);
+    setGlobalConst(HDS_HOTTRACK);
+    setGlobalConst(HDS_HIDDEN);
+    setGlobalConst(HDS_DRAGDROP);
+    setGlobalConst(HDS_FULLDRAG);
+    setGlobalConst(HDS_FILTERBAR);
+    setGlobalConst(HDS_FLAT);
+    setGlobalConst(HDS_CHECKBOXES);
+    setGlobalConst(HDS_NOSIZING);
+    setGlobalConst(HDS_OVERFLOW);
+    setGlobalConst(HDFT_ISSTRING);
+    setGlobalConst(HDFT_ISNUMBER);
+    setGlobalConst(HDFT_ISDATE);
+    setGlobalConst(HDFT_HASNOVALUE);
+    setGlobalConst(HDN_ITEMCHANGING);
+    setGlobalConst(HDN_ITEMCHANGED);
+    setGlobalConst(HDN_ITEMCLICK);
+    setGlobalConst(HDN_ITEMDBLCLICK);
+    setGlobalConst(HDN_DIVIDERDBLCLICK);
+    setGlobalConst(HDN_BEGINTRACK);
+    setGlobalConst(HDN_ENDTRACK);
+    setGlobalConst(HDN_TRACK);
+    setGlobalConst(HDN_GETDISPINFO);
+    setGlobalConst(HDM_LAYOUT);
+
     global->Set(isolate, "WC_LISTBOX", String::NewFromTwoByte(isolate, (const uint16_t*)WC_LISTBOX).ToLocalChecked());
     global->Set(isolate, "WC_IPADDRESS", String::NewFromTwoByte(isolate, (const uint16_t*)WC_IPADDRESS).ToLocalChecked());
     global->Set(isolate, "WC_LINK", String::NewFromTwoByte(isolate, (const uint16_t*)WC_LINK).ToLocalChecked());
@@ -12383,7 +12725,6 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const wchar_t* filename
     global->Set(isolate, "WC_STATIC", String::NewFromTwoByte(isolate, (const uint16_t*)WC_STATIC).ToLocalChecked());
     global->Set(isolate, "WC_TABCONTROL", String::NewFromTwoByte(isolate, (const uint16_t*)WC_TABCONTROL).ToLocalChecked());
     global->Set(isolate, "WC_TREEVIEW", String::NewFromTwoByte(isolate, (const uint16_t*)WC_TREEVIEW).ToLocalChecked());
-
     //setGlobalWrapper(DllCall);
 
     setGlobalWrapper(AddDllDirectory);
@@ -13886,9 +14227,24 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
     setGlobalConst(DI_NORMAL);
 
 #define MAKEINTRESOURCE(i) i //lol makeintresource messes with setGlobalConst so i gotta "remove" it
+#define MAKEINTRESOURCEW(i) i 
     setGlobalConst(IDI_APPLICATION); setGlobalConst(IDI_ERROR); setGlobalConst(IDI_QUESTION); setGlobalConst(IDI_WARNING); setGlobalConst(IDI_INFORMATION); setGlobalConst(IDI_WINLOGO); setGlobalConst(IDI_SHIELD);
 
     setGlobalConst(IDC_ARROW); setGlobalConst(IDC_IBEAM); setGlobalConst(IDC_WAIT); setGlobalConst(IDC_CROSS); setGlobalConst(IDC_UPARROW); setGlobalConst(IDC_SIZENWSE); setGlobalConst(IDC_SIZENESW); setGlobalConst(IDC_SIZEWE); setGlobalConst(IDC_SIZENS); setGlobalConst(IDC_SIZEALL); setGlobalConst(IDC_NO); setGlobalConst(IDC_HAND); setGlobalConst(IDC_APPSTARTING); setGlobalConst(IDC_HELP); setGlobalConst(IDC_PIN); setGlobalConst(IDC_PERSON);
+
+    setGlobalWrapper(EnumPropsEx);
+
+    //setGlobalWrapper(TaskDialog);
+    //setGlobalConst(TDCBF_OK_BUTTON);
+    //setGlobalConst(TDCBF_YES_BUTTON);
+    //setGlobalConst(TDCBF_NO_BUTTON);
+    //setGlobalConst(TDCBF_CANCEL_BUTTON);
+    //setGlobalConst(TDCBF_RETRY_BUTTON);
+    //setGlobalConst(TDCBF_CLOSE_BUTTON);
+    //setGlobalConst(TD_WARNING_ICON);
+    //setGlobalConst(TD_ERROR_ICON);
+    //setGlobalConst(TD_INFORMATION_ICON);
+    //setGlobalConst(TD_SHIELD_ICON);
 #define IDC_HANDWRITING MAKEINTRESOURCE(32631)
     setGlobalConst(IDC_HANDWRITING);
 

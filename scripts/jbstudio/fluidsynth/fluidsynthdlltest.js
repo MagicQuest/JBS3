@@ -81,7 +81,7 @@ for (i = 0; i < 120; i++)
 
     /* Stop the note */
     //fluid_synth_noteoff(synth, 0, key);
-    fluidsynth("fluid_synth_noteon", 3, [synth_ptr, 0, key], [VAR_INT, VAR_INT, VAR_INT], RETURN_NUMBER); //synth, channel, key
+    fluidsynth("fluid_synth_noteoff", 3, [synth_ptr, 0, key], [VAR_INT, VAR_INT, VAR_INT], RETURN_NUMBER); //synth, channel, key
 }
 
 cleanup(settings_ptr, synth_ptr, adriver_ptr);

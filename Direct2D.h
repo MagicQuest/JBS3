@@ -78,7 +78,7 @@ public:
 		else if(this->type == 1) {
 			ID2D1DCRenderTarget* renderTarget = (ID2D1DCRenderTarget*)this->renderTarget;
 			//i almost recreated the entire d2d object
-			tempDC = GetDC(this->window);
+			//tempDC = GetDC(this->window);
 			RECT r{ 0, 0, width, height};
 			//info.GetReturnValue().Set(Number::New(isolate, renderTarget->BindDC(dc, &r)));
 			return renderTarget->BindDC(tempDC, &r);

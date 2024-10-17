@@ -1,4 +1,5 @@
 //(lowkey i don't think this worked when i was on my windows 10 vm so maybe it's called something different idk)
+//nah on windows 10 it creates the task switching window everytime instead of reusing the same one like windows 11 (so if you hold alt+tab when you open this on windows 10 it will work until you stop alt+tabbing)
 const ts = FindWindow(NULL, "Task Switching"); //the alt+tab menu
 
 print(ts);
