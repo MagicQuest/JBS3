@@ -1,0 +1,53 @@
+
+output.obj:     file format pe-x86-64
+
+
+Disassembly of section .text:
+
+0000000000000000 <_Z11awesomefuncv>:
+    static int b = 5;
+    b++;
+    return num * num * b;
+}*/
+
+int awesomefunc() {
+   0:	55                   	push   rbp
+   1:	48 89 e5             	mov    rbp,rsp
+   4:	48 83 ec 10          	sub    rsp,0x10
+    int num = 5;
+   8:	c7 45 fc 05 00 00 00 	mov    DWORD PTR [rbp-0x4],0x5
+    return num;
+   f:	8b 45 fc             	mov    eax,DWORD PTR [rbp-0x4]
+}
+  12:	48 83 c4 10          	add    rsp,0x10
+  16:	5d                   	pop    rbp
+  17:	c3                   	ret    
+
+0000000000000018 <main>:
+
+int main() {
+  18:	55                   	push   rbp
+  19:	48 89 e5             	mov    rbp,rsp
+  1c:	48 83 ec 20          	sub    rsp,0x20
+  20:	e8 00 00 00 00       	call   25 <main+0xd>
+    return awesomefunc();
+  25:	e8 d6 ff ff ff       	call   0 <_Z11awesomefuncv>
+  2a:	90                   	nop
+  2b:	48 83 c4 20          	add    rsp,0x20
+  2f:	5d                   	pop    rbp
+  30:	c3                   	ret    
+  31:	90                   	nop
+  32:	90                   	nop
+  33:	90                   	nop
+  34:	90                   	nop
+  35:	90                   	nop
+  36:	90                   	nop
+  37:	90                   	nop
+  38:	90                   	nop
+  39:	90                   	nop
+  3a:	90                   	nop
+  3b:	90                   	nop
+  3c:	90                   	nop
+  3d:	90                   	nop
+  3e:	90                   	nop
+  3f:	90                   	nop

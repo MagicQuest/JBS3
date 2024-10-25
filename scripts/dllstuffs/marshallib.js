@@ -100,6 +100,25 @@ globalThis.objFromTypes = (obj, data) => { //replacing every this. with obj.
     //}).bind(obj); //haha bind! very fun! (this seems sarcastic but it's not lmao)
 }
 
+globalThis.__asm = function(arr, argc = 0, argv = [], argtypev = [], returntype = RETURN_NUMBER) {
+    const asm = new Uint8Array(arr);
+
+    //this ptr variable is the address of a portion of memory allocated by JS/V8 for my arraybuffer asm
+    //this piece of memory can't be executed because of its memory protection flags type shit
+    //so im gonna change that shit
+    const ptr = PointerFromArrayBuffer(asm);
+
+    //old is the previous memory protection flags
+    const old = VirtualProtect(ptr, asm.byteLength, PAGE_EXECUTE_READWRITE);
+
+    //apparently when changing code in memory you are supposed to use FlushInstructionCache but i might not have to because im not CHANGING code im making it (lowkey don't trust me on that)
+    //FlushInstructionCache(hInstance, ptr, asm.byteLength); //im not sure if hInstance is also a valid process handle
+
+    const res = Call(ptr, argc, argv, argtypev, returntype);
+    VirtualProtect(ptr, asm.byteLength, old); //just in case
+    return res;
+}
+
 //here we go this is a nice compromise
 class memoobjectidk {
     static sizeof() {

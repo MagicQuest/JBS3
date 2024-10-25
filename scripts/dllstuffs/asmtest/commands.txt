@@ -1,0 +1,21 @@
+im making this just in case i forget how i made these with mingw's gcc (i've got it on the PATH)
+
+https://stackoverflow.com/questions/137038/how-do-you-get-assembler-output-from-c-c-source-in-gcc
+//https://web.archive.org/web/20200731092922/https://software.intel.com/content/www/us/en/develop/articles/introduction-to-x64-assembly.html
+//https://learn.microsoft.com/en-us/windows-hardware/drivers/debugger/x64-architecture
+//https://www.cs.uaf.edu/2010/fall/cs301/lecture/10_06_the_stack.html
+//https://cs.brown.edu/courses/cs033/docs/guides/x64_cheatsheet.pdf
+//https://stackoverflow.com/questions/36529449/why-are-rbp-and-rsp-called-general-purpose-registers
+
+    creates asm
+gcc -S test.cpp -o test.asm
+
+    creates exe
+gcc -g -o test.exe test.cpp
+//gcc -g test.cpp -o test.exe
+
+                i snatched this one from godbolt
+gcc -g -o output.obj -fno-verbose-asm -c -fdiagnostics-color=always test.cpp
+
+                decom[p]
+objdump -S -Mintel --disassemble output.obj > helloworld.dump

@@ -21,15 +21,17 @@ typedef void* (__stdcall* g_func_ptr_8)(void*, void*, void*, void*, void*, void*
 typedef void* (__stdcall* g_func_ptr_9)(void*, void*, void*, void*, void*, void*, void*, void*, void*);
 typedef void* (__stdcall* g_func_ptr_10)(void*, void*, void*, void*, void*, void*, void*, void*, void*, void*);
 
-#define BLAHSHIT(i) g_func_ptr_##i func_ptr = (g_func_ptr_##i)GetProcAddress(dll, name); \
-					if(!func_ptr) { \
-						MessageBoxA(NULL, "couldn't find function", name, MB_OK | MB_ICONERROR); \
-						return 0; \
-					} \
-					return func_ptr
+//#define BLAHSHIT(i) g_func_ptr_##i func_ptr = (g_func_ptr_##i)GetProcAddress(dll, name); \
+//					if(!func_ptr) { \
+//						MessageBoxA(NULL, "couldn't find function", name, MB_OK | MB_ICONERROR); \
+//						return 0; \
+//					} \
+//					return func_ptr
+
+#define BLAHSHIT(i) g_func_ptr_##i func_ptr = (g_func_ptr_##i)addr; return func_ptr
 
 //wait i'll just make a function
-void* DllCall(HMODULE dll, const char* name, int argc, void** argv) { //we finding out the return value type later
+void* DllCall(/*HMODULE dll,*/ FARPROC addr/*, const char* name */ , int argc, void** argv) { //we finding out the return value type later
 	//there's probably some weird macro trick you could use but i guess im writing this by hand
 	if(argc == 0) {
 		BLAHSHIT(0)();

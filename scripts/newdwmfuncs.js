@@ -1,5 +1,6 @@
 //dedicated to the brave new functions added on this fine day
 //https://learn.microsoft.com/en-us/windows/win32/dwm/dwm-sample-customizethumbnail
+//https://www.youtube.com/watch?v=4sUsZlN_qZM
 
 //DwmSetWindowAttribute(GetConsoleWindow(), DWMWA_USE_IMMERSIVE_DARK_MODE, false); //haha
 //DwmSetWindowAttribute(GetConsoleWindow(), DWMWA_SYSTEMBACKDROP_TYPE, DWMSBT_TRANSIENTWINDOW); //YO ACRYLIC BACKGROUND???? (i have no idea why but this line by itself make the title bar for the console acrylic and idk why)

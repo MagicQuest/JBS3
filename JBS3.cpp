@@ -16,6 +16,9 @@
 //#pragma message("!!!win64_intel.S is excluded from the build because it would rebuild every time and i don't wanna do all that (so im copying the old obj from $(ProjectDir)Release)")
 //#pragma message("!!!win64_intel.S is excluded from the build because it would rebuild every time and i don't wanna do all that (so im copying the old obj from $(ProjectDir)Release)")
 //#pragma message("!!!win64_intel.S is excluded from the build because it would rebuild every time and i don't wanna do all that (so im copying the old obj from $(ProjectDir)Release)")
+
+//if you don't define USING_FFI, all the float/double related macros (RETURN_FLOAT, VAR_FLOAT) are not defined and a few things in the scripts/opencv folder will not work lmao you need ffi for floats that's whawt im tryna say
+//really without ffi you can't use floats or doubles that's what im tryna say
 #define USING_FFI
 #define V8_ENABLE_SANDBOX
 #define _CRT_SECURE_NO_WARNINGS
@@ -10200,6 +10203,98 @@ V8FUNC(RemoveDllDirectoryWrapper) {
 #include "v8-external.h"
 
 #ifndef USING_FFI
+
+void dodllstuff(const v8::FunctionCallbackInfo<v8::Value> info, FARPROC addr, const char* name) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    Local<Context> context = isolate->GetCurrentContext();
+
+    if (!addr) {
+        MessageBoxA(NULL, "couldn't find function", name, MB_OK | MB_ICONERROR);
+        return;
+    }
+
+    void* argv[10]{}; //lazy man's method
+    double* allocatedFloats[10]{};
+    Local<Array> args = info[2].As<Array>();
+    Local<Array> types = info[3].As<Array>();
+    //args->Iterate(context, [](uint32_t index, Local<Value> element, void* data) {
+    //    void** argv = *((void***)data); //ok i know this sounds bad BUT
+    //    //argv[index] = element.As<External>()->Value(); //yeah maybe????
+    //    void* value;
+    //    if (element->IsString()) {
+    //        
+    //        value = (void*)CStringFI(element->);
+    //    }
+    //    argv[index] = (void*)value;
+    //    return Array::CallbackResult::kContinue;
+    //}, &argv);
+    //im sorry bruh but the restrictions that Iterate puts on you is not worth it for like 10 arguments
+    for (int i = 0; i < args->Length(); i++) { //well idk if this knowledge does anything but there is a private field in v8::IndirectHandleBase that holds a location_ ptr (but idk if that would work as void* because i would be passing for example, an int* to a function that expects int (so the address is used as the number))
+        Local<Value> element = args->Get(context, i).ToLocalChecked();
+        void* value = nullptr;
+        //if (element->IsString()) {
+        //    if (info[3]->BooleanValue(isolate)) {
+        //        value = (void*)WStringFI(element);
+        //    }
+        //    else {
+        //        value = (void*)CStringFI(element);
+        //    }
+        //}
+        //else if (element->IsNumber()) {
+        //    value = (void*)IntegerFI(element);
+        //}
+        if (types->Length() == 0) { //im just interpreting them all as ints
+            value = (void*)IntegerFI(element);
+        }
+        else {
+            int type = IntegerFI(types->Get(context, i).ToLocalChecked());
+            //int,float,---,cstring,wstring
+            if (type == VAR_INT) {
+                value = (void*)IntegerFI(element);
+            }
+            //else if (type == VAR_FLOAT) {
+            //    //uhoh how to send float?
+            //    //allocatedFloats[i] = new double(FloatFI(element));
+            //    //value = (void*)allocatedFloats[i];//(void*)FloatFI(element);
+            //}
+            else if (type == VAR_CSTRING) {
+                value = (void*)CStringFI(element);
+            }
+            else if (type == VAR_WSTRING) {
+                value = (void*)WStringFI(element);
+            }
+        }
+        argv[i] = value;
+    }
+    void* returned = DllCall(addr, IntegerFI(info[1]), argv); //ok bro im not gonna lie floats completely destroy this ENTIRE process i got going on because passing a float through void* is UNDEFINED BEHAVOIR!
+    //if (!data->Get(context, 1).ToLocalChecked()->BooleanValue(isolate)) {
+    //    FreeLibrary(dll);
+    //}
+    int returnType = IntegerFI(info[4]);
+    if (returnType == RETURN_CSTRING || returnType == RETURN_WSTRING) {
+        if (returnType == RETURN_WSTRING) {    //info[5]->BooleanValue(isolate)) {
+            info.GetReturnValue().Set(String::NewFromTwoByte(isolate, (const uint16_t*)returned).ToLocalChecked());
+        }
+        else {
+            info.GetReturnValue().Set(String::NewFromUtf8(isolate, (const char*)returned).ToLocalChecked());
+        }
+        //}
+        //else if(returnType == RETURN_FLOAT) {
+        //    print(returned);
+        //    info.GetReturnValue().Set(Number::New(isolate, *(float *)&returned)); //yeahhhh https://stackoverflow.com/a/15313677 (well i was about to archive this but the internet archive is still down)
+    }
+    else if (returnType == RETURN_NUMBER) {
+        info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)returned));
+    }
+}
+
+V8FUNC(Call) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    dodllstuff(info, (FARPROC)(void*)IntegerFI(info[0]), ""); //you don't actually have to make 2 casts here you only need FarPROC (somehow typed that by waccineltg)
+}
+
 V8FUNC(DllCallWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
@@ -10212,6 +10307,9 @@ V8FUNC(DllCallWrapper) {
         return;
     }
 
+    dodllstuff(info, GetProcAddress((HMODULE)info.Data().As<External>()->Value(), CStringFI(info[0])), CStringFI(info[0]));
+
+    /*
     //HANDLE console = GetStdHandle(STD_OUTPUT_HANDLE);
     //
     ////Print(info.This()->GetOwnPropertyNames(isolate->GetCurrentContext()).ToLocalChecked())
@@ -10288,7 +10386,7 @@ V8FUNC(DllCallWrapper) {
         }
         argv[i] = value;
     }
-    void* returned = DllCall((HMODULE)info.Data().As<External>()->Value(), CStringFI(info[0]), IntegerFI(info[1]), argv); //ok bro im not gonna lie floats completely destroy this ENTIRE process i got going on because passing a float through void* is UNDEFINED BEHAVOIR!
+    void* returned = DllCall(GetProcAddress((HMODULE)info.Data().As<External>()->Value(), CStringFI(info[0])), CStringFI(info[0]), IntegerFI(info[1]), argv); //ok bro im not gonna lie floats completely destroy this ENTIRE process i got going on because passing a float through void* is UNDEFINED BEHAVOIR!
     //if (!data->Get(context, 1).ToLocalChecked()->BooleanValue(isolate)) {
     //    FreeLibrary(dll);
     //}
@@ -10318,10 +10416,131 @@ V8FUNC(DllCallWrapper) {
     //    }
     //}
     //i might be COOKED, v8 won't give you the pointer to the value of an v8::object because it could be "moved around the heap" (buddy im dying here (ok if i looked in the v8 source headers long enough i could probably find it and make it public))
-
+    */
 }
 #else
 #include <ffi.h>
+
+void doffistuff(const v8::FunctionCallbackInfo<v8::Value>& info, FARPROC func_ptr) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    Local<Context> context = isolate->GetCurrentContext();
+
+    ffi_type* ffi_argTypes[10];
+    void* argv[10]{}; //ffi man's method
+
+    Local<Array> args = info[2].As<Array>();
+    Local<Array> types = info[3].As<Array>();
+
+    for (int i = 0; i < args->Length(); i++) { //well idk if this knowledge does anything but there is a private field in v8::IndirectHandleBase that holds a location_ ptr (but idk if that would work as void* because i would be passing for example, an int* to a function that expects int (so the address is used as the number))
+        Local<Value> element = args->Get(context, i).ToLocalChecked();
+        void* value = nullptr;
+        //float floatvaluejustincase;
+        ffi_type* argtype = &ffi_type_pointer;
+        //if (element->IsString()) {
+        //    if (info[3]->BooleanValue(isolate)) {
+        //        value = (void*)WStringFI(element);
+        //    }
+        //    else {
+        //        value = (void*)CStringFI(element);
+        //    }
+        //}
+        //else if (element->IsNumber()) {
+        //    value = (void*)IntegerFI(element);
+        //}
+        //if (types->Length() == 0) { //im just interpreting them all as ints
+        //    value = (void*)IntegerFI(element);
+        //}
+        //else {
+        int type = IntegerFI(types->Get(context, i).ToLocalChecked()); //lowkey you gotta specify the types
+        //int,float,---,cstring,wstring
+        if (type == VAR_INT) {
+            value = new void* ((void*)IntegerFI(element)); //oh boy i think i need to use the new keyword here
+        }
+        //else if (type == VAR_FLOAT) {
+        //    //uhoh how to send float?
+        //    //allocatedFloats[i] = new double(FloatFI(element));
+        //    //value = (void*)allocatedFloats[i];//(void*)FloatFI(element);
+        //}
+        else if (type == VAR_CSTRING) {
+            value = new void* (CStringFI(element));
+        }
+        else if (type == VAR_WSTRING) {
+            value = new void* (*String::Value(isolate, element));
+        }
+        else //if (type == VAR_FLOAT || type == VAR_DOUBLE) {
+            if (type == VAR_FLOAT) {
+                //floatvaluejustincase = FloatFI(element);
+                value = new float(FloatFI(element));
+                argtype = &ffi_type_float;
+            }
+            else {
+                value = new double(FloatFI(element));
+                argtype = &ffi_type_double;
+            }
+        //}
+    //}
+        argv[i] = value;//new void*(value);//VAR_FLOAT ? (void*) & floatvaluejustincase : &value;
+        ffi_argTypes[i] = argtype;
+        //print(argv[i]);
+    }
+    int returnType = IntegerFI(info[4]);
+
+    static ffi_type* returntypesffi[6] = { &ffi_type_pointer, &ffi_type_pointer, &ffi_type_pointer, &ffi_type_float, &ffi_type_double, &ffi_type_void }; //oh shit i didn't even add double?!
+
+    ffi_type* c_retType = returntypesffi[returnType];
+    //ffi_type rc; // return value    
+    ///*void**/LONG_PTR returned = 0;//nullptr;
+    void* returned = new void* (); //honestly not sure at all about this one
+
+    ffi_cif cif;
+    if (ffi_prep_cif(&cif, FFI_DEFAULT_ABI, IntegerFI(info[1]), c_retType, ffi_argTypes) == FFI_OK) {
+
+        //FARPROC fn = GetProcAddress((HMODULE)info.Data().As<External>()->Value(), CStringFI(info[0])); //i had to separate GetProcAddress and FFI_FN because it wouldn't build for some reason
+        //ffi_call(&cif, FFI_FN(GetProcAddress((HMODULE)info.Data().As<External>()->Value(), CStringFI(info[0]))), &returned, argv);
+        ffi_call(&cif, FFI_FN(func_ptr), /*&*/returned, argv);
+    }
+    //if (!data->Get(context, 1).ToLocalChecked()->BooleanValue(isolate)) {
+    //    FreeLibrary(dll);
+    //}
+    if (returnType == RETURN_CSTRING || returnType == RETURN_WSTRING) {
+        if (returnType == RETURN_WSTRING) {    //info[5]->BooleanValue(isolate)) {
+            info.GetReturnValue().Set(String::NewFromTwoByte(isolate, *(const uint16_t**)returned).ToLocalChecked()); //OOPS you couldn't return a valid string this whole time lmao
+        }
+        else {
+            info.GetReturnValue().Set(String::NewFromUtf8(isolate, *(const char**)returned).ToLocalChecked()); //OOPS you couldn't return a valid string this whole time lmao
+        }
+        //}
+        //else if(returnType == RETURN_FLOAT) {
+        //    print(returned);
+        //    info.GetReturnValue().Set(Number::New(isolate, *(float *)&returned)); //yeahhhh https://stackoverflow.com/a/15313677 (well i was about to archive this but the internet archive is still down)
+    }
+    else if (returnType == RETURN_NUMBER) {
+        //print(returned << " reterend");
+        info.GetReturnValue().Set(Number::New(isolate, *(LONG_PTR*)returned));
+    }
+    else if (returnType == RETURN_FLOAT) {
+        //uh oh it might be hard to express a double as void* (in fact idk what it's returning)
+        info.GetReturnValue().Set(Number::New(isolate, *(float*)returned)); //wait fuck i already tried that LMAO
+    }
+    else if (returnType == RETURN_DOUBLE) {
+        //uh oh it might be hard to express a double as void* (in fact idk what it's returning)
+        info.GetReturnValue().Set(Number::New(isolate, *(double*)returned)); //wait fuck i already tried that LMAO
+    }
+
+    for (int i = 0; i < args->Length(); i++) {
+        //delete (*(void**)argv[i]);
+        delete argv[i];
+    }
+
+    delete returned;
+}
+
+V8FUNC(Call) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    doffistuff(info, (FARPROC)(void*)IntegerFI(info[0]));
+}
 
 V8FUNC(DllCallWrapper) {
     using namespace v8;
@@ -10335,14 +10554,17 @@ V8FUNC(DllCallWrapper) {
         return;
     }
 
+    doffistuff(info, GetProcAddress((HMODULE)info.Data().As<External>()->Value(), CStringFI(info[0])));
+
     //https://stackoverflow.com/questions/6886995/calling-windows-api-with-libffi-on-mingw
 
+    /*
     ffi_type* ffi_argTypes[10];
     void* argv[10]{}; //ffi man's method
-
+    
     Local<Array> args = info[2].As<Array>();
     Local<Array> types = info[3].As<Array>();
-
+    
     for (int i = 0; i < args->Length(); i++) { //well idk if this knowledge does anything but there is a private field in v8::IndirectHandleBase that holds a location_ ptr (but idk if that would work as void* because i would be passing for example, an int* to a function that expects int (so the address is used as the number))
         Local<Value> element = args->Get(context, i).ToLocalChecked();
         void* value = nullptr;
@@ -10396,20 +10618,22 @@ V8FUNC(DllCallWrapper) {
         //print(argv[i]);
     }
     int returnType = IntegerFI(info[4]);
-
+    
     static ffi_type* returntypesffi[6] = { &ffi_type_pointer, &ffi_type_pointer, &ffi_type_pointer, &ffi_type_float, &ffi_type_double, &ffi_type_void }; //oh shit i didn't even add double?!
     
     ffi_type* c_retType = returntypesffi[returnType];
     //ffi_type rc; // return value    
-    ///*void**/LONG_PTR returned = 0;//nullptr;
+    //void*
+    LONG_PTR returned = 0;//nullptr;
     void* returned = new void*(); //honestly not sure at all about this one
-
+    
     ffi_cif cif;
     if (ffi_prep_cif(&cif, FFI_DEFAULT_ABI, IntegerFI(info[1]), c_retType, ffi_argTypes) == FFI_OK) {
-
+    
         FARPROC fn = GetProcAddress((HMODULE)info.Data().As<External>()->Value(), CStringFI(info[0])); //i had to separate GetProcAddress and FFI_FN because it wouldn't build for some reason
         //ffi_call(&cif, FFI_FN(GetProcAddress((HMODULE)info.Data().As<External>()->Value(), CStringFI(info[0]))), &returned, argv);
-        ffi_call(&cif, FFI_FN(fn), /*&*/returned, argv);
+                                //&
+        ffi_call(&cif, FFI_FN(fn), returned, argv);
     }
     //if (!data->Get(context, 1).ToLocalChecked()->BooleanValue(isolate)) {
     //    FreeLibrary(dll);
@@ -10438,13 +10662,15 @@ V8FUNC(DllCallWrapper) {
         //uh oh it might be hard to express a double as void* (in fact idk what it's returning)
         info.GetReturnValue().Set(Number::New(isolate, *(double*)returned)); //wait fuck i already tried that LMAO
     }
-
+    
     for (int i = 0; i < args->Length(); i++) {
         //delete (*(void**)argv[i]);
         delete argv[i];
     }
-
+    
     delete returned;
+    */
+
     //print(returned);
     //for (double* alloc : allocatedFloats) {
     //    if (alloc) {
@@ -10529,6 +10755,20 @@ V8FUNC(LoadLibraryExWrapper) {
     Isolate* isolate = info.GetIsolate();
     
     info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)LoadLibraryExW(WStringFI(info[0]), NULL, IntegerFI(info[1]))));
+}
+
+V8FUNC(FreeLibraryWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, FreeLibrary((HMODULE)IntegerFI(info[0]))));
+}
+
+V8FUNC(GetProcAddressWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)GetProcAddress((HMODULE)IntegerFI(info[0]), CStringFI(info[1]))));
 }
 
 V8FUNC(InitializeWIC) {
@@ -11530,6 +11770,13 @@ V8FUNC(OpenProcessWrapper) {
     info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)OpenProcess(IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]))));
 }
 
+V8FUNC(GetCurrentProcessWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)GetCurrentProcess()));
+}
+
 V8FUNC(EnumProcessModulesWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
@@ -12325,10 +12572,132 @@ V8FUNC(GetDlgItemWrapper) {
     info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)GetDlgItem((HWND)IntegerFI(info[0]), IntegerFI(info[1]))));
 }
 
+V8FUNC(FindFirstChangeNotificationWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)FindFirstChangeNotification(WStringFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]))));
+}
+
+V8FUNC(FindNextChangeNotificationWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, FindNextChangeNotification((HANDLE)IntegerFI(info[0]))));
+}
+
+V8FUNC(FindCloseChangeNotificationWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, FindNextChangeNotification((HANDLE)IntegerFI(info[0]))));
+}
+
+V8FUNC(WaitForSingleObjectWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    
+    info.GetReturnValue().Set(Number::New(isolate, WaitForSingleObjectEx((HANDLE)IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]))));
+}
+
+V8FUNC(CreateFileWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    //SECURITY_ATTRIBUTES attr{ 0 };
+    //attr.nLength = sizeof(SECURITY_ATTRIBUTES);
+
+    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)CreateFile(WStringFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), NULL, IntegerFI(info[4]), IntegerFI(info[5]), (HANDLE)IntegerFI(info[6]))));
+}
+
+//https://github.com/apetrone/simplefilewatcher/blob/master/source/FileWatcherWin32.cpp
+//https://learn.microsoft.com/en-us/windows/win32/fileio/obtaining-directory-change-notifications?redirectedfrom=MSDN
+//https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilew
+//https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-readdirectorychangesw
+//https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-readdirectorychangesexw
+//V8FUNC(ReadDirectoryChangesWrapper) {
+//    using namespace v8;
+//    Isolate* isolate = info.GetIsolate();
+//
+//    info.GetReturnValue().Set(Number::New(isolate, ReadDirectoryChangesExW()));
+//}
+
+//V8FUNC(CloseHandleWrapper) {
+//    using namespace v8;
+//    Isolate* isolate = info.GetIsolate();
+//
+//    info.GetReturnValue().Set(Number::New(isolate, CloseHandle((HANDLE)IntegerFI(info[0]))));
+//}
+
+
+
+//https://stackoverflow.com/questions/23032409/understanding-hex-opcodes
+//typedef int(__stdcall/*__fastcall*/* temp_func_ptr)(); //apparently the default is __fastcall (not it is not it's __cdecl!!!!) but i just realized i don't even have to specify
+//
+//int coolerfuncthatproperlyshowsmyshit() {
+//    //volatile unsigned char bits[6]{0xB8, 0x05, 0x00, 0x00, 0x00, 0xC3};
+//    //unsigned char* bits = new unsigned char[6]{0xB8, 0x05, 0x00, 0x00, 0x00, 0xC3};
+//    unsigned char* bits = (unsigned char*)VirtualAlloc(NULL, sizeof(unsigned char)/* * 6*/, MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE);//PAGE_EXECUTE | PAGE_READWRITE);
+//    print((void*)bits);
+//    unsigned char stackbits[6]{0xB8, 0x05, 0x00, 0x00, 0x00, 0xC3};
+//    memcpy(bits, stackbits, sizeof(unsigned char) * 6);
+//
+//    temp_func_ptr func = temp_func_ptr((void*)bits);
+//    int r = func();
+//    return r;
+//
+//}
+
+//int coolfunc() { //for asm testing https://learn.microsoft.com/en-us/cpp/build/x64-calling-convention?view=msvc-170 https://learn.microsoft.com/en-us/cpp/build/x64-software-conventions?view=msvc-170&source=recommendations#register-volatility-and-preservation
+//    return 5;
+//}
+
+V8FUNC(__debugbreakWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    __debugbreak(); //intrinsic (0xCC) int 3 opcode
+    //print("dwvu");
+}
+
+
+//V8FUNC(callmyshitforme) {
+//    using namespace v8;
+//    Isolate* isolate = info.GetIsolate();
+//    //__m128 octaword = 10; //wait nevermind
+//    //__int128 largeassshit = 10;
+//    void* func = (void*)IntegerFI(info[0]);
+//    //int (* shit)();
+//    temp_func_ptr callable = temp_func_ptr(func);
+//    int r = callable();
+//
+//    info.GetReturnValue().Set(Number::New(isolate, r));
+//}
+
+V8FUNC(VirtualProtectWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    DWORD old = 0; VirtualProtect((void*)IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), &old);
+
+    info.GetReturnValue().Set(Number::New(isolate, old));
+}
+
+V8FUNC(FlushInstructionCacheWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, FlushInstructionCache((void*)IntegerFI(info[0]), (void*)IntegerFI(info[1]), IntegerFI(info[2]))));
+}
+
 v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const wchar_t* filename) {
     using namespace v8;
 
     Local<ObjectTemplate> global = ObjectTemplate::New(isolate);
+
+    //print(&coolfunc << " " << temp_func_ptr((&coolfunc))());
+
+    //print(coolerfuncthatproperlyshowsmyshit());
     // Bind the global 'print' function to the C++ Print callback.
     
     //Local<ObjectTemplate> console = ObjectTemplate::New(isolate);
@@ -12395,6 +12764,66 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const wchar_t* filename
     setGlobal(NewWCharStrPtr);
     setGlobal(DeletePtr);
     setGlobal(DeleteArrayPtr);
+    
+    setGlobalWrapper(VirtualProtect);
+    setGlobalConst(PAGE_NOACCESS);
+    setGlobalConst(PAGE_READONLY);
+    setGlobalConst(PAGE_READWRITE);
+    setGlobalConst(PAGE_WRITECOPY);
+    setGlobalConst(PAGE_EXECUTE);
+    setGlobalConst(PAGE_EXECUTE_READ);
+    setGlobalConst(PAGE_EXECUTE_READWRITE);
+    setGlobalConst(PAGE_EXECUTE_WRITECOPY);
+    setGlobalConst(PAGE_GUARD);
+    setGlobalConst(PAGE_NOCACHE);
+    setGlobalConst(PAGE_WRITECOMBINE);
+    setGlobalConst(PAGE_GRAPHICS_NOACCESS);
+    setGlobalConst(PAGE_GRAPHICS_READONLY);
+    setGlobalConst(PAGE_GRAPHICS_READWRITE);
+    setGlobalConst(PAGE_GRAPHICS_EXECUTE);
+    setGlobalConst(PAGE_GRAPHICS_EXECUTE_READ);
+    setGlobalConst(PAGE_GRAPHICS_EXECUTE_READWRITE);
+    setGlobalConst(PAGE_GRAPHICS_COHERENT);
+    setGlobalConst(PAGE_GRAPHICS_NOCACHE);
+    setGlobalConst(PAGE_ENCLAVE_THREAD_CONTROL);
+    setGlobalConst(PAGE_REVERT_TO_FILE_MAP);
+    setGlobalConst(PAGE_TARGETS_NO_UPDATE);
+    setGlobalConst(PAGE_TARGETS_INVALID);
+    setGlobalConst(PAGE_ENCLAVE_UNVALIDATED);
+    setGlobalConst(PAGE_ENCLAVE_MASK);
+    setGlobalConst(PAGE_ENCLAVE_DECOMMIT);
+    setGlobalConst(PAGE_ENCLAVE_SS_FIRST);
+    setGlobalConst(PAGE_ENCLAVE_SS_REST);
+    setGlobalConst(MEM_COMMIT);
+    setGlobalConst(MEM_RESERVE);
+    setGlobalConst(MEM_REPLACE_PLACEHOLDER);
+    setGlobalConst(MEM_RESERVE_PLACEHOLDER);
+    setGlobalConst(MEM_RESET);
+    setGlobalConst(MEM_TOP_DOWN);
+    setGlobalConst(MEM_WRITE_WATCH);
+    setGlobalConst(MEM_PHYSICAL);
+    setGlobalConst(MEM_ROTATE);
+    setGlobalConst(MEM_DIFFERENT_IMAGE_BASE_OK);
+    setGlobalConst(MEM_RESET_UNDO);
+    setGlobalConst(MEM_LARGE_PAGES);
+    setGlobalConst(MEM_4MB_PAGES);
+    setGlobalConst(MEM_64K_PAGES);
+    setGlobalConst(MEM_UNMAP_WITH_TRANSIENT_BOOST);
+    setGlobalConst(MEM_COALESCE_PLACEHOLDERS);
+    setGlobalConst(MEM_PRESERVE_PLACEHOLDER);
+    setGlobalConst(MEM_DECOMMIT);
+    setGlobalConst(MEM_RELEASE);
+    setGlobalConst(MEM_FREE);
+    setGlobalConst(MEM_EXTENDED_PARAMETER_GRAPHICS);
+    setGlobalConst(MEM_EXTENDED_PARAMETER_NONPAGED);
+    setGlobalConst(MEM_EXTENDED_PARAMETER_ZERO_PAGES_OPTIONAL);
+    setGlobalConst(MEM_EXTENDED_PARAMETER_NONPAGED_LARGE);
+    setGlobalConst(MEM_EXTENDED_PARAMETER_NONPAGED_HUGE);
+    setGlobalConst(MEM_EXTENDED_PARAMETER_SOFT_FAULT_PAGES);
+    setGlobalConst(MEM_EXTENDED_PARAMETER_EC_CODE);
+    setGlobalConst(MEM_EXTENDED_PARAMETER_NUMA_NODE_MANDATORY);
+    
+    setGlobalWrapper(FlushInstructionCache);
 
     global->Set(isolate, "BeginPaint", FunctionTemplate::New(isolate, BeginPaintWrapper));
     global->Set(isolate, "EndPaint", FunctionTemplate::New(isolate, EndPaintWrapper));
@@ -12463,6 +12892,30 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const wchar_t* filename
     setGlobal(StopSoundSpecial);
     setGlobalWrapper(InitiateSystemShutdown);
     setGlobalWrapper(AbortSystemShutdown);
+
+    setGlobalWrapper(CreateFile);
+    //setGlobalWrapper(CloseHandle);
+    //setGlobalWrapper(ReadDirectoryChanges);
+    setGlobalWrapper(FindFirstChangeNotification);
+    setGlobalWrapper(FindNextChangeNotification);
+    setGlobalWrapper(FindCloseChangeNotification);
+    setGlobalWrapper(WaitForSingleObject);
+    setGlobalConst(FILE_NOTIFY_CHANGE_FILE_NAME);
+    setGlobalConst(FILE_NOTIFY_CHANGE_DIR_NAME);
+    setGlobalConst(FILE_NOTIFY_CHANGE_ATTRIBUTES);
+    setGlobalConst(FILE_NOTIFY_CHANGE_SIZE);
+    setGlobalConst(FILE_NOTIFY_CHANGE_LAST_WRITE);
+    setGlobalConst(FILE_NOTIFY_CHANGE_LAST_ACCESS);
+    setGlobalConst(FILE_NOTIFY_CHANGE_CREATION);
+    setGlobalConst(FILE_NOTIFY_CHANGE_SECURITY);
+    setGlobalConst(WAIT_ABANDONED);
+    setGlobalConst(WAIT_IO_COMPLETION);
+    setGlobalConst(WAIT_OBJECT_0);
+    setGlobalConst(WAIT_TIMEOUT);
+    setGlobalConst(WAIT_FAILED);
+
+    setGlobalWrapper(__debugbreak);
+    //setGlobal(callmyshitforme);
 
     setGlobalWrapper(SoundSentry);
 
@@ -12731,6 +13184,7 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const wchar_t* filename
     setGlobalWrapper(SetDllDirectory);
     setGlobalWrapper(RemoveDllDirectory);
     setGlobal(DllLoad);
+    setGlobal(Call);
     
     setGlobalConst(RETURN_CSTRING);
     setGlobalConst(RETURN_WSTRING);
@@ -12748,6 +13202,8 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const wchar_t* filename
     setGlobalConst(VAR_WSTRING);
 
     setGlobalWrapper(LoadLibraryEx);
+    setGlobalWrapper(GetProcAddress);
+    setGlobalWrapper(FreeLibrary);
 
     setGlobalConst(DONT_RESOLVE_DLL_REFERENCES);
     setGlobalConst(LOAD_LIBRARY_AS_DATAFILE);
@@ -12991,6 +13447,7 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const wchar_t* filename
 
     setGlobalWrapper(EnumProcesses);
     setGlobalWrapper(OpenProcess);
+    setGlobalWrapper(GetCurrentProcess);
     setGlobalWrapper(EnumProcessModules);
     setGlobalWrapper(EnumProcessModulesEx);
     setGlobalWrapper(GetModuleBaseName);
