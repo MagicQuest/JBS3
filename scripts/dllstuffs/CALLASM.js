@@ -1,5 +1,9 @@
 //i need to take libffi out of DllLoad like how i took WIC out of d2d
 
+//intel syntax FTW!
+//https://stackoverflow.com/questions/1546141/jmp-to-absolute-address-op-codes
+//https://stackoverflow.com/questions/28133312/best-way-to-simulate-a-call-with-jmpdos-assembly?noredirect=1&lq=1
+
 //you know what this isn't working (access violation executing at location) and i just realized that maybe it's because they don't want you executing arbitrary code in memory but c'mon there has GYATT to be a way...
 
 //well what do you know my guess was totally wrong and the problem was actually the fact that the memory that TypedArrays/ArrayBuffers allocate is not executable (so i have to make it executable)
@@ -9,6 +13,7 @@
 //WOW THIS LINK HAS EXACTLY WHAT I'VE BEEN TRYING TO DO https://stackoverflow.com/a/40937610 (IF ONLY I KNEW HOW TO ASK THIS QUESTION WHEN I STARTED (i didn't even know pages of memory could not be executed like that))
 //lol i had this one open right before i found the solution (i was actually striking gold https://learn.microsoft.com/en-us/shows/inside/access-violation-c0000005-execute)
 
+//                                                                                                                                                           nah nevermind for some reason when you used x64 msvc to compile and get the disassembly it wouldn't give the binary opcodes and you had to enable link to binary
 //im using https://defuse.ca/online-x86-assembler.htm#disassembly to convert my asm to hex binsry (i could use godbolt or run gcc on my own computer but, 1. godbolt is actually pretty good but sometimes it doesn't want to give you the opcodes for the asm, and 2. sometimes that shit don't work)
 
 const user32 = LoadLibraryEx("user32.dll", NULL); //using NULL will make LoadLibraryEx work just like LoadLibrary
@@ -37,7 +42,7 @@ print(FreeLibrary(user32), "== 1?"); //just had to make sure GetProcAddress and 
 //    //0xCC,                       //__debugbreak() int 3
 //    0xC3,                         //ret
 //
-//    //0xCB,                       //far ret (ok i thought the problem was that when i returned, the piece of memory i was executing from was too far from the main area (which i mean it seemed to be but that isn't the problem))
+//    //0xCB,                       //far ret (ok i thought the problem was that when i returned, the piece of memory i was executing from was too far from the main area (which i mean it seemed to be but that isn't the problem)) OHHHH APPARENTLY YOU CAN'T EVEN HAVE FAR POINTERS ANYMORE (ON WINDOWS EVeryTHING IS IN THE SAME COde SEGMENT https://stackoverflow.com/questions/1396909/ret-retn-retf-how-to-use-them?rq=4)
 //    //0xcc, 0xcc, 0xcc, 0xcc, 0xcc, 0xcc, 0xcc, 0xcc, 0xcc, 0xcc, //0xcc is put as padding in memory and it's the break interupt (according to stackoverflow https://stackoverflow.com/a/40997957)
 //]);
 
@@ -100,7 +105,12 @@ print(__asm([
     0x48, 0xb8,                                                   //movabs rax, ...
     ...int64_to_little_endian_hex(0xdeadbeef21B1),                //...0xdeadbeef21B1D1
     0xc3                                                          //ret
-]), "int64_to_little_endian (should print", 0xdeadbeef21B1, ")");
+]), "int64_to_little_endian (should print", 0xdeadbeef21B1, ")"); //lowkey you don't have to do it this way because you could pass it as a variable
+
+print(__asm([
+    0x48, 0x89, 0xc8,                                             //mov rax, rcx
+    0xc3,                                                         //ret
+], 1, [0xdeadbeef21B1], [VAR_INT], RETURN_NUMBER), "passing int64 as the first parameter (should return and print", 0xdeadbeef21B1, ")"); //lowkey you don't have to do it this way because you could pass it as a variable
 
 const jmpasm = new Uint8Array([
     0x89, 0xc8,     //mov eax, ecx (ecx is the first integer argument (32 bit))
@@ -174,6 +184,8 @@ pop rbp
 ret
 */
 
+//https://stackoverflow.com/questions/14889643/how-encode-a-relative-short-jmp-in-x86
+
 //const loopasm = new Uint8Array(25); //i can't seem to figure out how to make this work...
 //[
 //    0x55,                                //push rbp
@@ -188,3 +200,19 @@ ret
 //].forEach((e, i) => loopasm[i] = e);
 //print(PointerFromArrayBuffer(loopasm)); __debugbreak();
 //print(__asm(loopasm, 1, [5], [VAR_INT], RETURN_NUMBER), "asm loop");
+
+const str = /*NewCharStrPtr*/("what's up my sigmas 🍷🗿?");
+
+print(str);
+
+print("should print w", String.fromCharCode(__asm([ //rax is 64, eax is 32, ax is lower 16 bits, ah is HIBYTE of the 16, al is LOBYTE of the 16
+    //0x48, 0x31, 0xc0,              //xor rax, rax (set rax to 0 just in case...)
+    
+                                     //apparently the BEST way to set a register to 0 is xor r32, r32  (it clears the upper 32 bits too!)   https://stackoverflow.com/questions/4829937/how-many-ways-to-set-a-register-to-zero   https://stackoverflow.com/questions/33666617/what-is-the-best-way-to-set-a-register-to-zero-in-x86-assembly-xor-mov-or-and/33668295#33668295
+    0x31, 0xc0,                      //xor eax, eax (set the eax register to 0 just in case...)
+    0x8a, 0x01,                      //mov al, BYTE PTR [rcx] (im dereferencing rcx (the first 64 bit integer parameter) and putting the first byte into al)
+    //0x48, 0x89, 0xc8,              //mov rax, rcx (lol i wasn't passing str correctly so i had to check the value)
+    0xc3,                            //ret
+], 1, [str], [VAR_CSTRING], RETURN_NUMBER)));
+
+//DeleteArrayPtr(str);

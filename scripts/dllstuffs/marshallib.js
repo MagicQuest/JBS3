@@ -18,7 +18,7 @@ globalThis.sizeof = {
 function defineProps(obj, data, key, i, datatype, bytes) {
     const reg = /([A-Za-z0-9]{2})/g;
     Object.defineProperty(obj, key, {
-        get() {
+        get() { //THIS SHIT IS LITTLE ENDIAN!
             let fulltype = 0n;
             //wait i can automate all this
             for(let j = 0; j < bytes; j++){
@@ -33,10 +33,40 @@ function defineProps(obj, data, key, i, datatype, bytes) {
             if(datatype[0] == "U") {
                 return fulltype < 0 ? (2**(bytes*8))-fulltype : fulltype; //checking if it's unsigned and flipping it 
             }else {
-                return fulltype >= (2**(bytes*8)) ? fulltype-(2**(bytes*8)) : fulltype;
-            }        
+                //print(fulltype, (2**(bytes*8-1)));
+                return fulltype >= (2**(bytes*8-1)) ? fulltype-(2**(bytes*8)) : fulltype;
+            }
         },
-        set(newValue) {
+        set(newValue) { //oops idk if i wrote the get part wrong or you aren't allowed to set signed correctly (going over doesn't flip to negative) (hey look at that i fixed it)
+            /*
+            if(datatype[0] == "U") {
+                //newValue = newValue < 0 ? (2**(bytes*8))-newValue : newValue;
+                if(newValue < 0) {
+                    newValue += (2**(bytes*8));
+                }else if(newValue >= 2**(bytes*8)) {
+                    newValue -= (2**(bytes*8));
+                }
+            }else {
+                if(newValue < 0) {
+                    newValue += (2**(bytes*8));
+                }else if(newValue >= 2**(bytes*8-1)) {
+                    newValue -= (2**(bytes*8));
+                }
+            }
+            */
+            //if(newValue < 0) {
+            //    newValue += 2**(bytes*8);
+            //}else if(datatype[0] == "U" && newValue >= 2**(bytes*8)) {
+            //    //newValue = newValue < 0 ? (2**(bytes*8))-newValue : newValue;
+            //    newValue -= 2**(bytes*8);
+            //}else if(newValue >= 2**(bytes*8-1)) { //oops i had it 2**(bytes*8-1) but it wasn't working 100% of the time and i actually didn't even need this branch...
+            //    newValue -= 2**(bytes*8);
+            //}
+            if(newValue < 0) {
+                newValue += 2**(bytes*8);
+            }else if(newValue >= 2**(bytes*8)) {
+                newValue -= 2**(bytes*8);
+            }
             let hex = newValue.toString(16);
             //for(let j = 0; j < hex.length; j++) { //bruh i accidently was creating an infinite loop here but for some reason v8 would instantly crash (i had to test this hoe on another website bruh)
             //    hex = "00"+hex;
@@ -48,6 +78,11 @@ function defineProps(obj, data, key, i, datatype, bytes) {
             for(let j = 0; j < bytes-(hl/2); j++) {
                 hex = "00"+hex;
             }
+            //console.log(hex.length, bytes*2);
+            //if(hex.length > bytes*2) {
+            //    console.log("too large nigga");
+            //    hex = Object.keys(new Array(bytes*2).toString()+1).map(e => "00").join(""); //bruh i KNOW i had some bullshit like this somewhere and i spent like 20 minutes trying to find it and i couldn't :(   (where would i have possibly put a function like this (equivalent to python's range or something idk))
+            //}
             //print(bytes, hex, i);
 
             const hexBytes = hex.match(reg);
@@ -101,7 +136,7 @@ globalThis.objFromTypes = (obj, data) => { //replacing every this. with obj.
 }
 
 globalThis.__asm = function(arr, argc = 0, argv = [], argtypev = [], returntype = RETURN_NUMBER) {
-    const asm = new Uint8Array(arr);
+    const asm = arr.constructor.name == "Uint8Array" ? arr : new Uint8Array(arr);
 
     //this ptr variable is the address of a portion of memory allocated by JS/V8 for my arraybuffer asm
     //this piece of memory can't be executed because of its memory protection flags type shit
