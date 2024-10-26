@@ -6,6 +6,8 @@ eval(require("fs").read(__dirname+"/marshallib.js")); //damn this marshalling go
 //https://stackoverflow.com/questions/14921735/write-a-jump-command-to-a-x86-64-binary-file?noredirect=1&lq=1
 //https://stackoverflow.com/questions/14889643/how-encode-a-relative-short-jmp-in-x86?rq=2
 //https://stackoverflow.com/questions/63648708/a-relative-jmp-in-x64
+//https://stackoverflow.com/questions/54745872/how-do-rip-relative-variable-references-like-rip-a-in-x86-64-gas-intel-sy
+//https://stackoverflow.com/questions/14925104/opcode-for-negative-jump
 
 function shit(a, b = 10) {
     return b > 0 ? shit(a+a, b-1) : a;

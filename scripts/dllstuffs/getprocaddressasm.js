@@ -55,6 +55,8 @@ caption = /*new WString*/("phonk trollface (using asm to call)");
 //https://stackoverflow.com/questions/22091434/how-assembly-accesses-stores-variables-on-the-stack
 //https://stackoverflow.com/questions/14416205/asm-call-instruction-how-does-it-work (i was looking for info about how the call command worked because i was using it wrong lol)
 //https://stackoverflow.com/questions/51312138/call-absolute-address-in-x64
+//https://medium.com/@sruthk/cracking-assembly-stack-frame-layout-in-x64-75eb862dde08
+
 print(__asm([ //oops i was having an error here and it was because i didn't include the standard push rbp, mov rbp<-rsp, and pop rbp (oops) (i think MessageBoxW changes rbp and i have to make sure i preserve its value!)
     //rcx, rdx, r8, r9
     //0x58,                                        //pop rax    (since i'm taking the pointer to MessageBoxW as a 5th argument, i must pop it from the stack type shit (for the 5th parameter and higher the values are pushed onto the stack)) (ok everything i said was true BUT i don't think you are supposed to pop it from the stack (and it didn't work lmao) )

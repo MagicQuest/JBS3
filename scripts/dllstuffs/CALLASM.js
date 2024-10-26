@@ -210,7 +210,7 @@ print("should print w", String.fromCharCode(__asm([ //rax is 64, eax is 32, ax i
     
                                      //apparently the BEST way to set a register to 0 is xor r32, r32  (it clears the upper 32 bits too!)   https://stackoverflow.com/questions/4829937/how-many-ways-to-set-a-register-to-zero   https://stackoverflow.com/questions/33666617/what-is-the-best-way-to-set-a-register-to-zero-in-x86-assembly-xor-mov-or-and/33668295#33668295
     0x31, 0xc0,                      //xor eax, eax (set the eax register to 0 just in case...)
-    0x8a, 0x01,                      //mov al, BYTE PTR [rcx] (im dereferencing rcx (the first 64 bit integer parameter) and putting the first byte into al)
+    0x8a, 0x01,                      //mov al, BYTE PTR [rcx] (im dereferencing rcx (the first 64 bit integer parameter) and putting the first byte into al) https://stackoverflow.com/questions/25129743/confusing-brackets-in-masm32  https://stackoverflow.com/questions/2030366/what-do-the-brackets-mean-in-nasm-syntax-for-x86-asm    https://github.com/simon987/Much-Assembly-Required/wiki/Basic-Assembly-tutorial#instruction-and-operands
     //0x48, 0x89, 0xc8,              //mov rax, rcx (lol i wasn't passing str correctly so i had to check the value)
     0xc3,                            //ret
 ], 1, [str], [VAR_CSTRING], RETURN_NUMBER)));
