@@ -16,6 +16,9 @@
 //                                                                                                                                                           nah nevermind for some reason when you used x64 msvc to compile and get the disassembly it wouldn't give the binary opcodes and you had to enable link to binary
 //im using https://defuse.ca/online-x86-assembler.htm#disassembly to convert my asm to hex binsry (i could use godbolt or run gcc on my own computer but, 1. godbolt is actually pretty good but sometimes it doesn't want to give you the opcodes for the asm, and 2. sometimes that shit don't work)
 
+//unrelated but interesting links:
+//https://stackoverflow.com/questions/8336214/how-can-i-get-a-process-entry-point-address
+
 const user32 = LoadLibraryEx("user32.dll", NULL); //using NULL will make LoadLibraryEx work just like LoadLibrary
 
 const swp = GetProcAddress(user32, "SetWindowPos");
@@ -205,13 +208,15 @@ const str = /*NewCharStrPtr*/("what's up my sigmas 🍷🗿?");
 
 print(str);
 
-print("should print w", String.fromCharCode(__asm([ //rax is 64, eax is 32, ax is lower 16 bits, ah is HIBYTE of the 16, al is LOBYTE of the 16
+print("should print w", String.fromCharCode(__asm([ //rax is 64, eax is 32, ax is the lower 16 bits, ah is HIBYTE of the 16, al is LOBYTE of the 16
     //0x48, 0x31, 0xc0,              //xor rax, rax (set rax to 0 just in case...)
     
                                      //apparently the BEST way to set a register to 0 is xor r32, r32  (it clears the upper 32 bits too!)   https://stackoverflow.com/questions/4829937/how-many-ways-to-set-a-register-to-zero   https://stackoverflow.com/questions/33666617/what-is-the-best-way-to-set-a-register-to-zero-in-x86-assembly-xor-mov-or-and/33668295#33668295
     0x31, 0xc0,                      //xor eax, eax (set the eax register to 0 just in case...)
     0x8a, 0x01,                      //mov al, BYTE PTR [rcx] (im dereferencing rcx (the first 64 bit integer parameter) and putting the first byte into al) https://stackoverflow.com/questions/25129743/confusing-brackets-in-masm32  https://stackoverflow.com/questions/2030366/what-do-the-brackets-mean-in-nasm-syntax-for-x86-asm    https://github.com/simon987/Much-Assembly-Required/wiki/Basic-Assembly-tutorial#instruction-and-operands
+    
     //0x48, 0x89, 0xc8,              //mov rax, rcx (lol i wasn't passing str correctly so i had to check the value)
+    
     0xc3,                            //ret
 ], 1, [str], [VAR_CSTRING], RETURN_NUMBER)));
 

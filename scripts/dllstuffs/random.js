@@ -37,6 +37,7 @@ function windowProc(hwnd, msg, wp, lp) {
                                         //passing both NULLs removed the current theme or some shit (https://learn.microsoft.com/en-us/windows/win32/api/uxtheme/nf-uxtheme-setwindowtheme#remarks)
         print(result, "S_OK?");
         // DwmSetWindowAttribute(hwnd, DWMWA_CAPTION_COLOR, RGB(24, 24, 24)); //aw you aren't allowed to change the titlebar like this when using themes (or something idk lol)
+        DwmExtendFrameIntoClientArea(hwnd, -1, -1, -1, -1); //wtf why did this make the window slightly transparent           https://learn.microsoft.com/en-us/windows/win32/dwm/customframe
         prog = CreateWindow(NULL, PROGRESS_CLASS, "", WS_VISIBLE | WS_CHILD | PBS_SMOOTH /*| PBS_MARQUEE*/, 0, 256, 512, 64, hwnd, 0, hInstance);
         SendMessage(prog, PBM_SETRANGE, 0, MAKELPARAM(0, 100));
         SendMessage(prog, PBM_SETSTEP, 10, 0);

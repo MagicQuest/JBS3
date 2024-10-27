@@ -165,11 +165,67 @@ class CString {
         this._data = new Uint8Array([...string.split("").map(e => e.charCodeAt(0)), 0x00]);
         this.ptr = PointerFromArrayBuffer(this._data);
     }
+
+    get value() {
+        //return String.fromCharCode(...Object.values(this._data));
+        let str = "";
+        for(let i = 0; i < this._data.length; i++) {
+            if(this._data[i] == 0) {
+                break;
+            }
+            str += String.fromCharCode(this._data[i]);
+        }
+        return str;
+    }
+    set value(newValue) {
+        if(newValue.length >= this._data.length) {
+            //too big and i gotta make a new array
+            //print("too big", newValue.length, ">=", this._data.length);
+            this._data = new Uint8Array([...newValue.split("").map(e => e.charCodeAt(0)), 0x00]);
+            this.ptr = PointerFromArrayBuffer(this._data);
+        }else {
+            for(let i = 0; i < this._data.length; i++) {
+                if(newValue.length <= i) {
+                    this._data[i] = 0;
+                }else {
+                    this._data[i] = newValue[i].charCodeAt(0);
+                }
+            }
+        }
+    }
 }
 class WString {
     constructor(wstring) {
         this._data = new Uint8Array([...wstring.split("").map(e => e+"\0").join("").split("").map(e => e.charCodeAt(0)), 0x00, 0x00]) //now that LoadIcon takes wchar_t i gotta add zeros because wchar is 2 bytes
         this.ptr = PointerFromArrayBuffer(this._data);
+    }
+
+    get value() {
+        //return String.fromCharCode(...Object.values(this._data));
+        let str = "";
+        for(let i = 0; i < this._data.length; i += 2) {
+            if(this._data[i] == 0) {
+                break;
+            }
+            str += String.fromCharCode(this._data[i]);
+        }
+        return str;
+    }
+    set value(newValue) {
+        if(newValue.length >= this._data.length/2) {
+            //too big and i gotta make a new array
+            print("too big", newValue.length, ">=", this._data.length/2);
+            this._data = new Uint8Array([...newValue.split("").map(e => e+"\0").join("").split("").map(e => e.charCodeAt(0)), 0x00, 0x00]);
+            this.ptr = PointerFromArrayBuffer(this._data);;
+        }else {
+            for(let i = 0; i < this._data.length; i++) {
+                if(i % 2 == 1 || newValue.length*2 <= i) {
+                    this._data[i] = 0;
+                }else {
+                    this._data[i] = newValue[(i/2)].charCodeAt(0);
+                }
+            }
+        }
     }
 }
 globalThis.memoobjectidk = memoobjectidk;

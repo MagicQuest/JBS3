@@ -851,17 +851,55 @@ void Version(const v8::FunctionCallbackInfo<v8::Value>& info) {
 }
 
 namespace fs {
+    //https://stackoverflow.com/questions/4775437/read-unicode-utf-8-file-into-wstring
+    size_t GetSizeOfFile(const std::wstring& path)
+    {
+        struct _stat fileinfo;
+        _wstat(path.c_str(), &fileinfo);
+        return fileinfo.st_size;
+    }
+
+    std::wstring LoadUtf8FileToString(const std::wstring& filename) //https://stackoverflow.com/a/4775542
+    {
+        std::wstring buffer;            // stores file contents
+        FILE* f = _wfopen(filename.c_str(), L"rtS, ccs=UTF-8");
+
+        // Failed to open file
+        if (f == NULL)
+        {
+            // ...handle some error...
+            return buffer;
+        }
+
+        size_t filesize = GetSizeOfFile(filename);
+
+        // Read entire file contents in to memory
+        if (filesize > 0)
+        {
+            buffer.resize(filesize);
+            size_t wchars_read = fread(&(buffer.front()), sizeof(wchar_t), filesize, f);
+            buffer.resize(wchars_read);
+            buffer.shrink_to_fit();
+        }
+
+        fclose(f);
+
+        return buffer;
+    }
+
     void read(const v8::FunctionCallbackInfo<v8::Value>& info) {
         using v8::String;
-        std::wstringstream buffer;
+        /*std::wstringstream buffer;
 
         std::wstring shit;
 
         std::wifstream file((wchar_t*)*String::Value(info.GetIsolate(), info[0]));//, std::ios::binary);
+        file.imbue(std::locale("en_US.UTF-8"));
 
         if (file.is_open()) {
             //i hate reading files in c++
             buffer << file.rdbuf();
+            //buffer.imbue(std::locale("en_US.UTF-8"));
             shit = buffer.str();
             //std::string tempstring(shit.size(), '#');
             //v8::Local<String> str = String::NewFromUtf8(info.GetIsolate(), tempstring.c_str()).ToLocalChecked();
@@ -879,7 +917,14 @@ namespace fs {
             info.GetReturnValue().SetUndefined();
         }
 
-        file.close();
+        file.close();*/
+        std::wstring file = LoadUtf8FileToString((wchar_t*)*String::Value(info.GetIsolate(), info[0]));
+        if (file.length() > 0) {
+            info.GetReturnValue().Set(String::NewFromTwoByte(info.GetIsolate(), (const uint16_t*)file.c_str()).ToLocalChecked());
+        }
+        else {
+            info.GetReturnValue().SetUndefined();
+        }
     }
 
     void readBinary(const v8::FunctionCallbackInfo<v8::Value>& info) {
@@ -946,6 +991,7 @@ namespace fs {
 void Require(const v8::FunctionCallbackInfo<v8::Value>& info) {
     const char* type = *v8::String::Utf8Value(info.GetIsolate(), info[0]); //insert tocstring here (dumb)
     v8::HandleScope handle_scope(info.GetIsolate());
+    //print(type << " " << LONG_PTR(type)); //bruh i was trying to use WinDbg to debug dllstuffs/asmloop.js but for some reason this string wouldn't go through and when i checked it in memory it was garbage
     if (strcmp(type, "fs") == 0) {
         print("typenigger");
         using namespace v8; //lol idk why you can do this right here
@@ -7891,6 +7937,11 @@ V8FUNC(CreateWindowWrapper) {
                 return lres;
             }
             else {
+                LRESULT ret = IntegerFI(returnedValue.ToLocalChecked());
+                if (ret != 0) {
+                    print(ret << " ret");
+                    return ret;
+                }
                 return DefWindowProcW(hwnd, msg, wp, lp);
                 //return SKIBIDI_CHECK;
             }
@@ -15482,6 +15533,9 @@ https://forums.codeguru.com/showthread.php?69236-How-to-obtain-HINSTANCE-using-H
         return -1;
     }
 
+    //std::wcin.imbue(std::locale("en_US.UTF-8")); //for some reason this was lowkey messing my stuff up (if i wrote special characters it would spam undefined)
+    //std::wcout.imbue(std::locale("en_US.UTF-8"));
+
     char exe[MAX_PATH]; GetModuleFileNameA(NULL, exe, MAX_PATH);
     print(exe);
 
@@ -15517,7 +15571,8 @@ https://forums.codeguru.com/showthread.php?69236-How-to-obtain-HINSTANCE-using-H
             //std::cin >> shit;
             //
             //std::cout << shit << std::endl;
-            std::wstringstream buffer;
+
+            //std::wstringstream buffer;
     
             std::wstring shit;
     
@@ -15533,8 +15588,8 @@ https://forums.codeguru.com/showthread.php?69236-How-to-obtain-HINSTANCE-using-H
             if (file.is_open()) {
                 wprint(L"working file ok good " << args << L" ;");
                 //i hate reading files in c++
-                buffer << file.rdbuf();
-                shit = buffer.str();
+                //buffer << file.rdbuf();
+                shit = fs::LoadUtf8FileToString(args); //buffer.str();
     
                 //while (file) {
                 //    getline(file, shit);
@@ -15545,7 +15600,7 @@ https://forums.codeguru.com/showthread.php?69236-How-to-obtain-HINSTANCE-using-H
             else {
                 wprint(L"ok buddy what is this file dumb nass nigasg " << nCmdList);
                 wprint(L"lemme hear you out tho for a second");
-                shit = nCmdList; //i did not know that equals sign was overloaded
+                //shit = nCmdList; //i did not know that equals sign was overloaded
             }
     
             file.close();
@@ -15594,15 +15649,27 @@ https://forums.codeguru.com/showthread.php?69236-How-to-obtain-HINSTANCE-using-H
                     wchar_t scriptwstr[256]; //buddy why was i using char (when you tried to use emoji in the terminal it wouldn't go through)
                     std::wcout << L">>> ";
                     std::wcin.getline(scriptwstr, 256);
-
+                    
                     if (wcscmp(scriptwstr, L"exit") == 0 || wcscmp(scriptwstr, L"quit") == 0) {
                         break;
                     }
-
+                    
                     //std::string scriptstring = "try {\n"+std::string(scriptcstr)+"\n}catch(e) {\nprint(e);\n}";
                                                                                                                                                                                     //bruh back in the day i thought i had to fill these out but they're calculated automagically
                     v8::Local<v8::String> source = v8::String::NewFromTwoByte(isolate, (const uint16_t*)scriptwstr).ToLocalChecked();//v8::String::NewFromUtf8(isolate, scriptcstr, v8::NewStringType::kNormal, strlen(scriptcstr)).ToLocalChecked();//v8::String::NewFromUtf8(isolate, (const char*)shit, v8::NewStringType::kNormal, strlen(shit)).ToLocalChecked();
                     //v8::String::NewFromUtf8Literal(isolate, shit);//"'Hello' + ', World!'");
+
+                    //char scriptstr[256]; //buddy why was i using char (when you tried to use emoji in the terminal it wouldn't go through)
+                    //std::cout << ">>> ";
+                    //std::cin.getline(scriptstr, 256);
+                    //
+                    //if (strcmp(scriptstr, "exit") == 0 || strcmp(scriptstr, "quit") == 0) {
+                    //    break;
+                    //}
+                    //
+                    ////std::string scriptstring = "try {\n"+std::string(scriptcstr)+"\n}catch(e) {\nprint(e);\n}";
+                    //                                                                                                                                                                //bruh back in the day i thought i had to fill these out but they're calculated automagically
+                    //v8::Local<v8::String> source = v8::String::NewFromUtf8(isolate, scriptstr).ToLocalChecked();//v8::String::NewFromUtf8(isolate, scriptcstr, v8::NewStringType::kNormal, strlen(scriptcstr)).ToLocalChecked();//v8::String::NewFromUtf8(isolate, (const char*)shit, v8::NewStringType::kNormal, strlen(shit)).ToLocalChecked();
 
                 // Compile the source code.
                     v8::Local<v8::Script> script;

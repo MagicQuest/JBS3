@@ -7,6 +7,8 @@ https://stackoverflow.com/questions/137038/how-do-you-get-assembler-output-from-
 //https://cs.brown.edu/courses/cs033/docs/guides/x64_cheatsheet.pdf
 //https://stackoverflow.com/questions/36529449/why-are-rbp-and-rsp-called-general-purpose-registers
 
+//https://sonictk.github.io/asm_tutorial/           <-------- damn this is some good stuff
+
     creates asm
 gcc -S test.cpp -o test.asm
 

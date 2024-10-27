@@ -1,6 +1,14 @@
-SIGMA!
-maybe bloojmed
-sigmsa
-what
-HLEP
-\whwsrfzd
+{"nx": 200, "ny": 100, "nw": 512, "nh": 300, "b": true}
+SetBkColor(memDC, RGB(255, 255, 255)); CreateFontSimple("burbank big cd bd", 12, 24); //haha fortnite font
+
+kill people really fast
+hit headshots
+honk cars at night
+hire characters!
+damage niggas with chainsaw man
+reload a lot after damaging an opp
+
+${String.fromCharCode(0xd83e, 0xdd13)}
+${[memDC, (WS_BORDER & GetWindowLongPtr(hwnd, GWL_STYLE)) == WS_BORDER, WS_BORDER]}
+${[GetSystemMetrics(SM_CYCAPTION)]}
+${SetWindowPos(hwnd, NULL, nx, ny, nw, nh, SWP_NOZORDER)}
