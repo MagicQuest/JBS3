@@ -1451,7 +1451,55 @@ V8FUNC(EndPaintWrapper) {
 V8FUNC(CreateRectRgnWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
+
     info.GetReturnValue().Set(Number::New(isolate, (long long)CreateRectRgn(IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]))));
+}
+
+V8FUNC(SetRectRgnWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, SetRectRgn((HRGN)IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]), IntegerFI(info[4]))));
+}
+
+V8FUNC(FillRgnWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, FillRgn((HDC)IntegerFI(info[0]), (HRGN)IntegerFI(info[1]), (HBRUSH)IntegerFI(info[2]))));
+}
+
+V8FUNC(EqualRgnWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, EqualRgn((HRGN)IntegerFI(info[0]), (HRGN)IntegerFI(info[1]))));
+}
+
+V8FUNC(PaintRgnWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, PaintRgn((HDC)IntegerFI(info[0]), (HRGN)IntegerFI(info[1]))));
+}
+
+V8FUNC(FrameRgnWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, FrameRgn((HDC)IntegerFI(info[0]), (HRGN)IntegerFI(info[1]), (HBRUSH)IntegerFI(info[2]), IntegerFI(info[3]), IntegerFI(info[4]))));
+}
+
+V8FUNC(GetRgnBoxWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    RECT rect{};
+    int complexity = GetRgnBox((HRGN)IntegerFI(info[0]), &rect);
+    Local<Object> jsRect = jsImpl::createWinRect(isolate, rect);
+    jsRect->Set(isolate->GetCurrentContext(), LITERAL("complexity"), Number::New(isolate, complexity));
+
+    info.GetReturnValue().Set(jsRect);
 }
 
 V8FUNC(GetDCWrapper) {
@@ -7874,7 +7922,7 @@ V8FUNC(CreateWindowWrapper) {
         }
         wc.style = IntegerFI(GetProperty("style"));
         wc.lpfnWndProc = WinProc;
-
+        
         //wc.lpfnWndProc = WinProc;
         //wc.hInstance = hInstance;
         //wc.cbSize = sizeof(WNDCLASSEXW);
@@ -8048,7 +8096,7 @@ V8FUNC(CreateWindowWrapper) {
             else {
                 while (Message.message != WM_QUIT)
                 {
-                    if (GetMessage(&Message, NULL, 0, 0)) //uh oh when testing customcontextmenu.js i keep getting debugbreaks here but i can still continue execution?
+                    if (GetMessage(&Message, NULL, 0, 0)) //uh oh when testing customcontextmenu.js i keep getting debugbreaks here but i can still continue execution? (i was corrupting the heap with GetMenuItemInfo because i didn't know how to get the string out)
                     {
                         // If a message was waiting in the message queue, process it
                         //print("wajt");
@@ -12741,7 +12789,34 @@ V8FUNC(FlushInstructionCacheWrapper) {
     info.GetReturnValue().Set(Number::New(isolate, FlushInstructionCache((void*)IntegerFI(info[0]), (void*)IntegerFI(info[1]), IntegerFI(info[2]))));
 }
 
-v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const wchar_t* filename) {
+V8FUNC(TrackMouseEventWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    DWORD flags = IntegerFI(info[0]);
+
+    TRACKMOUSEEVENT eventTrack{};
+    eventTrack.cbSize = sizeof(TRACKMOUSEEVENT);
+    eventTrack.dwFlags = flags;
+    eventTrack.hwndTrack = (HWND)IntegerFI(info[1]);
+    eventTrack.dwHoverTime = IntegerFI(info[2]);
+
+    BOOL succ = TrackMouseEvent(&eventTrack);
+
+    if ((flags & TME_QUERY) == TME_QUERY && succ) {
+        Local<Context> context = isolate->GetCurrentContext();
+        Local<Object> obj = Object::New(isolate);
+        obj->Set(context, LITERAL("dwFlags"), Number::New(isolate, eventTrack.dwFlags));
+        obj->Set(context, LITERAL("hwndTrack"), Number::New(isolate, (LONG_PTR)eventTrack.hwndTrack));
+        obj->Set(context, LITERAL("dwHoverTime"), Number::New(isolate, eventTrack.dwHoverTime));
+        info.GetReturnValue().Set(obj);
+    }
+    else {
+        info.GetReturnValue().Set(Number::New(isolate, succ));
+    }
+}
+
+v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const wchar_t* filename, int nCmdShow) {
     using namespace v8;
 
     Local<ObjectTemplate> global = ObjectTemplate::New(isolate);
@@ -12775,6 +12850,8 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const wchar_t* filename
 
     Local<ObjectTemplate> file = ObjectTemplate::New(isolate);
     file->Set(isolate, "name", String::NewFromTwoByte(isolate, (const uint16_t*)filename).ToLocalChecked());
+
+    global->Set(isolate, "nCmdShow", Number::New(isolate, nCmdShow));
 
     global->Set(isolate, "file", file);
 
@@ -12882,6 +12959,16 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const wchar_t* filename
     global->Set(isolate, "GetDC", FunctionTemplate::New(isolate, GetDCWrapper));
     global->Set(isolate, "GetDCEx", FunctionTemplate::New(isolate, GetDCExWrapper));
     global->Set(isolate, "CreateRectRgn", FunctionTemplate::New(isolate, CreateRectRgnWrapper));
+    global->Set(isolate, "GetRgnBox", FunctionTemplate::New(isolate, GetRgnBoxWrapper));
+    setGlobalWrapper(SetRectRgn);
+    setGlobalWrapper(PaintRgn);
+    setGlobalWrapper(FillRgn);
+    setGlobalWrapper(EqualRgn);
+    setGlobalWrapper(FrameRgn);
+    setGlobalConst(NULLREGION);
+    setGlobalConst(SIMPLEREGION);
+    setGlobalConst(COMPLEXREGION);
+    
     global->Set(isolate, "ReleaseDC", FunctionTemplate::New(isolate, ReleaseDCWrapper));
 
     global->Set(isolate, "TextOut", FunctionTemplate::New(isolate, TextOutWrapper));
@@ -13993,7 +14080,15 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const wchar_t* filename
 
     setGlobalConst(SND_APPLICATION); setGlobalConst(SND_ALIAS); setGlobalConst(SND_ALIAS_ID); setGlobalConst(SND_ASYNC); setGlobalConst(SND_FILENAME); setGlobalConst(SND_LOOP); setGlobalConst(SND_MEMORY); setGlobalConst(SND_NODEFAULT); setGlobalConst(SND_NOSTOP); setGlobalConst(SND_NOWAIT); setGlobalConst(SND_PURGE); setGlobalConst(SND_RESOURCE); setGlobalConst(SND_SENTRY); setGlobalConst(SND_SYNC); setGlobalConst(SND_SYSTEM);
     setGlobalConst(MM_MCINOTIFY);
-    
+
+    setGlobalWrapper(TrackMouseEvent);
+    setGlobalConst(TME_CANCEL);
+    setGlobalConst(TME_HOVER);
+    setGlobalConst(TME_LEAVE);
+    setGlobalConst(TME_NONCLIENT);
+    setGlobalConst(TME_QUERY);
+    setGlobalConst(HOVER_DEFAULT);
+
     global->Set(isolate, "CreateWindow", FunctionTemplate::New(isolate, CreateWindowWrapper));
     global->Set(isolate, "CreateWindowClass", FunctionTemplate::New(isolate, CreateWindowClass));
 
@@ -14357,6 +14452,36 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const wchar_t* filename
     setGlobalConst(LBS_STANDARD);
 
     setGlobalConst(WM_NULL); setGlobalConst(WM_CREATE); setGlobalConst(WM_DESTROY); setGlobalConst(WM_MOVE); setGlobalConst(WM_SIZE); setGlobalConst(WM_ACTIVATE); setGlobalConst(WM_SETFOCUS); setGlobalConst(WM_KILLFOCUS); setGlobalConst(WM_ENABLE); setGlobalConst(WM_SETREDRAW); setGlobalConst(WM_SETTEXT); setGlobalConst(WM_GETTEXT); setGlobalConst(WM_GETTEXTLENGTH); setGlobalConst(WM_PAINT); setGlobalConst(WM_CLOSE); setGlobalConst(WM_QUERYENDSESSION); setGlobalConst(WM_QUIT); setGlobalConst(WM_QUERYOPEN); setGlobalConst(WM_ERASEBKGND); setGlobalConst(WM_SYSCOLORCHANGE); setGlobalConst(WM_ENDSESSION); setGlobalConst(WM_SHOWWINDOW); setGlobalConst(WM_WININICHANGE); setGlobalConst(WM_DEVMODECHANGE); setGlobalConst(WM_ACTIVATEAPP); setGlobalConst(WM_FONTCHANGE); setGlobalConst(WM_TIMECHANGE); setGlobalConst(WM_CANCELMODE); setGlobalConst(WM_SETCURSOR); setGlobalConst(WM_MOUSEACTIVATE); setGlobalConst(WM_CHILDACTIVATE); setGlobalConst(WM_QUEUESYNC); setGlobalConst(WM_GETMINMAXINFO); setGlobalConst(WM_PAINTICON); setGlobalConst(WM_ICONERASEBKGND); setGlobalConst(WM_NEXTDLGCTL); setGlobalConst(WM_SPOOLERSTATUS); setGlobalConst(WM_DRAWITEM); setGlobalConst(WM_MEASUREITEM); setGlobalConst(WM_DELETEITEM); setGlobalConst(WM_VKEYTOITEM); setGlobalConst(WM_CHARTOITEM); setGlobalConst(WM_SETFONT); setGlobalConst(WM_GETFONT); setGlobalConst(WM_SETHOTKEY); setGlobalConst(WM_GETHOTKEY); setGlobalConst(WM_QUERYDRAGICON); setGlobalConst(WM_COMPAREITEM); setGlobalConst(WM_GETOBJECT); setGlobalConst(WM_COMPACTING); setGlobalConst(WM_COMMNOTIFY); setGlobalConst(WM_WINDOWPOSCHANGING); setGlobalConst(WM_WINDOWPOSCHANGED); setGlobalConst(WM_POWER); setGlobalConst(WM_COPYDATA); setGlobalConst(WM_CANCELJOURNAL); setGlobalConst(WM_NOTIFY); setGlobalConst(WM_INPUTLANGCHANGEREQUEST); setGlobalConst(WM_INPUTLANGCHANGE); setGlobalConst(WM_TCARD); setGlobalConst(WM_HELP); setGlobalConst(WM_USERCHANGED); setGlobalConst(WM_NOTIFYFORMAT); setGlobalConst(WM_CONTEXTMENU); setGlobalConst(WM_STYLECHANGING); setGlobalConst(WM_STYLECHANGED); setGlobalConst(WM_DISPLAYCHANGE); setGlobalConst(WM_GETICON); setGlobalConst(WM_SETICON); setGlobalConst(WM_NCCREATE); setGlobalConst(WM_NCDESTROY); setGlobalConst(WM_NCCALCSIZE); setGlobalConst(WM_NCHITTEST); setGlobalConst(WM_NCPAINT); setGlobalConst(WM_NCACTIVATE); setGlobalConst(WM_GETDLGCODE); setGlobalConst(WM_SYNCPAINT); setGlobalConst(WM_NCMOUSEMOVE); setGlobalConst(WM_NCLBUTTONDOWN); setGlobalConst(WM_NCLBUTTONUP); setGlobalConst(WM_NCLBUTTONDBLCLK); setGlobalConst(WM_NCRBUTTONDOWN); setGlobalConst(WM_NCRBUTTONUP); setGlobalConst(WM_NCRBUTTONDBLCLK); setGlobalConst(WM_NCMBUTTONDOWN); setGlobalConst(WM_NCMBUTTONUP); setGlobalConst(WM_NCMBUTTONDBLCLK); setGlobalConst(WM_NCXBUTTONDOWN); setGlobalConst(WM_NCXBUTTONUP); setGlobalConst(WM_NCXBUTTONDBLCLK); setGlobalConst(WM_INPUT); setGlobalConst(WM_KEYDOWN); setGlobalConst(WM_KEYFIRST); setGlobalConst(WM_KEYUP); setGlobalConst(WM_CHAR); setGlobalConst(WM_DEADCHAR); setGlobalConst(WM_SYSKEYDOWN); setGlobalConst(WM_SYSKEYUP); setGlobalConst(WM_SYSCHAR); setGlobalConst(WM_SYSDEADCHAR); setGlobalConst(WM_UNICHAR / WM_KEYLAST); setGlobalConst(WM_IME_STARTCOMPOSITION); setGlobalConst(WM_IME_ENDCOMPOSITION); setGlobalConst(WM_IME_COMPOSITION); setGlobalConst(WM_IME_KEYLAST); setGlobalConst(WM_INITDIALOG); setGlobalConst(WM_COMMAND); setGlobalConst(WM_SYSCOMMAND); setGlobalConst(WM_TIMER); setGlobalConst(WM_HSCROLL); setGlobalConst(WM_VSCROLL); setGlobalConst(WM_INITMENU); setGlobalConst(WM_INITMENUPOPUP); setGlobalConst(WM_MENUSELECT); setGlobalConst(WM_MENUCHAR); setGlobalConst(WM_ENTERIDLE); setGlobalConst(WM_MENURBUTTONUP); setGlobalConst(WM_MENUDRAG); setGlobalConst(WM_MENUGETOBJECT); setGlobalConst(WM_UNINITMENUPOPUP); setGlobalConst(WM_MENUCOMMAND); setGlobalConst(WM_CHANGEUISTATE); setGlobalConst(WM_UPDATEUISTATE); setGlobalConst(WM_QUERYUISTATE); setGlobalConst(WM_CTLCOLORMSGBOX); setGlobalConst(WM_CTLCOLOREDIT); setGlobalConst(WM_CTLCOLORLISTBOX); setGlobalConst(WM_CTLCOLORBTN); setGlobalConst(WM_CTLCOLORDLG); setGlobalConst(WM_CTLCOLORSCROLLBAR); setGlobalConst(WM_CTLCOLORSTATIC); setGlobalConst(WM_MOUSEFIRST); setGlobalConst(WM_MOUSEMOVE); setGlobalConst(WM_LBUTTONDOWN); setGlobalConst(WM_LBUTTONUP); setGlobalConst(WM_LBUTTONDBLCLK); setGlobalConst(WM_RBUTTONDOWN); setGlobalConst(WM_RBUTTONUP); setGlobalConst(WM_RBUTTONDBLCLK); setGlobalConst(WM_MBUTTONDOWN); setGlobalConst(WM_MBUTTONUP); setGlobalConst(WM_MBUTTONDBLCLK); setGlobalConst(WM_MOUSELAST); setGlobalConst(WM_MOUSEWHEEL); setGlobalConst(WM_XBUTTONDOWN); setGlobalConst(WM_XBUTTONUP); setGlobalConst(WM_XBUTTONDBLCLK); setGlobalConst(WM_MOUSEHWHEEL); setGlobalConst(WM_PARENTNOTIFY); setGlobalConst(WM_ENTERMENULOOP); setGlobalConst(WM_EXITMENULOOP); setGlobalConst(WM_NEXTMENU); setGlobalConst(WM_SIZING); setGlobalConst(WM_CAPTURECHANGED); setGlobalConst(WM_MOVING); setGlobalConst(WM_POWERBROADCAST); setGlobalConst(WM_DEVICECHANGE); setGlobalConst(WM_MDICREATE); setGlobalConst(WM_MDIDESTROY); setGlobalConst(WM_MDIACTIVATE); setGlobalConst(WM_MDIRESTORE); setGlobalConst(WM_MDINEXT); setGlobalConst(WM_MDIMAXIMIZE); setGlobalConst(WM_MDITILE); setGlobalConst(WM_MDICASCADE); setGlobalConst(WM_MDIICONARRANGE); setGlobalConst(WM_MDIGETACTIVE); setGlobalConst(WM_MDISETMENU); setGlobalConst(WM_ENTERSIZEMOVE); setGlobalConst(WM_EXITSIZEMOVE); setGlobalConst(WM_DROPFILES); setGlobalConst(WM_MDIREFRESHMENU); setGlobalConst(WM_IME_SETCONTEXT); setGlobalConst(WM_IME_NOTIFY); setGlobalConst(WM_IME_CONTROL); setGlobalConst(WM_IME_COMPOSITIONFULL); setGlobalConst(WM_IME_SELECT); setGlobalConst(WM_IME_CHAR); setGlobalConst(WM_IME_REQUEST); setGlobalConst(WM_IME_KEYDOWN); setGlobalConst(WM_IME_KEYUP); setGlobalConst(WM_NCMOUSEHOVER); setGlobalConst(WM_MOUSEHOVER); setGlobalConst(WM_NCMOUSELEAVE); setGlobalConst(WM_MOUSELEAVE); setGlobalConst(WM_CUT); setGlobalConst(WM_COPY); setGlobalConst(WM_PASTE); setGlobalConst(WM_CLEAR); setGlobalConst(WM_UNDO); setGlobalConst(WM_RENDERFORMAT); setGlobalConst(WM_RENDERALLFORMATS); setGlobalConst(WM_DESTROYCLIPBOARD); setGlobalConst(WM_DRAWCLIPBOARD); setGlobalConst(WM_PAINTCLIPBOARD); setGlobalConst(WM_VSCROLLCLIPBOARD); setGlobalConst(WM_SIZECLIPBOARD); setGlobalConst(WM_ASKCBFORMATNAME); setGlobalConst(WM_CHANGECBCHAIN); setGlobalConst(WM_HSCROLLCLIPBOARD); setGlobalConst(WM_QUERYNEWPALETTE); setGlobalConst(WM_PALETTEISCHANGING); setGlobalConst(WM_PALETTECHANGED); setGlobalConst(WM_HOTKEY); setGlobalConst(WM_PRINT); setGlobalConst(WM_PRINTCLIENT); setGlobalConst(WM_APPCOMMAND); setGlobalConst(WM_HANDHELDFIRST); setGlobalConst(WM_HANDHELDLAST); setGlobalConst(WM_AFXFIRST); setGlobalConst(WM_AFXLAST); setGlobalConst(WM_PENWINFIRST); setGlobalConst(WM_PENWINLAST); setGlobalConst(WM_PSD_PAGESETUPDLG); setGlobalConst(WM_USER); setGlobalConst(WM_CHOOSEFONT_GETLOGFONT); setGlobalConst(WM_PSD_FULLPAGERECT); setGlobalConst(WM_PSD_MINMARGINRECT); setGlobalConst(WM_PSD_MARGINRECT); setGlobalConst(WM_PSD_GREEKTEXTRECT); setGlobalConst(WM_PSD_ENVSTAMPRECT); setGlobalConst(WM_PSD_YAFULLPAGERECT); setGlobalConst(WM_CHOOSEFONT_SETLOGFONT); setGlobalConst(WM_CHOOSEFONT_SETFLAGS);
+    setGlobalConst(HTERROR);
+    setGlobalConst(HTTRANSPARENT);
+    setGlobalConst(HTNOWHERE);
+    setGlobalConst(HTCLIENT);
+    setGlobalConst(HTCAPTION);
+    setGlobalConst(HTSYSMENU);
+    setGlobalConst(HTGROWBOX);
+    setGlobalConst(HTSIZE);
+    setGlobalConst(HTMENU);
+    setGlobalConst(HTHSCROLL);
+    setGlobalConst(HTVSCROLL);
+    setGlobalConst(HTMINBUTTON);
+    setGlobalConst(HTMAXBUTTON);
+    setGlobalConst(HTLEFT);
+    setGlobalConst(HTRIGHT);
+    setGlobalConst(HTTOP);
+    setGlobalConst(HTTOPLEFT);
+    setGlobalConst(HTTOPRIGHT);
+    setGlobalConst(HTBOTTOM);
+    setGlobalConst(HTBOTTOMLEFT);
+    setGlobalConst(HTBOTTOMRIGHT);
+    setGlobalConst(HTBORDER);
+    setGlobalConst(HTREDUCE);
+    setGlobalConst(HTZOOM);
+    setGlobalConst(HTSIZEFIRST);
+    setGlobalConst(HTSIZELAST);
+    setGlobalConst(HTOBJECT);
+    setGlobalConst(HTCLOSE);
+    setGlobalConst(HTHELP);
+
     setGlobalConst(CB_OKAY);
     setGlobalConst(CB_ERR);
     setGlobalConst(CB_ERRSPACE);
@@ -14833,6 +14958,19 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
     //setGlobalConst(PS_ALTERNATIVE);
     setGlobalConst(PS_USERSTYLE);
     setGlobalConst(PS_ENDCAP_ROUND); setGlobalConst(PS_ENDCAP_SQUARE); setGlobalConst(PS_ENDCAP_FLAT); setGlobalConst(PS_JOIN_BEVEL); setGlobalConst(PS_JOIN_MITER); setGlobalConst(PS_JOIN_ROUND);
+    
+    setGlobalConst(BS_SOLID);
+    setGlobalConst(BS_NULL);
+    setGlobalConst(BS_HOLLOW);
+    setGlobalConst(BS_HATCHED);
+    setGlobalConst(BS_PATTERN);
+    setGlobalConst(BS_INDEXED);
+    setGlobalConst(BS_DIBPATTERN);
+    setGlobalConst(BS_DIBPATTERNPT);
+    setGlobalConst(BS_PATTERN8X8);
+    setGlobalConst(BS_DIBPATTERN8X8);
+    setGlobalConst(BS_MONOPATTERN);
+
     setGlobalWrapper(GetStockObject);
 
     setGlobalConst(BLACK_BRUSH); setGlobalConst(DKGRAY_BRUSH); setGlobalConst(DC_BRUSH); setGlobalConst(GRAY_BRUSH); setGlobalConst(HOLLOW_BRUSH); setGlobalConst(LTGRAY_BRUSH); setGlobalConst(NULL_BRUSH); setGlobalConst(WHITE_BRUSH); setGlobalConst(BLACK_PEN); setGlobalConst(DC_PEN); setGlobalConst(NULL_PEN); setGlobalConst(WHITE_PEN); setGlobalConst(ANSI_FIXED_FONT); setGlobalConst(ANSI_VAR_FONT); setGlobalConst(DEVICE_DEFAULT_FONT); setGlobalConst(DEFAULT_GUI_FONT); setGlobalConst(OEM_FIXED_FONT); setGlobalConst(SYSTEM_FONT); setGlobalConst(SYSTEM_FIXED_FONT); setGlobalConst(DEFAULT_PALETTE);
@@ -15558,7 +15696,7 @@ https://forums.codeguru.com/showthread.php?69236-How-to-obtain-HINSTANCE-using-H
     
        // v8::TryCatch trycatch(isolate);
         // Create a new context.
-        v8::Local<v8::Context> context = InitGlobals(isolate, nCmdList);//argv[1]);//v8::Context::New(isolate, NULL, global);
+        v8::Local<v8::Context> context = InitGlobals(isolate, nCmdList, nCmdShow);//argv[1]);//v8::Context::New(isolate, NULL, global);
     
         // Enter the context for compiling and running the hello world script.
         v8::Context::Scope context_scope(context);
