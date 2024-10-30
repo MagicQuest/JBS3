@@ -88,10 +88,10 @@ class OtherWindow { //https://www.youtube.com/watch?v=24Eh2-DZTgQ
         otherwc.hbrBackground = COLOR_BACKGROUND;
         otherwc.hCursor = LoadCursor(NULL, IDC_HAND);
         otherwc.DefWindowProc = false;
-        otherwc.style = CS_HREDRAW | CS_VREDRAW;
+        //otherwc.style = CS_HREDRAW | CS_VREDRAW; //oops this was causing flickering
 
         CreateWindow(NULL, otherwc, NULL, (WS_SIZEBOX | WS_CHILD | WS_VISIBLE) ^ (WS_BORDER | WS_THICKFRAME), 0, 325, w, h-325, hwnd, NULL, hInstance); //why can'yt you do WS_POPUP with WS_CHILD
-        print("closed otherwnd");
+        //print("closed otherwnd");
     }
 
     windowProc(hwnd, msg, wp, lp) { //OK LOWKEY i decided not to use WM_NCPAINT because i can just use WM_NCHITTEST to say when it's resizable
@@ -158,7 +158,7 @@ class OtherWindow { //https://www.youtube.com/watch?v=24Eh2-DZTgQ
             }
         }
         else if(msg == WM_DESTROY) {
-            print("quit?");
+            print("quit? closed otherwnd");
             //SetWindowPos(hwnd, NULL, Math.random()*300, Math.random()*300, NULL, NULL, SWP_NOSIZE | SWP_NOZORDER);
             //return -1; //aw man i thought that i could stop DefWindowProc and it wouldn't close the window (but the only times i've ever "done" that was 3 years ago when i used SFML's events to move the window instead of calling RenderWindow::close())
             PostQuitMessage(0);

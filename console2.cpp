@@ -4,7 +4,7 @@
 #include <iostream>
 
 
-void BindCrtHandlesToStdHandles(bool bindStdIn, bool bindStdOut, bool bindStdErr)
+void BindCrtHandlesToStdHandles(bool bindStdIn, bool bindStdOut, bool bindStdErr) //https://stackoverflow.com/questions/311955/redirecting-cout-to-a-console-in-windows/25927081#25927081
 {
     // Re-initialize the C runtime "FILE" handles with clean handles bound to "nul". We do this because it has been
     // observed that the file number of our standard handle file objects can be assigned internally to a value of -2

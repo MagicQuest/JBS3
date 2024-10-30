@@ -7753,6 +7753,20 @@ V8FUNC(EllipseWrapper) {
     info.GetReturnValue().Set(Number::New(isolate, Ellipse((HDC)IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]), IntegerFI(info[4]))));
 }
 
+V8FUNC(AddFontResourceExWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, AddFontResourceEx(WStringFI(info[0]), IntegerFI(info[1]), 0)));
+}
+
+V8FUNC(RemoveFontResourceExWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, RemoveFontResourceEx(WStringFI(info[0]), IntegerFI(info[1]), 0)));
+}
+
 V8FUNC(SetCaptureWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
@@ -7949,7 +7963,7 @@ V8FUNC(CreateWindowWrapper) {
         auto newWinProc = [=](HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) -> LRESULT {
             HandleScope handle_scope(isolate); //slapping this bad boy in here
             //oof im still mad about this global i gotta fix that at some point (you cannot create 2 main windows (idk when you would want to but))
-            Local<Function> listener = GetProperty("windowProc").As<Function>();
+            Local<Function> listener = GetProperty("windowProc").As<Function>(); //nevermind bruh when i made new windows not block the thread these variables (wndclass) would leave the stack as this function ended and my shit would be access violating
 
             Local<Value> args[] = { Number::New(isolate, (LONG_PTR)hwnd),  Number::New(isolate, msg), Number::New(isolate, wp), Number::New(isolate, lp) };
             // Local<Value> result;
@@ -8065,10 +8079,12 @@ V8FUNC(CreateWindowWrapper) {
         UpdateWindow(newWindow);
         //GetProperty("init").As<Function>()->Call(isolate->GetCurrentContext(), isolate->GetCurrentContext()->Global(), 1, args)/*.ToLocalChecked()*/;
 
-        Local<Function> looper = GetProperty("loop").As<Function>();
-        print(looper.IsEmpty() << " " << looper->IsUndefined());
+        //if ((winProcMap.size() - 1) == 0) { //you only need the loop once! (also im subtracting one because at this point winProcMap has at least 1 element)
 
-        //std::thread f([=] { //well shit if i actually use a new thread nothing is blocking v8 and jbs from just reaching the end of the program
+            Local<Function> looper = GetProperty("loop").As<Function>();
+            print(looper.IsEmpty() << " " << looper->IsUndefined());
+
+            //std::thread f([=] { //well shit if i actually use a new thread nothing is blocking v8 and jbs from just reaching the end of the program
             MSG Message{};
             Message.message = ~WM_QUIT;
 
@@ -8107,6 +8123,7 @@ V8FUNC(CreateWindowWrapper) {
             }
 
             print("loop over nigga");
+        //}
         //});
         //f.detach();
         //uh->Resolve(isolate->GetCurrentContext(), Undefined(isolate)); //https://gist.github.com/jupp0r/5f11c0ee2b046b0ab89660ce85ea480e
@@ -9943,6 +9960,7 @@ V8FUNC(SwitchToThisWindowWrapper) {
 void showFilePicker(const v8::FunctionCallbackInfo<v8::Value>& info, bool saveDialog) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
+    HandleScope handle_scope(isolate);
     //i could use a promise but idk if i can be bothered
     Local<Object> options = info[0].As<Object>();
 
@@ -10012,7 +10030,17 @@ void showFilePicker(const v8::FunctionCallbackInfo<v8::Value>& info, bool saveDi
                         }
                     }
 
-                    c_rgSaveTypes[i] = { WStringFI(desc), aTWS.c_str()}; //lets hope this c_str() keeps working outside this scope (bruh this shit really running off of duktape (get it) and hopes and dreams (haha get it frisk))
+                    wchar_t* descPtr = new wchar_t[desc->Length()];
+                    wcscpy(descPtr, WStringFI(desc)); //i guess i could use memcpy because i know the length...
+
+                    wchar_t* vecPtr = new wchar_t[aTWS.length()];
+                    wcscpy(vecPtr, &aTWS[0]);
+
+                    c_rgSaveTypes[i] = { descPtr, vecPtr }; //lets hope this c_str() keeps working outside this scope (bruh this shit really running off of duktape (get it) and hopes and dreams (haha get it frisk))
+
+
+                    //yeah lowkey i think this is screwing up because im using these local stack variables                                                              (i used duktape for jbs2)
+                    //c_rgSaveTypes[i] = { WStringFI(desc), aTWS.c_str()}; //lets hope this c_str() keeps working outside this scope (bruh this shit really running off of duktape (get it) and hopes and dreams (haha get it frisk))
                 }
             }
             if (!excludeAcceptAll) {
@@ -10070,6 +10098,10 @@ void showFilePicker(const v8::FunctionCallbackInfo<v8::Value>& info, bool saveDi
                     }
                     shellItem->Release();
                 }
+            }
+            for (int i = 0; i < types->Length(); i++) {
+                delete[] c_rgSaveTypes[i].pszName; //hopefully no memory leaks heree
+                delete[] c_rgSaveTypes[i].pszSpec;
             }
             delete[] c_rgSaveTypes;
         }
@@ -11747,10 +11779,23 @@ V8FUNC(spawn) {
     //OH YEAH lua(u) spawn use this at your own risk
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
+    HandleScope handle_scope(isolate);
 
     Persistent<Function> func = Persistent<Function>(isolate, info[0].As<Function>());
     std::thread f([=] { //
-        func.Get(isolate)->Call(isolate->GetCurrentContext(), isolate->GetCurrentContext()->Global(), 0, nullptr);
+        //Isolate::Scope isolate_scope(isolate);
+        isolate->Enter();
+        //Locker locker_(isolate);
+        //print(isolate << " " << Isolate::GetCurrent() << " president");
+        //Isolate* i = Isolate::GetCurrent();
+        Local<Context> context = isolate->GetCurrentContext();
+        //func.Get(isolate)->Call(context, context->Global(), 0, nullptr);
+        Local<Function> callable = func.Get(isolate);
+        Local<Object> globalThis = context->Global(); //it does not like Global here... (it works when i use isolate->Enter() but again stops working when i use Locker)
+        callable->Call(context, globalThis, 0, nullptr);
+        //isolate->EnqueueMicrotask(callable); //im tryna get my knowledge of v8 up so hopefully i've learned enough here
+        //isolate->PerformMicrotaskCheckpoint();
+        isolate->Exit();
     });
     f.detach();
 }
@@ -15467,6 +15512,12 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
     setGlobalWrapper(GetActiveWindow);
     setGlobalWrapper(SetActiveWindow);
 
+    setGlobalWrapper(AddFontResourceEx);
+    setGlobalConst(FR_PRIVATE);
+    setGlobalConst(FR_NOT_ENUM);
+    setGlobalWrapper(RemoveFontResourceEx);
+
+
     setGlobalWrapper(SetCapture);
     setGlobalWrapper(ReleaseCapture);
     setGlobalWrapper(ClipCursor);
@@ -15570,7 +15621,7 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrevInstance, PWSTR nCmdList, in
 
     AllocConsole();
 
-    BindCrtHandlesToStdHandles(true, true, true);
+    BindCrtHandlesToStdHandles(true, true, true); //redirrect console output?!
 
     SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), 4); //https://stackoverflow.com/questions/4053837/colorizing-text-in-the-console-with-c
 

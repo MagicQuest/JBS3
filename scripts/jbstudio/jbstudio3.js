@@ -199,8 +199,8 @@ function readAndPrepareMidi(file) {
         //Math.floor((note.x - 70)/91)*(60/tempo)*1000;
         //ok symbolab told me that to find note.x it's (91*note.start*tempo)/60000 + 70
         let x = (92*note.start*tempo)/60000 + 70;
-        print(note.start, tempo, x, note.key, "erm...");
-        let pRN = new ABSDraggable(x, ((131-note.key)*21), (note.beats*4)*23, 20, channelColors[note.channel].map(val => val/255), pianoRollNoteDrag); //haha prn
+        print(note.start, tempo, x, note.key, note.vel, "erm...");                                  //oops i thought midi max velocity was 100!
+        let pRN = new ABSDraggable(x, ((131-note.key)*21), (note.beats*4)*23, 20, channelColors[note.channel].map(val => (note.vel/127)*(val/255)), pianoRollNoteDrag); //haha prn
         pRN.key = note.key;
         pRN.channel = note.channel;
         pRN.AltInteract = pianoRollNoteAlt;
@@ -339,10 +339,17 @@ function playTone(key, pitch, up = false) {
         let tone = tones[key]*(2**pitch);
         Beep(tone, 500);//.then(any => console.log("promise: ", any)); //ok for some reason it keeps randomly crashing and idk what the error is saying
     }else {
+        const note = pitch*12 + key;
         if(!up) {
-            fluidsynthinst.noteon(0, pitch*12 + key, 100);
+            if(!pianoKeys[note].lastColor) {
+                pianoKeys[note].lastColor = pianoKeys[note].color; //luckily this is js and i can just add properties (i could just add it directly to interactable but i only need this property for the piano keys)
+            }
+            pianoKeys[note].color = [1, 155/255, 0];
+            fluidsynthinst.noteon(0, note, 100);
         }else {
-            fluidsynthinst.noteoff(0, pitch*12 + key);
+            pianoKeys[note].color = pianoKeys[note].lastColor;
+            delete pianoKeys[note].lastColor; //delete this property so i can check if it already exists when you call playTone (because to fire playTone again with up being false means you held the key for too long and it started sending repeat messages lmao)
+            fluidsynthinst.noteoff(0, note);
         }
     }
 }
@@ -448,7 +455,7 @@ function windowProc(hwnd, msg, wp, lp) {
             let c = blackkey ? 0.0 : 1.0;
             
             pianoKeys.push(new Interactable(0, ((131-i)*21), 70, 20, [c,c,c], function(realcolor, mouse) {
-                if(GetKeyDown(VK_LBUTTON)) {
+                if(GetKeyDown(VK_LBUTTON) && GetForegroundWindow() == hwnd) {
                     playTone(i%12, Math.floor(i/12));
                 }
                 return [1.0, 205/255, 145/255];
@@ -543,6 +550,7 @@ function windowProc(hwnd, msg, wp, lp) {
             let note = new ABSDraggable(mouse.x, mouse.y, 4*23, 20, [158/255, 209/255, 165/255], pianoRollNoteDrag);
             //note.beats = 1;
             //note.key = 0;
+            note.vel = 80;
             note.channel = 0;
             note.AltInteract = pianoRollNoteAlt;
             pianoRollNotes.push(note);
@@ -581,7 +589,7 @@ function windowProc(hwnd, msg, wp, lp) {
                 //    sortedNotes[playJ-1].color = channelColors[sortedNotes[playJ-1].channel].map(val => val/255);
                 //    fluidsynthinst.noteoff(sortedNotes[playJ-1].channel, sortedNotes[playJ-1].key);
                 //}
-                sortedNotes[playJ].color = channelColors[10].map(val => val/255);
+                sortedNotes[playJ].color = channelColors[10].map(val => (sortedNotes[playJ].vel/127)*(val/255));
                 playJ++;
                 //if(playJ >= sortedNotes.length) {
                 //    playing = false;
@@ -592,7 +600,7 @@ function windowProc(hwnd, msg, wp, lp) {
             for(let i = 0; i < noteEndTimes.length; i++) {
                 const note = sortedNotes[noteEndTimes[i]];
                 if(time > note.timing + (note.beats*(60/tempo)*(1000))) { //timing (note start time in ms) + beats in ms = note end timing
-                    note.color = channelColors[note.channel].map(val => val/255);
+                    note.color = channelColors[note.channel].map(val => (note.vel/127)*(val/255)); //lowkey why am i calculating the color here
                     delist.push(noteEndTimes[i]);
                     if(fluidsynthinst.valid) {
                         fluidsynthinst.noteoff(note.channel, note.key);
@@ -635,7 +643,7 @@ function windowProc(hwnd, msg, wp, lp) {
         width = nWidth;
         height = nHeight;
     }else if(msg == WM_LBUTTONDOWN) {
-        SetCapture(hwnd); //window still recieves mouse events even when the mouse is off the window
+        SetCapture(hwnd); //window still receives mouse events even when the mouse is off the window
     }else if(msg == WM_LBUTTONUP) {
         ReleaseCapture();
         dragging = undefined;

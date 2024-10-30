@@ -1,5 +1,6 @@
 //based off a similar c++ program i made in SFML (minus the minimap and ifoundamongus)
 //bruh i just realized i included deez.TTF but i didn't use it because you can't load fonts and after trying to figure out how i learned it was lowkey way too hard and stupid i ain't doiong all that nananana 
+//hold on i just learned a gdi way of loading fonts so lets see... (spoiler alert it didn't work with d2d) https://learn.microsoft.com/en-us/answers/questions/1282086/how-to-use-other-fonts-in-gdi
 
 let window;
 let windowDC;
@@ -137,9 +138,13 @@ function init(hwnd) {
     //revealedBmpBrush = d2d.CreateBitmapBrush(tiledRevealedBmp);
     //revealedBmpBrush.SetExtendMode(D2D1_EXTEND_MODE_WRAP);
     //revealedBmpBrush.SetOpacity(.01);
+    
+                            //this fonts real name is Pixel Arial 11
+    print(AddFontResourceEx(__dirname+"/deez.TTF", FR_PRIVATE), "added fonts"); //using FR_PRIVATE means that only this app has access to this font (for some reason the regular AddFontResource would add the font for every process)
 
     colorBrush = d2d.CreateSolidColorBrush(1.0,0.0,0.0,1.0);
     font = d2d.CreateFont("Comic Sans ms", BB);
+    //font = d2d.CreateFont("Pixel Arial 11", BB); //damn it ain't working like that (i was hoping that it would work anyways despite AddFontResourceEx being for GDI)
     font.SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
     print(font.GetFontFamilyNameLength());
     print(font.GetFontFamilyName());
@@ -147,7 +152,7 @@ function init(hwnd) {
     windowDC = GetDC(window);
     
     EnumFontFamilies(windowDC, (font, textMetric, FontType) => {
-        //print(font);
+        //print(font.lfFaceName);
         font.lfHeight = 50;
         font.lfWidth = 25;
         gdiFonts.push(CreateFontIndirect(font));
@@ -236,6 +241,7 @@ function windowProc(hwnd, msg, wp, lp) {
         }
     }else if(msg == WM_DESTROY) {
         PostQuitMessage(0);
+        print(RemoveFontResourceEx(__dirname+"/deez.TTF", FR_PRIVATE),"== 1?");
     }
 }
 

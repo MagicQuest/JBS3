@@ -3,5 +3,9 @@
 //https://stackoverflow.com/questions/496034/most-efficient-replacement-for-isbadreadptr
 //https://stackoverflow.com/a/683111 (lol a pointer to the stack (in the tune of don't copy my flow))
 
+//https://stackoverflow.com/questions/5419356/is-there-a-way-to-redirect-stdout-stderr-to-a-string
+
 //ReadProcessMemory
 //VirtualQuery(Ex)
+
+// 2n**(2n**30n-1n)-1n is apparently the largest representable bigint in js (https://stackoverflow.com/a/70537884)

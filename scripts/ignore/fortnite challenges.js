@@ -55,6 +55,11 @@ function readanddrawmyshit(hwnd) {
         contents.splice(0, 1); //just snip that out there
         contents.splice(0, 1); //remove that newline too
 
+        //Object.entries(arr).filter(([i, e]) => e.startsWith("//")).sort(([i, e], [i2, e2]) => i2 - i); //lol my first way of doing this was kinda extra
+        Object.keys(contents).filter((v) => contents[v].startsWith("//")).sort((a, b) => b-a).forEach(index => { //im filtering the keys of contents based on if the value starts with //, then i sort it so that when i splice it doesn't mess up the order i can still use the indicies
+            contents.splice(index, 1);
+        });
+
         SelectObject(memDC, font);
 
         for(const line of contents) {
@@ -96,6 +101,9 @@ function windowProc(hwnd, msg, wp, lp) {
         //print(COLOR_BACKGROUND, GetSysColor(COLOR_BACKGROUND), RGB(200, 200, 200))
         SetLayeredWindowAttributes(hwnd, RGB(200, 200, 200), 200, LWA_COLORKEY | LWA_ALPHA);
         //DwmExtendFrameIntoClientArea(hwnd, -1, -1, -1, -1);
+
+                                //this fonts real name is Pixel Arial 11
+        print(AddFontResourceEx(__dirname+"/../minesweeper/deez.TTF", FR_PRIVATE), "added fonts"); //using FR_PRIVATE means that only this app has access to this font (for some reason the regular AddFontResource would add the font for every process) https://learn.microsoft.com/en-us/answers/questions/1282086/how-to-use-other-fonts-in-gdi
         dc = GetDC(hwnd);
         compat = CreateCompatibleBitmap(dc, w, h);
         //const memDC = CreateCompatibleDC(dc);
@@ -131,6 +139,9 @@ function windowProc(hwnd, msg, wp, lp) {
     }
     else if(msg == WM_DESTROY) {
         PostQuitMessage(0);
+        DeleteObject(font);
+        DeleteObject(compat);
+        print(RemoveFontResourceEx(__dirname+"/../minesweeper/deez.TTF", FR_PRIVATE),"== 1?");
     }
 }
 
