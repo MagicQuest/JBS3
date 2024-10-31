@@ -859,4 +859,6 @@ const wc = CreateWindowClass("jbstudio", windowProc);
 wc.hbrBackground = COLOR_WINDOW+1;
 wc.hCursor = LoadCursor(NULL, IDC_ARROW);
 
+//using DragAcceptFiles instead of WS_EX_ACCEPTFILES even though im pretty sure there's no difference
+//im just writing this here to say that there's 2 ways of doing it
 window = CreateWindow(WS_EX_OVERLAPPEDWINDOW, wc, "jbstudio3.js (use arrows to edit tempo)", WS_OVERLAPPEDWINDOW | WS_VISIBLE, CW_USEDEFAULT, CW_USEDEFAULT, width+20, height+42+20, NULL, NULL, hInstance);

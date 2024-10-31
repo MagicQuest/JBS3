@@ -25,8 +25,9 @@
     //let format;
     //let numtracks;
 
-    headerLength = parseInt(`0x${midi[4]}${midi[5]}${midi[6]}${midi[7]}`, 16);
-
+    //headerLength = parseInt(`0x${midi[4]}${midi[5]}${midi[6]}${midi[7]}`, 16);
+    headerLength = Number(BigInt(midi[4]) << 32n | BigInt(midi[5]) << 16n | BigInt(midi[6]) << 8n | BigInt(midi[7]));
+    
     //for(let i = 8; i < 8+headerLength; i++) {
     //    headerData.push(midi[i]);
     //    if(i % 2 == 1) {
@@ -37,6 +38,10 @@
     //        }
     //    }
     //}
+
+    function snip(i) {
+        return i & (~0b10000000); //bitwise AND after i flip the bits of 128 to remove the 8th bit from i (because variable deltatime's values are represented with only 7 bits)
+    }
 
     function elapse(time) {
         elapsedTime += (parseInt(time, 16)/divisions)*(60/tempo)*(1000); //deltatime in milliseconds
@@ -75,38 +80,51 @@
     function parseNotes() {
         //midinote = midinote.map((e) => (e.toString(16).length == 1 ? "0"+e.toString(16) : e.toString(16)).toUpperCase());
         //print(midinote);
-        let time;
-        let i = 0; //wait why do i use i here but j in readmidigui.js ?
-        if(midinote.length == 5) {
-            time = midinote[0]+midinote[1]; //aw damn it bruh this shit does NOT work the same way one byte deltatime works (AW FUCK I JUST LEARNED THAT DELTATIME COULD BE 4 BYTES)
-            i = 1;
-            print("variable deltatime moment",time,midinote);
-            let binary = parseInt(time, 16).toString(2).split("");
-            binary.splice(0, 1);
-            binary.splice(7, 1);
-            //https://www.ccarh.org/courses/253/handout/vlv/
-            //http://midi.teragonaudio.com/tech/midifile/vari.htm
-            elapsedTime += (parseInt(binary.join(""), 2)/divisions)*(60/tempo)*(1000);//(60000/(tempo * parseInt(time, 16)));
-            print("special elapsed", (parseInt(binary.join(""), 2)/divisions)*(60/tempo)*(1000), "ms");
+        let time = midinote[0];
+        //let i = 0; //wait why do i use i here but j in readmidigui.js ?
+        if(midinote[0].length > 2) {
+            //time = midinote[0]+midinote[1]; //aw damn it bruh this shit does NOT work the same way one byte deltatime works (AW FUCK I JUST LEARNED THAT DELTATIME COULD BE 4 BYTES)
+            //i = 1;
+            print("variable deltatime moment",time,midinote.join(" "));
+            //let binary = parseInt(time, 16).toString(2).split("");
+            //binary.splice(0, 1);
+            //binary.splice(7, 1);
+            ////https://www.ccarh.org/courses/253/handout/vlv/
+            ////http://midi.teragonaudio.com/tech/midifile/vari.htm
+            //elapsedTime += (parseInt(binary.join(""), 2)/divisions)*(60/tempo)*(1000);//(60000/(tempo * parseInt(time, 16)));
+            //print("special elapsed", (parseInt(binary.join(""), 2)/divisions)*(60/tempo)*(1000), "ms");
+
+            let timeasint = 0;
+
+            //alright i changed midinote when you call parseNotes and midinote[0] is the deltatime 
+            const deltahexi = midinote[0].match(/([A-F0-9]{2})/g); //midinote[0].split() //shoot split works kinda weird so i don't think you can split a string every n characters like that (but guess what the google said i should use instead :troll:)
+            for(let k = 0; k < deltahexi.length; k++) {
+                //globalThis?.midinote?.[0]?.skibidi?.(); //as careful as possible
+                timeasint |= snip(parseInt(deltahexi[k], 16)) << ((deltahexi.length-(k+1))*7); //math checks out (in my head that is)
+            }
+    
+            elapsedTime += (timeasint/divisions)*(60/tempo)*(1000);
+            print("special elapsed", (timeasint/divisions)*(60/tempo)*(1000), "ms!");    
         }else {
-            time = midinote[0];
+            //time = midinote[0];
             elapse(time);
         }
-        if(midinote[i+1][0] == "9") { //if the second byte of midinote starts with 9 it's a note on event
-            const key = parseInt(midinote[i+2], 16);
-            const vel = parseInt(midinote[i+3], 16);
+        const notedata = midinote[2].match(/([A-F0-9]{2})/g);
+        const key = parseInt(notedata[0], 16);
+        if(midinote[1][0] == "9") { //if the second byte of midinote starts with 9 it's a note on event
+            const vel = parseInt(notedata[1], 16);
             print(`hit ${musicnotes[key%12]}${Math.floor(key/12)} at ${elapsedTime}ms in (${vel} velocity)`);
             holdingNotes[key] = {time: elapsedTime, vel};
-        }else if(midinote[i+1][0] == "8") { //if the second byte of midinote starts with 8 it's a note off event
-            let key = parseInt(midinote[i+2], 16);
+        }else if(midinote[1][0] == "8") { //if the second byte of midinote starts with 8 it's a note off event
+            //let key = parseInt(notedata[0], 16);
             if(holdingNotes[key] == undefined) { //bruh i had this as !holdingNotes[key] and it falsely accused the first note of being a glitch
                 print(`not holding key but released anyways? (${key} -> ${musicnotes[key%12]}${Math.floor(key/12)})`);
             }else {
                 //print(midinote[i+3]);
-                realNotes.push({key, duration: elapsedTime-holdingNotes[key].time, start: holdingNotes[key].time, beats: /*parseInt(note[0], 16)/divisions*/(elapsedTime-holdingNotes[key].time)/(60000/tempo), channel: parseInt(midinote[i+1][1], 16), vel: holdingNotes[key].vel}); //x 500 tempo 60 = .5
+                realNotes.push({key, duration: elapsedTime-holdingNotes[key].time, start: holdingNotes[key].time, beats: /*parseInt(note[0], 16)/divisions*/(elapsedTime-holdingNotes[key].time)/(60000/tempo), channel: parseInt(midinote[1][1], 16), vel: holdingNotes[key].vel}); //x 500 tempo 60 = .5
                 //key == 0 && print(midinote, "midinote"); //uh one of my test midis is kinda weird and keeps "releasing" a key that wasn't pressed
                 delete holdingNotes[key];
-                print(`released ${musicnotes[key%12]}${Math.floor(key/12)} after ${i == 0 ? (parseInt(time, 16)/divisions)*(60/tempo)*(1000) : "variable"} ms`);
+                print(`released ${musicnotes[key%12]}${Math.floor(key/12)} after ${(parseInt(time, 16)/divisions)*(60/tempo)*(1000)} ms`);
             }
         }
                 //        //let releasedNotes = [];
@@ -151,10 +169,12 @@
     for(let i = 0; i < midi.byteLength; i++) {
         if(midi[i] == 77 && midi[i+1] == 84) { //new chunk
             if(midi[i+2] == 104 && midi[i+3] == 100) { //header
-                headerLength = parseInt(`0x${midi[i+4].toString(16)}${midi[i+5].toString(16)}${midi[i+6].toString(16)}${midi[i+7].toString(16)}`, 16);
+                //headerLength = parseInt(`0x${midi[i+4].toString(16)}${midi[i+5].toString(16)}${midi[i+6].toString(16)}${midi[i+7].toString(16)}`, 16);
+                headerLength = Number(BigInt(midi[i+4]) << 32n | BigInt(midi[i+5]) << 16n | BigInt(midi[i+6]) << 8n | BigInt(midi[i+7]));
                 for(let j = i+8; j < i+8+headerLength; j+=2) {
                     //print(midi[j], midi[j+1]);
-                    headerData.push(parseInt(`0x${midi[j].toString(16)}${midi[j+1].toString(16)}`, 16));
+                    //headerData.push(parseInt(`0x${midi[j].toString(16)}${midi[j+1].toString(16)}`, 16));
+                    headerData.push(midi[j] << 8 | midi[j+1]);
                 }
                 print(headerData);
                 print("headerData");
@@ -163,7 +183,15 @@
                 readingTrack = true;
                 readingTrackHeader = true;
                 currentTrackNumber++;
-                currentTrackLength = parseInt(`0x${midi[i+4].toString(16)}${midi[i+5].toString(16)}${midi[i+6].toString(16)}${midi[i+7].toString(16)}`, 16);
+
+                //noooooo i was using the lame .toString(16) which doesn't fill the second space if the number is less than 16 (so 14 .toString(16) == "e" instead of "0e")
+                //i tawlk more about it in readmidigui.js
+                //currentTrackLength = parseInt(`0x${midi[i+4].toString(16)}${midi[i+5].toString(16)}${midi[i+6].toString(16)}${midi[i+7].toString(16)}`, 16);
+
+                currentTrackLength = Number(BigInt(midi[i+4]) << 32n | BigInt(midi[i+5]) << 16n | BigInt(midi[i+6]) << 8n | BigInt(midi[i+7])); //the n suffix is for bigint :)
+                    
+                print(`track ${currentTrackNumber} is ${currentTrackLength} bytes long (apparently)`);
+
                 currentEndTrackHeader = i+7;
                 currentTrackStartIndex = currentEndTrackHeader+1;
                 //let track = {length: parseInt(`0x${midi[i+3].toString(16)}${midi[i+4].toString(16)}${midi[i+5].toString(16)}${midi[i+6].toString(16)}`, 16), data: [], events: [], notes: []};
@@ -243,10 +271,27 @@
                     }
                 }else if(midi[i+1] != 255){
                     let hex = midi[i].toString(16).toUpperCase();
+                    //cheeky regex i came up with /((?:[A-F0-9]{2}){1,4}?)([8-9A-E][A-F0-9])((?:[A-F0-9]{2}){2})/ (alright nevermind wrap it up guys, for this to work i'd need to already know the length of the note event)
+                    //HOLD ON CLUTCH? /((?:[A-F0-9]{2}){1,4}?)([8-9A-E][A-F0-9])((?:[A-F0-7][A-F0-9]){2})/
+                    
                     //print(hex.length == 1 ? "0"+hex : hex, i);
                     midinote.push(hex.length == 1 ? "0"+hex : hex);//midi[i]);
-                    if(midinote.length > 2) { //wait wtf why does the 0xC and 0xD event only have a length of 3 because they don't pad it ???
-                        if((midinote[1][0] == "C" || midinote[1][0] == "D") && midinote.length == 3) {
+                    if(midinote.length > 2) { //wait wtf why does the 0xC and 0xD event only have a length of 3 because they don't pad it ??? (probably the same reason variable deltatime exists...)
+                        //let programchangeorchannelpressure = false;
+                        let results = midinote.join("").match(/((?:[A-F0-9]{2}){1,4}?)([8-9A-E][A-F0-9])((?:[A-F0-7][A-F0-9]){2})/)?.filter((v, k) => k > 0);
+                        if(results) {
+                            midinote = results;
+                            parseNotes();
+                        }//else if((midinote[1][0] == "C" || midinote[1][0] == "D") && midinote.length == 3) {
+                        else if((midinote[midinote.length-2][0] == "C" || midinote[midinote.length-2][0] == "D")) { //this MAYBE could happen with deltatime but according to the examples they gave, it doesn't :)
+                            //programchangeorchannelpressure = true;
+                            let r2 = midinote.join("").match(/((?:[A-F0-9]{2}){1,4}?)([8-9A-E][A-F0-9])((?:[A-F0-7][A-F0-9]){1})/)?.filter((v, k) => k > 0);
+                            if(r2) {
+                                midinote = r2;
+                                parseNotes();
+                            }
+                        }
+                        /*if((midinote[1][0] == "C" || midinote[1][0] == "D") && midinote.length == 3) {
                             parseNotes();
                         }else if(midinote[1][0] != "8" && midinote[1][0] != "9" && midinote[1][0] != "A" && midinote[1][0] != "B" && midinote[1][0] != "C" && midinote[1][0] != "D" && midinote[1][0] != "E") {
                             //print("midinote slippage");
@@ -257,7 +302,8 @@
                             }
                         }else if(midinote.length == 4){
                             parseNotes();
-                        }
+                        }*/
+                        
                     }
                 }
             }

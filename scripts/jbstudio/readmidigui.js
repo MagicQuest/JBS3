@@ -66,69 +66,88 @@ function parseEvent(event) {
     return eventevent;
 }
 
+function snip(i) {
+    return i & (~0b10000000); //bitwise AND after i flip the bits of 128 to remove the 8th bit from i (because variable deltatime's values are represented with only 7 bits)
+}
+
 function parseNotes() {
     //midinote = midinote.map((e) => (e.toString(16).length == 1 ? "0"+e.toString(16) : e.toString(16)).toUpperCase());
     //print(midinote);
-    let time;
-    let j = 0;
+    let time = midinote[0];
+    //let j = 0;
+    const lengthforposi = midinote.join("").match(/([A-F0-9]{2})/g).length;
     brush.SetColor(255/255, 204/255, 153/255, 0.5);
-    if(midinote.length == 5) {
-        time = midinote[0]+midinote[1]; //aw damn it bruh this shit does NOT work the same way one byte deltatime works (AW FUCK I JUST LEARNED THAT DELTATIME COULD BE 4 BYTES)
-        j = 1;
-        print("variable deltatime moment",time,midinote);
-        let binary = parseInt(time, 16).toString(2).split("");
-        binary.splice(0, 1);
-        binary.splice(7, 1);
-        //https://www.ccarh.org/courses/253/handout/vlv/
-        //http://midi.teragonaudio.com/tech/midifile/vari.htm
-        elapsedTime += (parseInt(binary.join(""), 2)/divisions)*(60/tempo)*(1000);//(60000/(tempo * parseInt(time, 16)));
-        print("special elapsed", (parseInt(binary.join(""), 2)/divisions)*(60/tempo)*(1000), "ms");
+    if(midinote[0].length > 2) {
+        //time = midinote[0]+midinote[1]; //aw damn it bruh this shit does NOT work the same way one byte deltatime works (AW FUCK I JUST LEARNED THAT DELTATIME COULD BE 4 BYTES)
+        //j = 1;
+        print("variable deltatime moment",time,midinote.join(" "));
+        //let binary = parseInt(time, 16).toString(2).split("");
+        //binary.splice(0, 1);
+        //binary.splice(7, 1);
+        ////https://www.ccarh.org/courses/253/handout/vlv/
+        ////http://midi.teragonaudio.com/tech/midifile/vari.htm
+        //elapsedTime += (parseInt(binary.join(""), 2)/divisions)*(60/tempo)*(1000);//(60000/(tempo * parseInt(time, 16)));
+        //print("special elapsed", (parseInt(binary.join(""), 2)/divisions)*(60/tempo)*(1000), "ms");
+
+        let timeasint = 0;
+
+        //alright i changed midinote when you call parseNotes and midinote[0] is the deltatime 
+        const deltahexi = midinote[0].match(/([A-F0-9]{2})/g); //midinote[0].split() //shoot split works kinda weird so i don't think you can split a string every n characters like that (but guess what the google said i should use instead :troll:)
+        for(let k = 0; k < deltahexi.length; k++) {
+            //globalThis?.midinote?.[0]?.skibidi?.(); //as careful as possible
+            timeasint |= snip(parseInt(deltahexi[k], 16)) << ((deltahexi.length-(k+1))*7); //math checks out (in my head that is)
+        }
+
+        elapsedTime += (timeasint/divisions)*(60/tempo)*(1000);
+        print("special elapsed", (timeasint/divisions)*(60/tempo)*(1000), "ms!");
+
         d2d.BeginDraw();
-        let [_1, x1, y1] = calcPosFromI(i-midinote.length+1);
+        let [_1, x1, y1] = calcPosFromI(i-lengthforposi+1);
         d2d.FillRectangle(x1, y1, x1+32, y1+16, brush);
         d2d.EndDraw();
         Sleep(8);
         d2d.BeginDraw();
-        let [_2, x2, y2] = calcPosFromI(i-midinote.length+2);
+        let [_2, x2, y2] = calcPosFromI(i-lengthforposi+2);
         d2d.FillRectangle(x2, y2, x2+32, y2+16, brush);
         d2d.EndDraw();
     }else {
-        time = midinote[0];
+        //time = midinote[0][0];
         elapse(time);
         d2d.BeginDraw();
-        let [yk, x, y] = calcPosFromI(i-midinote.length+1);
+        let [yk, x, y] = calcPosFromI(i-lengthforposi+1);
         d2d.FillRectangle(x, y, x+32, y+16, brush);
         d2d.EndDraw();
     }
     Sleep(8);
-    if(midinote[j+1][0] == "9") {
+    if(midinote[1][0] == "9") {
         brush.SetColor(1.0, 153/255, 0.0, 0.5);
-    }else if(midinote[j+1][0] == "8"){
+    }else if(midinote[1][0] == "8"){
         brush.SetColor(0.0, 153/255, 1.0, 0.5);
     }else {
         brush.SetColor(204/255, 1.0, 204/255, 0.5);
     }
-    for(let k = j+1; k < midinote.length; k++) {
+    for(let k = midinote[0].length/2; k < lengthforposi; k++) {
         d2d.BeginDraw();
-        let [yk, x, y] = calcPosFromI(i-midinote.length+1+k);
+        let [yk, x, y] = calcPosFromI(i-lengthforposi+1+k);
         d2d.FillRectangle(x, y, x+32, y+16, brush);
         d2d.EndDraw();
         Sleep(8);
     }
-    let key = parseInt(midinote[j+2], 16);
+    const notedata = midinote[2].match(/([A-F0-9]{2})/g);
+    let key = parseInt(notedata[0], 16);
     updateStatus(`parsing note ${musicnotes[key%12]}${Math.floor(key/12)}`);
-    if(midinote[j+1][0] == "9") { //if the second byte of midinote starts with 9 it's a note on event
-        const vel = parseInt(midinote[j+3], 16);
+    if(midinote[1][0] == "9") { //if the second byte of midinote starts with 9 it's a note on event
+        const vel = parseInt(notedata[1], 16);
         print(`hit ${musicnotes[key%12]}${Math.floor(key/12)} at ${elapsedTime}ms in (${vel} velocity)`);
         holdingNotes[key] = {time: elapsedTime, vel};
-    }else if(midinote[j+1][0] == "8") { //if the second byte of midinote starts with 8 it's a note off event
+    }else if(midinote[1][0] == "8") { //if the second byte of midinote starts with 8 it's a note off event
         if(holdingNotes[key] == undefined) { //bruh i had this as !holdingNotes[key] and it falsely accused the first note of being a glitch
             print(`not holding key but released anyways? (${key} -> ${musicnotes[key%12]}${Math.floor(key/12)})`);
         }else {
-            realNotes.push({key, duration: elapsedTime-holdingNotes[key].time, start: holdingNotes[key].time, beats: /*parseInt(note[0], 16)/divisions*/(elapsedTime-holdingNotes[key].time)/(60000/tempo), channel: parseInt(midinote[j+1][1], 16), vel: holdingNotes[key].vel}); //x 500 tempo 60 = .5
+            realNotes.push({key, duration: elapsedTime-holdingNotes[key].time, start: holdingNotes[key].time, beats: /*parseInt(note[0], 16)/divisions*/(elapsedTime-holdingNotes[key].time)/(60000/tempo), channel: parseInt(midinote[1][1], 16), vel: holdingNotes[key].vel}); //x 500 tempo 60 = .5
             //key == 0 && print(midinote, "midinote"); //uh one of my test midis is kinda weird and keeps "releasing" a key that wasn't pressed
             delete holdingNotes[key];
-            print(`released ${musicnotes[key%12]}${Math.floor(key/12)} after ${i == 0 ? (parseInt(time, 16)/divisions)*(60/tempo)*(1000) : "variable"} ms`);
+            print(`released ${musicnotes[key%12]}${Math.floor(key/12)} after ${(parseInt(time, 16)/divisions)*(60/tempo)*(1000)} ms`);
         }
     }
 
@@ -180,8 +199,34 @@ function updateStatus(status) {
     d2d.EndDraw();
 }
 
+function readAndPrepareFile(file) {
+    print(file);
+    if(file) {
+        midi = fs.readBinary(file);
+        i = 0;
+        d2d.BeginDraw();
+        d2d.Clear(1.0, 1.0, 1.0, 1.0);
+        brush.SetColor(0.0, 0.0, 0.0);
+        for(let i = 0; i < midi.byteLength; i++) {
+            let hex = midi[i].toString(16).toUpperCase();
+            let yk = i%16;
+            let x = ((yk)*32)+8;
+            let y = Math.floor(i/16)*16;
+            if(yk == 8) {
+                d2d.DrawLine(x-8, y, x-8, y+16, brush);
+            }
+            d2d.DrawText(hex.length == 1 ? "0"+hex : hex, font, x, y, x+32, y+16, brush);
+        }
+        d2d.EndDraw();
+
+        realreading = true;
+    }
+}
+
 function windowProc(hwnd, msg, wp, lp) {
     if(msg == WM_CREATE) {
+        DragAcceptFiles(hwnd, true); //you can just use WS_EX_ACCEPTFILES
+
         d2d = createCanvas("d2d", ID2D1RenderTarget/*ID2D1DeviceContext*/, hwnd); //no fancy shit because calling EndDraw (with ID2D1DeviceContext and up) will also call Present (which apparently automatically clears the screen?)
         brush = d2d.CreateSolidColorBrush(0.0,0.0,0.0,1.0);
         font = d2d.CreateFont("Consolas", 16);
@@ -202,7 +247,7 @@ function windowProc(hwnd, msg, wp, lp) {
         //AppendMenu(hFileMenu, MF_STRING, 2, "Exit");
         
         if(wp == 1) {
-            let file = showOpenFilePicker({
+            const file = showOpenFilePicker({
                 multiple: false,
                 excludeAcceptAllOption: true,
                 types: [
@@ -212,31 +257,14 @@ function windowProc(hwnd, msg, wp, lp) {
                     }
                 ]
             });
-            print(file);
-            if(file) {
-                midi = fs.readBinary(file[0]);
-                i = 0;
-                d2d.BeginDraw();
-                d2d.Clear(1.0, 1.0, 1.0, 1.0);
-                brush.SetColor(0.0, 0.0, 0.0);
-                for(let i = 0; i < midi.byteLength; i++) {
-                    let hex = midi[i].toString(16).toUpperCase();
-                    let yk = i%16;
-                    let x = ((yk)*32)+8;
-                    let y = Math.floor(i/16)*16;
-                    if(yk == 8) {
-                        d2d.DrawLine(x-8, y, x-8, y+16, brush);
-                    }
-                    d2d.DrawText(hex.length == 1 ? "0"+hex : hex, font, x, y, x+32, y+16, brush);
-                }
-                d2d.EndDraw();
-
-                realreading = true;
-            }
+            readAndPrepareFile(file?.[0]); //lol how fun! optional chaining operator is the goat
         }else if(wp == 2) {
             DestroyWindow(hwnd);
         }
 
+    }else if(msg == WM_DROPFILES) {
+        const filename = DragQueryFile(wp, 0);
+        readAndPrepareFile(filename);
     }else if(msg == WM_TIMER) {
         if(i >= midi.byteLength) {
             realreading = false;
@@ -244,8 +272,9 @@ function windowProc(hwnd, msg, wp, lp) {
         if(realreading) {
             if(midi[i] == 77 && midi[i+1] == 84) { //new chunk
                 if(midi[i+2] == 104 && midi[i+3] == 100) { //header
-                    headerLength = parseInt(`0x${midi[i+4].toString(16)}${midi[i+5].toString(16)}${midi[i+6].toString(16)}${midi[i+7].toString(16)}`, 16);
-                    
+                    //headerLength = parseInt(`0x${midi[i+4].toString(16)}${midi[i+5].toString(16)}${midi[i+6].toString(16)}${midi[i+7].toString(16)}`, 16);
+                    headerLength = Number(BigInt(midi[i+4]) << 32n | BigInt(midi[i+5]) << 16n | BigInt(midi[i+6]) << 8n | BigInt(midi[i+7]));
+
                     brush.SetColor(242/255, 6/255, 132/255, 0.5);
                     for(let j = i; j < i+8; j++) {
                         d2d.BeginDraw();
@@ -264,7 +293,8 @@ function windowProc(hwnd, msg, wp, lp) {
                         let [_2, x2, y2] = calcPosFromI(j+1);
                         d2d.FillRectangle(x1, y1, x1+32, y1+16, brush);
                         d2d.FillRectangle(x2, y2, x2+32, y2+16, brush);
-                        headerData.push(parseInt(`0x${midi[j].toString(16)}${midi[j+1].toString(16)}`, 16));
+                        //headerData.push(parseInt(`0x${midi[j].toString(16)}${midi[j+1].toString(16)}`, 16));
+                        headerData.push(midi[j] << 8 | midi[j+1]);
                         d2d.EndDraw(); //wait does present automatically clear ??? (im gonna switch to simple d2d)
                         Sleep(8);
                     }
@@ -287,7 +317,15 @@ function windowProc(hwnd, msg, wp, lp) {
                     readingTrack = true;
                     readingTrackHeader = true;
                     currentTrackNumber++;
-                    currentTrackLength = parseInt(`0x${midi[i+4].toString(16)}${midi[i+5].toString(16)}${midi[i+6].toString(16)}${midi[i+7].toString(16)}`, 16);
+                    //OOPS! javascript's toString(16) will NOT fill in the extra 0 if it's not long enough (so basically it would get passed as 0x0013 INSTEAD OF 0x00000103!!!)
+                    //currentTrackLength = parseInt(`0x${midi[i+4].toString(16)}${midi[i+5].toString(16)}${midi[i+6].toString(16)}${midi[i+7].toString(16)}`, 16);
+
+                    //how could i do this without reparsing them? I asked.
+                    //I realized that I could bitshift them!
+                    //wait vscode is telling me that a bitshift of 32 doesn't do anything holod on i gotta use bigints
+                    currentTrackLength = Number(BigInt(midi[i+4]) << 32n | BigInt(midi[i+5]) << 16n | BigInt(midi[i+6]) << 8n | BigInt(midi[i+7])); //the n suffix is for bigint :)
+                    
+                    print(`track ${currentTrackNumber} is ${currentTrackLength} bytes long (apparently)`);
                     currentEndTrackHeader = i+7;
                     currentTrackStartIndex = currentEndTrackHeader+1;
                     updateStatus("reading track");
@@ -346,10 +384,27 @@ function windowProc(hwnd, msg, wp, lp) {
                     }else if(midi[i+1] != 255){
                         updateStatus("reading notes");
                         let hex = midi[i].toString(16).toUpperCase();
+                        //cheeky regex i came up with /((?:[A-F0-9]{2}){1,4}?)([8-9A-E][A-F0-9])((?:[A-F0-9]{2}){2})/ (alright nevermind wrap it up guys, for this to work i'd need to already know the length of the note event)
+                        //HOLD ON CLUTCH? /((?:[A-F0-9]{2}){1,4}?)([8-9A-E][A-F0-9])((?:[A-F0-7][A-F0-9]){2})/
+
                         //print(hex.length == 1 ? "0"+hex : hex, i);
                         midinote.push(hex.length == 1 ? "0"+hex : hex);//midi[i]);
-                        if(midinote.length > 2) { //wait wtf why does the 0xC and 0xD event only have a length of 3 because they don't pad it ???
-                            if((midinote[1][0] == "C" || midinote[1][0] == "D") && midinote.length == 3) {
+                        if(midinote.length > 2) { //wait wtf why does the 0xC and 0xD event only have a length of 3 because they don't pad it ??? (probably the same reason variable deltatime exists...)
+                            //let programchangeorchannelpressure = false;
+                            let results = midinote.join("").match(/((?:[A-F0-9]{2}){1,4}?)([8-9A-E][A-F0-9])((?:[A-F0-7][A-F0-9]){2})/)?.filter((v, k) => k > 0);
+                            if(results) {
+                                midinote = results;
+                                parseNotes();
+                            }//else if((midinote[1][0] == "C" || midinote[1][0] == "D") && midinote.length == 3) {
+                            else if((midinote[midinote.length-2][0] == "C" || midinote[midinote.length-2][0] == "D")) { //this MAYBE could happen with deltatime but according to the examples they gave, it doesn't :)
+                                //programchangeorchannelpressure = true;
+                                let r2 = midinote.join("").match(/((?:[A-F0-9]{2}){1,4}?)([8-9A-E][A-F0-9])((?:[A-F0-7][A-F0-9]){1})/)?.filter((v, k) => k > 0);
+                                if(r2) {
+                                    midinote = r2;
+                                    parseNotes();
+                                }
+                            }
+                            /*if((midinote[1][0] == "C" || midinote[1][0] == "D") && midinote.length == 3) {
                                 parseNotes();
                             }else if(midinote[1][0] != "8" && midinote[1][0] != "9" && midinote[1][0] != "A" && midinote[1][0] != "B" && midinote[1][0] != "C" && midinote[1][0] != "D" && midinote[1][0] != "E") {
                                 //print("midinote slippage");
@@ -360,13 +415,14 @@ function windowProc(hwnd, msg, wp, lp) {
                                 }
                             }else if(midinote.length == 4){
                                 parseNotes();
-                            }
+                            }*/
+                            
                         }
                     }
                 }
                 if(i-currentTrackStartIndex >= currentTrackLength) {
                     readingTrack = false;
-                    print(`finished reading track ${currentTrackNumber}`, i);
+                    print(`finished reading track ${currentTrackNumber}`, i, currentTrackStartIndex, currentTrackLength);
                     elapsedTime = 0;
                 }
             }
@@ -387,4 +443,6 @@ const wc = CreateWindowClass("rmg", windowProc);
 wc.hbrBackground = COLOR_WINDOW+1;
 wc.hCursor = LoadCursor(NULL, IDC_ARROW);
 
+//using DragAcceptFiles instead of WS_EX_ACCEPTFILES even though im pretty sure there's no difference
+//im just writing this here to say that there's 2 ways of doing it
 window = CreateWindow(WS_EX_OVERLAPPEDWINDOW, wc, "read midi gui", WS_OVERLAPPEDWINDOW | WS_VISIBLE, CW_USEDEFAULT, CW_USEDEFAULT, width+20, height+42+20, NULL, NULL, hInstance);
