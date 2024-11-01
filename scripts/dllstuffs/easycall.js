@@ -50,7 +50,7 @@ const LoadDll = function() {//function LoadDllClosure() {
 
     return function(path) {return new Proxy(new DLL(path), handler)};
 }();
-//globalThis.LoadDll = LoadDll;
-const user32 = LoadDll("user32.dll");
-print(user32);
-print(user32.SetWindowPos(GetConsoleWindow(), NULL, 100, 100, 500, 500, SWP_NOZORDER), "== 1?");
+globalThis.LoadDll = LoadDll;
+//const user32 = LoadDll("user32.dll");
+//print(user32);
+//print(user32.SetWindowPos(GetConsoleWindow(), NULL, 100, 100, 500, 500, SWP_NOZORDER), "== 1?");

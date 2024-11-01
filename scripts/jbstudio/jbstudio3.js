@@ -233,6 +233,9 @@ class Interactable {
             //print(this);
             realcolor = this.Interact(realcolor, mouse);
         }
+        if(!realcolor) {
+            print(realcolor, "realcolor why this not working who is this", this);
+        }
         brush.SetColor(...realcolor);
         d2d.FillRectangle(this.x, this.y, this.x+this.width, this.y+this.height, brush);
     }
@@ -249,7 +252,7 @@ class Draggable extends Interactable {
             dragging = this;
             this.dragOffset = {x: mouse.x-this.x, y: mouse.y-this.y};
         }else if(GetKey(VK_RBUTTON)) {
-            this.AltInteract(mouse);
+            this.AltInteract?.(mouse); //oops apparently this whole time jbstudio3 would crash if you right clicked on the scrollbars! this should;ve been optional chained anyways
         }
         return realcolor.map((val) => Math.min(val+.1, 1));
     }
@@ -266,7 +269,7 @@ class ABSDraggable extends Draggable { //affected by scroll
             let scrolledY = this.y-scrollPos*(131*21);
             this.dragOffset = {x: mouse.x-scrolledX, y: mouse.y-scrolledY};
         }else if(GetKey(VK_RBUTTON)) {
-            this.AltInteract(mouse);
+            this.AltInteract?.(mouse);
         }
         return realcolor.map((val) => Math.min(val+.1, 1));
     }
@@ -654,7 +657,7 @@ function windowProc(hwnd, msg, wp, lp) {
             scrollPosX = Math.min(Math.max(scrollPosX+wheel, 0), 1);
         }else {
             scrollPos = Math.min(Math.max(scrollPos+wheel, 0), 1);
-        }    
+        }
     }else if(msg == WM_KEYDOWN) {
         print(String.fromCharCode(wp), wp);
         let args;
@@ -690,51 +693,54 @@ function windowProc(hwnd, msg, wp, lp) {
         }else if(wp == VK_DOWN || wp == VK_LEFT) {
             let mul = (GetKey(VK_SHIFT)) ? 1/5 : (GetKey(VK_CONTROL)) ? 10 : 1
             tempo -= 5*mul;
-        }else if(wp == VK_SPACE && !playing) {
-            playing = true;
-            playStart = Date.now();
-            playJ = 0;
-            //let ms = beats*(60/tempo)*(1000);
-            //let milliseconds = [];
-            //let hertz = [];
-            noteEndTimes = [];
-            sortedNotes = pianoRollNotes.sort((noteL, noteR) => noteL.x - noteR.x); //ascending by x value
-//
-            for(let note of sortedNotes) {
-                note.beats = note.width/92;
-                //milliseconds.push(note.beats*(60/tempo)*(1000));
-                //hertz.push(tones[note.key%12]*(2**Math.floor(note.key/12)));
-                note.timing = /*Math.floor*/((note.x - 70)/92)*(60/tempo)*1000; //yo wait wtf i think my floor here is fucking it up
-                //print(note.timing);
+        }else if(wp == VK_SPACE) {
+            
+            playing = !playing;
+            if(playing) {
+                playStart = Date.now();
+                playJ = 0;
+                //let ms = beats*(60/tempo)*(1000);
+                //let milliseconds = [];
+                //let hertz = [];
+                noteEndTimes = [];
+                sortedNotes = pianoRollNotes.sort((noteL, noteR) => noteL.x - noteR.x); //ascending by x value
+    //
+                for(let note of sortedNotes) {
+                    note.beats = note.width/92;
+                    //milliseconds.push(note.beats*(60/tempo)*(1000));
+                    //hertz.push(tones[note.key%12]*(2**Math.floor(note.key/12)));
+                    note.timing = /*Math.floor*/((note.x - 70)/92)*(60/tempo)*1000; //yo wait wtf i think my floor here is fucking it up
+                    //print(note.timing);
+                }
+                //print("Using asynchronous Beep(, , true); sometimes crashes jbs for some reason so watch out for that"); //wait running it in the debugger shows that d2d is actually crashing it
+    //
+                //let j = 0;
+    //
+                //let start = Date.now();
+                //print("start",start);
+    //
+                ////while((Date.now() - start) < sorted.at(-1).timing+(sorted.at(-1).beats*(60/tempo)*(1000))) { //bruh i think the beeps are blocking the thread for so long that it runs out of time
+                //while(true) {
+                //    if((Date.now() - start) > sorted[j].timing) {
+                //        //print(hertz[j], milliseconds[j]);
+                //        Beep(hertz[j], milliseconds[j]); //, true);
+                //        j++;
+                //        if(j >= sorted.length) {
+                //            break;
+                //        }
+                //    }
+                //    Sleep(16);
+                //}
+
+                //for(let i = 0; i < sorted.length; i++) {
+                //    print(i, hertz[i], milliseconds[i]);
+                //    Beep(hertz[i], milliseconds[i]);
+                //}
+
+                //for(let note of pianoRollNotes) {
+                //    
+                //}
             }
-            //print("Using asynchronous Beep(, , true); sometimes crashes jbs for some reason so watch out for that"); //wait running it in the debugger shows that d2d is actually crashing it
-//
-            //let j = 0;
-//
-            //let start = Date.now();
-            //print("start",start);
-//
-            ////while((Date.now() - start) < sorted.at(-1).timing+(sorted.at(-1).beats*(60/tempo)*(1000))) { //bruh i think the beeps are blocking the thread for so long that it runs out of time
-            //while(true) {
-            //    if((Date.now() - start) > sorted[j].timing) {
-            //        //print(hertz[j], milliseconds[j]);
-            //        Beep(hertz[j], milliseconds[j]); //, true);
-            //        j++;
-            //        if(j >= sorted.length) {
-            //            break;
-            //        }
-            //    }
-            //    Sleep(16);
-            //}
-
-            //for(let i = 0; i < sorted.length; i++) {
-            //    print(i, hertz[i], milliseconds[i]);
-            //    Beep(hertz[i], milliseconds[i]);
-            //}
-
-            //for(let note of pianoRollNotes) {
-            //    
-            //}
         }
     }else if(msg == WM_KEYUP) {
         let args;

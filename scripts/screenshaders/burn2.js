@@ -462,7 +462,7 @@ function windowProc(hwnd, msg, wp, lp) {
         gl.viewport(0, 0, screenWidth, screenHeight);
 
         gl.activeTexture(gl.TEXTURE1);
-        gl.bindTexture(gl.TEXTURE_2D, iChannel1);
+        //gl.bindTexture(gl.TEXTURE_2D, iChannel1); //uh oh... i think i've been misunderstanding what this function does and im starting to think you only need to call it once? (i mean come on the docs don't give it any justice wtf does this shit do?) https://stackoverflow.com/questions/36349985/bind-a-texture-before-draw-it-webgl
 
         const dc = GetDC(NULL); //wait why do i get the dc everytime instead of just getting it once? (idk it's probably not that bad)
         const memDC = CreateCompatibleDC(dc);
@@ -476,7 +476,7 @@ function windowProc(hwnd, msg, wp, lp) {
         gl.drawArrays(gl.TRIANGLE_FAN, 0, 4, true); //4 verts
 
         gl.activeTexture(gl.TEXTURE0);
-        gl.bindTexture(gl.TEXTURE_2D, iChannel0); //rebind as active texture
+        //gl.bindTexture(gl.TEXTURE_2D, iChannel0); //rebind as active texture
 
         gl.copyTexImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 0, 0, screenWidth, screenHeight, 0);
 
@@ -488,7 +488,7 @@ function windowProc(hwnd, msg, wp, lp) {
             gl.drawArrays(gl.TRIANGLE_FAN, 0, 4, true); //4 verts
 
             gl.activeTexture(gl.TEXTURE2);
-            gl.bindTexture(gl.TEXTURE_2D, iChannel2); //rebind as active texture
+            //gl.bindTexture(gl.TEXTURE_2D, iChannel2); //rebind as active texture
 
             gl.copyTexImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 0, 0, screenWidth, screenHeight, 0);
         }
