@@ -15,6 +15,8 @@
 //    ]
 //})[0];//`${__dirname}/test5(60bpm).mid`;
 (function(filename) {
+    const funprints = false; //printing these messages is lowkey the slowest part
+
     let midi = require("fs").readBinary(filename);//`${__dirname}/test5(60bpm).mid`);
 
     let headerData = [];
@@ -45,7 +47,7 @@
 
     function elapse(time) {
         elapsedTime += (parseInt(time, 16)/divisions)*(60/tempo)*(1000); //deltatime in milliseconds
-        print("elapsed", (parseInt(time, 16)/divisions)*(60/tempo)*(1000), "ms");
+        funprints && print("elapsed", (parseInt(time, 16)/divisions)*(60/tempo)*(1000), "ms");
     }
 
     function parseEvent(event) {
@@ -104,7 +106,7 @@
             }
     
             elapsedTime += (timeasint/divisions)*(60/tempo)*(1000);
-            print("special elapsed", (timeasint/divisions)*(60/tempo)*(1000), "ms!");    
+            funprints && print("special elapsed", (timeasint/divisions)*(60/tempo)*(1000), "ms!");    
         }else {
             //time = midinote[0];
             elapse(time);
@@ -113,7 +115,7 @@
         const key = parseInt(notedata[0], 16);
         if(midinote[1][0] == "9") { //if the second byte of midinote starts with 9 it's a note on event
             const vel = parseInt(notedata[1], 16);
-            print(`hit ${musicnotes[key%12]}${Math.floor(key/12)} at ${elapsedTime}ms in (${vel} velocity)`);
+            funprints && print(`hit ${musicnotes[key%12]}${Math.floor(key/12)} at ${elapsedTime}ms in (${vel} velocity)`);
             holdingNotes[key] = {time: elapsedTime, vel};
         }else if(midinote[1][0] == "8") { //if the second byte of midinote starts with 8 it's a note off event
             //let key = parseInt(notedata[0], 16);
@@ -124,7 +126,7 @@
                 realNotes.push({key, duration: elapsedTime-holdingNotes[key].time, start: holdingNotes[key].time, beats: /*parseInt(note[0], 16)/divisions*/(elapsedTime-holdingNotes[key].time)/(60000/tempo), channel: parseInt(midinote[1][1], 16), vel: holdingNotes[key].vel}); //x 500 tempo 60 = .5
                 //key == 0 && print(midinote, "midinote"); //uh one of my test midis is kinda weird and keeps "releasing" a key that wasn't pressed
                 delete holdingNotes[key];
-                print(`released ${musicnotes[key%12]}${Math.floor(key/12)} after ${(parseInt(time, 16)/divisions)*(60/tempo)*(1000)} ms`);
+                funprints && print(`released ${musicnotes[key%12]}${Math.floor(key/12)} after ${(parseInt(time, 16)/divisions)*(60/tempo)*(1000)} ms`);
             }
         }
                 //        //let releasedNotes = [];
@@ -315,7 +317,7 @@
         }
     }
 
-    print(/*headerLength, headerData, trackData, */divisions, tempo, realNotes);
+    funprints && print(/*headerLength, headerData, trackData, */divisions, tempo, realNotes);
 
     return [tempo, realNotes];
 

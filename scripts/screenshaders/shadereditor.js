@@ -179,7 +179,7 @@ class GLManager {
     }
 }
 
-GLManager.programs.push({name: "fortnite", vertexid: 0, fragmentid: 1}, {name: "fortnite", vertexid: 0, fragmentid: 1}  );
+//GLManager.programs.push({name: "fortnite", vertexid: 0, fragmentid: 1}, {name: "fortnite", vertexid: 0, fragmentid: 1}  );
 
 class OtherWindow { //https://www.youtube.com/watch?v=24Eh2-DZTgQ
     hover = false;

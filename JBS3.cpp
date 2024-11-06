@@ -1632,6 +1632,22 @@ V8FUNC(DrawTextWrapper) {
     info.GetReturnValue().Set(Number::New(isolate, DrawText((HDC)IntegerFI(info[0]), WStringFI(info[1]), -1, &r, IntegerFI(info[6]))));
 }
 
+V8FUNC(DrawFrameControlWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    RECT r = RECT{ (long)IntegerFI(info[1]) ,(long)IntegerFI(info[2]) ,(long)IntegerFI(info[3]) ,(long)IntegerFI(info[4]) };
+    info.GetReturnValue().Set(Number::New(isolate, DrawFrameControl((HDC)IntegerFI(info[0]), &r, IntegerFI(info[5]), IntegerFI(info[6]))));
+}
+
+V8FUNC(DrawCaptionWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    RECT r = RECT{ (long)IntegerFI(info[2]) ,(long)IntegerFI(info[3]) ,(long)IntegerFI(info[4]) ,(long)IntegerFI(info[5]) };
+    info.GetReturnValue().Set(Number::New(isolate, DrawCaption((HWND)IntegerFI(info[0]), (HDC)IntegerFI(info[1]), &r, IntegerFI(info[6]))));
+}
+
 //HFONT defaultfont = NULL;
 
 V8FUNC(SelectObjectWrapper) {
@@ -6817,7 +6833,7 @@ V8FUNC(createCanvas) {
         //setGlConst(BLEND_EQUATION_RGB); setGlConst(VERTEX_ATTRIB_ARRAY_ENABLED); setGlConst(VERTEX_ATTRIB_ARRAY_SIZE); setGlConst(VERTEX_ATTRIB_ARRAY_STRIDE); setGlConst(VERTEX_ATTRIB_ARRAY_TYPE); setGlConst(CURRENT_VERTEX_ATTRIB); setGlConst(VERTEX_PROGRAM_POINT_SIZE); setGlConst(VERTEX_PROGRAM_TWO_SIDE); setGlConst(VERTEX_ATTRIB_ARRAY_POINTER); setGlConst(STENCIL_BACK_FUNC); setGlConst(STENCIL_BACK_FAIL); setGlConst(STENCIL_BACK_PASS_DEPTH_FAIL); setGlConst(STENCIL_BACK_PASS_DEPTH_PASS); setGlConst(MAX_DRAW_BUFFERS); setGlConst(DRAW_BUFFER0); setGlConst(DRAW_BUFFER1); setGlConst(DRAW_BUFFER2); setGlConst(DRAW_BUFFER3); setGlConst(DRAW_BUFFER4); setGlConst(DRAW_BUFFER5); setGlConst(DRAW_BUFFER6); setGlConst(DRAW_BUFFER7); setGlConst(DRAW_BUFFER8); setGlConst(DRAW_BUFFER9); setGlConst(DRAW_BUFFER10); setGlConst(DRAW_BUFFER11); setGlConst(DRAW_BUFFER12); setGlConst(DRAW_BUFFER13); setGlConst(DRAW_BUFFER14); setGlConst(DRAW_BUFFER15); setGlConst(BLEND_EQUATION_ALPHA); setGlConst(POINT_SPRITE); setGlConst(COORD_REPLACE); setGlConst(MAX_VERTEX_ATTRIBS); setGlConst(VERTEX_ATTRIB_ARRAY_NORMALIZED); setGlConst(MAX_TEXTURE_COORDS); setGlConst(MAX_TEXTURE_IMAGE_UNITS); setGlConst(FRAGMENT_SHADER); setGlConst(VERTEX_SHADER); setGlConst(MAX_FRAGMENT_UNIFORM_COMPONENTS); setGlConst(MAX_VERTEX_UNIFORM_COMPONENTS); setGlConst(MAX_VARYING_FLOATS); setGlConst(MAX_VERTEX_TEXTURE_IMAGE_UNITS); setGlConst(MAX_COMBINED_TEXTURE_IMAGE_UNITS); setGlConst(SHADER_TYPE); setGlConst(FLOAT_VEC2); setGlConst(FLOAT_VEC3); setGlConst(FLOAT_VEC4); setGlConst(INT_VEC2); setGlConst(INT_VEC3); setGlConst(INT_VEC4); setGlConst(BOOL); setGlConst(BOOL_VEC2); setGlConst(BOOL_VEC3); setGlConst(BOOL_VEC4); setGlConst(FLOAT_MAT2); setGlConst(FLOAT_MAT3); setGlConst(FLOAT_MAT4); setGlConst(SAMPLER_1D); setGlConst(SAMPLER_2D); setGlConst(SAMPLER_3D); setGlConst(SAMPLER_CUBE); setGlConst(SAMPLER_1D_SHADOW); setGlConst(SAMPLER_2D_SHADOW); setGlConst(DELETE_STATUS); setGlConst(COMPILE_STATUS); setGlConst(LINK_STATUS); setGlConst(VALIDATE_STATUS); setGlConst(INFO_LOG_LENGTH); setGlConst(ATTACHED_SHADERS); setGlConst(ACTIVE_UNIFORMS); setGlConst(ACTIVE_UNIFORM_MAX_LENGTH); setGlConst(SHADER_SOURCE_LENGTH); setGlConst(ACTIVE_ATTRIBUTES); setGlConst(ACTIVE_ATTRIBUTE_MAX_LENGTH); setGlConst(FRAGMENT_SHADER_DERIVATIVE_HINT); setGlConst(SHADING_LANGUAGE_VERSION); setGlConst(CURRENT_PROGRAM); setGlConst(POINT_SPRITE_COORD_ORIGIN); setGlConst(LOWER_LEFT); setGlConst(UPPER_LEFT); setGlConst(STENCIL_BACK_REF); setGlConst(STENCIL_BACK_VALUE_MASK); setGlConst(STENCIL_BACK_WRITEMASK);
         setGlConst(DEPTH_BUFFER_BIT); setGlConst(STENCIL_BUFFER_BIT); setGlConst(COLOR_BUFFER_BIT); setGlConst(POINTS); setGlConst(LINES); setGlConst(LINE_LOOP); setGlConst(LINE_STRIP); setGlConst(TRIANGLES); setGlConst(TRIANGLE_STRIP); setGlConst(TRIANGLE_FAN); setGlConst(ZERO); setGlConst(ONE); setGlConst(SRC_COLOR); setGlConst(ONE_MINUS_SRC_COLOR); setGlConst(SRC_ALPHA); setGlConst(ONE_MINUS_SRC_ALPHA); setGlConst(DST_ALPHA); setGlConst(ONE_MINUS_DST_ALPHA); setGlConst(DST_COLOR); setGlConst(ONE_MINUS_DST_COLOR); setGlConst(SRC_ALPHA_SATURATE); setGlConst(FUNC_ADD); setGlConst(BLEND_EQUATION); setGlConst(BLEND_EQUATION_RGB); setGlConst(BLEND_EQUATION_ALPHA); setGlConst(FUNC_SUBTRACT); setGlConst(FUNC_REVERSE_SUBTRACT); setGlConst(BLEND_DST_RGB); setGlConst(BLEND_SRC_RGB); setGlConst(BLEND_DST_ALPHA); setGlConst(BLEND_SRC_ALPHA); setGlConst(CONSTANT_COLOR); setGlConst(ONE_MINUS_CONSTANT_COLOR); setGlConst(CONSTANT_ALPHA); setGlConst(ONE_MINUS_CONSTANT_ALPHA); setGlConst(BLEND_COLOR); setGlConst(ARRAY_BUFFER); setGlConst(ELEMENT_ARRAY_BUFFER); setGlConst(ARRAY_BUFFER_BINDING); setGlConst(ELEMENT_ARRAY_BUFFER_BINDING); setGlConst(STREAM_DRAW); setGlConst(STATIC_DRAW); setGlConst(DYNAMIC_DRAW); setGlConst(BUFFER_SIZE); setGlConst(BUFFER_USAGE); setGlConst(CURRENT_VERTEX_ATTRIB); setGlConst(FRONT); setGlConst(BACK); setGlConst(FRONT_AND_BACK); setGlConst(CULL_FACE); setGlConst(BLEND); setGlConst(DITHER); setGlConst(STENCIL_TEST); setGlConst(DEPTH_TEST); setGlConst(SCISSOR_TEST); setGlConst(POLYGON_OFFSET_FILL); setGlConst(SAMPLE_ALPHA_TO_COVERAGE); setGlConst(SAMPLE_COVERAGE); setGlConst(NO_ERROR); setGlConst(INVALID_ENUM); setGlConst(INVALID_VALUE); setGlConst(INVALID_OPERATION); setGlConst(OUT_OF_MEMORY); setGlConst(CW); setGlConst(CCW); setGlConst(LINE_WIDTH); setGlConst(ALIASED_POINT_SIZE_RANGE); setGlConst(ALIASED_LINE_WIDTH_RANGE); setGlConst(CULL_FACE_MODE); setGlConst(FRONT_FACE); setGlConst(DEPTH_RANGE); setGlConst(DEPTH_WRITEMASK); setGlConst(DEPTH_CLEAR_VALUE); setGlConst(DEPTH_FUNC); setGlConst(STENCIL_CLEAR_VALUE); setGlConst(STENCIL_FUNC); setGlConst(STENCIL_FAIL); setGlConst(STENCIL_PASS_DEPTH_FAIL); setGlConst(STENCIL_PASS_DEPTH_PASS); setGlConst(STENCIL_REF); setGlConst(STENCIL_VALUE_MASK); setGlConst(STENCIL_WRITEMASK); setGlConst(STENCIL_BACK_FUNC); setGlConst(STENCIL_BACK_FAIL); setGlConst(STENCIL_BACK_PASS_DEPTH_FAIL); setGlConst(STENCIL_BACK_PASS_DEPTH_PASS); setGlConst(STENCIL_BACK_REF); setGlConst(STENCIL_BACK_VALUE_MASK); setGlConst(STENCIL_BACK_WRITEMASK); setGlConst(VIEWPORT); setGlConst(SCISSOR_BOX); setGlConst(COLOR_CLEAR_VALUE); setGlConst(COLOR_WRITEMASK); setGlConst(UNPACK_ALIGNMENT); setGlConst(PACK_ALIGNMENT); setGlConst(MAX_TEXTURE_SIZE); setGlConst(MAX_VIEWPORT_DIMS); setGlConst(SUBPIXEL_BITS); setGlConst(RED_BITS); setGlConst(GREEN_BITS); setGlConst(BLUE_BITS); setGlConst(ALPHA_BITS); setGlConst(DEPTH_BITS); setGlConst(STENCIL_BITS); setGlConst(POLYGON_OFFSET_UNITS); setGlConst(POLYGON_OFFSET_FACTOR); setGlConst(TEXTURE_BINDING_2D); setGlConst(SAMPLE_BUFFERS); setGlConst(SAMPLES); setGlConst(SAMPLE_COVERAGE_VALUE); setGlConst(SAMPLE_COVERAGE_INVERT); setGlConst(COMPRESSED_TEXTURE_FORMATS); setGlConst(DONT_CARE); setGlConst(FASTEST); setGlConst(NICEST); setGlConst(GENERATE_MIPMAP_HINT); setGlConst(BYTE); setGlConst(UNSIGNED_BYTE); setGlConst(SHORT); setGlConst(UNSIGNED_SHORT); setGlConst(INT); setGlConst(UNSIGNED_INT); setGlConst(FLOAT); setGlConst(DEPTH_COMPONENT); setGlConst(ALPHA); setGlConst(RGB); setGlConst(RGBA); setGlConst(LUMINANCE); setGlConst(LUMINANCE_ALPHA); setGlConst(UNSIGNED_SHORT_4_4_4_4); setGlConst(UNSIGNED_SHORT_5_5_5_1); setGlConst(UNSIGNED_SHORT_5_6_5); setGlConst(FRAGMENT_SHADER); setGlConst(VERTEX_SHADER); setGlConst(MAX_VERTEX_ATTRIBS); setGlConst(MAX_VERTEX_UNIFORM_VECTORS); setGlConst(MAX_VARYING_VECTORS); setGlConst(MAX_COMBINED_TEXTURE_IMAGE_UNITS); setGlConst(MAX_VERTEX_TEXTURE_IMAGE_UNITS); setGlConst(MAX_TEXTURE_IMAGE_UNITS); setGlConst(MAX_FRAGMENT_UNIFORM_VECTORS); setGlConst(SHADER_TYPE); setGlConst(DELETE_STATUS); setGlConst(LINK_STATUS); setGlConst(VALIDATE_STATUS); setGlConst(ATTACHED_SHADERS); setGlConst(ACTIVE_UNIFORMS); setGlConst(ACTIVE_ATTRIBUTES); setGlConst(SHADING_LANGUAGE_VERSION); setGlConst(CURRENT_PROGRAM); setGlConst(NEVER); setGlConst(LESS); setGlConst(EQUAL); setGlConst(LEQUAL); setGlConst(GREATER); setGlConst(NOTEQUAL); setGlConst(GEQUAL); setGlConst(ALWAYS); setGlConst(KEEP); setGlConst(REPLACE); setGlConst(INCR); setGlConst(DECR); setGlConst(INVERT); setGlConst(INCR_WRAP); setGlConst(DECR_WRAP); setGlConst(VENDOR); setGlConst(RENDERER); setGlConst(VERSION); setGlConst(NEAREST); setGlConst(LINEAR); setGlConst(NEAREST_MIPMAP_NEAREST); setGlConst(LINEAR_MIPMAP_NEAREST); setGlConst(NEAREST_MIPMAP_LINEAR); setGlConst(LINEAR_MIPMAP_LINEAR); setGlConst(TEXTURE_MAG_FILTER); setGlConst(TEXTURE_MIN_FILTER); setGlConst(TEXTURE_WRAP_S); setGlConst(TEXTURE_WRAP_T); setGlConst(TEXTURE_2D); setGlConst(TEXTURE); setGlConst(TEXTURE_CUBE_MAP); setGlConst(TEXTURE_BINDING_CUBE_MAP); setGlConst(TEXTURE_CUBE_MAP_POSITIVE_X); setGlConst(TEXTURE_CUBE_MAP_NEGATIVE_X); setGlConst(TEXTURE_CUBE_MAP_POSITIVE_Y); setGlConst(TEXTURE_CUBE_MAP_NEGATIVE_Y); setGlConst(TEXTURE_CUBE_MAP_POSITIVE_Z); setGlConst(TEXTURE_CUBE_MAP_NEGATIVE_Z); setGlConst(MAX_CUBE_MAP_TEXTURE_SIZE); setGlConst(TEXTURE0); setGlConst(TEXTURE1); setGlConst(TEXTURE2); setGlConst(TEXTURE3); setGlConst(TEXTURE4); setGlConst(TEXTURE5); setGlConst(TEXTURE6); setGlConst(TEXTURE7); setGlConst(TEXTURE8); setGlConst(TEXTURE9); setGlConst(TEXTURE10); setGlConst(TEXTURE11); setGlConst(TEXTURE12); setGlConst(TEXTURE13); setGlConst(TEXTURE14); setGlConst(TEXTURE15); setGlConst(TEXTURE16); setGlConst(TEXTURE17); setGlConst(TEXTURE18); setGlConst(TEXTURE19); setGlConst(TEXTURE20); setGlConst(TEXTURE21); setGlConst(TEXTURE22); setGlConst(TEXTURE23); setGlConst(TEXTURE24); setGlConst(TEXTURE25); setGlConst(TEXTURE26); setGlConst(TEXTURE27); setGlConst(TEXTURE28); setGlConst(TEXTURE29); setGlConst(TEXTURE30); setGlConst(TEXTURE31); setGlConst(ACTIVE_TEXTURE); setGlConst(REPEAT); setGlConst(CLAMP_TO_EDGE); setGlConst(MIRRORED_REPEAT); setGlConst(FLOAT_VEC2); setGlConst(FLOAT_VEC3); setGlConst(FLOAT_VEC4); setGlConst(INT_VEC2); setGlConst(INT_VEC3); setGlConst(INT_VEC4); setGlConst(BOOL); setGlConst(BOOL_VEC2); setGlConst(BOOL_VEC3); setGlConst(BOOL_VEC4); setGlConst(FLOAT_MAT2); setGlConst(FLOAT_MAT3); setGlConst(FLOAT_MAT4); setGlConst(SAMPLER_2D); setGlConst(SAMPLER_CUBE); setGlConst(VERTEX_ATTRIB_ARRAY_ENABLED); setGlConst(VERTEX_ATTRIB_ARRAY_SIZE); setGlConst(VERTEX_ATTRIB_ARRAY_STRIDE); setGlConst(VERTEX_ATTRIB_ARRAY_TYPE); setGlConst(VERTEX_ATTRIB_ARRAY_NORMALIZED); setGlConst(VERTEX_ATTRIB_ARRAY_POINTER); setGlConst(VERTEX_ATTRIB_ARRAY_BUFFER_BINDING); setGlConst(IMPLEMENTATION_COLOR_READ_TYPE); setGlConst(IMPLEMENTATION_COLOR_READ_FORMAT); setGlConst(COMPILE_STATUS); setGlConst(LOW_FLOAT); setGlConst(MEDIUM_FLOAT); setGlConst(HIGH_FLOAT); setGlConst(LOW_INT); setGlConst(MEDIUM_INT); setGlConst(HIGH_INT); setGlConst(FRAMEBUFFER); setGlConst(RENDERBUFFER); setGlConst(RGBA4); setGlConst(RGB5_A1); setGlConst(RGBA8); setGlConst(RGB565); setGlConst(DEPTH_COMPONENT16); setGlConst(STENCIL_INDEX8); setGlConst(DEPTH_STENCIL); setGlConst(RENDERBUFFER_WIDTH); setGlConst(RENDERBUFFER_HEIGHT); setGlConst(RENDERBUFFER_INTERNAL_FORMAT); setGlConst(RENDERBUFFER_RED_SIZE); setGlConst(RENDERBUFFER_GREEN_SIZE); setGlConst(RENDERBUFFER_BLUE_SIZE); setGlConst(RENDERBUFFER_ALPHA_SIZE); setGlConst(RENDERBUFFER_DEPTH_SIZE); setGlConst(RENDERBUFFER_STENCIL_SIZE); setGlConst(FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE); setGlConst(FRAMEBUFFER_ATTACHMENT_OBJECT_NAME); setGlConst(FRAMEBUFFER_ATTACHMENT_TEXTURE_LEVEL); setGlConst(FRAMEBUFFER_ATTACHMENT_TEXTURE_CUBE_MAP_FACE); setGlConst(COLOR_ATTACHMENT0); setGlConst(DEPTH_ATTACHMENT); setGlConst(STENCIL_ATTACHMENT); setGlConst(DEPTH_STENCIL_ATTACHMENT); setGlConst(NONE); setGlConst(FRAMEBUFFER_COMPLETE); setGlConst(FRAMEBUFFER_INCOMPLETE_ATTACHMENT); setGlConst(FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT);
         setGlConst(FRAMEBUFFER_UNSUPPORTED); setGlConst(FRAMEBUFFER_BINDING); setGlConst(RENDERBUFFER_BINDING); setGlConst(MAX_RENDERBUFFER_SIZE); setGlConst(INVALID_FRAMEBUFFER_OPERATION);
-        //idk if these links stay valid like desmos but here -> regexr.com/80n5s
+        //idk if these links stay valid like desmos but here -> regexr.com/80n5sdrawArrays
         //unfortunately these don't work and double unfortunate is that UNPACK_FLIP_Y_WEBGL is important (and has no native gl equivalent (so i guess i'll just flip the images when i load them (some how)))
         //actually wait they're defined in the spec too
 #define GL_FRAMEBUFFER_INCOMPLETE_DIMENSIONS 0x8CD9
@@ -7774,6 +7790,13 @@ V8FUNC(SetCaptureWrapper) {
     info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)SetCapture((HWND)IntegerFI(info[0]))));
 }
 
+V8FUNC(GetCaptureWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)GetCapture()));
+}
+
 V8FUNC(ReleaseCaptureWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
@@ -7806,6 +7829,41 @@ V8FUNC(GET_WHEEL_DELTA_WPARAMWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
     info.GetReturnValue().Set(GET_WHEEL_DELTA_WPARAM(IntegerFI(info[0])));
+}
+
+V8FUNC(GetGUIThreadInfoWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    Local<Context> context = isolate->GetCurrentContext();
+
+    GUITHREADINFO guithreadinfo{};
+    guithreadinfo.cbSize = sizeof(GUITHREADINFO);
+
+    BOOL res = GetGUIThreadInfo(IntegerFI(info[0]), &guithreadinfo);
+    Local<Object> jsgti = Object::New(isolate);
+    jsgti->Set(context, LITERAL("flags"), Number::New(isolate, guithreadinfo.flags));
+    jsgti->Set(context, LITERAL("hwndActive"), Number::New(isolate, (LONG_PTR)guithreadinfo.hwndActive));
+    jsgti->Set(context, LITERAL("hwndFocus"), Number::New(isolate, (LONG_PTR)guithreadinfo.hwndFocus));
+    jsgti->Set(context, LITERAL("hwndCapture"), Number::New(isolate, (LONG_PTR)guithreadinfo.hwndCapture));
+    jsgti->Set(context, LITERAL("hwndMenuOwner"), Number::New(isolate, (LONG_PTR)guithreadinfo.hwndMenuOwner));
+    jsgti->Set(context, LITERAL("hwndMoveSize"), Number::New(isolate, (LONG_PTR)guithreadinfo.hwndMoveSize));
+    jsgti->Set(context, LITERAL("hwndCaret"), Number::New(isolate, (LONG_PTR)guithreadinfo.hwndCaret));
+    jsgti->Set(context, LITERAL("rcCaret"), jsImpl::createWinRect(isolate, guithreadinfo.rcCaret));
+
+    info.GetReturnValue().Set(jsgti);
+}
+
+V8FUNC(GetGuiResourcesWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, GetGuiResources((HANDLE)IntegerFI(info[0]), IntegerFI(info[1]))));
+}
+
+V8FUNC(DisableProcessWindowsGhostingWrapper) {
+    //using namespace v8;
+    //Isolate* isolate = info.GetIsolate();
+    DisableProcessWindowsGhosting();
 }
 
 V8FUNC(CreateWindowClass) {
@@ -7876,6 +7934,9 @@ LRESULT CALLBACK WinProc(HWND hWnd, UINT msg, WPARAM wp, LPARAM lp)
 }
 
 //just in case i wanna do some dialogbox stuff https://learn.microsoft.com/en-us/windows/win32/dlgbox/using-dialog-boxes#creating-a-template-in-memory https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-dialogboxindirectw https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-dialogboxindirectparamw https://learn.microsoft.com/en-us/windows/win32/dlgbox/dlgtemplateex https://learn.microsoft.com/en-us/windows/win32/dlgbox/about-dialog-boxes#templates-in-memory
+
+//#include <vssym32.h> //BP_PUSHBUTTON
+//#include <Uxtheme.h>
 
 V8FUNC(CreateWindowWrapper) {
     //MessageBoxA(NULL, "aw shit another unfiinished hting", "ok so like no cap the only message you can resieve as of now is WM_PAINT", MB_OK | MB_ICONEXCLAMATION);
@@ -7999,7 +8060,7 @@ V8FUNC(CreateWindowWrapper) {
                 return lres;
             }
             else {
-                LRESULT ret = IntegerFI(returnedValue.ToLocalChecked());
+                LRESULT ret = IntegerFI(returnedValue.ToLocalChecked()); //oh wait i could just check if this value is undefined i think right
                 if (ret != 0) {
                     print(ret << " ret");
                     return ret;
@@ -12932,6 +12993,7 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const wchar_t* filename
 
     //https://stackoverflow.com/questions/6707148/foreach-macro-on-macros-arguments
 #define setGlobalConst(g) global->Set(isolate, #g, Number::New(isolate, g))
+#define setGlobalConstLONGPTR(g) global->Set(isolate, #g, Number::New(isolate, (LONG_PTR)g))
 
     setGlobal(NewCharStrPtr);
     setGlobal(NewWCharStrPtr);
@@ -14263,8 +14325,6 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const wchar_t* filename
 
     //setGlobalConst((LONG_PTR)HBMMENU_CALLBACK); //lol (wait oops this was adding the (LONG_PTR) part)
 
-#define setGlobalConstLONGPTR(g) global->Set(isolate, #g, Number::New(isolate, (LONG_PTR)g))
-
     setGlobalConstLONGPTR(HBMMENU_CALLBACK); //lol
     setGlobalConstLONGPTR(HBMMENU_SYSTEM);
     setGlobalConstLONGPTR(HBMMENU_MBAR_RESTORE);
@@ -14277,7 +14337,7 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const wchar_t* filename
     setGlobalConstLONGPTR(HBMMENU_POPUP_MAXIMIZE);
     setGlobalConstLONGPTR(HBMMENU_POPUP_MINIMIZE);
 
-#undef setGlobalConstLONGPTR
+//#undef setGlobalConstLONGPTR
 
     setGlobal(GET_MEASURE_ITEM_STRUCT_LPARAM);
     setGlobal(GET_DRAW_ITEM_STRUCT_LPARAM);
@@ -14955,6 +15015,51 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
     setGlobalWrapper(LineTo);
     setGlobalWrapper(DrawText);
     setGlobalConst(DT_BOTTOM); setGlobalConst(DT_CALCRECT); setGlobalConst(DT_CENTER); setGlobalConst(DT_EDITCONTROL); setGlobalConst(DT_END_ELLIPSIS); setGlobalConst(DT_EXPANDTABS); setGlobalConst(DT_EXTERNALLEADING); setGlobalConst(DT_HIDEPREFIX); setGlobalConst(DT_INTERNAL); setGlobalConst(DT_LEFT); setGlobalConst(DT_MODIFYSTRING); setGlobalConst(DT_NOCLIP); setGlobalConst(DT_NOFULLWIDTHCHARBREAK); setGlobalConst(DT_NOPREFIX); setGlobalConst(DT_PATH_ELLIPSIS); setGlobalConst(DT_PREFIXONLY); setGlobalConst(DT_RIGHT); setGlobalConst(DT_RTLREADING); setGlobalConst(DT_SINGLELINE); setGlobalConst(DT_TABSTOP); setGlobalConst(DT_TOP); setGlobalConst(DT_VCENTER); setGlobalConst(DT_WORDBREAK); setGlobalConst(DT_WORD_ELLIPSIS);
+    setGlobalWrapper(DrawFrameControl);
+    setGlobalConst(DFC_CAPTION);
+    setGlobalConst(DFC_MENU);
+    setGlobalConst(DFC_SCROLL);
+    setGlobalConst(DFC_BUTTON);
+    setGlobalConst(DFC_POPUPMENU);
+    setGlobalConst(DFCS_CAPTIONCLOSE);
+    setGlobalConst(DFCS_CAPTIONMIN);
+    setGlobalConst(DFCS_CAPTIONMAX);
+    setGlobalConst(DFCS_CAPTIONRESTORE);
+    setGlobalConst(DFCS_CAPTIONHELP);
+    setGlobalConst(DFCS_MENUARROW);
+    setGlobalConst(DFCS_MENUCHECK);
+    setGlobalConst(DFCS_MENUBULLET);
+    setGlobalConst(DFCS_MENUARROWRIGHT);
+    setGlobalConst(DFCS_SCROLLUP);
+    setGlobalConst(DFCS_SCROLLDOWN);
+    setGlobalConst(DFCS_SCROLLLEFT);
+    setGlobalConst(DFCS_SCROLLRIGHT);
+    setGlobalConst(DFCS_SCROLLCOMBOBOX);
+    setGlobalConst(DFCS_SCROLLSIZEGRIP);
+    setGlobalConst(DFCS_SCROLLSIZEGRIPRIGHT);
+    setGlobalConst(DFCS_BUTTONCHECK);
+    setGlobalConst(DFCS_BUTTONRADIOIMAGE);
+    setGlobalConst(DFCS_BUTTONRADIOMASK);
+    setGlobalConst(DFCS_BUTTONRADIO);
+    setGlobalConst(DFCS_BUTTON3STATE);
+    setGlobalConst(DFCS_BUTTONPUSH);
+    setGlobalConst(DFCS_INACTIVE);
+    setGlobalConst(DFCS_PUSHED);
+    setGlobalConst(DFCS_CHECKED);
+    setGlobalConst(DFCS_TRANSPARENT);
+    setGlobalConst(DFCS_HOT);
+    setGlobalConst(DFCS_ADJUSTRECT);
+    setGlobalConst(DFCS_FLAT);
+    setGlobalConst(DFCS_MONO);
+    setGlobalWrapper(DrawCaption);
+    setGlobalConst(DC_ACTIVE);
+    setGlobalConst(DC_SMALLCAP);
+    setGlobalConst(DC_ICON);
+    setGlobalConst(DC_TEXT);
+    setGlobalConst(DC_INBUTTON);
+    setGlobalConst(DC_GRADIENT);
+    setGlobalConst(DC_BUTTONS);
+
 
     setGlobalWrapper(GetWindowDC);
     setGlobalWrapper(SaveDC);
@@ -15519,10 +15624,27 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
 
 
     setGlobalWrapper(SetCapture);
+    setGlobalWrapper(GetCapture);
     setGlobalWrapper(ReleaseCapture);
     setGlobalWrapper(ClipCursor);
     setGlobalWrapper(MAKEPOINTS);
     setGlobalWrapper(GET_WHEEL_DELTA_WPARAM);
+
+    setGlobalWrapper(GetGUIThreadInfo);
+    setGlobalConst(GUI_CARETBLINKING);
+    setGlobalConst(GUI_INMOVESIZE);
+    setGlobalConst(GUI_INMENUMODE);
+    setGlobalConst(GUI_SYSTEMMENUMODE);
+    setGlobalConst(GUI_POPUPMENUMODE);
+    setGlobalConst(GUI_16BITTASK);
+
+    setGlobalWrapper(GetGuiResources);
+    setGlobalConst(GR_GDIOBJECTS);
+    setGlobalConst(GR_USEROBJECTS);
+    setGlobalConst(GR_GDIOBJECTS_PEAK);
+    setGlobalConst(GR_USEROBJECTS_PEAK);
+    setGlobalConstLONGPTR(GR_GLOBAL);
+    setGlobalWrapper(DisableProcessWindowsGhosting);
 
     setGlobalWrapper(IsIconic);
     setGlobalWrapper(IsWindowVisible);

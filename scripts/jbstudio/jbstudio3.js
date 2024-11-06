@@ -199,7 +199,8 @@ function readAndPrepareMidi(file) {
         //Math.floor((note.x - 70)/91)*(60/tempo)*1000;
         //ok symbolab told me that to find note.x it's (91*note.start*tempo)/60000 + 70
         let x = (92*note.start*tempo)/60000 + 70;
-        print(note.start, tempo, x, note.key, note.vel, "erm...");                                  //oops i thought midi max velocity was 100!
+        // print(note.start, tempo, x, note.key, note.vel, "erm..."); //printing is too slow bruh
+                                                                                                            //oops i thought midi max velocity was 100!
         let pRN = new ABSDraggable(x, ((131-note.key)*21), (note.beats*4)*23, 20, channelColors[note.channel].map(val => (note.vel/127)*(val/255)), pianoRollNoteDrag); //haha prn
         pRN.key = note.key;
         pRN.channel = note.channel;
@@ -350,8 +351,11 @@ function playTone(key, pitch, up = false) {
             pianoKeys[note].color = [1, 155/255, 0];
             fluidsynthinst.noteon(0, note, 100);
         }else {
-            pianoKeys[note].color = pianoKeys[note].lastColor;
-            delete pianoKeys[note].lastColor; //delete this property so i can check if it already exists when you call playTone (because to fire playTone again with up being false means you held the key for too long and it started sending repeat messages lmao)
+            //print(pitch, key, "off");
+            if(pianoKeys[note].lastColor) {
+                pianoKeys[note].color = pianoKeys[note].lastColor; //OHHHH jbstudio will crash after you release shift while the virtual piano layout is on and it's because when you release shift it gets sent over to playTone as 48 (the "0" key) and when it tries to release this note it sets color to undefined because lastColor wasn't defined yet (when i made this part i assumed that there couldn't be any random note offs)
+                delete pianoKeys[note].lastColor; //delete this property so i can check if it already exists when you call playTone (because to fire playTone again with up being false means you held the key for too long and it started sending repeat messages lmao)
+            }
             fluidsynthinst.noteoff(0, note);
         }
     }
@@ -677,8 +681,9 @@ function windowProc(hwnd, msg, wp, lp) {
                 0x39: 0x28,  // '9' -> '('
             }
             //args = pianoLayout[String.fromCharCode(shifted[wp] || (wp+(GetKey(VK_SHIFT) == 0)*32))]; //write dumb code bruh (wait this was actually dumb because it was wrong haha)
-            if(GetKey(VK_SHIFT)) {
+            if(GetKey(VK_SHIFT)) { //why does WM_KEYDOWN not pass which modifier keys were active
                 args = pianoLayout[String.fromCharCode(shifted[wp] || wp)];
+                print(args, shifted[wp], wp);
             }else {
                 args = pianoLayout[String.fromCharCode(shifted[wp] ? wp : wp+32)];
             }

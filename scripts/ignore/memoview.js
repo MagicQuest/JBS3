@@ -9,3 +9,5 @@
 //VirtualQuery(Ex)
 
 // 2n**(2n**30n-1n)-1n is apparently the largest representable bigint in js (https://stackoverflow.com/a/70537884)
+
+//check Local<Object> value in locals window or something and get the private _location pointer and see how various types of data are stored (specifically json)
