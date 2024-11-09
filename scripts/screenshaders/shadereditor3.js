@@ -1,4 +1,5 @@
 //ok im making shadereditor3.js because i had a brain blast and realized this would be better to make
+//oh yeah i should lowkey do this kinda thing for EVERY function in jbs just like unreal blueprints (and then i want to make a visual scripting discord bot thing!)
 
 //for later:
 //https://learn.microsoft.com/en-us/windows/win32/controls/create-a-list-view-control
@@ -26,11 +27,13 @@
 let wic, d2d, font, colorBrush;
 let gl;
 let dirty = false;
-let hitresult = 0;
+let hit = {};
 let hitblueprint;
 let activeButton;
+let activePin;
 
 const arrow = LoadCursor(NULL, IDC_ARROW);
+const hand = LoadCursor(NULL, IDC_HAND);
 
 const Int_To_WM = function() { //this gotta be the only good reason to use a closure
     const wm = {}; //with a closure im using wm like it's static!!!
@@ -230,24 +233,26 @@ function withinBounds({x, y, width, height}, pair) {
     return pair.x > x && pair.y > y && pair.x < x+width && pair.y < y+height;
 }
 
-const TOP = 0b00000001;
-const LEFT = 0b00000010;
-const RIGHT = 0b00000100;
-const BOTTOM = 0b00001000;
-const BUTTON  = 0b00010000;
-const MOVE     = 0b00100000;
-const CONTEXTMENU=0b01000000;
-const DROP        =0b10000000;
+const TOP = 0b000000001;
+const LEFT = 0b000000010;
+const RIGHT = 0b000000100;
+const BOTTOM = 0b000001000;
+const BUTTON  = 0b000010000;
+const MOVE     = 0b000100000;
+const CONTEXTMENU=0b001000000;
+const DROP        =0b010000000;
+const DRAG         =0b100000000;
 
 const hittestarr = [
     [TOP, LoadCursor(NULL, IDC_SIZENS)],
     [LEFT, LoadCursor(NULL, IDC_SIZEWE)],
     [RIGHT, LoadCursor(NULL, IDC_SIZEWE)],
     [BOTTOM, LoadCursor(NULL, IDC_SIZENS)],
-    [BUTTON, LoadCursor(NULL, IDC_HAND)],
+    [BUTTON, hand],
     [MOVE, LoadCursor(NULL, IDC_SIZEALL)],
     [CONTEXTMENU, LoadCursor(NULL, IDC_HELP)],
-    [DROP, LoadCursor(NULL, IDC_HAND)],
+    [DROP, hand],
+    [DRAG, hand],
 ];
 
 class Draggable { //not to be confused with Draggable from jbstudio3 (this shit is elegant as fuck)
@@ -306,17 +311,21 @@ class Blueprint {
 
     gradientStops = [];
     gradients = [];
+    paramText = [];
+    outText = [];
+
+    connections = [];
 
     static padding = 16;
     static radius = 4;
 
-    static create(parent, title, x, y, width, height, parameters, out) {
-        const b = new Blueprint(parent, title, x, y, width, height, parameters, out);
+    static create(parent, title, color, x, y, width, height, parameters, out) {
+        const b = new Blueprint(parent, color, title, x, y, width, height, parameters, out);
         blueprints.push(b);
         return b;
     }
 
-    constructor(parent, title, x, y, width, height, parameters, out) {
+    constructor(parent, title, color, x, y, width, height, parameters, out) {
         this.parent = parent;
         this.title = title;
         this.x = x;
@@ -328,45 +337,80 @@ class Blueprint {
 
         this.gradientStops.push(
             //d2d.CreateGradientStopCollection([0.0, 0.0, 67/255, 255/255], [0.8, 32/255, 32/255, 32/255]),
-            d2d.CreateGradientStopCollection([0.0, 95/255, 150/255, 187/255], [0.8, 32/255, 32/255, 32/255]),
+            d2d.CreateGradientStopCollection([0.0, ...color], [0.85, 32/255, 32/255, 32/255]),
             d2d.CreateGradientStopCollection([0.0, 32/255, 32/255, 32/255], [0.4, 0.0, 0.0, 0.0, 0.0]),
             d2d.CreateGradientStopCollection([0.0, 27/255, 28/255, 27/255], [0.4, 19/255, 21/255, 19/255], [.8, 15/255, 17/255, 15/255]),
+            d2d.CreateGradientStopCollection([0.0, ...color], [0.2, 0.0, 0.0, 0.0, 0.0]),
         );
         
-        this.gradients.push(
-            d2d.CreateLinearGradientBrush(0,0,this.width,this.height, this.gradientStops[0]),
+        this.gradients.push( //https://learn.microsoft.com/en-us/windows/win32/api/d2d1/ns-d2d1-d2d1_linear_gradient_brush_properties
+            d2d.CreateLinearGradientBrush(0,0,this.width,/*this.height*/ Blueprint.captionHeight, this.gradientStops[0]),
             d2d.CreateRadialGradientBrush(this.width/3, Blueprint.captionHeight/2, 0, 0, this.width, Blueprint.captionHeight, this.gradientStops[1]),
             d2d.CreateLinearGradientBrush(0, Blueprint.captionHeight, this.width, this.height, this.gradientStops[2]),
+            d2d.CreateLinearGradientBrush(2, 2, 2, Blueprint.captionHeight-2, this.gradientStops[3]), //pointing down
         );
 
         for(let i = 0; i < this.parameters.length; i++) {
             const param = this.parameters[i];
             const gsc = d2d.CreateGradientStopCollection([0.0, ...Blueprint.paramColors[param]], [0.5, 0.0, 0.0, 0.0, 0.0]);
+            this.paramText.push(d2d.CreateTextLayout(param, font, w, h));
             this.gradientStops.push(gsc);
             this.gradients.push(d2d.CreateRadialGradientBrush(Blueprint.padding, (i+1)*Blueprint.captionHeight+Blueprint.padding, 0, 0, this.width/2, Blueprint.captionHeight, gsc));
         }
 
         for(let i = 0; i < this.out.length; i++) {
             const op = this.out[i];
-            const gsc = d2d.CreateGradientStopCollection([0.0, ...Blueprint.paramColors[param]], [0.5, 0.0, 0.0, 0.0, 0.0]);
+            const gsc = d2d.CreateGradientStopCollection([0.0, ...Blueprint.paramColors[op]], [0.5, 0.0, 0.0, 0.0, 0.0]);
+            this.outText.push(d2d.CreateTextLayout(op, font, w, h));
             this.gradientStops.push(gsc);
             this.gradients.push(d2d.CreateRadialGradientBrush(Blueprint.padding, (i+1)*Blueprint.captionHeight+Blueprint.padding, 0, 0, this.width/2, Blueprint.captionHeight, gsc));
         }
     }
 
-    redraw() {
-        d2d.FillRectangle(0, 0, this.width, Blueprint.captionHeight, this.gradients[0]);
-        d2d.FillRectangle(0, 0, this.width, Blueprint.captionHeight, this.gradients[1]);
+    redraw() { //wait i could lowkey draw basically all of these into a bitmap and draw that instead (efficiency) i was thinking about using a CommandList too //https://learn.microsoft.com/en-us/windows/win32/direct2d/improving-direct2d-performance
+        //https://learn.microsoft.com/en-us/windows/win32/direct2d/printing-and-command-lists
+        //https://github.com/MicrosoftDocs/win32/blob/docs/desktop-src/direct3d12/d2d-using-d3d11on12.md
+        d2d.FillRoundedRectangle(0, Blueprint.captionHeight-4, this.width, this.height, 4, 4, this.gradients[2]);
+
+        d2d.FillRoundedRectangle(0, 0, this.width, Blueprint.captionHeight, 4, 4, this.gradients[0]);
+        d2d.FillRoundedRectangle(0, 0, this.width, Blueprint.captionHeight, 4, 4, this.gradients[1]);
+        //d2d.FillRectangle(0, 0, this.width, Blueprint.captionHeight, this.gradients[0]);
+        //d2d.FillRectangle(0, 0, this.width, Blueprint.captionHeight, this.gradients[1]);
         colorBrush.SetColor(1.0, 1.0, 1.0);
         d2d.DrawText(this.title, font, 21, 0, this.width, Blueprint.captionHeight, colorBrush);
-        d2d.FillRectangle(0, Blueprint.captionHeight, this.width, this.height, this.gradients[2]);
+
+        d2d.DrawRoundedRectangle(2, 2, this.width-2, Blueprint.captionHeight-2, 4, 4, this.gradients[3], 1);
+        //d2d.FillRectangle(0, Blueprint.captionHeight, this.width, this.height, this.gradients[2]);
         for(let i = 0; i < this.parameters.length; i++) {
             const param = this.parameters[i];
-            d2d.FillRectangle(Blueprint.padding, (i+1)*Blueprint.captionHeight+Blueprint.padding, 100, this.height, this.gradients[3+i]);
+            d2d.FillRectangle(Blueprint.padding, (i+1)*Blueprint.captionHeight+Blueprint.padding, 100, this.height, this.gradients[4+i]);
             colorBrush.SetColor(...Blueprint.paramColors[param]);
             d2d.DrawEllipse(Blueprint.padding-8, (i+1)*Blueprint.captionHeight+Blueprint.padding, Blueprint.radius, Blueprint.radius, colorBrush, 2);
             colorBrush.SetColor(1.0, 1.0, 1.0); 
-            d2d.DrawText(param, font, Blueprint.padding, (i+1)*Blueprint.captionHeight + Blueprint.padding, this.width, this.height, colorBrush);
+            //d2d.DrawText(param, font, Blueprint.padding, (i+1)*Blueprint.captionHeight + Blueprint.padding, this.width, this.height, colorBrush);
+            d2d.DrawTextLayout(Blueprint.padding, (i+1)*Blueprint.captionHeight + Blueprint.padding, this.paramText[i], colorBrush);
+            //d2d.DrawRectangle(Blueprint.padding-8-Blueprint.radius-2, (i+1)*Blueprint.captionHeight+Blueprint.padding-Blueprint.radius-2, Blueprint.padding-8-Blueprint.radius-2+(Blueprint.radius*2+2), (i+1)*Blueprint.captionHeight+Blueprint.padding-Blueprint.radius-2+(Blueprint.radius*2+2), colorBrush);
+        }
+        for(let i = 0; i < this.out.length; i++) {
+            const op = this.out[i];
+            const tl = this.outText[i];
+            const y = (i+1)*Blueprint.captionHeight+Blueprint.padding;
+            //print(tl.GetMetrics());
+            d2d.DrawTextLayout(this.width-10-tl.GetMetrics().width, y, tl, colorBrush);
+            colorBrush.SetColor(...Blueprint.paramColors[op]);
+            d2d.DrawEllipse(this.width-8, y, Blueprint.radius, Blueprint.radius, colorBrush, 2);
+            colorBrush.SetColor(1.0, 1.0, 1.0);
+
+            const connection = this.connections[i];
+            if(connection) {
+                const r = connection.receiver;
+                if(r) {
+                    connection.x = r.source.x+Blueprint.padding-8;
+                    connection.y = r.source.y+((r.i+1)*Blueprint.captionHeight+Blueprint.padding);
+                }
+                    //remember that i set transform before calling Blueprint.redraw so i gotta do math to get screen coords
+                d2d.DrawLine(this.width-8, y, connection.x-this.x, connection.y-this.y, colorBrush, 4); //maybe there's a drawbezier or something like that for paths or whatevers
+            }
         }
     }
 
@@ -380,9 +424,17 @@ class Blueprint {
         if(mouse.y < Blueprint.captionHeight) {
             return [MOVE];
         }else {
+            //if(mouse.x > this.width-4) {
+            //    return [RIGHT];
+            //}
             for(let i = 0; i < this.parameters.length; i++) {
                 if(withinBounds({x: Blueprint.padding-8-Blueprint.radius-2, y: (i+1)*Blueprint.captionHeight+Blueprint.padding-Blueprint.radius-2, width: Blueprint.radius*2+2, height: Blueprint.radius*2+2}, mouse)) {
                     return [DROP, i];
+                }
+            }
+            for(let i = 0; i < this.out.length; i++) {
+                if(withinBounds({x: this.width-8-Blueprint.radius, y: (i+1)*Blueprint.captionHeight+Blueprint.padding-Blueprint.radius-2, width: Blueprint.radius*2+2, height: Blueprint.radius*2+2}, mouse)) {
+                    return [DRAG, i];
                 }
             }
             return [NULL];
@@ -394,7 +446,19 @@ class Blueprint {
             this.gradientStops[i].Release();
             this.gradients[i].Release();
         }
+        for(let i = 0; i < this.paramText.length; i++) {
+            this.paramText[i].Release();
+        }
+        for(let i = 0; i < this.outText.length; i++) {
+            this.outText[i].Release();
+        }
         blueprints.splice(blueprints.indexOf(this), 1);
+    }
+
+    preDrag(mouse, data) {
+        activePin = {i: data, source: this};
+        this.connections[data] = {x: mouse.x, y: mouse.y};
+        return this.connections[data];
     }
 
     //onDrag() { //implements DraggableObject (if this were a stronger object oriented language)
@@ -411,6 +475,7 @@ let blueprints = [];
 
 function d2dpaint() {
     d2d.BeginDraw();
+    d2d.Clear(0.0, 0.0, 0.0, 0.1);
     //d2d.DrawBitmap(drawing, 0, 0, w, h);
     for(const blueprint of blueprints) {
         d2d.SaveDrawingState();
@@ -437,6 +502,7 @@ function windowProc(hwnd, msg, wp, lp) {
         gl = createCanvas("gl", NULL, hwnd);
         Blueprint.paramColors["FRAGMENT_SHADER"] = [255/255, 42/255, 0.0];
         Blueprint.paramColors["VERTEX_SHADER"] = [136/255, 255/255, 0.0];
+        Blueprint.paramColors["SHADER"] = [200/255, 200/255, 200/255];
         //DragAcceptFiles(hwnd, true); //you can just use WS_EX_ACCEPTFILES
         //uxtheme = DllLoad("UxTheme.dll");
         //print(uxtheme("IsAppThemed", 0, [], [], RETURN_NUMBER)); //oh hell yeah it's one (https://learn.microsoft.com/en-us/windows/win32/api/uxtheme/nf-uxtheme-isappthemed)
@@ -446,8 +512,8 @@ function windowProc(hwnd, msg, wp, lp) {
         DwmSetWindowAttribute(hwnd, DWMWA_CAPTION_COLOR, RGB(24, 24, 24)); //hell yeah this shit tuff asf (dark title bar)[doesn't work if you get rid of the window theme tho]
         
         //otherwnd = new BottomPane(hwnd); //no longer blocks the thread as i make and draw every control myself
-        blueprints.push(new Blueprint(hwnd, "Program", 300, 100, 221, 90*2, ["FRAGMENT_SHADER", "VERTEX_SHADER"], []));
-        blueprints.push(new Blueprint(hwnd, "Shader", 0, 100, 221, 90, [], ["SHADER"]));
+        blueprints.push(new Blueprint(hwnd, "Program", [95/255, 150/255, 187/255], 300, 100, 221, 90*2, ["FRAGMENT_SHADER", "VERTEX_SHADER"], []));
+        blueprints.push(new Blueprint(hwnd, "Shader", [95/255, 150/255, 187/255], 0, 100, 221, 90, [], ["SHADER"]));
         d2dpaint();
     }else if(msg == WM_PAINT) {   
         dirty = true;
@@ -494,32 +560,34 @@ function windowProc(hwnd, msg, wp, lp) {
         const mouse = GetCursorPos();//{x: GET_X_LPARAM(lp), y: GET_Y_LPARAM(lp)}; //i was originally using WM_MOUSEMOVE which passed the mouse position in the lp
         ScreenToClient(hwnd, mouse); //fun (returns nothing and modifies the object)
         //let result = 0;
-        hitresult = 0;
-        hitblueprint = undefined;
+        hit = {};
+        //hitblueprint = undefined;
         for(const blueprint of blueprints) {
             if(withinBounds(blueprint, mouse)) {
-                hitblueprint = undefined;
+                //hitblueprint = undefined;
 
                 const clientmouse = {x: mouse.x-blueprint.x, y: mouse.y-blueprint.y};
                 //mouse.x -= blueprint.x;
                 //mouse.y -= blueprint.y; //to client (oops i was directly modifying mouse)
                 const [legit, data] = blueprint.hittest(clientmouse);
-                //hitresult |= legit; //lowkey i was just OR ing them together to make it easier
+                //hit |= legit; //lowkey i was just OR ing them together to make it easier
                 //if(legit != 0) {
-                    hitresult = legit;
+                    hit.result = legit;
+                    hit.blueprint = blueprint;
                     if(legit) {
-                        hitblueprint = legit == BUTTON ? data : blueprint;
+                        //hitblueprint = legit == BUTTON ? data : blueprint;
+                        hit.data = data;
                     }
                 //}
             }
         }
         for(const [flag, cursor] of hittestarr) {
-            //if((hitresult & flag) == flag) {
-            if(hitresult == flag) { //i had to change hitresult to be only one value because if the topmost blueprint set TOP and a blueprint below set MOVE, it would use MOVE because it was the last element of hittestarr (wait a second that's not even the current problem)
+            //if((hit & flag) == flag) {
+            if(hit.result == flag) { //i had to change hit to be only one value because if the topmost blueprint set TOP and a blueprint below set MOVE, it would use MOVE because it was the last element of hittestarr (wait a second that's not even the current problem)
                 SetCursor(cursor);
             }
         }
-        if(hitresult) {
+        if(hit.result) {
             dirty = true;
             //SetCursor(arrow);
             return 1; //return true from WM_SETCURSOR to halt further processing (AND MOST IMPORTANTLY, RETURNING A VALUE OTHER THAN 0 DOES NOT CALL DefWindowProc NO MATTWR WHAT!!!!!)
@@ -527,20 +595,22 @@ function windowProc(hwnd, msg, wp, lp) {
     }else if(msg == WM_LBUTTONDOWN) {
         SetCapture(hwnd);
         const mouse = {x: GET_X_LPARAM(lp), y: GET_Y_LPARAM(lp)}; //lp is client mouse pos
-        if(hitresult && hitblueprint) {
-            //if((hitresult & BUTTON) == BUTTON) {
-            if(hitresult == BUTTON) {
-                hitblueprint.mouseDown(mouse);
-                activeButton = hitblueprint;
-            }else //if((hitresult & MOVE) == MOVE) {
-            if(hitresult == MOVE) {
-                Draggable.select(hitblueprint, mouse, false, false);
-            }else if(hitresult == CONTEXTMENU || hitresult == DROP) {
+        if(hit.result) {
+            //if((hit.result & BUTTON) == BUTTON) {
+            if(hit.result == BUTTON) {
+                hit.data.mouseDown(mouse);
+                activeButton = hit.data;
+            }else //if((hit.result & MOVE) == MOVE) {
+            if(hit.result == MOVE) {
+                Draggable.select(hit.blueprint, mouse, false, false);
+            }else if(hit.result == CONTEXTMENU || hit.result == DROP) {
                 //no
+            }else if(hit.result == DRAG) {
+                Draggable.select(hit.blueprint.preDrag?.(mouse, hit.data) ?? hit.blueprint, mouse, false, false);
             }else {
-                //const updown = ((hitresult & TOP) == TOP) || ((hitresult & BOTTOM) == BOTTOM);
-                const updown = hitresult == TOP || hitresult == BOTTOM;
-                Draggable.select(hitblueprint, mouse, updown, !updown);
+                //const updown = ((hit.result & TOP) == TOP) || ((hit.result & BOTTOM) == BOTTOM);
+                const updown = hit.result == TOP || hit.result == BOTTOM;
+                Draggable.select(hit.blueprint, mouse, updown, !updown);
             }
         }
 
@@ -548,18 +618,18 @@ function windowProc(hwnd, msg, wp, lp) {
             if(blueprint.x <= mouse.x && blueprint.y <= mouse.y) {
                 mouse.x -= blueprint.x;
                 mouse.y -= blueprint.y; //to client
-                //hitresult |= blueprint.hittest(mouse);
+                //hit |= blueprint.hittest(mouse);
                 blueprint.mouseDown?.(mouse);
             }
         }
     }else if(msg == WM_RBUTTONDOWN) {
         const mouse = {x: GET_X_LPARAM(lp), y: GET_Y_LPARAM(lp)}; //lp is client mouse pos
 
-        if(hitresult == BUTTON) {
+        if(hit.result == BUTTON) {
             hitblueprint.rightMouseDown?.(mouse);
-        }else if(hitresult == CONTEXTMENU) {
+        }else if(hit.result == CONTEXTMENU) {
             const screenmousepos = GetCursorPos();
-            hitblueprint.preContextMenu(screenmousepos);
+            hitblueprint.preContextMenu?.(screenmousepos);
             TrackPopupMenu(hitblueprint.contextMenu, TPM_BOTTOMALIGN | TPM_LEFTALIGN, screenmousepos.x, screenmousepos.y, hwnd);
         }
 
@@ -567,7 +637,7 @@ function windowProc(hwnd, msg, wp, lp) {
             if(blueprint.x <= mouse.x && blueprint.y <= mouse.y) {
                 mouse.x -= blueprint.x;
                 mouse.y -= blueprint.y; //to client
-                //hitresult |= blueprint.hittest(mouse);
+                //hit |= blueprint.hittest(mouse);
                 blueprint.rightMouseDown?.(mouse);
             }
         }
@@ -576,26 +646,52 @@ function windowProc(hwnd, msg, wp, lp) {
         Draggable.mouseUp();
 
         const mouse = {x: GET_X_LPARAM(lp), y: GET_Y_LPARAM(lp)}; //lp is client mouse pos
-        //if(hitresult == BUTTON) {
+        //if(hit == BUTTON) {
         //    hitblueprint.mouseUp(mouse);
         //}
         if(activeButton) {
             activeButton.mouseUp?.(mouse);
             dirty = true;
         }
+        if(activePin) {
+            //print(hit);
+            //dang it bruh WM_SETCURSOR doesn't fire when holding the mouse down and so hit.blueprint is still/actually activePin.source
+            let receiver;
+            for(const blueprint of blueprints) {
+                if(withinBounds(blueprint, mouse)) {
+                    //hitblueprint = undefined;
+    
+                    const clientmouse = {x: mouse.x-blueprint.x, y: mouse.y-blueprint.y};
+                    //mouse.x -= blueprint.x;
+                    //mouse.y -= blueprint.y; //to client (oops i was directly modifying mouse)
+                    const [legit, data] = blueprint.hittest(clientmouse);
+                    if(legit == DROP) {
+                        receiver = {i: data, source: blueprint};
+                    }
+                }
+            }    
+    
+            if(receiver) {
+                activePin.source.connections[activePin.i].receiver = receiver; //{i: receiver.data, source: receiver.blueprint};
+            }else {
+                activePin.source.connections[activePin.i] = undefined;
+            }
+        }
+        activePin = undefined;
         activeButton = undefined;
+
 
         for(const blueprint of blueprints) {
             if(blueprint.x <= mouse.x && blueprint.y <= mouse.y) {
                 mouse.x -= blueprint.x;
                 mouse.y -= blueprint.y; //to client
-                //hitresult |= blueprint.hittest(mouse);
+                //hit |= blueprint.hittest(mouse);
                 blueprint.mouseUp?.(mouse);
             }
         }
     }else if(msg == WM_COMMAND) {
-        if(hitresult == CONTEXTMENU) { //mango
-            hitblueprint.onCommand(wp, lp);
+        if(hit.result == CONTEXTMENU) { //mango
+            hit.blueprint.onCommand(wp, lp);
             dirty = true;
         }
     }else if(msg == WM_KEYDOWN) {
@@ -632,7 +728,7 @@ function windowProc(hwnd, msg, wp, lp) {
     //    if(blueprint.x <= mouse.x && blueprint.y <= mouse.y) {
     //        mouse.x -= blueprint.x;
     //        mouse.y -= blueprint.y; //to client
-    //        //hitresult |= blueprint.hittest(mouse);
+    //        //hit |= blueprint.hittest(mouse);
     //        blueprint.windowProc(hwnd, msg, wp, lp);
     //    }
     //}

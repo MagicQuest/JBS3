@@ -2893,9 +2893,29 @@ namespace DIRECT2D {
         return jsBrush;
     }
 
+    Local<Object> getColorFImpl(Isolate* isolate, D2D1_COLOR_F color) {
+        Local<Object> jsColor = Object::New(isolate);
+
+        jsColor->Set(isolate->GetCurrentContext(), LITERAL("r"), Number::New(isolate, color.r));
+        jsColor->Set(isolate->GetCurrentContext(), LITERAL("g"), Number::New(isolate, color.g));
+        jsColor->Set(isolate->GetCurrentContext(), LITERAL("b"), Number::New(isolate, color.b));
+        jsColor->Set(isolate->GetCurrentContext(), LITERAL("a"), Number::New(isolate, color.a));
+
+        return jsColor;
+    }
+
+    Local<Object> getPoint2FImpl(Isolate* isolate, D2D1_POINT_2F point) {
+        Local<Object> jsPoint = Object::New(isolate);
+
+        jsPoint->Set(isolate->GetCurrentContext(), LITERAL("x"), Number::New(isolate, point.x));
+        jsPoint->Set(isolate->GetCurrentContext(), LITERAL("y"), Number::New(isolate, point.y));
+
+        return jsPoint;
+    }
+
     Local<ObjectTemplate> getBitmapImpl(Isolate* isolate, ID2D1Image* bmp) {
         Local<ObjectTemplate> jsBitmap = DIRECT2D::getIUnknownImpl(isolate, bmp);
-        
+
         jsBitmap->Set(isolate, "GetDpi", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
             Isolate* isolate = info.GetIsolate();
             ID2D1Bitmap* bmp = (ID2D1Bitmap*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
@@ -2904,26 +2924,26 @@ namespace DIRECT2D {
 
             bmp->GetDpi(&x, &y);
 
-            Local<Array> jsArray = Array::New(isolate, 2);
-            jsArray->Set(isolate->GetCurrentContext(), 0, Number::New(isolate,x));
-            jsArray->Set(isolate->GetCurrentContext(), 1, Number::New(isolate,y));
+            //Local<Array> jsArray = Array::New(isolate, 2);
+            //jsArray->Set(isolate->GetCurrentContext(), 0, Number::New(isolate,x));
+            //jsArray->Set(isolate->GetCurrentContext(), 1, Number::New(isolate,y));
 
-            info.GetReturnValue().Set(jsArray);
-        }));
+            info.GetReturnValue().Set(DIRECT2D::getPoint2FImpl(isolate, D2D1::Point2F(x, y)));//jsArray);
+            }));
 
         jsBitmap->Set(isolate, "GetPixelFormat", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
             Isolate* isolate = info.GetIsolate();
             ID2D1Bitmap* bmp = (ID2D1Bitmap*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
 
             D2D1_PIXEL_FORMAT pf = bmp->GetPixelFormat();
-            
-            
+
+
             Local<Object> jsPixelFormat = Object::New(isolate);
             jsPixelFormat->Set(isolate->GetCurrentContext(), LITERAL("format"), Number::New(isolate, pf.format));
             jsPixelFormat->Set(isolate->GetCurrentContext(), LITERAL("alphaMode"), Number::New(isolate, pf.alphaMode));
-        
+
             info.GetReturnValue().Set(jsPixelFormat);
-        }));
+            }));
 
         jsBitmap->Set(isolate, "GetPixelSize", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
             Isolate* isolate = info.GetIsolate();
@@ -2936,7 +2956,7 @@ namespace DIRECT2D {
             jsPixelSize->Set(isolate->GetCurrentContext(), LITERAL("height"), Number::New(isolate, size.height));
 
             info.GetReturnValue().Set(jsPixelSize);
-        }));
+            }));
         //jsBitmap->Set(isolate, "internalPtr", Number::New(isolate, (LONG_PTR)bmp));
         jsBitmap->Set(isolate, "GetSize", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
             Isolate* isolate = info.GetIsolate();
@@ -2948,14 +2968,14 @@ namespace DIRECT2D {
             sizeF->Set(isolate->GetCurrentContext(), LITERAL("width"), Number::New(isolate, bmpSize.width));
             sizeF->Set(isolate->GetCurrentContext(), LITERAL("height"), Number::New(isolate, bmpSize.height));
             info.GetReturnValue().Set(sizeF);
-        }));
+            }));
         jsBitmap->Set(isolate, "CopyFromBitmap", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
             Isolate* isolate = info.GetIsolate();
             ID2D1Bitmap* bmp = (ID2D1Bitmap*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-            
+
             D2D1_POINT_2U point = D2D1::Point2U(IntegerFI(info[0]), IntegerFI(info[1]));
             D2D1_RECT_U rect = D2D1::RectU(IntegerFI(info[3]), IntegerFI(info[4]), IntegerFI(info[5]), IntegerFI(info[6]));
-            
+
             ID2D1Bitmap* copyFrom = (ID2D1Bitmap*)(IntegerFI(info[2].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()));
 
             //print(bmp << " " << point.x << "<-x  y->" << point.y << " left->" << rect.left << " top->" << rect.top << " right->" << rect.right << " bottom->" << rect.bottom << " " << copyFrom);
@@ -2966,37 +2986,37 @@ namespace DIRECT2D {
             //0x80070057 -> E_INVALIDARG
             //it did NOT need all that effort to get the code
             //ok i just found the solution
-		//https://stackoverflow.com/questions/22493524/decode-hresult-2147467259
-            https://stackoverflow.com/questions/7008047/is-there-a-way-to-get-the-string-representation-of-hresult-value-using-win-api
+        //https://stackoverflow.com/questions/22493524/decode-hresult-2147467259
+        https://stackoverflow.com/questions/7008047/is-there-a-way-to-get-the-string-representation-of-hresult-value-using-win-api
             //IT THINKS MY UNCOMMENTED LINKS ARE LABELS FOR GOTO!
             //info.GetReturnValue().Set(Number::New(isolate, bmp->CopyFromBitmap(&point, /*(ID2D1Bitmap*)IntegerFI(info[2])*/copyFrom, &rect)));
             RetIfFailed(bmp->CopyFromBitmap(&point, copyFrom, &rect), "CopyFromBitmap failed!");
-        }));
+            }));
         jsBitmap->Set(isolate, "CopyFromRenderTarget", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
             Isolate* isolate = info.GetIsolate();
             ID2D1Bitmap* bmp = (ID2D1Bitmap*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-            
+
             D2D1_POINT_2U point = D2D1::Point2U(IntegerFI(info[0]), IntegerFI(info[1]));
             D2D1_RECT_U rect = D2D1::RectU(IntegerFI(info[3]), IntegerFI(info[4]), IntegerFI(info[5]), IntegerFI(info[6]));
-            
+
             ID2D1RenderTarget* rt = (ID2D1RenderTarget*)IntegerFI(info[2]);//info[2].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()->IntegerValue(isolate->GetCurrentContext()).FromJust();
             RetIfFailed(bmp->CopyFromRenderTarget(&point, rt, &rect), "CopyFromRenderTarget failed!~");
-        }));
+            }));
         jsBitmap->Set(isolate, "CopyFromMemory", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) { //oops i made this because i wanted to convert HICON to ID2D1Bitmap BUT wic can already basically do that with CreateBitmapFromHICON
             Isolate* isolate = info.GetIsolate();
             ID2D1Bitmap* bmp = (ID2D1Bitmap*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-            
+
             //D2D1_POINT_2U point = D2D1::Point2U(IntegerFI(info[0]), IntegerFI(info[1]));
             D2D1_RECT_U rect = D2D1::RectU(IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]));
-            
+
             DWORD* data = nullptr;//new DWORD[jsBits->Length()];
             Local<Uint32Array> jsBits = info[4].As<Uint32Array>();
             data = new DWORD[jsBits->Length()]; //genius code stolen from my StretchDIBits func
             jsBits->CopyContents(data, jsBits->ByteLength()); //hell yeah (i was using jsBits->Length() instead of ByteLength)
-            
 
-            RetIfFailed(bmp->CopyFromMemory(&rect, data, sizeof(DWORD)*(rect.right-rect.left)), "CopyFromMemory failed!");
-        }));
+
+            RetIfFailed(bmp->CopyFromMemory(&rect, data, sizeof(DWORD) * (rect.right - rect.left)), "CopyFromMemory failed!");
+            }));
         jsBitmap->Set(isolate, "Map", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) { //oops i made this because i wanted to convert HICON to ID2D1Bitmap BUT wic can already basically do that with CreateBitmapFromHICON
             Isolate* isolate = info.GetIsolate();
             ID2D1Bitmap* bmp = (ID2D1Bitmap*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
@@ -3019,7 +3039,7 @@ namespace DIRECT2D {
             //print("w " << size2.width << " h " << size2.height);
 
             info.GetReturnValue().Set(jsMapped);
-        }));
+            }));
         jsBitmap->Set(isolate, "Unmap", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) { //oops i made this because i wanted to convert HICON to ID2D1Bitmap BUT wic can already basically do that with CreateBitmapFromHICON
             Isolate* isolate = info.GetIsolate();
             ID2D1Bitmap* bmp = (ID2D1Bitmap*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
@@ -3027,7 +3047,7 @@ namespace DIRECT2D {
 
             RetIfFailed(gooder->Unmap(), "Unmap failed for some reason but maybe because the bitmap wasn't already mapped idk");
             gooder->Release();
-        }));
+            }));
         //jsBitmap->Set(isolate, "Release", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
         //    Isolate* isolate = info.GetIsolate();
         //    ID2D1Bitmap* bmp = (ID2D1Bitmap*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
@@ -3035,26 +3055,6 @@ namespace DIRECT2D {
         //}));
 
         return jsBitmap;
-    }
-
-    Local<Object> getColorFImpl(Isolate* isolate, D2D1_COLOR_F color) {
-        Local<Object> jsColor = Object::New(isolate);
-
-        jsColor->Set(isolate->GetCurrentContext(), LITERAL("r"), Number::New(isolate, color.r));
-        jsColor->Set(isolate->GetCurrentContext(), LITERAL("g"), Number::New(isolate, color.g));
-        jsColor->Set(isolate->GetCurrentContext(), LITERAL("b"), Number::New(isolate, color.b));
-        jsColor->Set(isolate->GetCurrentContext(), LITERAL("a"), Number::New(isolate, color.a));
-
-        return jsColor;
-    }
-
-    Local<Object> getPoint2FImpl(Isolate* isolate, D2D1_POINT_2F point) {
-        Local<Object> jsPoint = Object::New(isolate);
-
-        jsPoint->Set(isolate->GetCurrentContext(), LITERAL("x"), Number::New(isolate, point.x));
-        jsPoint->Set(isolate->GetCurrentContext(), LITERAL("y"), Number::New(isolate, point.y));
-
-        return jsPoint;
     }
 
     Local<ObjectTemplate> getCompositionEffectImpl(Isolate* isolate, IDCompositionFilterEffect* effect) {
@@ -3066,6 +3066,538 @@ namespace DIRECT2D {
             RetIfFailed(effect->SetInput(IntegerFI(info[0]), (IUnknown*)IntegerFI(info[1].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()), IntegerFI(info[2])), "IDCompositionFIlterEffect* -> SetInput failed");
         }));
         return jsDCompEffect;
+    }
+
+    Local<Object> getStrokeStyleImpl(Isolate* isolate, ID2D1StrokeStyle1* strokingStyle) {
+        Local<ObjectTemplate> jsSS = DIRECT2D::getIUnknownImpl(isolate, strokingStyle);
+        jsSS->Set(isolate, "GetStrokeTransformType", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            ID2D1StrokeStyle1* strokingStyle = (ID2D1StrokeStyle1*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+            info.GetReturnValue().Set(Number::New(isolate, strokingStyle->GetStrokeTransformType()));
+        }));
+        jsSS->Set(isolate, "GetEndCap", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            ID2D1StrokeStyle1* strokingStyle = (ID2D1StrokeStyle1*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+            info.GetReturnValue().Set(Number::New(isolate, strokingStyle->GetEndCap()));
+        }));
+        jsSS->Set(isolate, "GetDashCap", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            ID2D1StrokeStyle1* strokingStyle = (ID2D1StrokeStyle1*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+            info.GetReturnValue().Set(Number::New(isolate, strokingStyle->GetDashCap()));
+        }));
+        jsSS->Set(isolate, "GetMiterLimit", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            ID2D1StrokeStyle1* strokingStyle = (ID2D1StrokeStyle1*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+            info.GetReturnValue().Set(Number::New(isolate, strokingStyle->GetMiterLimit()));
+        }));
+        jsSS->Set(isolate, "GetLineJoin", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            ID2D1StrokeStyle1* strokingStyle = (ID2D1StrokeStyle1*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+            info.GetReturnValue().Set(Number::New(isolate, strokingStyle->GetLineJoin()));
+        }));
+        jsSS->Set(isolate, "GetDashOffset", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            ID2D1StrokeStyle1* strokingStyle = (ID2D1StrokeStyle1*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+            info.GetReturnValue().Set(Number::New(isolate, strokingStyle->GetDashOffset()));
+        }));
+        jsSS->Set(isolate, "GetDashStyle", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            ID2D1StrokeStyle1* strokingStyle = (ID2D1StrokeStyle1*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+            info.GetReturnValue().Set(Number::New(isolate, strokingStyle->GetDashStyle()));
+        }));
+        jsSS->Set(isolate, "GetDashesCount", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            ID2D1StrokeStyle1* strokingStyle = (ID2D1StrokeStyle1*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+            info.GetReturnValue().Set(Number::New(isolate, strokingStyle->GetDashesCount()));
+        }));
+        jsSS->Set(isolate, "GetDashes", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            Local<Context> context = isolate->GetCurrentContext();
+            ID2D1StrokeStyle1* strokingStyle = (ID2D1StrokeStyle1*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+            UINT32 count = strokingStyle->GetDashesCount();
+            std::vector<float> dash(count, 0.0); //oh yeah i don't have to use new float[count]
+            strokingStyle->GetDashes(dash.data(), count);
+            Local<Array> jsDashes = Array::New(isolate);
+            for (int i = 0; i < count; i++) {
+                jsDashes->Set(context, i, Number::New(isolate, dash[i]));
+            }
+            info.GetReturnValue().Set(jsDashes);
+        }));
+
+        return jsSS->NewInstance(isolate->GetCurrentContext()).ToLocalChecked();
+    }
+
+    Local<ObjectTemplate> getGeometryImpl(Isolate* isolate, ID2D1Geometry* geo) {
+        Local<ObjectTemplate> jsG = DIRECT2D::getIUnknownImpl(isolate, geo);
+        jsG->Set(isolate, "GetBounds", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            Local<Context> context = isolate->GetCurrentContext();
+            ID2D1Geometry* geo = (ID2D1Geometry*)IntegerFI(info.This()->GetRealNamedProperty(context, LITERAL("internalPtr")).ToLocalChecked());
+            D2D1_RECT_F rectf{};
+            D2D1_MATRIX_3X2_F* trans = nullptr;
+            //if (info[0]->IsNumber()) { //assuming it's 0 so null
+            //    //trans = (D2D1_MATRIX_3X2_F*)IntegerFI(info[0]);
+            //}
+            //else if (info[0]->IsObject()) {
+            if (!info[0]->IsNumber() && info[0]->IsObject()) {
+                trans = new D2D1_MATRIX_3X2_F(DIRECT2D::fromJSMatrix3x2(isolate, info[0].As<Object>()));
+            }
+            RetIfFailed(geo->GetBounds(trans, &rectf), "ID2D1Geometry->GetBounds failed");
+            Local<Object> mango = Object::New(isolate);
+            mango->Set(context, LITERAL("left"), Number::New(isolate, rectf.left));
+            mango->Set(context, LITERAL("top"), Number::New(isolate, rectf.top));
+            mango->Set(context, LITERAL("right"), Number::New(isolate, rectf.right));
+            mango->Set(context, LITERAL("bottom"), Number::New(isolate, rectf.bottom));
+            info.GetReturnValue().Set(mango);
+            if (trans != nullptr) {
+                delete trans;
+            }
+        }));
+        jsG->Set(isolate, "GetWidenedBounds", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            Local<Context> context = isolate->GetCurrentContext();
+            ID2D1Geometry* geo = (ID2D1Geometry*)IntegerFI(info.This()->GetRealNamedProperty(context, LITERAL("internalPtr")).ToLocalChecked());
+            D2D1_RECT_F rectf{};
+            D2D1_MATRIX_3X2_F* trans = nullptr;
+            //if (info[0]->IsNumber()) { //assuming it's 0 so null
+                //trans = (D2D1_MATRIX_3X2_F*)IntegerFI(info[0]);
+            //}
+            //else if (info[0]->IsObject()) {
+            if(!info[0]->IsNumber() && info[0]->IsObject()) {
+                trans = new D2D1_MATRIX_3X2_F(DIRECT2D::fromJSMatrix3x2(isolate, info[0].As<Object>()));
+            }
+            ID2D1StrokeStyle* strokeStyle = NULL;
+            if (!info[1]->IsNumber() && info[1]->IsObject()) {
+                strokeStyle = (ID2D1StrokeStyle*)IntegerFI(info[1].As<Object>()->GetRealNamedProperty(context, LITERAL("internalPtr")).ToLocalChecked()); //(ID2D1StrokeStyle*)IntegerFI(info[6]);
+            }
+            ContIfFailed(geo->GetWidenedBounds(FloatFI(info[0]), strokeStyle, trans, &rectf), "ID2D1Geometry->GetWidenedBounds failed"); //this function lowkey made be realize that i need to actually add stroke styles
+            Local<Object> mango = Object::New(isolate);
+            mango->Set(context, LITERAL("left"), Number::New(isolate, rectf.left));
+            mango->Set(context, LITERAL("top"), Number::New(isolate, rectf.top));
+            mango->Set(context, LITERAL("right"), Number::New(isolate, rectf.right));
+            mango->Set(context, LITERAL("bottom"), Number::New(isolate, rectf.bottom));
+            info.GetReturnValue().Set(mango);
+            if (trans != nullptr) {
+                delete trans;
+            }
+        }));
+        jsG->Set(isolate, "StrokeContainsPoint", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            ID2D1Geometry* geo = (ID2D1Geometry*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+            ID2D1StrokeStyle* strokeStyle = NULL;
+            D2D1_MATRIX_3X2_F* trans = nullptr;
+            if (!info[3]->IsNumber() && info[3]->IsObject()) {
+                strokeStyle = (ID2D1StrokeStyle*)IntegerFI(info[3].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()); //(ID2D1StrokeStyle*)IntegerFI(info[6]);
+            }
+            if (!info[4]->IsNumber() && info[4]->IsObject()) {
+                trans = new D2D1_MATRIX_3X2_F(DIRECT2D::fromJSMatrix3x2(isolate, info[0].As<Object>()));
+            }
+            BOOL contains = 0;
+            ContIfFailed(geo->StrokeContainsPoint(D2D1::Point2F(FloatFI(info[0]), FloatFI(info[1])), FloatFI(info[2]), strokeStyle, trans, &contains), "StrokeContainsPoint failed..");
+            info.GetReturnValue().Set(Number::New(isolate, contains));
+            if (trans != nullptr) {
+                delete trans;
+            }
+        }));
+        jsG->Set(isolate, "FillContainsPoint", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            ID2D1Geometry* geo = (ID2D1Geometry*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+            D2D1_MATRIX_3X2_F* trans = nullptr;
+            if (!info[2]->IsNumber() && info[2]->IsObject()) {
+                trans = new D2D1_MATRIX_3X2_F(DIRECT2D::fromJSMatrix3x2(isolate, info[2].As<Object>()));
+            }
+            BOOL contains = 0;
+            ContIfFailed(geo->FillContainsPoint(D2D1::Point2F(FloatFI(info[0]), FloatFI(info[1])), trans, &contains), "FillContainsPoint failed...");
+            info.GetReturnValue().Set(Number::New(isolate, contains));
+            if (trans != nullptr) {
+                delete trans;
+            }
+        }));
+        jsG->Set(isolate, "CompareWithGeometry", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            ID2D1Geometry* geo = (ID2D1Geometry*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+            ID2D1Geometry* otherGeo = (ID2D1Geometry*)IntegerFI(info[0].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+            D2D1_MATRIX_3X2_F* trans = nullptr;
+            if (!info[1]->IsNumber() && info[1]->IsObject()) {
+                trans = new D2D1_MATRIX_3X2_F(DIRECT2D::fromJSMatrix3x2(isolate, info[2].As<Object>()));
+            }
+            D2D1_GEOMETRY_RELATION relation;
+            ContIfFailed(geo->CompareWithGeometry(otherGeo, trans, &relation), "CompareWithGeometry failed (amybe you forgot to pass a simplified geo sink object )");
+            info.GetReturnValue().Set(Number::New(isolate, relation));
+            if (trans != nullptr) {
+                delete trans;
+            }
+        }));
+        jsG->Set(isolate, "Simplify", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            ID2D1Geometry* geo = (ID2D1Geometry*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+            D2D1_MATRIX_3X2_F* trans = nullptr;
+            if (!info[1]->IsNumber() && info[1]->IsObject()) {
+                trans = new D2D1_MATRIX_3X2_F(DIRECT2D::fromJSMatrix3x2(isolate, info[1].As<Object>()));
+            }
+            ID2D1SimplifiedGeometrySink* simplifiedGeoSink = (ID2D1SimplifiedGeometrySink*)IntegerFI(info[2].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+            //if (!info[2]->IsNumber() && info[2]->IsObject()) {
+            //    simplifiedGeoSink = (ID2D1SimplifiedGeometrySink*)IntegerFI(info[2].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+            //}
+            ContIfFailed(geo->Simplify((D2D1_GEOMETRY_SIMPLIFICATION_OPTION)IntegerFI(info[0]), trans, simplifiedGeoSink), "Simplify failed (perhaps you forgot to create and pass a simplified geometry sink object? lowk i idk)");
+            if (trans != nullptr) {
+                delete trans;
+            }
+        }));
+        jsG->Set(isolate, "Tessellate", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            ID2D1Geometry* geo = (ID2D1Geometry*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+            D2D1_MATRIX_3X2_F* trans = nullptr;
+            if (!info[0]->IsNumber() && info[0]->IsObject()) {
+                trans = new D2D1_MATRIX_3X2_F(DIRECT2D::fromJSMatrix3x2(isolate, info[0].As<Object>()));
+            }
+            ID2D1TessellationSink* tesselationSink = (ID2D1TessellationSink*)IntegerFI(info[1].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+            ContIfFailed(geo->Tessellate(trans, tesselationSink), "Tessellate failed...");
+            if (trans != nullptr) {
+                delete trans;
+            }
+        }));
+        jsG->Set(isolate, "CombineWithGeometry", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            ID2D1Geometry* geo = (ID2D1Geometry*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+            ID2D1Geometry* otherGeo = (ID2D1Geometry*)IntegerFI(info[0].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+            D2D1_MATRIX_3X2_F* trans = nullptr;
+            if (!info[2]->IsNumber() && info[2]->IsObject()) {
+                trans = new D2D1_MATRIX_3X2_F(DIRECT2D::fromJSMatrix3x2(isolate, info[2].As<Object>()));
+            }
+            ID2D1SimplifiedGeometrySink* simplifiedGeoSink = (ID2D1SimplifiedGeometrySink*)IntegerFI(info[3].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+            ContIfFailed(geo->CombineWithGeometry(otherGeo, (D2D1_COMBINE_MODE)IntegerFI(info[1]), trans, simplifiedGeoSink), "CombineWithGeometry failed (amybe you forgot to pass a simplified geo sink object )");
+            if (trans != nullptr) {
+                delete trans;
+            }
+        }));
+        jsG->Set(isolate, "Outline", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            ID2D1Geometry* geo = (ID2D1Geometry*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+            D2D1_MATRIX_3X2_F* trans = nullptr;
+            if (!info[0]->IsNumber() && info[0]->IsObject()) {
+                trans = new D2D1_MATRIX_3X2_F(DIRECT2D::fromJSMatrix3x2(isolate, info[0].As<Object>()));
+            }
+            ID2D1SimplifiedGeometrySink* simplifiedGeoSink = (ID2D1SimplifiedGeometrySink*)IntegerFI(info[1].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+            ContIfFailed(geo->Outline(trans, simplifiedGeoSink), "Outline failed");
+            if (trans != nullptr) {
+                delete trans;
+            }
+        }));
+        jsG->Set(isolate, "ComputeArea", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            ID2D1Geometry* geo = (ID2D1Geometry*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+            D2D1_MATRIX_3X2_F* trans = nullptr;
+            if (!info[0]->IsNumber() && info[0]->IsObject()) {
+                trans = new D2D1_MATRIX_3X2_F(DIRECT2D::fromJSMatrix3x2(isolate, info[0].As<Object>()));
+            }
+            FLOAT area = 0.0f;
+            ContIfFailed(geo->ComputeArea(trans, &area), "ComputeArea failedf");
+            info.GetReturnValue().Set(Number::New(isolate, area));
+            if (trans != nullptr) {
+                delete trans;
+            }
+        }));
+        jsG->Set(isolate, "ComputeLength", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            ID2D1Geometry* geo = (ID2D1Geometry*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+            D2D1_MATRIX_3X2_F* trans = nullptr;
+            if (!info[0]->IsNumber() && info[0]->IsObject()) {
+                trans = new D2D1_MATRIX_3X2_F(DIRECT2D::fromJSMatrix3x2(isolate, info[0].As<Object>()));
+            }
+            FLOAT length = 0.0f;
+            ContIfFailed(geo->ComputeLength(trans, &length), "ComputeLength failedf");
+            info.GetReturnValue().Set(Number::New(isolate, length));
+            if (trans != nullptr) {
+                delete trans;
+            }
+        }));
+        jsG->Set(isolate, "ComputePointAtLength", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            Local<Context> context = isolate->GetCurrentContext();
+            ID2D1Geometry* geo = (ID2D1Geometry*)IntegerFI(info.This()->GetRealNamedProperty(context, LITERAL("internalPtr")).ToLocalChecked());
+            D2D1_MATRIX_3X2_F* trans = nullptr;
+            if (!info[1]->IsNumber() && info[1]->IsObject()) {
+                trans = new D2D1_MATRIX_3X2_F(DIRECT2D::fromJSMatrix3x2(isolate, info[1].As<Object>()));
+            }
+            D2D1_POINT_2F p2f{};
+            D2D1_POINT_2F tv{};
+            geo->ComputePointAtLength(FloatFI(info[0]), trans, &p2f, &tv);
+            Local<Object> jsInfo = Object::New(isolate);
+            jsInfo->Set(context, LITERAL("point"), DIRECT2D::getPoint2FImpl(isolate, p2f));
+            jsInfo->Set(context, LITERAL("unitTangentVector"), DIRECT2D::getPoint2FImpl(isolate, tv));
+            info.GetReturnValue().Set(jsInfo);
+            if (trans != nullptr) {
+                delete trans;
+            }
+        }));
+        jsG->Set(isolate, "Widen", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            ID2D1Geometry* geo = (ID2D1Geometry*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+            ID2D1StrokeStyle* strokeStyle = NULL;
+            D2D1_MATRIX_3X2_F* trans = nullptr;
+            if (!info[1]->IsNumber() && info[1]->IsObject()) {
+                strokeStyle = (ID2D1StrokeStyle*)IntegerFI(info[1].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()); //(ID2D1StrokeStyle*)IntegerFI(info[6]);
+            }
+            if (!info[2]->IsNumber() && info[2]->IsObject()) {
+                trans = new D2D1_MATRIX_3X2_F(DIRECT2D::fromJSMatrix3x2(isolate, info[2].As<Object>()));
+            }
+            ID2D1SimplifiedGeometrySink* simplifiedGeoSink = (ID2D1SimplifiedGeometrySink*)IntegerFI(info[3].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+            //if (!info[2]->IsNumber() && info[2]->IsObject()) {
+            //    simplifiedGeoSink = (ID2D1SimplifiedGeometrySink*)IntegerFI(info[2].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+            //}
+            ContIfFailed(geo->Widen(FloatFI(info[0]), strokeStyle, trans, simplifiedGeoSink), "Widen failed (perhaps you forgot to create and pass a simplified geometry sink object? lowk i idk)");
+            if (trans != nullptr) {
+                delete trans;
+            }
+        }));
+        return jsG;
+    }
+
+    Local<ObjectTemplate> getSimplifiedGeometrySinkImpl(Isolate* isolate, ID2D1SimplifiedGeometrySink* simplifiedGeoSink) {
+        Local<ObjectTemplate> jsSGS = DIRECT2D::getIUnknownImpl(isolate, simplifiedGeoSink);
+        jsSGS->Set(isolate, "SetFillMode", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            ID2D1SimplifiedGeometrySink* simplifiedGeoSink = (ID2D1SimplifiedGeometrySink*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+            simplifiedGeoSink->SetFillMode((D2D1_FILL_MODE)IntegerFI(info[0]));
+        }));
+        jsSGS->Set(isolate, "SetSegmentFlags", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            ID2D1SimplifiedGeometrySink* simplifiedGeoSink = (ID2D1SimplifiedGeometrySink*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+            simplifiedGeoSink->SetSegmentFlags((D2D1_PATH_SEGMENT)IntegerFI(info[0]));
+        }));
+        jsSGS->Set(isolate, "BeginFigure", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            ID2D1SimplifiedGeometrySink* simplifiedGeoSink = (ID2D1SimplifiedGeometrySink*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+            simplifiedGeoSink->BeginFigure(D2D1::Point2F(FloatFI(info[0]), FloatFI(info[1])), (D2D1_FIGURE_BEGIN)IntegerFI(info[2]));
+        }));
+        jsSGS->Set(isolate, "AddLines", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            Local<Context> context = isolate->GetCurrentContext();
+            
+            ID2D1SimplifiedGeometrySink* simplifiedGeoSink = (ID2D1SimplifiedGeometrySink*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+            
+            Local<Array> jsLines = info[0].As<Array>();
+            uint32_t len = jsLines->Length();
+            
+            std::vector<D2D1_POINT_2F> points(len);
+            
+            if (jsLines->Get(context, 0).ToLocalChecked()->IsArray()) { //this points array can be filled with more arrays -> [[10, 20], [20, 30]]
+                for (int i = 0; i < len; i++) {
+                    Local<Array> innerArr = jsLines->Get(context, i).ToLocalChecked().As<Array>();
+                    points[i] = D2D1::Point2F(FloatFI(innerArr->Get(context, 0).ToLocalChecked()), FloatFI(innerArr->Get(context, 1).ToLocalChecked()));
+                }
+            }
+            else { //or it can be filled with objects -> [{x: 10, y: 20}, {x: 20, y: 30}]
+                for (int i = 0; i < len; i++) {
+                    Local<Object> innerObj = jsLines->Get(context, i).ToLocalChecked().As<Object>();
+                    points[i] = D2D1::Point2F(FloatFI(innerObj->Get(context, LITERAL("x")).ToLocalChecked()), FloatFI(innerObj->Get(context, LITERAL("y")).ToLocalChecked()));
+                }
+            }
+
+            simplifiedGeoSink->AddLines(points.data(), len);
+        }));
+        jsSGS->Set(isolate, "AddBeziers", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            Local<Context> context = isolate->GetCurrentContext();
+
+            ID2D1SimplifiedGeometrySink* simplifiedGeoSink = (ID2D1SimplifiedGeometrySink*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+
+            Local<Array> jsLines = info[0].As<Array>();
+            uint32_t len = jsLines->Length();
+
+            std::vector<D2D1_BEZIER_SEGMENT> beziers(len);
+
+            //if (jsLines->Get(context, 0).ToLocalChecked()->IsArray()) { //this points array can be filled with more arrays -> [[[10, 20], [20, 30], [30, 40]], [[40, 50], [50, 60], [60, 70]]]
+            for (int i = 0; i < len; i++) {
+                Local<Array> innerArr = jsLines->Get(context, i).ToLocalChecked().As<Array>();
+                Local<Array> point1 = innerArr->Get(context, 0).ToLocalChecked().As<Array>();
+                Local<Array> point2 = innerArr->Get(context, 1).ToLocalChecked().As<Array>();
+                Local<Array> point3 = innerArr->Get(context, 2).ToLocalChecked().As<Array>();
+                beziers[i] = D2D1::BezierSegment(
+                    D2D1::Point2F(FloatFI(point1->Get(context, 0).ToLocalChecked()), FloatFI(point1->Get(context, 1).ToLocalChecked())),
+                    D2D1::Point2F(FloatFI(point2->Get(context, 0).ToLocalChecked()), FloatFI(point2->Get(context, 1).ToLocalChecked())),
+                    D2D1::Point2F(FloatFI(point3->Get(context, 0).ToLocalChecked()), FloatFI(point3->Get(context, 1).ToLocalChecked()))//,
+                );
+            }
+
+            simplifiedGeoSink->AddBeziers(beziers.data(), len);
+        }));
+        jsSGS->Set(isolate, "EndFigure", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            ID2D1SimplifiedGeometrySink* simplifiedGeoSink = (ID2D1SimplifiedGeometrySink*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+            simplifiedGeoSink->EndFigure((D2D1_FIGURE_END)IntegerFI(info[0]));
+        }));
+        jsSGS->Set(isolate, "Close", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            ID2D1SimplifiedGeometrySink* simplifiedGeoSink = (ID2D1SimplifiedGeometrySink*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+            RetIfFailed(simplifiedGeoSink->Close(), "ID2D1(Simplified?)GeometrySink->Close failed");
+        }));
+        return jsSGS;
+    }
+
+    Local<Object> getGeometrySinkImpl(Isolate* isolate, ID2D1GeometrySink* geoSink) {
+        Local<ObjectTemplate> jsGS = DIRECT2D::getSimplifiedGeometrySinkImpl(isolate, geoSink);
+        jsGS->Set(isolate, "AddLine", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            Local<Context> context = isolate->GetCurrentContext();
+            ID2D1GeometrySink* geoSink = (ID2D1GeometrySink*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+            D2D1_POINT_2F point{};
+            if (info[0]->IsArray()) {
+                //assuming you called this function like AddLine([x,  y])
+                Local<Array> arr = info[0].As<Array>();
+                point = D2D1::Point2F(FloatFI(arr->Get(context, 0).ToLocalChecked()), FloatFI(arr->Get(context, 1).ToLocalChecked()));
+            }
+            else if (info[0]->IsNumber()) {
+                //assuming you called this function like AddLine(x, y)
+                point = D2D1::Point2F(FloatFI(info[0]), FloatFI(info[1]));
+            }
+            else if (info[0]->IsObject()) {
+                //assuming you called this function like AddLine({x, y})
+                Local<Object> obj = info[0].As<Object>();
+                point = D2D1::Point2F(FloatFI(obj->Get(context, LITERAL("x")).ToLocalChecked()), FloatFI(obj->Get(context, LITERAL("y")).ToLocalChecked()));
+            }
+
+            geoSink->AddLine(point);
+        }));
+        jsGS->Set(isolate, "AddBezier", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            Local<Context> context = isolate->GetCurrentContext();
+            ID2D1GeometrySink* geoSink = (ID2D1GeometrySink*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+            D2D1_BEZIER_SEGMENT bezier{};
+            
+            if (info.Length() == 1) {
+                //assuming you called this function like AddBezier([[x, y], [x2, y2], [x3, y3]])
+                Local<Array> arr = info[0].As<Array>();
+                Local<Array> point1 = arr->Get(context, 0).ToLocalChecked().As<Array>();
+                Local<Array> point2 = arr->Get(context, 1).ToLocalChecked().As<Array>();
+                Local<Array> point3 = arr->Get(context, 2).ToLocalChecked().As<Array>();
+                bezier.point1 = D2D1::Point2F(FloatFI(point1->Get(context, 0).ToLocalChecked()), FloatFI(point1->Get(context, 1).ToLocalChecked()));
+                bezier.point2 = D2D1::Point2F(FloatFI(point2->Get(context, 0).ToLocalChecked()), FloatFI(point2->Get(context, 1).ToLocalChecked()));
+                bezier.point3 = D2D1::Point2F(FloatFI(point3->Get(context, 0).ToLocalChecked()), FloatFI(point3->Get(context, 1).ToLocalChecked()));
+            }
+            else {
+                //assuming you called this function like AddBezier([x, y], [x2, y2], [x3, y3]);
+                bezier.point1 = D2D1::Point2F(FloatFI(info[0].As<Array>()->Get(context, 0).ToLocalChecked()), FloatFI(info[0].As<Array>()->Get(context, 1).ToLocalChecked()));
+                bezier.point2 = D2D1::Point2F(FloatFI(info[1].As<Array>()->Get(context, 0).ToLocalChecked()), FloatFI(info[1].As<Array>()->Get(context, 1).ToLocalChecked()));
+                bezier.point3 = D2D1::Point2F(FloatFI(info[2].As<Array>()->Get(context, 0).ToLocalChecked()), FloatFI(info[2].As<Array>()->Get(context, 1).ToLocalChecked()));
+            }
+
+            geoSink->AddBezier(bezier);
+        }));
+        jsGS->Set(isolate, "AddQuadraticBezier", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            Local<Context> context = isolate->GetCurrentContext();
+            ID2D1GeometrySink* geoSink = (ID2D1GeometrySink*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+            
+            D2D1_QUADRATIC_BEZIER_SEGMENT bezier{};
+
+            if (info.Length() == 1) {
+                //assuming you called this function like AddQuadraticBezier([[x, y], [x2, y2]])
+                Local<Array> arr = info[0].As<Array>();
+                Local<Array> point1 = arr->Get(context, 0).ToLocalChecked().As<Array>();
+                Local<Array> point2 = arr->Get(context, 1).ToLocalChecked().As<Array>();
+                bezier.point1 = D2D1::Point2F(FloatFI(point1->Get(context, 0).ToLocalChecked()), FloatFI(point1->Get(context, 1).ToLocalChecked()));
+                bezier.point2 = D2D1::Point2F(FloatFI(point2->Get(context, 0).ToLocalChecked()), FloatFI(point2->Get(context, 1).ToLocalChecked()));
+            }
+            else {
+                //assuming you called this function like AddQuadraticBezier([x, y], [x2, y2]);
+                bezier.point1 = D2D1::Point2F(FloatFI(info[0].As<Array>()->Get(context, 0).ToLocalChecked()), FloatFI(info[0].As<Array>()->Get(context, 1).ToLocalChecked()));
+                bezier.point2 = D2D1::Point2F(FloatFI(info[1].As<Array>()->Get(context, 0).ToLocalChecked()), FloatFI(info[1].As<Array>()->Get(context, 1).ToLocalChecked()));
+            }
+
+            geoSink->AddQuadraticBezier(bezier);
+        }));
+        jsGS->Set(isolate, "AddQuadraticBeziers", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            Local<Context> context = isolate->GetCurrentContext();
+            ID2D1GeometrySink* geoSink = (ID2D1GeometrySink*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+            Local<Array> jsLines = info[0].As<Array>();
+            uint32_t len = info.Length() > 1 ? info.Length() : jsLines->Length();
+
+            std::vector<D2D1_QUADRATIC_BEZIER_SEGMENT> beziers(len);
+
+            //if (jsLines->Get(context, 0).ToLocalChecked()->IsArray()) { //this points array can be filled with more arrays -> [[[10, 20], [20, 30], [30, 40]], [[40, 50], [50, 60], [60, 70]]]
+            if (info.Length() == 1) {
+                for (int i = 0; i < len; i++) {
+                    //assuming you called this function like AddQuadraticBeziers([[[x, y], [x2, y2]], [[x3, y3], [x4, y4]]])
+                    Local<Array> innerArr = jsLines->Get(context, i).ToLocalChecked().As<Array>();
+                    Local<Array> point1 = innerArr->Get(context, 0).ToLocalChecked().As<Array>();
+                    Local<Array> point2 = innerArr->Get(context, 1).ToLocalChecked().As<Array>();
+                    //Local<Array> point3 = innerArr->Get(context, 2).ToLocalChecked().As<Array>();
+                    beziers[i] = D2D1::QuadraticBezierSegment(
+                        D2D1::Point2F(FloatFI(point1->Get(context, 0).ToLocalChecked()), FloatFI(point1->Get(context, 1).ToLocalChecked())),
+                        D2D1::Point2F(FloatFI(point2->Get(context, 0).ToLocalChecked()), FloatFI(point2->Get(context, 1).ToLocalChecked()))
+                        //D2D1::Point2F(FloatFI(point3->Get(context, 0).ToLocalChecked()), FloatFI(point3->Get(context, 1).ToLocalChecked()))//,
+                    );
+                }
+            }
+            else {
+                //assuming you called this function like AddQuadraticBeziers([[x, y], [x2, y2]], [[x3, y3], [x4, y4]])
+                for (int i = 0; i < len; i++) {
+                    Local<Array> innerArr = info[0].As<Array>()->Get(context, i).ToLocalChecked().As<Array>();
+
+                    Local<Array> point1 = innerArr->Get(context, 0).ToLocalChecked().As<Array>();
+                    Local<Array> point2 = innerArr->Get(context, 1).ToLocalChecked().As<Array>();
+                    //Local<Array> point3 = innerArr->Get(context, 2).ToLocalChecked().As<Array>();
+                    beziers[i] = D2D1::QuadraticBezierSegment(
+                        D2D1::Point2F(FloatFI(point1->Get(context, 0).ToLocalChecked()), FloatFI(point1->Get(context, 1).ToLocalChecked())),
+                        D2D1::Point2F(FloatFI(point2->Get(context, 0).ToLocalChecked()), FloatFI(point2->Get(context, 1).ToLocalChecked()))
+                        //D2D1::Point2F(FloatFI(point3->Get(context, 0).ToLocalChecked()), FloatFI(point3->Get(context, 1).ToLocalChecked()))//,
+                    );
+                }
+            }
+
+            geoSink->AddQuadraticBezier(beziers.data());
+        }));
+        jsGS->Set(isolate, "AddArc", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            ID2D1GeometrySink* geoSink = (ID2D1GeometrySink*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+
+            //D2D1_ARC_SEGMENT arc[}; //BRUHHH i accidently put [} instead of {} and intellisense threw a huge fit and i even restarted visual studio because i thought it was a glitch! (there were errors everywhere past this line)
+
+            D2D1_ARC_SEGMENT arc = D2D1::ArcSegment(
+                D2D1::Point2F(FloatFI(info[0]), FloatFI(info[1])),
+                D2D1::SizeF(FloatFI(info[2]), FloatFI(info[3])),
+                FloatFI(info[4]),
+                D2D1_SWEEP_DIRECTION(IntegerFI(info[5])),
+                D2D1_ARC_SIZE(IntegerFI(info[6]))
+            );
+
+            geoSink->AddArc(arc);
+        }));
+
+        return jsGS->NewInstance(isolate->GetCurrentContext()).ToLocalChecked();
+    }
+
+    Local<Object> getPathGeometryImpl(Isolate* isolate, ID2D1PathGeometry1* path) {
+        Local<ObjectTemplate> jsPG = DIRECT2D::getGeometryImpl(isolate, path);
+        jsPG->Set(isolate, "Open", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            ID2D1PathGeometry1* path = (ID2D1PathGeometry1*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+            ID2D1GeometrySink* geoSink = nullptr; RetIfFailed(path->Open(&geoSink), "Open failed...");
+            Local<Object> jsGS = DIRECT2D::getGeometrySinkImpl(isolate, geoSink);
+            info.GetReturnValue().Set(jsGS);
+        }));
+        jsPG->Set(isolate, "Stream", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            ID2D1PathGeometry1* path = (ID2D1PathGeometry1*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+            ID2D1GeometrySink* geoSink = (ID2D1GeometrySink*)IntegerFI(info[0].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+            RetIfFailed(path->Stream(geoSink), "Stream faioled...");
+        }));
+        jsPG->Set(isolate, "GetSegmentCount", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            ID2D1PathGeometry1* path = (ID2D1PathGeometry1*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+            UINT32 count = 0; RetIfFailed(path->GetSegmentCount(&count), "GetSegmentCount failed");
+            info.GetReturnValue().Set(Number::New(isolate, count));
+        }));
+        jsPG->Set(isolate, "GetFigureCount", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            ID2D1PathGeometry1* path = (ID2D1PathGeometry1*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+            UINT32 count = 0; RetIfFailed(path->GetFigureCount(&count), "GetFigureCount failed");
+            info.GetReturnValue().Set(Number::New(isolate, count));
+        }));
+        return jsPG->NewInstance(isolate->GetCurrentContext()).ToLocalChecked();
     }
 
     float f(float x) {
@@ -4205,115 +4737,6 @@ V8FUNC(createCanvas) {
             //info.GetReturnValue().Set(d2d->EndDraw(info[0]->BooleanValue(isolate)));
             d2d->EndDraw(info[0]->BooleanValue(isolate));
         }));
-        context->Set(isolate, "Present", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-            if (d2d->type >= 2) {
-                RetIfFailed(((Direct2D11*)d2d)->swapChain->Present(1, 0), "D2D11 Present failed?");
-            }
-            else {
-                MessageBox(NULL, L"To use Present you must create this canvas with ID2D1DeviceContext or ID2D1DeviceContextDComposition", L"Sorry", MB_OK | MB_SYSTEMMODAL);
-            }
-        }));
-        context->Set(isolate, "SetTarget", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-            if (d2d->type >= 2) {
-                ID2D1Image* target = nullptr;
-                if (info[0]->BooleanValue(isolate)) {
-                    target = (ID2D1Image*)(IntegerFI(info[0].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()));
-                }
-                ((Direct2D11*) d2d)->d2dcontext->SetTarget(target);
-            }
-            else {
-                MessageBox(NULL, L"To use SetTarget you must create this canvas with ID2D1DeviceContext or ID2D1DeviceContextDComposition", L"Sorry", MB_OK | MB_SYSTEMMODAL);
-            }
-        }));
-        context->Set(isolate, "DrawImage", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-            if (d2d->type >= 2) {
-                IUnknown* image = (IUnknown*)(IntegerFI(info[0].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()));
-
-                D2D1_POINT_2F point = D2D1::Point2F(FloatFI(info[1]), FloatFI(info[2]));
-                D2D1_RECT_F rect = D2D1::RectF(FloatFI(info[3]), FloatFI(info[4]), FloatFI(info[5]), FloatFI(info[6]));
-
-                Local<Value> diddydidit; //lmao
-
-                info[0].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("effect")).ToLocal(&diddydidit); //i think this is the first time im using ToLocal (without commenting it out)
-
-                if (!diddydidit.IsEmpty()) {
-                    if (info[1]->IsNullOrUndefined()) {
-                        ((Direct2D11*)d2d)->d2dcontext->DrawImage((ID2D1Effect*)image);
-                    }
-                    else if (info[3]->IsNullOrUndefined()) {
-                        ((Direct2D11*)d2d)->d2dcontext->DrawImage((ID2D1Effect*)image, point);
-                    }
-                    else {
-                        ((Direct2D11*)d2d)->d2dcontext->DrawImage((ID2D1Effect*)image, point, rect, (D2D1_INTERPOLATION_MODE)IntegerFI(info[7]));
-                    }
-                }
-                else {
-                    if (info[1]->IsNullOrUndefined()) {
-                        ((Direct2D11*)d2d)->d2dcontext->DrawImage((ID2D1Image*)image);
-                    }
-                    else if (info[3]->IsNullOrUndefined()) {
-                        ((Direct2D11*)d2d)->d2dcontext->DrawImage((ID2D1Image*)image, point);
-                    }
-                    else {
-                        ((Direct2D11*)d2d)->d2dcontext->DrawImage((ID2D1Image*)image, point, rect, (D2D1_INTERPOLATION_MODE)IntegerFI(info[7]));
-                    }
-                }
-                //((Direct2D11*)d2d)->d2dcontext->DrawImage(image);
-            }
-            else {
-                MessageBox(NULL, L"To use DrawImage you must create this canvas with ID2D1DeviceContext or ID2D1DeviceContextDComposition", L"Sorry", MB_OK | MB_SYSTEMMODAL);
-            }
-        }));
-        context->Set(isolate, "CreateBitmapFromDxgiSurface", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-            if (d2d->type >= 2) {
-                Direct2D11* d2d11 = (Direct2D11*)d2d;
-
-                ID2D1Bitmap1* target;
-
-                D2D1_BITMAP_OPTIONS options = (D2D1_BITMAP_OPTIONS)IntegerFI(info[0]);
-                D2D1_PIXEL_FORMAT format;
-                if (info[1]->IsNullOrUndefined()) {
-                    format = d2d11->d2dcontext->GetPixelFormat();//d2d->renderTarget->GetPixelFormat();
-                    print("getting default format");
-                }
-                else {
-                    format = D2D1::PixelFormat((DXGI_FORMAT)IntegerFI(info[1]), (D2D1_ALPHA_MODE)IntegerFI(info[2]));
-                }
-
-                D2D1_BITMAP_PROPERTIES1 bitmapProperties =
-                    D2D1::BitmapProperties1(
-                        options,
-                        format,
-                        0,//dpi, //dxgi
-                        0//dpi  //dxgi
-                    );
-                // Get a D2D surface from the DXGI back buffer to use.
-                //DX::ThrowIfFailed(
-                RetIfFailed(d2d11->d2dcontext->CreateBitmapFromDxgiSurface(
-                    d2d11->dxgiBackBuffer.Get(),
-                    &bitmapProperties,
-                    &target
-                ), "CreateBitmapFromDxgiSurface failed");
-                //  );
-                
-                info.GetReturnValue().Set(DIRECT2D::getBitmapImpl(isolate, target)->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
-            }
-            else {
-                MessageBox(NULL, L"To use CreateBitmapFromDxgiSurface you must create this canvas with ID2D1DeviceContext or ID2D1DeviceContextDComposition (lol regular d2d doesn't even have a dxgi surface so that's why)", L"Sorry", MB_OK | MB_SYSTEMMODAL);
-            }
-        }));
         context->Set(isolate, "Resize", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
             Isolate* isolate = info.GetIsolate();
             Local<Context> context = isolate->GetCurrentContext();
@@ -4406,6 +4829,53 @@ V8FUNC(createCanvas) {
 
             info.GetReturnValue().Set(jsBrush->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
         }));
+        context->Set(isolate, "CreatePathGeometry", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+            ID2D1PathGeometry1* path = nullptr;
+
+            RetIfFailed(d2d->factory->CreatePathGeometry(&path), "ID2D1Factory7->CreatePathGeometry failed...");
+
+            info.GetReturnValue().Set(DIRECT2D::getPathGeometryImpl(isolate, path));
+        }));
+        context->Set(isolate, "CreateStrokeStyle", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+            D2D1_STROKE_STYLE_PROPERTIES1 props{}; //why should i use D2D1::StrokeStyleProperties()
+            props.startCap = (D2D1_CAP_STYLE)IntegerFI(info[0]);
+            props.endCap = (D2D1_CAP_STYLE)IntegerFI(info[1]);
+            props.dashCap = (D2D1_CAP_STYLE)IntegerFI(info[2]);
+            props.lineJoin = (D2D1_LINE_JOIN)IntegerFI(info[3]);
+            props.miterLimit = IntegerFI(info[4]);
+            props.dashStyle = (D2D1_DASH_STYLE)IntegerFI(info[5]);
+            props.dashOffset = IntegerFI(info[6]);
+            props.transformType = (D2D1_STROKE_TRANSFORM_TYPE)IntegerFI(info[7]);
+
+            float* dash = nullptr;//info[8].As<Array>()
+            UINT32 count = 0;
+            if (!info[8]->IsNullOrUndefined() && !info[8]->IsNumber()) {
+                //since i\m not getting a vector out of this scope like rthat im gonna use new
+                Local<Context> context = isolate->GetCurrentContext();
+                Local<Array> jsArr = info[8].As<Array>();
+                count = jsArr->Length();
+                dash = new float[count];
+                for (int i = 0; i < count; i++) {
+                    dash[i] = FloatFI(jsArr->Get(context, i).ToLocalChecked());
+                }
+            }
+
+            ID2D1StrokeStyle1* strokingStyle = nullptr;
+
+            RetIfFailed(d2d->factory->CreateStrokeStyle(props, dash, count, &strokingStyle), "CreateStrokeStyle failed bruhhh [mango]");
+            
+            info.GetReturnValue().Set(DIRECT2D::getStrokeStyleImpl(isolate, strokingStyle));
+
+            if (dash != nullptr) {
+                delete[] dash;
+            }
+        }));
         context->Set(isolate, "DrawRectangle", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
             Isolate* isolate = info.GetIsolate();
             Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
@@ -4415,8 +4885,8 @@ V8FUNC(createCanvas) {
                 strokeWidth = FloatFI(info[5]);
             }
             ID2D1StrokeStyle* strokeStyle = NULL;
-            if (info[6]->IsNumber()) {
-                strokeStyle = (ID2D1StrokeStyle*)IntegerFI(info[6]);
+            if (!info[6]->IsNumber() && info[6]->IsObject()) {
+                strokeStyle = (ID2D1StrokeStyle*)IntegerFI(info[6].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()); //(ID2D1StrokeStyle*)IntegerFI(info[6]);
             }
 
             ID2D1Brush* brush = (ID2D1Brush*)info[4].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()->IntegerValue(isolate->GetCurrentContext()).FromJust();
@@ -4431,8 +4901,8 @@ V8FUNC(createCanvas) {
                 strokeWidth = FloatFI(info[6]);
             }
             ID2D1StrokeStyle* strokeStyle = NULL;
-            if (info[7]->IsNumber()) {
-                strokeStyle = (ID2D1StrokeStyle*)IntegerFI(info[7]);
+            if (!info[7]->IsNumber() && info[7]->IsObject()) {
+                strokeStyle = (ID2D1StrokeStyle*)IntegerFI(info[7].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()); //(ID2D1StrokeStyle*)IntegerFI(info[6]);
             }
 
             D2D1_POINT_2F point0 = D2D1::Point2F(FloatFI(info[0]), FloatFI(info[1]));
@@ -4467,8 +4937,8 @@ V8FUNC(createCanvas) {
                 strokeWidth = FloatFI(info[6]);
             }
             ID2D1StrokeStyle* strokeStyle = NULL;
-            if (info[7]->IsNumber()) {
-                strokeStyle = (ID2D1StrokeStyle*)IntegerFI(info[7]);
+            if (!info[7]->IsNumber() && info[7]->IsObject()) {
+                strokeStyle = (ID2D1StrokeStyle*)IntegerFI(info[7].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()); //(ID2D1StrokeStyle*)IntegerFI(info[6]);
             }
             D2D1_POINT_2F radius = D2D1::Point2F(FloatFI(info[2]), FloatFI(info[3]));
             D2D1_POINT_2F ogPoints = D2D1::Point2F(FloatFI(info[0]), FloatFI(info[1]));
@@ -4488,8 +4958,8 @@ V8FUNC(createCanvas) {
                 strokeWidth = FloatFI(info[5]);
             }
             ID2D1StrokeStyle* strokeStyle = NULL;
-            if (info[6]->IsNumber()) {
-                strokeStyle = (ID2D1StrokeStyle*)IntegerFI(info[6]);
+            if (!info[6]->IsNumber() && info[6]->IsObject()) {
+                strokeStyle = (ID2D1StrokeStyle*)IntegerFI(info[6].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()); //(ID2D1StrokeStyle*)IntegerFI(info[6]);
             }
             ID2D1Brush* brush = (ID2D1Brush*)info[4].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()->IntegerValue(isolate->GetCurrentContext()).FromJust();
             d2d->renderTarget->DrawEllipse(D2D1::Ellipse(D2D1::Point2F(FloatFI(info[0]), FloatFI(info[1])), FloatFI(info[2]), FloatFI(info[3])), brush, strokeWidth, strokeStyle);
@@ -5299,113 +5769,6 @@ V8FUNC(createCanvas) {
             info.GetReturnValue().Set(jsBrush->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
 
         }));
-        context->Set(isolate, "CreateImageBrush", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-            if (d2d->type >= 2) {
-                Direct2D11* d2d11 = (Direct2D11*)d2d;
-                ID2D1Image* image = (ID2D1Image*)(IntegerFI(info[0].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()));
-                ID2D1ImageBrush* brush;
-                RetIfFailed(d2d11->d2dcontext->CreateImageBrush(image, nullptr, nullptr, &brush), "CreateImageBrush failed");
-
-                Local<ObjectTemplate> jsBrush = DIRECT2D::getDefaultBrushImpl(isolate, brush, "bitmap");//ObjectTemplate::New(isolate);
-                //jsBrush->Set(isolate, "internalPtr", Number::New(isolate, (LONG_PTR)bmpBrush));
-                jsBrush->Set(isolate, "GetExtendModeX", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                    Isolate* isolate = info.GetIsolate();
-                    ID2D1ImageBrush* bmpBrush = (ID2D1ImageBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                    
-                    //unsigned int extend = bmpBrush->GetExtendModeX();
-                    info.GetReturnValue().Set(bmpBrush->GetExtendModeX());
-                }));
-                jsBrush->Set(isolate, "GetExtendModeY", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                    Isolate* isolate = info.GetIsolate();
-                    ID2D1ImageBrush* bmpBrush = (ID2D1ImageBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                    
-                    //unsigned int extend = bmpBrush->GetExtendModeX();
-                    info.GetReturnValue().Set(bmpBrush->GetExtendModeY());
-                }));
-                jsBrush->Set(isolate, "GetExtendMode", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                    Isolate* isolate = info.GetIsolate();
-                    ID2D1ImageBrush* bmpBrush = (ID2D1ImageBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                    
-                    //unsigned int extend = bmpBrush->GetExtendModeX();
-                    info.GetReturnValue().Set(DIRECT2D::getPoint2FImpl(isolate, D2D1::Point2F(bmpBrush->GetExtendModeX(), bmpBrush->GetExtendModeY())));
-                }));
-                jsBrush->Set(isolate, "GetInterpolationMode", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                    Isolate* isolate = info.GetIsolate();
-                    ID2D1ImageBrush* bmpBrush = (ID2D1ImageBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                    
-                    info.GetReturnValue().Set(bmpBrush->GetInterpolationMode());
-                }));
-
-                jsBrush->Set(isolate, "SetExtendModeX", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                    Isolate* isolate = info.GetIsolate();
-                    ID2D1ImageBrush* bmpBrush = (ID2D1ImageBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                    
-                    //unsigned int extend = bmpBrush->GetExtendModeX();
-                    bmpBrush->SetExtendModeX((D2D1_EXTEND_MODE)IntegerFI(info[0]));
-                }));
-                jsBrush->Set(isolate, "SetExtendModeY", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                    Isolate* isolate = info.GetIsolate();
-                    ID2D1ImageBrush* bmpBrush = (ID2D1ImageBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                    
-                    bmpBrush->SetExtendModeY((D2D1_EXTEND_MODE)IntegerFI(info[0]));
-                }));
-                jsBrush->Set(isolate, "SetExtendMode", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                    Isolate* isolate = info.GetIsolate();
-                    ID2D1ImageBrush* bmpBrush = (ID2D1ImageBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                    
-                    bmpBrush->SetExtendModeX((D2D1_EXTEND_MODE)IntegerFI(info[0]));
-                    bmpBrush->SetExtendModeY((D2D1_EXTEND_MODE)IntegerFI(info[0]));
-                }));
-                jsBrush->Set(isolate, "SetInterpolationMode", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                    Isolate* isolate = info.GetIsolate();
-                    ID2D1ImageBrush* bmpBrush = (ID2D1ImageBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                    
-                    bmpBrush->SetInterpolationMode((D2D1_INTERPOLATION_MODE)IntegerFI(info[0]));
-                }));
-
-                jsBrush->Set(isolate, "SetImage", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                    Isolate* isolate = info.GetIsolate();
-                    ID2D1ImageBrush* bmpBrush = (ID2D1ImageBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                    ID2D1Image* bmp = (ID2D1Image*)info[0].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                    //print("bmpBrush->" << bmpBrush << " bmp->" << bmp);
-                    bmpBrush->SetImage(bmp);
-                }));
-                jsBrush->Set(isolate, "GetImage", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                    Isolate* isolate = info.GetIsolate();
-                    ID2D1ImageBrush* bmpBrush = (ID2D1ImageBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                    ID2D1Image* bmp;
-                    bmpBrush->GetImage(&bmp);
-
-                    Local<ObjectTemplate> jsBitmap = DIRECT2D::getBitmapImpl(isolate, bmp);//DIRECT2D::getIUnknownImpl(isolate, bmp);//ObjectTemplate::New(isolate);
-
-                    info.GetReturnValue().Set(jsBitmap->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
-                    //info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)bmp));
-                }));
-                //jsBrush->Set(isolate, "SetOpacity", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                //    Isolate* isolate = info.GetIsolate();
-                //    ID2D1ImageBrush* bmpBrush = (ID2D1ImageBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                //    bmpBrush->SetOpacity(FloatFI(info[0]));
-                //}));
-                //jsBrush->Set(isolate, "GetOpacity", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                //    Isolate* isolate = info.GetIsolate();
-                //    ID2D1ImageBrush* bmpBrush = (ID2D1ImageBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                //    info.GetReturnValue().Set(bmpBrush->GetOpacity());
-                //}));
-                //jsBrush->Set(isolate, "Release", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                //    Isolate* isolate = info.GetIsolate();
-                //    ID2D1ImageBrush* bmpBrush = (ID2D1ImageBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                //    bmpBrush->Release();
-                //}));
-
-                info.GetReturnValue().Set(jsBrush->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
-            }
-            else {
-                MessageBox(NULL, L"To use CreateImageBrush you must create this canvas with ID2D1DeviceContext or ID2D1DeviceContextDComposition", L"Sorry", MB_OK | MB_SYSTEMMODAL);
-            }
-        }));
         //d2d->renderTarget->SetTransform;
         //d2d->renderTarget->GetTransform;
         context->Set(isolate, "CreateGradientStopCollection", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
@@ -5504,7 +5867,6 @@ V8FUNC(createCanvas) {
                 newBrush->SetStartPoint(D2D1::Point2F(FloatFI(info[0]), FloatFI(info[1])));
                 newBrush->SetEndPoint(D2D1::Point2F(FloatFI(info[2]), FloatFI(info[3])));
             }));
-            
             //jsBrush->Set(isolate, "Release", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
             //    Isolate* isolate = info.GetIsolate();
             //    ID2D1LinearGradientBrush* newBrush = (ID2D1LinearGradientBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
@@ -5681,14 +6043,22 @@ V8FUNC(createCanvas) {
             D2D1_POINT_2F point0 = D2D1::Point2F(FloatFI(info[0]), FloatFI(info[1]));
             D2D1_POINT_2F point1 = D2D1::Point2F(FloatFI(info[2]), FloatFI(info[3]));
             ID2D1Brush* bruh = DIRECT2D::AdjustGradients(isolate, info[6].As<Object>(), point0, point1, FloatFI(info[7]));
-            d2d->renderTarget->DrawRoundedRectangle(D2D1::RoundedRect(D2D1::RectF(point0.x, point0.y, point1.x, point1.y), FloatFI(info[4]), FloatFI(info[5])), bruh, info[8]->IsNumber() ? FloatFI(info[8]) : 1.0F, info[9]->IsNumber() ? (ID2D1StrokeStyle*)IntegerFI(info[9]) : NULL);
+            ID2D1StrokeStyle* strokeStyle = NULL;
+            if (!info[9]->IsNumber() && info[9]->IsObject()) {
+                strokeStyle = (ID2D1StrokeStyle*)IntegerFI(info[9].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()); //(ID2D1StrokeStyle*)IntegerFI(info[6]);
+            }
+            d2d->renderTarget->DrawRoundedRectangle(D2D1::RoundedRect(D2D1::RectF(point0.x, point0.y, point1.x, point1.y), FloatFI(info[4]), FloatFI(info[5])), bruh, info[8]->IsNumber() ? FloatFI(info[8]) : 1.0F, strokeStyle);
         }));
         context->Set(isolate, "DrawRoundedRectangle", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
             Isolate* isolate = info.GetIsolate();
             Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
             ID2D1Brush* brush = (ID2D1Brush*)info[6].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            ID2D1StrokeStyle* strokeStyle = NULL;
+            if (!info[8]->IsNumber() && info[8]->IsObject()) {
+                strokeStyle = (ID2D1StrokeStyle*)IntegerFI(info[8].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()); //(ID2D1StrokeStyle*)IntegerFI(info[6]);
+            }
 
-            d2d->renderTarget->DrawRoundedRectangle(D2D1::RoundedRect(D2D1::RectF(FloatFI(info[0]), FloatFI(info[1]), FloatFI(info[2]), FloatFI(info[3])), FloatFI(info[4]), FloatFI(info[5])), brush, info[7]->IsNumber() ? FloatFI(info[7]) : 1.0F, info[8]->IsNumber() ? (ID2D1StrokeStyle*)IntegerFI(info[8]) : NULL);
+            d2d->renderTarget->DrawRoundedRectangle(D2D1::RoundedRect(D2D1::RectF(FloatFI(info[0]), FloatFI(info[1]), FloatFI(info[2]), FloatFI(info[3])), FloatFI(info[4]), FloatFI(info[5])), brush, info[7]->IsNumber() ? FloatFI(info[7]) : 1.0F, strokeStyle);
         }));
         context->Set(isolate, "FillRoundedRectangle", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
             Isolate* isolate = info.GetIsolate();
@@ -5719,6 +6089,20 @@ V8FUNC(createCanvas) {
             Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
             
             d2d->renderTarget->SetAntialiasMode((D2D1_ANTIALIAS_MODE)IntegerFI(info[0]));
+        }));
+        context->Set(isolate, "GetDpi", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            
+            float x, y;
+
+            d2d->renderTarget->GetDpi(&x, &y);
+
+            //Local<Array> jsArray = Array::New(isolate, 2);
+            //jsArray->Set(isolate->GetCurrentContext(), 0, Number::New(isolate,x));
+            //jsArray->Set(isolate->GetCurrentContext(), 1, Number::New(isolate,y));
+
+            info.GetReturnValue().Set(DIRECT2D::getPoint2FImpl(isolate, D2D1::Point2F(x, y)));//jsArray);
         }));
         context->Set(isolate, "SetDpi", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
             Isolate* isolate = info.GetIsolate();
@@ -5765,8 +6149,11 @@ V8FUNC(createCanvas) {
             Isolate* isolate = info.GetIsolate();
             Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
             ID2D1Brush* brush = (ID2D1Brush*)info[4].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-            d2d->renderTarget->DrawLine(D2D1::Point2F(FloatFI(info[0]), FloatFI(info[1])), D2D1::Point2F(FloatFI(info[2]), FloatFI(info[3])), brush, info[5]->IsNumber() ? FloatFI(info[5]) : 1.0F, info[6]->IsNumber() ? (ID2D1StrokeStyle*)IntegerFI(info[6]) : NULL);
+            ID2D1StrokeStyle* strokeStyle = NULL;
+            if (!info[6]->IsNumber() && info[6]->IsObject()) {
+                strokeStyle = (ID2D1StrokeStyle*)IntegerFI(info[6].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()); //(ID2D1StrokeStyle*)IntegerFI(info[6]);
+            }
+            d2d->renderTarget->DrawLine(D2D1::Point2F(FloatFI(info[0]), FloatFI(info[1])), D2D1::Point2F(FloatFI(info[2]), FloatFI(info[3])), brush, info[5]->IsNumber() ? FloatFI(info[5]) : 1.0F, strokeStyle);
         }));
         context->Set(isolate, "DrawGradientLine", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
             Isolate* isolate = info.GetIsolate();
@@ -5776,11 +6163,37 @@ V8FUNC(createCanvas) {
             //const char* brushType = CStringFI(jsBrush->Get(isolate->GetCurrentContext(), LITERAL("brush")).ToLocalChecked());
             D2D1_POINT_2F point0 = D2D1::Point2F(FloatFI(info[0]), FloatFI(info[1]));
             D2D1_POINT_2F point1 = D2D1::Point2F(FloatFI(info[2]), FloatFI(info[3]));
-            float strokeWidth = info[5]->IsNumber() ? FloatFI(info[5]) : 1.0F;
-            ID2D1Brush* bruh = DIRECT2D::AdjustGradients(isolate, jsBrush, point0, point1, FloatFI(info[7]));//, strokeWidth);
-
-            d2d->renderTarget->DrawLine(point0, point1, bruh, strokeWidth, info[6]->IsNumber() ? (ID2D1StrokeStyle*)IntegerFI(info[6]) : NULL);
+            float strokeWidth = info[6]->IsNumber() ? FloatFI(info[6]) : 1.0F;
+            ID2D1Brush* bruh = DIRECT2D::AdjustGradients(isolate, jsBrush, point0, point1, FloatFI(info[5]));//, strokeWidth);
+            ID2D1StrokeStyle* strokeStyle = NULL;
+            if (!info[7]->IsNumber() && info[7]->IsObject()) {
+                strokeStyle = (ID2D1StrokeStyle*)IntegerFI(info[7].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()); //(ID2D1StrokeStyle*)IntegerFI(info[6]);
+            }
+            d2d->renderTarget->DrawLine(point0, point1, bruh, strokeWidth, strokeStyle);
         }));
+        context->Set(isolate, "DrawGeometry", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            ID2D1Brush* brush = (ID2D1Brush*)info[1].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            ID2D1StrokeStyle* strokeStyle = NULL;
+            if (!info[3]->IsNumber() && info[3]->IsObject()) {
+                strokeStyle = (ID2D1StrokeStyle*)IntegerFI(info[3].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()); //(ID2D1StrokeStyle*)IntegerFI(info[6]);
+            }
+            ID2D1Geometry* geometry = (ID2D1Geometry*)info[0].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            d2d->renderTarget->DrawGeometry(geometry, brush, info[2]->IsNumber() ? FloatFI(info[2]) : 1.0F, strokeStyle);
+        }));
+        context->Set(isolate, "FillGeometry", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            ID2D1Geometry* geometry = (ID2D1Geometry*)info[0].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            ID2D1Brush* brush = (ID2D1Brush*)info[1].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            ID2D1Brush* opacityBrush = NULL;
+            if (info[2]->IsNumber()) {
+                opacityBrush = (ID2D1Brush*)info[2].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            }
+            d2d->renderTarget->FillGeometry(geometry, brush, opacityBrush);
+        }));
+
 
         context->Set(isolate, "Clear", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
             Isolate* isolate = info.GetIsolate();
@@ -5858,7 +6271,222 @@ V8FUNC(createCanvas) {
                 MessageBox(NULL, L"CreateEffect only works if d2d was created with ID2D1DeviceContext or ID2D1DeviceContextDComposition", L"CreateEffect failed", MB_OK | MB_SYSTEMMODAL);
             }
         }));
+        context->Set(isolate, "Present", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
 
+            if (d2d->type >= 2) {
+                RetIfFailed(((Direct2D11*)d2d)->swapChain->Present(1, 0), "D2D11 Present failed?");
+            }
+            else {
+                MessageBox(NULL, L"To use Present you must create this canvas with ID2D1DeviceContext or ID2D1DeviceContextDComposition", L"Sorry", MB_OK | MB_SYSTEMMODAL);
+            }
+        }));
+        context->Set(isolate, "SetTarget", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+            if (d2d->type >= 2) {
+                ID2D1Image* target = nullptr;
+                if (info[0]->BooleanValue(isolate)) {
+                    target = (ID2D1Image*)(IntegerFI(info[0].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()));
+                }
+                ((Direct2D11*) d2d)->d2dcontext->SetTarget(target);
+            }
+            else {
+                MessageBox(NULL, L"To use SetTarget you must create this canvas with ID2D1DeviceContext or ID2D1DeviceContextDComposition", L"Sorry", MB_OK | MB_SYSTEMMODAL);
+            }
+        }));
+        context->Set(isolate, "DrawImage", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+            if (d2d->type >= 2) {
+                IUnknown* image = (IUnknown*)(IntegerFI(info[0].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()));
+
+                D2D1_POINT_2F point = D2D1::Point2F(FloatFI(info[1]), FloatFI(info[2]));
+                D2D1_RECT_F rect = D2D1::RectF(FloatFI(info[3]), FloatFI(info[4]), FloatFI(info[5]), FloatFI(info[6]));
+
+                Local<Value> diddydidit; //lmao
+
+                info[0].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("effect")).ToLocal(&diddydidit); //i think this is the first time im using ToLocal (without commenting it out)
+
+                if (!diddydidit.IsEmpty()) {
+                    if (info[1]->IsNullOrUndefined()) {
+                        ((Direct2D11*)d2d)->d2dcontext->DrawImage((ID2D1Effect*)image);
+                    }
+                    else if (info[3]->IsNullOrUndefined()) {
+                        ((Direct2D11*)d2d)->d2dcontext->DrawImage((ID2D1Effect*)image, point);
+                    }
+                    else {
+                        ((Direct2D11*)d2d)->d2dcontext->DrawImage((ID2D1Effect*)image, point, rect, (D2D1_INTERPOLATION_MODE)IntegerFI(info[7]));
+                    }
+                }
+                else {
+                    if (info[1]->IsNullOrUndefined()) {
+                        ((Direct2D11*)d2d)->d2dcontext->DrawImage((ID2D1Image*)image);
+                    }
+                    else if (info[3]->IsNullOrUndefined()) {
+                        ((Direct2D11*)d2d)->d2dcontext->DrawImage((ID2D1Image*)image, point);
+                    }
+                    else {
+                        ((Direct2D11*)d2d)->d2dcontext->DrawImage((ID2D1Image*)image, point, rect, (D2D1_INTERPOLATION_MODE)IntegerFI(info[7]));
+                    }
+                }
+                //((Direct2D11*)d2d)->d2dcontext->DrawImage(image);
+            }
+            else {
+                MessageBox(NULL, L"To use DrawImage you must create this canvas with ID2D1DeviceContext or ID2D1DeviceContextDComposition", L"Sorry", MB_OK | MB_SYSTEMMODAL);
+            }
+        }));
+        context->Set(isolate, "CreateBitmapFromDxgiSurface", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+            if (d2d->type >= 2) {
+                Direct2D11* d2d11 = (Direct2D11*)d2d;
+
+                ID2D1Bitmap1* target;
+
+                D2D1_BITMAP_OPTIONS options = (D2D1_BITMAP_OPTIONS)IntegerFI(info[0]);
+                D2D1_PIXEL_FORMAT format;
+                if (info[1]->IsNullOrUndefined()) {
+                    format = d2d11->d2dcontext->GetPixelFormat();//d2d->renderTarget->GetPixelFormat();
+                    print("getting default format");
+                }
+                else {
+                    format = D2D1::PixelFormat((DXGI_FORMAT)IntegerFI(info[1]), (D2D1_ALPHA_MODE)IntegerFI(info[2]));
+                }
+
+                D2D1_BITMAP_PROPERTIES1 bitmapProperties =
+                    D2D1::BitmapProperties1(
+                        options,
+                        format,
+                        0,//dpi, //dxgi
+                        0//dpi  //dxgi
+                    );
+                // Get a D2D surface from the DXGI back buffer to use.
+                //DX::ThrowIfFailed(
+                RetIfFailed(d2d11->d2dcontext->CreateBitmapFromDxgiSurface(
+                    d2d11->dxgiBackBuffer.Get(),
+                    &bitmapProperties,
+                    &target
+                ), "CreateBitmapFromDxgiSurface failed");
+                //  );
+                
+                info.GetReturnValue().Set(DIRECT2D::getBitmapImpl(isolate, target)->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
+            }
+            else {
+                MessageBox(NULL, L"To use CreateBitmapFromDxgiSurface you must create this canvas with ID2D1DeviceContext or ID2D1DeviceContextDComposition (lol regular d2d doesn't even have a dxgi surface so that's why)", L"Sorry", MB_OK | MB_SYSTEMMODAL);
+            }
+        }));
+        context->Set(isolate, "CreateImageBrush", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+            if (d2d->type >= 2) {
+                Direct2D11* d2d11 = (Direct2D11*)d2d;
+                ID2D1Image* image = (ID2D1Image*)(IntegerFI(info[0].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()));
+                ID2D1ImageBrush* brush;
+                RetIfFailed(d2d11->d2dcontext->CreateImageBrush(image, nullptr, nullptr, &brush), "CreateImageBrush failed");
+
+                Local<ObjectTemplate> jsBrush = DIRECT2D::getDefaultBrushImpl(isolate, brush, "bitmap");//ObjectTemplate::New(isolate);
+                //jsBrush->Set(isolate, "internalPtr", Number::New(isolate, (LONG_PTR)bmpBrush));
+                jsBrush->Set(isolate, "GetExtendModeX", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                    Isolate* isolate = info.GetIsolate();
+                    ID2D1ImageBrush* bmpBrush = (ID2D1ImageBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                    
+                    //unsigned int extend = bmpBrush->GetExtendModeX();
+                    info.GetReturnValue().Set(bmpBrush->GetExtendModeX());
+                }));
+                jsBrush->Set(isolate, "GetExtendModeY", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                    Isolate* isolate = info.GetIsolate();
+                    ID2D1ImageBrush* bmpBrush = (ID2D1ImageBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                    
+                    //unsigned int extend = bmpBrush->GetExtendModeX();
+                    info.GetReturnValue().Set(bmpBrush->GetExtendModeY());
+                }));
+                jsBrush->Set(isolate, "GetExtendMode", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                    Isolate* isolate = info.GetIsolate();
+                    ID2D1ImageBrush* bmpBrush = (ID2D1ImageBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                    
+                    //unsigned int extend = bmpBrush->GetExtendModeX();
+                    info.GetReturnValue().Set(DIRECT2D::getPoint2FImpl(isolate, D2D1::Point2F(bmpBrush->GetExtendModeX(), bmpBrush->GetExtendModeY())));
+                }));
+                jsBrush->Set(isolate, "GetInterpolationMode", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                    Isolate* isolate = info.GetIsolate();
+                    ID2D1ImageBrush* bmpBrush = (ID2D1ImageBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                    
+                    info.GetReturnValue().Set(bmpBrush->GetInterpolationMode());
+                }));
+
+                jsBrush->Set(isolate, "SetExtendModeX", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                    Isolate* isolate = info.GetIsolate();
+                    ID2D1ImageBrush* bmpBrush = (ID2D1ImageBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                    
+                    //unsigned int extend = bmpBrush->GetExtendModeX();
+                    bmpBrush->SetExtendModeX((D2D1_EXTEND_MODE)IntegerFI(info[0]));
+                }));
+                jsBrush->Set(isolate, "SetExtendModeY", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                    Isolate* isolate = info.GetIsolate();
+                    ID2D1ImageBrush* bmpBrush = (ID2D1ImageBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                    
+                    bmpBrush->SetExtendModeY((D2D1_EXTEND_MODE)IntegerFI(info[0]));
+                }));
+                jsBrush->Set(isolate, "SetExtendMode", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                    Isolate* isolate = info.GetIsolate();
+                    ID2D1ImageBrush* bmpBrush = (ID2D1ImageBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                    
+                    bmpBrush->SetExtendModeX((D2D1_EXTEND_MODE)IntegerFI(info[0]));
+                    bmpBrush->SetExtendModeY((D2D1_EXTEND_MODE)IntegerFI(info[0]));
+                }));
+                jsBrush->Set(isolate, "SetInterpolationMode", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                    Isolate* isolate = info.GetIsolate();
+                    ID2D1ImageBrush* bmpBrush = (ID2D1ImageBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                    
+                    bmpBrush->SetInterpolationMode((D2D1_INTERPOLATION_MODE)IntegerFI(info[0]));
+                }));
+
+                jsBrush->Set(isolate, "SetImage", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                    Isolate* isolate = info.GetIsolate();
+                    ID2D1ImageBrush* bmpBrush = (ID2D1ImageBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                    ID2D1Image* bmp = (ID2D1Image*)info[0].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                    //print("bmpBrush->" << bmpBrush << " bmp->" << bmp);
+                    bmpBrush->SetImage(bmp);
+                }));
+                jsBrush->Set(isolate, "GetImage", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                    Isolate* isolate = info.GetIsolate();
+                    ID2D1ImageBrush* bmpBrush = (ID2D1ImageBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                    ID2D1Image* bmp;
+                    bmpBrush->GetImage(&bmp);
+
+                    Local<ObjectTemplate> jsBitmap = DIRECT2D::getBitmapImpl(isolate, bmp);//DIRECT2D::getIUnknownImpl(isolate, bmp);//ObjectTemplate::New(isolate);
+
+                    info.GetReturnValue().Set(jsBitmap->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
+                    //info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)bmp));
+                }));
+                //jsBrush->Set(isolate, "SetOpacity", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                //    Isolate* isolate = info.GetIsolate();
+                //    ID2D1ImageBrush* bmpBrush = (ID2D1ImageBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                //    bmpBrush->SetOpacity(FloatFI(info[0]));
+                //}));
+                //jsBrush->Set(isolate, "GetOpacity", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                //    Isolate* isolate = info.GetIsolate();
+                //    ID2D1ImageBrush* bmpBrush = (ID2D1ImageBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                //    info.GetReturnValue().Set(bmpBrush->GetOpacity());
+                //}));
+                //jsBrush->Set(isolate, "Release", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                //    Isolate* isolate = info.GetIsolate();
+                //    ID2D1ImageBrush* bmpBrush = (ID2D1ImageBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                //    bmpBrush->Release();
+                //}));
+
+                info.GetReturnValue().Set(jsBrush->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
+            }
+            else {
+                MessageBox(NULL, L"To use CreateImageBrush you must create this canvas with ID2D1DeviceContext or ID2D1DeviceContextDComposition", L"Sorry", MB_OK | MB_SYSTEMMODAL);
+            }
+        }));
         context->Set(isolate, "CreateBitmap1", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
             Isolate* isolate = info.GetIsolate();
             Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
@@ -5997,13 +6625,33 @@ V8FUNC(createCanvas) {
             context->Set(isolate, "CreateColorMatrixEffect", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
                 Isolate* isolate = info.GetIsolate();
                 Direct2D11* d2d11 = (Direct2D11*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                MessageBoxA(NULL, "Can't use a ColorMatrixEffect because i haven't implemented Matrix5x4F", "My fault og.", MB_OK | MB_SYSTEMMODAL);
-                //IDCompositionColorMatrixEffect* effect;
-                //
-                //RetIfFailed(d2d11->m_dcompD1->CreateColorMatrixEffect(&effect), "DComposition CreateColorMatrixEffect");
-                //
-                //Local<ObjectTemplate> jsDCompEffect = DIRECT2D::getCompositionEffectImpl(isolate, effect);
-                //info.GetReturnValue().Set(jsDCompEffect->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
+                //MessageBoxA(NULL, "Can't use a ColorMatrixEffect because i haven't implemented Matrix5x4F", "My fault og.", MB_OK | MB_SYSTEMMODAL);
+                IDCompositionColorMatrixEffect* effect;
+                
+                RetIfFailed(d2d11->m_dcompD1->CreateColorMatrixEffect(&effect), "DComposition CreateColorMatrixEffect");
+                
+                Local<ObjectTemplate> jsDCompEffect = DIRECT2D::getCompositionEffectImpl(isolate, effect);
+                jsDCompEffect->Set(isolate, "SetMatrix", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                    Isolate* isolate = info.GetIsolate();
+                    IDCompositionColorMatrixEffect* effect = (IDCompositionColorMatrixEffect*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+                    RetIfFailed(effect->SetMatrix(DIRECT2D::fromJSMatrix5x4(isolate, info[0].As<Object>())), "SetMatrix failed (IDCompositionColorMatrixEffect)");
+                }));
+                jsDCompEffect->Set(isolate, "SetMatrixElement", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                    Isolate* isolate = info.GetIsolate();
+                    IDCompositionColorMatrixEffect* effect = (IDCompositionColorMatrixEffect*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+                    RetIfFailed(effect->SetMatrixElement(IntegerFI(info[0]), IntegerFI(info[1]), FloatFI(info[2])), "SetMatrixElement failed (IDCompositionColorMatrixEffect)");
+                }));
+                jsDCompEffect->Set(isolate, "SetAlphaMode", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                    Isolate* isolate = info.GetIsolate();
+                    IDCompositionColorMatrixEffect* effect = (IDCompositionColorMatrixEffect*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+                    RetIfFailed(effect->SetAlphaMode((D2D1_COLORMATRIX_ALPHA_MODE)IntegerFI(info[0])), "SetAlphaMode failed (IDCompositionColorMatrixEffect)");
+                }));
+                jsDCompEffect->Set(isolate, "SetClampOutput", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                    Isolate* isolate = info.GetIsolate();
+                    IDCompositionColorMatrixEffect* effect = (IDCompositionColorMatrixEffect*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+                    RetIfFailed(effect->SetClampOutput(IntegerFI(info[0])), "SetClampOutput failed (IDCompositionColorMatrixEffect)");
+                }));
+                info.GetReturnValue().Set(jsDCompEffect->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
             }));
             context->Set(isolate, "CreateShadowEffect", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
                 Isolate* isolate = info.GetIsolate();
@@ -6023,7 +6671,6 @@ V8FUNC(createCanvas) {
                     IDCompositionShadowEffect* effect = (IDCompositionShadowEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
                     RetIfFailed(effect->SetColor(D2D1_VECTOR_4F{ (FLOAT)FloatFI(info[0]) , (FLOAT)FloatFI(info[1]) , (FLOAT)FloatFI(info[2]) , (FLOAT)FloatFI(info[3]) }), "SetColor failed (IDCompositionShadowEffect)");
                 }));
-
                 info.GetReturnValue().Set(jsDCompEffect->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
             }));
             context->Set(isolate, "CreateHueRotationEffect", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
@@ -6177,7 +6824,7 @@ V8FUNC(createCanvas) {
                 }));
                 info.GetReturnValue().Set(jsDCompEffect->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
             }));
-            //idk how this one works
+            //idk how this one works (well the real problem is i gotta allocate space for the tables and i don't feel like it)
             //context->Set(isolate, "CreateTableTransferEffect", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
             //    Isolate* isolate = info.GetIsolate();
             //    Direct2D11* d2d11 = (Direct2D11*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
@@ -6287,6 +6934,12 @@ V8FUNC(createCanvas) {
                 
                     D2D1::Matrix3x2F matrix = DIRECT2D::fromJSMatrix3x2(isolate, info[0].As<Object>());
                     RetIfFailed(effect->SetTransformMatrix(matrix), "SetTransformMatrix failed (IDCompositionAffineTransform2DEffect)");
+                }));
+                jsDCompEffect->Set(isolate, "SetTransformMatrixElement", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                    Isolate* isolate = info.GetIsolate();
+                    IDCompositionAffineTransform2DEffect* effect = (IDCompositionAffineTransform2DEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                
+                    RetIfFailed(effect->SetTransformMatrixElement(IntegerFI(info[0]), IntegerFI(info[1]), FloatFI(info[2])), "SetTransformMatrixElement failed (IDCompositionAffineTransform2DEffect)");
                 }));
                 jsDCompEffect->Set(isolate, "SetSharpness", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
                     Isolate* isolate = info.GetIsolate();
@@ -7929,7 +8582,7 @@ LRESULT CALLBACK WinProc(HWND hWnd, UINT msg, WPARAM wp, LPARAM lp)
     else {
         print("NULL?" << msg);
         //nullMsgsMap[hWnd].push_back(std::make_tuple(msg, wp, lp));
-        DefWindowProcW(hWnd, msg, wp, lp);;
+        DefWindowProcW(hWnd, msg, wp, lp);
     }
 }
 
@@ -15381,6 +16034,48 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
 #undef ID2D1DeviceContext
 #undef ID2D1DeviceContextDComposition
 
+    setGlobalConst(D2D1_CAP_STYLE_FLAT);
+    setGlobalConst(D2D1_CAP_STYLE_SQUARE);
+    setGlobalConst(D2D1_CAP_STYLE_ROUND);
+    setGlobalConst(D2D1_CAP_STYLE_TRIANGLE);
+    setGlobalConst(D2D1_LINE_JOIN_MITER);
+    setGlobalConst(D2D1_LINE_JOIN_BEVEL);
+    setGlobalConst(D2D1_LINE_JOIN_ROUND);
+    setGlobalConst(D2D1_LINE_JOIN_MITER_OR_BEVEL);
+    setGlobalConst(D2D1_DASH_STYLE_SOLID);
+    setGlobalConst(D2D1_DASH_STYLE_DASH);
+    setGlobalConst(D2D1_DASH_STYLE_DOT);
+    setGlobalConst(D2D1_DASH_STYLE_DASH_DOT);
+    setGlobalConst(D2D1_DASH_STYLE_DASH_DOT_DOT);
+    setGlobalConst(D2D1_DASH_STYLE_CUSTOM);
+    setGlobalConst(D2D1_STROKE_TRANSFORM_TYPE_NORMAL);
+    setGlobalConst(D2D1_STROKE_TRANSFORM_TYPE_FIXED);
+    setGlobalConst(D2D1_STROKE_TRANSFORM_TYPE_HAIRLINE);
+    setGlobalConst(D2D1_GEOMETRY_SIMPLIFICATION_OPTION_CUBICS_AND_LINES);
+    setGlobalConst(D2D1_GEOMETRY_SIMPLIFICATION_OPTION_LINES);
+    setGlobalConst(D2D1_COMBINE_MODE_UNION);
+    setGlobalConst(D2D1_COMBINE_MODE_INTERSECT);
+    setGlobalConst(D2D1_COMBINE_MODE_XOR);
+    setGlobalConst(D2D1_COMBINE_MODE_EXCLUDE);
+    setGlobalConst(D2D1_FILL_MODE_ALTERNATE);
+    setGlobalConst(D2D1_FILL_MODE_WINDING);
+    setGlobalConst(D2D1_GEOMETRY_RELATION_UNKNOWN);
+    setGlobalConst(D2D1_GEOMETRY_RELATION_DISJOINT);
+    setGlobalConst(D2D1_GEOMETRY_RELATION_IS_CONTAINED);
+    setGlobalConst(D2D1_GEOMETRY_RELATION_CONTAINS);
+    setGlobalConst(D2D1_GEOMETRY_RELATION_OVERLAP);
+    setGlobalConst(D2D1_PATH_SEGMENT_NONE);
+    setGlobalConst(D2D1_PATH_SEGMENT_FORCE_UNSTROKED);
+    setGlobalConst(D2D1_PATH_SEGMENT_FORCE_ROUND_LINE_JOIN);
+    setGlobalConst(D2D1_FIGURE_BEGIN_FILLED);
+    setGlobalConst(D2D1_FIGURE_BEGIN_HOLLOW);
+    setGlobalConst(D2D1_FIGURE_END_OPEN);
+    setGlobalConst(D2D1_FIGURE_END_CLOSED);
+    setGlobalConst(D2D1_SWEEP_DIRECTION_COUNTER_CLOCKWISE);
+    setGlobalConst(D2D1_SWEEP_DIRECTION_CLOCKWISE);
+    setGlobalConst(D2D1_ARC_SIZE_SMALL);
+    setGlobalConst(D2D1_ARC_SIZE_LARGE);
+
 
     setGlobalConst(MK_CONTROL);
     setGlobalConst(MK_LBUTTON);
@@ -15524,6 +16219,20 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
     setGlobalConst(D2D1_BORDER_MODE_SOFT); setGlobalConst(D2D1_BORDER_MODE_HARD); setGlobalConst(D2D1_BORDER_MODE_FORCE_DWORD); setGlobalConst(D2D1_CHANNEL_SELECTOR_R); setGlobalConst(D2D1_CHANNEL_SELECTOR_G); setGlobalConst(D2D1_CHANNEL_SELECTOR_B); setGlobalConst(D2D1_CHANNEL_SELECTOR_A); setGlobalConst(D2D1_CHANNEL_SELECTOR_FORCE_DWORD); setGlobalConst(D2D1_BITMAPSOURCE_ORIENTATION_DEFAULT); setGlobalConst(D2D1_BITMAPSOURCE_ORIENTATION_FLIP_HORIZONTAL); setGlobalConst(D2D1_BITMAPSOURCE_ORIENTATION_ROTATE_CLOCKWISE180); setGlobalConst(D2D1_BITMAPSOURCE_ORIENTATION_ROTATE_CLOCKWISE180_FLIP_HORIZONTAL); setGlobalConst(D2D1_BITMAPSOURCE_ORIENTATION_ROTATE_CLOCKWISE270_FLIP_HORIZONTAL); setGlobalConst(D2D1_BITMAPSOURCE_ORIENTATION_ROTATE_CLOCKWISE90); setGlobalConst(D2D1_BITMAPSOURCE_ORIENTATION_ROTATE_CLOCKWISE90_FLIP_HORIZONTAL); setGlobalConst(D2D1_BITMAPSOURCE_ORIENTATION_ROTATE_CLOCKWISE270); setGlobalConst(D2D1_BITMAPSOURCE_ORIENTATION_FORCE_DWORD); setGlobalConst(D2D1_GAUSSIANBLUR_PROP_STANDARD_DEVIATION); setGlobalConst(D2D1_GAUSSIANBLUR_PROP_OPTIMIZATION); setGlobalConst(D2D1_GAUSSIANBLUR_PROP_BORDER_MODE); setGlobalConst(D2D1_GAUSSIANBLUR_PROP_FORCE_DWORD); setGlobalConst(D2D1_GAUSSIANBLUR_OPTIMIZATION_SPEED); setGlobalConst(D2D1_GAUSSIANBLUR_OPTIMIZATION_BALANCED); setGlobalConst(D2D1_GAUSSIANBLUR_OPTIMIZATION_QUALITY); setGlobalConst(D2D1_GAUSSIANBLUR_OPTIMIZATION_FORCE_DWORD); setGlobalConst(D2D1_DIRECTIONALBLUR_PROP_STANDARD_DEVIATION); setGlobalConst(D2D1_DIRECTIONALBLUR_PROP_ANGLE); setGlobalConst(D2D1_DIRECTIONALBLUR_PROP_OPTIMIZATION); setGlobalConst(D2D1_DIRECTIONALBLUR_PROP_BORDER_MODE); setGlobalConst(D2D1_DIRECTIONALBLUR_PROP_FORCE_DWORD); setGlobalConst(D2D1_DIRECTIONALBLUR_OPTIMIZATION_SPEED); setGlobalConst(D2D1_DIRECTIONALBLUR_OPTIMIZATION_BALANCED); setGlobalConst(D2D1_DIRECTIONALBLUR_OPTIMIZATION_QUALITY); setGlobalConst(D2D1_DIRECTIONALBLUR_OPTIMIZATION_FORCE_DWORD); setGlobalConst(D2D1_SHADOW_PROP_BLUR_STANDARD_DEVIATION); setGlobalConst(D2D1_SHADOW_PROP_COLOR); setGlobalConst(D2D1_SHADOW_PROP_OPTIMIZATION); setGlobalConst(D2D1_SHADOW_PROP_FORCE_DWORD); setGlobalConst(D2D1_SHADOW_OPTIMIZATION_SPEED); setGlobalConst(D2D1_SHADOW_OPTIMIZATION_BALANCED); setGlobalConst(D2D1_SHADOW_OPTIMIZATION_QUALITY); setGlobalConst(D2D1_SHADOW_OPTIMIZATION_FORCE_DWORD); setGlobalConst(D2D1_BLEND_PROP_MODE); setGlobalConst(D2D1_BLEND_PROP_FORCE_DWORD); setGlobalConst(D2D1_BLEND_MODE_MULTIPLY); setGlobalConst(D2D1_BLEND_MODE_SCREEN); setGlobalConst(D2D1_BLEND_MODE_DARKEN); setGlobalConst(D2D1_BLEND_MODE_LIGHTEN); setGlobalConst(D2D1_BLEND_MODE_DISSOLVE); setGlobalConst(D2D1_BLEND_MODE_COLOR_BURN); setGlobalConst(D2D1_BLEND_MODE_LINEAR_BURN); setGlobalConst(D2D1_BLEND_MODE_DARKER_COLOR); setGlobalConst(D2D1_BLEND_MODE_LIGHTER_COLOR); setGlobalConst(D2D1_BLEND_MODE_COLOR_DODGE); setGlobalConst(D2D1_BLEND_MODE_LINEAR_DODGE); setGlobalConst(D2D1_BLEND_MODE_OVERLAY); setGlobalConst(D2D1_BLEND_MODE_SOFT_LIGHT); setGlobalConst(D2D1_BLEND_MODE_HARD_LIGHT); setGlobalConst(D2D1_BLEND_MODE_VIVID_LIGHT); setGlobalConst(D2D1_BLEND_MODE_LINEAR_LIGHT); setGlobalConst(D2D1_BLEND_MODE_PIN_LIGHT); setGlobalConst(D2D1_BLEND_MODE_HARD_MIX); setGlobalConst(D2D1_BLEND_MODE_DIFFERENCE); setGlobalConst(D2D1_BLEND_MODE_EXCLUSION); setGlobalConst(D2D1_BLEND_MODE_HUE); setGlobalConst(D2D1_BLEND_MODE_SATURATION); setGlobalConst(D2D1_BLEND_MODE_COLOR); setGlobalConst(D2D1_BLEND_MODE_LUMINOSITY); setGlobalConst(D2D1_BLEND_MODE_SUBTRACT); setGlobalConst(D2D1_BLEND_MODE_DIVISION); setGlobalConst(D2D1_BLEND_MODE_FORCE_DWORD); setGlobalConst(D2D1_SATURATION_PROP_SATURATION); setGlobalConst(D2D1_SATURATION_PROP_FORCE_DWORD); setGlobalConst(D2D1_HUEROTATION_PROP_ANGLE); setGlobalConst(D2D1_HUEROTATION_PROP_FORCE_DWORD); setGlobalConst(D2D1_COLORMATRIX_PROP_COLOR_MATRIX); setGlobalConst(D2D1_COLORMATRIX_PROP_ALPHA_MODE); setGlobalConst(D2D1_COLORMATRIX_PROP_CLAMP_OUTPUT); setGlobalConst(D2D1_COLORMATRIX_PROP_FORCE_DWORD); setGlobalConst(D2D1_COLORMATRIX_ALPHA_MODE_PREMULTIPLIED); setGlobalConst(D2D1_COLORMATRIX_ALPHA_MODE_STRAIGHT); setGlobalConst(D2D1_COLORMATRIX_ALPHA_MODE_FORCE_DWORD); setGlobalConst(D2D1_BITMAPSOURCE_PROP_WIC_BITMAP_SOURCE); setGlobalConst(D2D1_BITMAPSOURCE_PROP_SCALE); setGlobalConst(D2D1_BITMAPSOURCE_PROP_INTERPOLATION_MODE); setGlobalConst(D2D1_BITMAPSOURCE_PROP_ENABLE_DPI_CORRECTION); setGlobalConst(D2D1_BITMAPSOURCE_PROP_ALPHA_MODE); setGlobalConst(D2D1_BITMAPSOURCE_PROP_ORIENTATION); setGlobalConst(D2D1_BITMAPSOURCE_PROP_FORCE_DWORD); setGlobalConst(D2D1_BITMAPSOURCE_INTERPOLATION_MODE_NEAREST_NEIGHBOR); setGlobalConst(D2D1_BITMAPSOURCE_INTERPOLATION_MODE_LINEAR); setGlobalConst(D2D1_BITMAPSOURCE_INTERPOLATION_MODE_CUBIC); setGlobalConst(D2D1_BITMAPSOURCE_INTERPOLATION_MODE_FANT); setGlobalConst(D2D1_BITMAPSOURCE_INTERPOLATION_MODE_MIPMAP_LINEAR); setGlobalConst(D2D1_BITMAPSOURCE_INTERPOLATION_MODE_FORCE_DWORD); setGlobalConst(D2D1_BITMAPSOURCE_ALPHA_MODE_PREMULTIPLIED); setGlobalConst(D2D1_BITMAPSOURCE_ALPHA_MODE_STRAIGHT); setGlobalConst(D2D1_BITMAPSOURCE_ALPHA_MODE_FORCE_DWORD); setGlobalConst(D2D1_COMPOSITE_PROP_MODE); setGlobalConst(D2D1_COMPOSITE_PROP_FORCE_DWORD); setGlobalConst(D2D1_3DTRANSFORM_PROP_INTERPOLATION_MODE); setGlobalConst(D2D1_3DTRANSFORM_PROP_BORDER_MODE); setGlobalConst(D2D1_3DTRANSFORM_PROP_TRANSFORM_MATRIX); setGlobalConst(D2D1_3DTRANSFORM_PROP_FORCE_DWORD); setGlobalConst(D2D1_3DTRANSFORM_INTERPOLATION_MODE_NEAREST_NEIGHBOR); setGlobalConst(D2D1_3DTRANSFORM_INTERPOLATION_MODE_LINEAR); setGlobalConst(D2D1_3DTRANSFORM_INTERPOLATION_MODE_CUBIC); setGlobalConst(D2D1_3DTRANSFORM_INTERPOLATION_MODE_MULTI_SAMPLE_LINEAR); setGlobalConst(D2D1_3DTRANSFORM_INTERPOLATION_MODE_ANISOTROPIC); setGlobalConst(D2D1_3DTRANSFORM_INTERPOLATION_MODE_FORCE_DWORD); setGlobalConst(D2D1_3DPERSPECTIVETRANSFORM_PROP_INTERPOLATION_MODE); setGlobalConst(D2D1_3DPERSPECTIVETRANSFORM_PROP_BORDER_MODE); setGlobalConst(D2D1_3DPERSPECTIVETRANSFORM_PROP_DEPTH); setGlobalConst(D2D1_3DPERSPECTIVETRANSFORM_PROP_PERSPECTIVE_ORIGIN); setGlobalConst(D2D1_3DPERSPECTIVETRANSFORM_PROP_LOCAL_OFFSET); setGlobalConst(D2D1_3DPERSPECTIVETRANSFORM_PROP_GLOBAL_OFFSET); setGlobalConst(D2D1_3DPERSPECTIVETRANSFORM_PROP_ROTATION_ORIGIN); setGlobalConst(D2D1_3DPERSPECTIVETRANSFORM_PROP_ROTATION); setGlobalConst(D2D1_3DPERSPECTIVETRANSFORM_PROP_FORCE_DWORD); setGlobalConst(D2D1_3DPERSPECTIVETRANSFORM_INTERPOLATION_MODE_NEAREST_NEIGHBOR); setGlobalConst(D2D1_3DPERSPECTIVETRANSFORM_INTERPOLATION_MODE_LINEAR); setGlobalConst(D2D1_3DPERSPECTIVETRANSFORM_INTERPOLATION_MODE_CUBIC); setGlobalConst(D2D1_3DPERSPECTIVETRANSFORM_INTERPOLATION_MODE_MULTI_SAMPLE_LINEAR); setGlobalConst(D2D1_3DPERSPECTIVETRANSFORM_INTERPOLATION_MODE_ANISOTROPIC); setGlobalConst(D2D1_3DPERSPECTIVETRANSFORM_INTERPOLATION_MODE_FORCE_DWORD); setGlobalConst(D2D1_2DAFFINETRANSFORM_PROP_INTERPOLATION_MODE); setGlobalConst(D2D1_2DAFFINETRANSFORM_PROP_BORDER_MODE); setGlobalConst(D2D1_2DAFFINETRANSFORM_PROP_TRANSFORM_MATRIX); setGlobalConst(D2D1_2DAFFINETRANSFORM_PROP_SHARPNESS); setGlobalConst(D2D1_2DAFFINETRANSFORM_PROP_FORCE_DWORD); setGlobalConst(D2D1_2DAFFINETRANSFORM_INTERPOLATION_MODE_NEAREST_NEIGHBOR); setGlobalConst(D2D1_2DAFFINETRANSFORM_INTERPOLATION_MODE_LINEAR); setGlobalConst(D2D1_2DAFFINETRANSFORM_INTERPOLATION_MODE_CUBIC); setGlobalConst(D2D1_2DAFFINETRANSFORM_INTERPOLATION_MODE_MULTI_SAMPLE_LINEAR); setGlobalConst(D2D1_2DAFFINETRANSFORM_INTERPOLATION_MODE_ANISOTROPIC); setGlobalConst(D2D1_2DAFFINETRANSFORM_INTERPOLATION_MODE_HIGH_QUALITY_CUBIC); setGlobalConst(D2D1_2DAFFINETRANSFORM_INTERPOLATION_MODE_FORCE_DWORD); setGlobalConst(D2D1_DPICOMPENSATION_PROP_INTERPOLATION_MODE); setGlobalConst(D2D1_DPICOMPENSATION_PROP_BORDER_MODE); setGlobalConst(D2D1_DPICOMPENSATION_PROP_INPUT_DPI); setGlobalConst(D2D1_DPICOMPENSATION_PROP_FORCE_DWORD); setGlobalConst(D2D1_DPICOMPENSATION_INTERPOLATION_MODE_NEAREST_NEIGHBOR); setGlobalConst(D2D1_DPICOMPENSATION_INTERPOLATION_MODE_LINEAR); setGlobalConst(D2D1_DPICOMPENSATION_INTERPOLATION_MODE_CUBIC); setGlobalConst(D2D1_DPICOMPENSATION_INTERPOLATION_MODE_MULTI_SAMPLE_LINEAR); setGlobalConst(D2D1_DPICOMPENSATION_INTERPOLATION_MODE_ANISOTROPIC); setGlobalConst(D2D1_DPICOMPENSATION_INTERPOLATION_MODE_HIGH_QUALITY_CUBIC); setGlobalConst(D2D1_DPICOMPENSATION_INTERPOLATION_MODE_FORCE_DWORD); setGlobalConst(D2D1_SCALE_PROP_SCALE); setGlobalConst(D2D1_SCALE_PROP_CENTER_POINT); setGlobalConst(D2D1_SCALE_PROP_INTERPOLATION_MODE); setGlobalConst(D2D1_SCALE_PROP_BORDER_MODE); setGlobalConst(D2D1_SCALE_PROP_SHARPNESS); setGlobalConst(D2D1_SCALE_PROP_FORCE_DWORD); setGlobalConst(D2D1_SCALE_INTERPOLATION_MODE_NEAREST_NEIGHBOR); setGlobalConst(D2D1_SCALE_INTERPOLATION_MODE_LINEAR); setGlobalConst(D2D1_SCALE_INTERPOLATION_MODE_CUBIC); setGlobalConst(D2D1_SCALE_INTERPOLATION_MODE_MULTI_SAMPLE_LINEAR); setGlobalConst(D2D1_SCALE_INTERPOLATION_MODE_ANISOTROPIC); setGlobalConst(D2D1_SCALE_INTERPOLATION_MODE_HIGH_QUALITY_CUBIC); setGlobalConst(D2D1_SCALE_INTERPOLATION_MODE_FORCE_DWORD); setGlobalConst(D2D1_TURBULENCE_PROP_OFFSET); setGlobalConst(D2D1_TURBULENCE_PROP_SIZE); setGlobalConst(D2D1_TURBULENCE_PROP_BASE_FREQUENCY); setGlobalConst(D2D1_TURBULENCE_PROP_NUM_OCTAVES); setGlobalConst(D2D1_TURBULENCE_PROP_SEED); setGlobalConst(D2D1_TURBULENCE_PROP_NOISE); setGlobalConst(D2D1_TURBULENCE_PROP_STITCHABLE); setGlobalConst(D2D1_TURBULENCE_PROP_FORCE_DWORD); setGlobalConst(D2D1_TURBULENCE_NOISE_FRACTAL_SUM); setGlobalConst(D2D1_TURBULENCE_NOISE_TURBULENCE); setGlobalConst(D2D1_TURBULENCE_NOISE_FORCE_DWORD); setGlobalConst(D2D1_DISPLACEMENTMAP_PROP_SCALE); setGlobalConst(D2D1_DISPLACEMENTMAP_PROP_X_CHANNEL_SELECT); setGlobalConst(D2D1_DISPLACEMENTMAP_PROP_Y_CHANNEL_SELECT); setGlobalConst(D2D1_DISPLACEMENTMAP_PROP_FORCE_DWORD); setGlobalConst(D2D1_COLORMANAGEMENT_PROP_SOURCE_COLOR_CONTEXT); setGlobalConst(D2D1_COLORMANAGEMENT_PROP_SOURCE_RENDERING_INTENT); setGlobalConst(D2D1_COLORMANAGEMENT_PROP_DESTINATION_COLOR_CONTEXT); setGlobalConst(D2D1_COLORMANAGEMENT_PROP_DESTINATION_RENDERING_INTENT); setGlobalConst(D2D1_COLORMANAGEMENT_PROP_ALPHA_MODE); setGlobalConst(D2D1_COLORMANAGEMENT_PROP_QUALITY); setGlobalConst(D2D1_COLORMANAGEMENT_PROP_FORCE_DWORD); setGlobalConst(D2D1_COLORMANAGEMENT_ALPHA_MODE_PREMULTIPLIED); setGlobalConst(D2D1_COLORMANAGEMENT_ALPHA_MODE_STRAIGHT); setGlobalConst(D2D1_COLORMANAGEMENT_ALPHA_MODE_FORCE_DWORD); setGlobalConst(D2D1_COLORMANAGEMENT_QUALITY_PROOF); setGlobalConst(D2D1_COLORMANAGEMENT_QUALITY_NORMAL); setGlobalConst(D2D1_COLORMANAGEMENT_QUALITY_BEST); setGlobalConst(D2D1_COLORMANAGEMENT_QUALITY_FORCE_DWORD); setGlobalConst(D2D1_COLORMANAGEMENT_RENDERING_INTENT_PERCEPTUAL); setGlobalConst(D2D1_COLORMANAGEMENT_RENDERING_INTENT_RELATIVE_COLORIMETRIC); setGlobalConst(D2D1_COLORMANAGEMENT_RENDERING_INTENT_SATURATION); setGlobalConst(D2D1_COLORMANAGEMENT_RENDERING_INTENT_ABSOLUTE_COLORIMETRIC); setGlobalConst(D2D1_COLORMANAGEMENT_RENDERING_INTENT_FORCE_DWORD); setGlobalConst(D2D1_HISTOGRAM_PROP_NUM_BINS); setGlobalConst(D2D1_HISTOGRAM_PROP_CHANNEL_SELECT); setGlobalConst(D2D1_HISTOGRAM_PROP_HISTOGRAM_OUTPUT); setGlobalConst(D2D1_HISTOGRAM_PROP_FORCE_DWORD); setGlobalConst(D2D1_POINTSPECULAR_PROP_LIGHT_POSITION); setGlobalConst(D2D1_POINTSPECULAR_PROP_SPECULAR_EXPONENT); setGlobalConst(D2D1_POINTSPECULAR_PROP_SPECULAR_CONSTANT); setGlobalConst(D2D1_POINTSPECULAR_PROP_SURFACE_SCALE); setGlobalConst(D2D1_POINTSPECULAR_PROP_COLOR); setGlobalConst(D2D1_POINTSPECULAR_PROP_KERNEL_UNIT_LENGTH); setGlobalConst(D2D1_POINTSPECULAR_PROP_SCALE_MODE); setGlobalConst(D2D1_POINTSPECULAR_PROP_FORCE_DWORD); setGlobalConst(D2D1_POINTSPECULAR_SCALE_MODE_NEAREST_NEIGHBOR); setGlobalConst(D2D1_POINTSPECULAR_SCALE_MODE_LINEAR); setGlobalConst(D2D1_POINTSPECULAR_SCALE_MODE_CUBIC); setGlobalConst(D2D1_POINTSPECULAR_SCALE_MODE_MULTI_SAMPLE_LINEAR); setGlobalConst(D2D1_POINTSPECULAR_SCALE_MODE_ANISOTROPIC); setGlobalConst(D2D1_POINTSPECULAR_SCALE_MODE_HIGH_QUALITY_CUBIC); setGlobalConst(D2D1_POINTSPECULAR_SCALE_MODE_FORCE_DWORD); setGlobalConst(D2D1_SPOTSPECULAR_PROP_LIGHT_POSITION); setGlobalConst(D2D1_SPOTSPECULAR_PROP_POINTS_AT); setGlobalConst(D2D1_SPOTSPECULAR_PROP_FOCUS); setGlobalConst(D2D1_SPOTSPECULAR_PROP_LIMITING_CONE_ANGLE); setGlobalConst(D2D1_SPOTSPECULAR_PROP_SPECULAR_EXPONENT); setGlobalConst(D2D1_SPOTSPECULAR_PROP_SPECULAR_CONSTANT); setGlobalConst(D2D1_SPOTSPECULAR_PROP_SURFACE_SCALE); setGlobalConst(D2D1_SPOTSPECULAR_PROP_COLOR); setGlobalConst(D2D1_SPOTSPECULAR_PROP_KERNEL_UNIT_LENGTH); setGlobalConst(D2D1_SPOTSPECULAR_PROP_SCALE_MODE); setGlobalConst(D2D1_SPOTSPECULAR_PROP_FORCE_DWORD); setGlobalConst(D2D1_SPOTSPECULAR_SCALE_MODE_NEAREST_NEIGHBOR); setGlobalConst(D2D1_SPOTSPECULAR_SCALE_MODE_LINEAR); setGlobalConst(D2D1_SPOTSPECULAR_SCALE_MODE_CUBIC); setGlobalConst(D2D1_SPOTSPECULAR_SCALE_MODE_MULTI_SAMPLE_LINEAR); setGlobalConst(D2D1_SPOTSPECULAR_SCALE_MODE_ANISOTROPIC); setGlobalConst(D2D1_SPOTSPECULAR_SCALE_MODE_HIGH_QUALITY_CUBIC); setGlobalConst(D2D1_SPOTSPECULAR_SCALE_MODE_FORCE_DWORD); setGlobalConst(D2D1_DISTANTSPECULAR_PROP_AZIMUTH); setGlobalConst(D2D1_DISTANTSPECULAR_PROP_ELEVATION); setGlobalConst(D2D1_DISTANTSPECULAR_PROP_SPECULAR_EXPONENT); setGlobalConst(D2D1_DISTANTSPECULAR_PROP_SPECULAR_CONSTANT); setGlobalConst(D2D1_DISTANTSPECULAR_PROP_SURFACE_SCALE); setGlobalConst(D2D1_DISTANTSPECULAR_PROP_COLOR); setGlobalConst(D2D1_DISTANTSPECULAR_PROP_KERNEL_UNIT_LENGTH); setGlobalConst(D2D1_DISTANTSPECULAR_PROP_SCALE_MODE); setGlobalConst(D2D1_DISTANTSPECULAR_PROP_FORCE_DWORD); setGlobalConst(D2D1_DISTANTSPECULAR_SCALE_MODE_NEAREST_NEIGHBOR); setGlobalConst(D2D1_DISTANTSPECULAR_SCALE_MODE_LINEAR); setGlobalConst(D2D1_DISTANTSPECULAR_SCALE_MODE_CUBIC); setGlobalConst(D2D1_DISTANTSPECULAR_SCALE_MODE_MULTI_SAMPLE_LINEAR); setGlobalConst(D2D1_DISTANTSPECULAR_SCALE_MODE_ANISOTROPIC); setGlobalConst(D2D1_DISTANTSPECULAR_SCALE_MODE_HIGH_QUALITY_CUBIC); setGlobalConst(D2D1_DISTANTSPECULAR_SCALE_MODE_FORCE_DWORD); setGlobalConst(D2D1_POINTDIFFUSE_PROP_LIGHT_POSITION); setGlobalConst(D2D1_POINTDIFFUSE_PROP_DIFFUSE_CONSTANT); setGlobalConst(D2D1_POINTDIFFUSE_PROP_SURFACE_SCALE); setGlobalConst(D2D1_POINTDIFFUSE_PROP_COLOR); setGlobalConst(D2D1_POINTDIFFUSE_PROP_KERNEL_UNIT_LENGTH); setGlobalConst(D2D1_POINTDIFFUSE_PROP_SCALE_MODE); setGlobalConst(D2D1_POINTDIFFUSE_PROP_FORCE_DWORD); setGlobalConst(D2D1_POINTDIFFUSE_SCALE_MODE_NEAREST_NEIGHBOR); setGlobalConst(D2D1_POINTDIFFUSE_SCALE_MODE_LINEAR); setGlobalConst(D2D1_POINTDIFFUSE_SCALE_MODE_CUBIC); setGlobalConst(D2D1_POINTDIFFUSE_SCALE_MODE_MULTI_SAMPLE_LINEAR); setGlobalConst(D2D1_POINTDIFFUSE_SCALE_MODE_ANISOTROPIC); setGlobalConst(D2D1_POINTDIFFUSE_SCALE_MODE_HIGH_QUALITY_CUBIC); setGlobalConst(D2D1_POINTDIFFUSE_SCALE_MODE_FORCE_DWORD); setGlobalConst(D2D1_SPOTDIFFUSE_PROP_LIGHT_POSITION); setGlobalConst(D2D1_SPOTDIFFUSE_PROP_POINTS_AT); setGlobalConst(D2D1_SPOTDIFFUSE_PROP_FOCUS); setGlobalConst(D2D1_SPOTDIFFUSE_PROP_LIMITING_CONE_ANGLE); setGlobalConst(D2D1_SPOTDIFFUSE_PROP_DIFFUSE_CONSTANT); setGlobalConst(D2D1_SPOTDIFFUSE_PROP_SURFACE_SCALE); setGlobalConst(D2D1_SPOTDIFFUSE_PROP_COLOR); setGlobalConst(D2D1_SPOTDIFFUSE_PROP_KERNEL_UNIT_LENGTH); setGlobalConst(D2D1_SPOTDIFFUSE_PROP_SCALE_MODE); setGlobalConst(D2D1_SPOTDIFFUSE_PROP_FORCE_DWORD); setGlobalConst(D2D1_SPOTDIFFUSE_SCALE_MODE_NEAREST_NEIGHBOR); setGlobalConst(D2D1_SPOTDIFFUSE_SCALE_MODE_LINEAR); setGlobalConst(D2D1_SPOTDIFFUSE_SCALE_MODE_CUBIC); setGlobalConst(D2D1_SPOTDIFFUSE_SCALE_MODE_MULTI_SAMPLE_LINEAR); setGlobalConst(D2D1_SPOTDIFFUSE_SCALE_MODE_ANISOTROPIC); setGlobalConst(D2D1_SPOTDIFFUSE_SCALE_MODE_HIGH_QUALITY_CUBIC); setGlobalConst(D2D1_SPOTDIFFUSE_SCALE_MODE_FORCE_DWORD); setGlobalConst(D2D1_DISTANTDIFFUSE_PROP_AZIMUTH); setGlobalConst(D2D1_DISTANTDIFFUSE_PROP_ELEVATION); setGlobalConst(D2D1_DISTANTDIFFUSE_PROP_DIFFUSE_CONSTANT); setGlobalConst(D2D1_DISTANTDIFFUSE_PROP_SURFACE_SCALE); setGlobalConst(D2D1_DISTANTDIFFUSE_PROP_COLOR); setGlobalConst(D2D1_DISTANTDIFFUSE_PROP_KERNEL_UNIT_LENGTH); setGlobalConst(D2D1_DISTANTDIFFUSE_PROP_SCALE_MODE); setGlobalConst(D2D1_DISTANTDIFFUSE_PROP_FORCE_DWORD); setGlobalConst(D2D1_DISTANTDIFFUSE_SCALE_MODE_NEAREST_NEIGHBOR); setGlobalConst(D2D1_DISTANTDIFFUSE_SCALE_MODE_LINEAR); setGlobalConst(D2D1_DISTANTDIFFUSE_SCALE_MODE_CUBIC); setGlobalConst(D2D1_DISTANTDIFFUSE_SCALE_MODE_MULTI_SAMPLE_LINEAR); setGlobalConst(D2D1_DISTANTDIFFUSE_SCALE_MODE_ANISOTROPIC); setGlobalConst(D2D1_DISTANTDIFFUSE_SCALE_MODE_HIGH_QUALITY_CUBIC); setGlobalConst(D2D1_DISTANTDIFFUSE_SCALE_MODE_FORCE_DWORD); setGlobalConst(D2D1_FLOOD_PROP_COLOR); setGlobalConst(D2D1_FLOOD_PROP_FORCE_DWORD); setGlobalConst(D2D1_LINEARTRANSFER_PROP_RED_Y_INTERCEPT); setGlobalConst(D2D1_LINEARTRANSFER_PROP_RED_SLOPE); setGlobalConst(D2D1_LINEARTRANSFER_PROP_RED_DISABLE); setGlobalConst(D2D1_LINEARTRANSFER_PROP_GREEN_Y_INTERCEPT); setGlobalConst(D2D1_LINEARTRANSFER_PROP_GREEN_SLOPE); setGlobalConst(D2D1_LINEARTRANSFER_PROP_GREEN_DISABLE); setGlobalConst(D2D1_LINEARTRANSFER_PROP_BLUE_Y_INTERCEPT); setGlobalConst(D2D1_LINEARTRANSFER_PROP_BLUE_SLOPE); setGlobalConst(D2D1_LINEARTRANSFER_PROP_BLUE_DISABLE); setGlobalConst(D2D1_LINEARTRANSFER_PROP_ALPHA_Y_INTERCEPT); setGlobalConst(D2D1_LINEARTRANSFER_PROP_ALPHA_SLOPE); setGlobalConst(D2D1_LINEARTRANSFER_PROP_ALPHA_DISABLE); setGlobalConst(D2D1_LINEARTRANSFER_PROP_CLAMP_OUTPUT); setGlobalConst(D2D1_LINEARTRANSFER_PROP_FORCE_DWORD); setGlobalConst(D2D1_GAMMATRANSFER_PROP_RED_AMPLITUDE); setGlobalConst(D2D1_GAMMATRANSFER_PROP_RED_EXPONENT); setGlobalConst(D2D1_GAMMATRANSFER_PROP_RED_OFFSET); setGlobalConst(D2D1_GAMMATRANSFER_PROP_RED_DISABLE); setGlobalConst(D2D1_GAMMATRANSFER_PROP_GREEN_AMPLITUDE); setGlobalConst(D2D1_GAMMATRANSFER_PROP_GREEN_EXPONENT); setGlobalConst(D2D1_GAMMATRANSFER_PROP_GREEN_OFFSET); setGlobalConst(D2D1_GAMMATRANSFER_PROP_GREEN_DISABLE); setGlobalConst(D2D1_GAMMATRANSFER_PROP_BLUE_AMPLITUDE); setGlobalConst(D2D1_GAMMATRANSFER_PROP_BLUE_EXPONENT); setGlobalConst(D2D1_GAMMATRANSFER_PROP_BLUE_OFFSET); setGlobalConst(D2D1_GAMMATRANSFER_PROP_BLUE_DISABLE); setGlobalConst(D2D1_GAMMATRANSFER_PROP_ALPHA_AMPLITUDE); setGlobalConst(D2D1_GAMMATRANSFER_PROP_ALPHA_EXPONENT); setGlobalConst(D2D1_GAMMATRANSFER_PROP_ALPHA_OFFSET); setGlobalConst(D2D1_GAMMATRANSFER_PROP_ALPHA_DISABLE); setGlobalConst(D2D1_GAMMATRANSFER_PROP_CLAMP_OUTPUT); setGlobalConst(D2D1_GAMMATRANSFER_PROP_FORCE_DWORD); setGlobalConst(D2D1_TABLETRANSFER_PROP_RED_TABLE); setGlobalConst(D2D1_TABLETRANSFER_PROP_RED_DISABLE); setGlobalConst(D2D1_TABLETRANSFER_PROP_GREEN_TABLE); setGlobalConst(D2D1_TABLETRANSFER_PROP_GREEN_DISABLE); setGlobalConst(D2D1_TABLETRANSFER_PROP_BLUE_TABLE); setGlobalConst(D2D1_TABLETRANSFER_PROP_BLUE_DISABLE); setGlobalConst(D2D1_TABLETRANSFER_PROP_ALPHA_TABLE); setGlobalConst(D2D1_TABLETRANSFER_PROP_ALPHA_DISABLE); setGlobalConst(D2D1_TABLETRANSFER_PROP_CLAMP_OUTPUT); setGlobalConst(D2D1_TABLETRANSFER_PROP_FORCE_DWORD); setGlobalConst(D2D1_DISCRETETRANSFER_PROP_RED_TABLE); setGlobalConst(D2D1_DISCRETETRANSFER_PROP_RED_DISABLE); setGlobalConst(D2D1_DISCRETETRANSFER_PROP_GREEN_TABLE); setGlobalConst(D2D1_DISCRETETRANSFER_PROP_GREEN_DISABLE); setGlobalConst(D2D1_DISCRETETRANSFER_PROP_BLUE_TABLE); setGlobalConst(D2D1_DISCRETETRANSFER_PROP_BLUE_DISABLE); setGlobalConst(D2D1_DISCRETETRANSFER_PROP_ALPHA_TABLE); setGlobalConst(D2D1_DISCRETETRANSFER_PROP_ALPHA_DISABLE); setGlobalConst(D2D1_DISCRETETRANSFER_PROP_CLAMP_OUTPUT); setGlobalConst(D2D1_DISCRETETRANSFER_PROP_FORCE_DWORD); setGlobalConst(D2D1_CONVOLVEMATRIX_PROP_KERNEL_UNIT_LENGTH); setGlobalConst(D2D1_CONVOLVEMATRIX_PROP_SCALE_MODE); setGlobalConst(D2D1_CONVOLVEMATRIX_PROP_KERNEL_SIZE_X); setGlobalConst(D2D1_CONVOLVEMATRIX_PROP_KERNEL_SIZE_Y); setGlobalConst(D2D1_CONVOLVEMATRIX_PROP_KERNEL_MATRIX); setGlobalConst(D2D1_CONVOLVEMATRIX_PROP_DIVISOR); setGlobalConst(D2D1_CONVOLVEMATRIX_PROP_BIAS); setGlobalConst(D2D1_CONVOLVEMATRIX_PROP_KERNEL_OFFSET); setGlobalConst(D2D1_CONVOLVEMATRIX_PROP_PRESERVE_ALPHA); setGlobalConst(D2D1_CONVOLVEMATRIX_PROP_BORDER_MODE); setGlobalConst(D2D1_CONVOLVEMATRIX_PROP_CLAMP_OUTPUT); setGlobalConst(D2D1_CONVOLVEMATRIX_PROP_FORCE_DWORD); setGlobalConst(D2D1_CONVOLVEMATRIX_SCALE_MODE_NEAREST_NEIGHBOR); setGlobalConst(D2D1_CONVOLVEMATRIX_SCALE_MODE_LINEAR); setGlobalConst(D2D1_CONVOLVEMATRIX_SCALE_MODE_CUBIC); setGlobalConst(D2D1_CONVOLVEMATRIX_SCALE_MODE_MULTI_SAMPLE_LINEAR); setGlobalConst(D2D1_CONVOLVEMATRIX_SCALE_MODE_ANISOTROPIC); setGlobalConst(D2D1_CONVOLVEMATRIX_SCALE_MODE_HIGH_QUALITY_CUBIC); setGlobalConst(D2D1_CONVOLVEMATRIX_SCALE_MODE_FORCE_DWORD); setGlobalConst(D2D1_BRIGHTNESS_PROP_WHITE_POINT); setGlobalConst(D2D1_BRIGHTNESS_PROP_BLACK_POINT); setGlobalConst(D2D1_BRIGHTNESS_PROP_FORCE_DWORD); setGlobalConst(D2D1_ARITHMETICCOMPOSITE_PROP_COEFFICIENTS); setGlobalConst(D2D1_ARITHMETICCOMPOSITE_PROP_CLAMP_OUTPUT); setGlobalConst(D2D1_ARITHMETICCOMPOSITE_PROP_FORCE_DWORD); setGlobalConst(D2D1_CROP_PROP_RECT); setGlobalConst(D2D1_CROP_PROP_BORDER_MODE); setGlobalConst(D2D1_CROP_PROP_FORCE_DWORD); setGlobalConst(D2D1_BORDER_PROP_EDGE_MODE_X); setGlobalConst(D2D1_BORDER_PROP_EDGE_MODE_Y); setGlobalConst(D2D1_BORDER_PROP_FORCE_DWORD); setGlobalConst(D2D1_BORDER_EDGE_MODE_CLAMP); setGlobalConst(D2D1_BORDER_EDGE_MODE_WRAP); setGlobalConst(D2D1_BORDER_EDGE_MODE_MIRROR); setGlobalConst(D2D1_BORDER_EDGE_MODE_FORCE_DWORD); setGlobalConst(D2D1_MORPHOLOGY_PROP_MODE); setGlobalConst(D2D1_MORPHOLOGY_PROP_WIDTH); setGlobalConst(D2D1_MORPHOLOGY_PROP_HEIGHT); setGlobalConst(D2D1_MORPHOLOGY_PROP_FORCE_DWORD); setGlobalConst(D2D1_MORPHOLOGY_MODE_ERODE); setGlobalConst(D2D1_MORPHOLOGY_MODE_DILATE); setGlobalConst(D2D1_MORPHOLOGY_MODE_FORCE_DWORD); setGlobalConst(D2D1_TILE_PROP_RECT); setGlobalConst(D2D1_TILE_PROP_FORCE_DWORD); setGlobalConst(D2D1_ATLAS_PROP_INPUT_RECT); setGlobalConst(D2D1_ATLAS_PROP_INPUT_PADDING_RECT); setGlobalConst(D2D1_ATLAS_PROP_FORCE_DWORD); setGlobalConst(D2D1_OPACITYMETADATA_PROP_INPUT_OPAQUE_RECT); setGlobalConst(D2D1_OPACITYMETADATA_PROP_FORCE_DWORD);
     //d2d1effects_2.h
     setGlobalConst(D2D1_CONTRAST_PROP_CONTRAST); setGlobalConst(D2D1_CONTRAST_PROP_CLAMP_INPUT); setGlobalConst(D2D1_CONTRAST_PROP_FORCE_DWORD); setGlobalConst(D2D1_RGBTOHUE_PROP_OUTPUT_COLOR_SPACE); setGlobalConst(D2D1_RGBTOHUE_PROP_FORCE_DWORD); setGlobalConst(D2D1_RGBTOHUE_OUTPUT_COLOR_SPACE_HUE_SATURATION_VALUE); setGlobalConst(D2D1_RGBTOHUE_OUTPUT_COLOR_SPACE_HUE_SATURATION_LIGHTNESS); setGlobalConst(D2D1_RGBTOHUE_OUTPUT_COLOR_SPACE_FORCE_DWORD); setGlobalConst(D2D1_HUETORGB_PROP_INPUT_COLOR_SPACE); setGlobalConst(D2D1_HUETORGB_PROP_FORCE_DWORD); setGlobalConst(D2D1_HUETORGB_INPUT_COLOR_SPACE_HUE_SATURATION_VALUE); setGlobalConst(D2D1_HUETORGB_INPUT_COLOR_SPACE_HUE_SATURATION_LIGHTNESS); setGlobalConst(D2D1_HUETORGB_INPUT_COLOR_SPACE_FORCE_DWORD); setGlobalConst(D2D1_CHROMAKEY_PROP_COLOR); setGlobalConst(D2D1_CHROMAKEY_PROP_TOLERANCE); setGlobalConst(D2D1_CHROMAKEY_PROP_INVERT_ALPHA); setGlobalConst(D2D1_CHROMAKEY_PROP_FEATHER); setGlobalConst(D2D1_CHROMAKEY_PROP_FORCE_DWORD); setGlobalConst(D2D1_EMBOSS_PROP_HEIGHT); setGlobalConst(D2D1_EMBOSS_PROP_DIRECTION); setGlobalConst(D2D1_EMBOSS_PROP_FORCE_DWORD); setGlobalConst(D2D1_EXPOSURE_PROP_EXPOSURE_VALUE); setGlobalConst(D2D1_EXPOSURE_PROP_FORCE_DWORD); setGlobalConst(D2D1_POSTERIZE_PROP_RED_VALUE_COUNT); setGlobalConst(D2D1_POSTERIZE_PROP_GREEN_VALUE_COUNT); setGlobalConst(D2D1_POSTERIZE_PROP_BLUE_VALUE_COUNT); setGlobalConst(D2D1_POSTERIZE_PROP_FORCE_DWORD); setGlobalConst(D2D1_SEPIA_PROP_INTENSITY); setGlobalConst(D2D1_SEPIA_PROP_ALPHA_MODE); setGlobalConst(D2D1_SEPIA_PROP_FORCE_DWORD); setGlobalConst(D2D1_SHARPEN_PROP_SHARPNESS); setGlobalConst(D2D1_SHARPEN_PROP_THRESHOLD); setGlobalConst(D2D1_SHARPEN_PROP_FORCE_DWORD); setGlobalConst(D2D1_STRAIGHTEN_PROP_ANGLE); setGlobalConst(D2D1_STRAIGHTEN_PROP_MAINTAIN_SIZE); setGlobalConst(D2D1_STRAIGHTEN_PROP_SCALE_MODE); setGlobalConst(D2D1_STRAIGHTEN_PROP_FORCE_DWORD); setGlobalConst(D2D1_STRAIGHTEN_SCALE_MODE_NEAREST_NEIGHBOR); setGlobalConst(D2D1_STRAIGHTEN_SCALE_MODE_LINEAR); setGlobalConst(D2D1_STRAIGHTEN_SCALE_MODE_CUBIC); setGlobalConst(D2D1_STRAIGHTEN_SCALE_MODE_MULTI_SAMPLE_LINEAR); setGlobalConst(D2D1_STRAIGHTEN_SCALE_MODE_ANISOTROPIC); setGlobalConst(D2D1_STRAIGHTEN_SCALE_MODE_FORCE_DWORD); setGlobalConst(D2D1_TEMPERATUREANDTINT_PROP_TEMPERATURE); setGlobalConst(D2D1_TEMPERATUREANDTINT_PROP_TINT); setGlobalConst(D2D1_TEMPERATUREANDTINT_PROP_FORCE_DWORD); setGlobalConst(D2D1_VIGNETTE_PROP_COLOR); setGlobalConst(D2D1_VIGNETTE_PROP_TRANSITION_SIZE); setGlobalConst(D2D1_VIGNETTE_PROP_STRENGTH); setGlobalConst(D2D1_VIGNETTE_PROP_FORCE_DWORD); setGlobalConst(D2D1_EDGEDETECTION_PROP_STRENGTH); setGlobalConst(D2D1_EDGEDETECTION_PROP_BLUR_RADIUS); setGlobalConst(D2D1_EDGEDETECTION_PROP_MODE); setGlobalConst(D2D1_EDGEDETECTION_PROP_OVERLAY_EDGES); setGlobalConst(D2D1_EDGEDETECTION_PROP_ALPHA_MODE); setGlobalConst(D2D1_EDGEDETECTION_PROP_FORCE_DWORD); setGlobalConst(D2D1_EDGEDETECTION_MODE_SOBEL); setGlobalConst(D2D1_EDGEDETECTION_MODE_PREWITT); setGlobalConst(D2D1_EDGEDETECTION_MODE_FORCE_DWORD); setGlobalConst(D2D1_HIGHLIGHTSANDSHADOWS_PROP_HIGHLIGHTS); setGlobalConst(D2D1_HIGHLIGHTSANDSHADOWS_PROP_SHADOWS); setGlobalConst(D2D1_HIGHLIGHTSANDSHADOWS_PROP_CLARITY); setGlobalConst(D2D1_HIGHLIGHTSANDSHADOWS_PROP_INPUT_GAMMA); setGlobalConst(D2D1_HIGHLIGHTSANDSHADOWS_PROP_MASK_BLUR_RADIUS); setGlobalConst(D2D1_HIGHLIGHTSANDSHADOWS_PROP_FORCE_DWORD); setGlobalConst(D2D1_HIGHLIGHTSANDSHADOWS_INPUT_GAMMA_LINEAR); setGlobalConst(D2D1_HIGHLIGHTSANDSHADOWS_INPUT_GAMMA_SRGB); setGlobalConst(D2D1_HIGHLIGHTSANDSHADOWS_INPUT_GAMMA_FORCE_DWORD); setGlobalConst(D2D1_LOOKUPTABLE3D_PROP_LUT); setGlobalConst(D2D1_LOOKUPTABLE3D_PROP_ALPHA_MODE); setGlobalConst(D2D1_LOOKUPTABLE3D_PROP_FORCE_DWORD); setGlobalConst(D2D1_OPACITY_PROP_OPACITY); setGlobalConst(D2D1_OPACITY_PROP_FORCE_DWORD); setGlobalConst(D2D1_CROSSFADE_PROP_WEIGHT); setGlobalConst(D2D1_CROSSFADE_PROP_FORCE_DWORD); setGlobalConst(D2D1_TINT_PROP_COLOR); setGlobalConst(D2D1_TINT_PROP_CLAMP_OUTPUT); setGlobalConst(D2D1_TINT_PROP_FORCE_DWORD); setGlobalConst(D2D1_WHITELEVELADJUSTMENT_PROP_INPUT_WHITE_LEVEL); setGlobalConst(D2D1_WHITELEVELADJUSTMENT_PROP_OUTPUT_WHITE_LEVEL); setGlobalConst(D2D1_WHITELEVELADJUSTMENT_PROP_FORCE_DWORD); setGlobalConst(D2D1_HDRTONEMAP_PROP_INPUT_MAX_LUMINANCE); setGlobalConst(D2D1_HDRTONEMAP_PROP_OUTPUT_MAX_LUMINANCE); setGlobalConst(D2D1_HDRTONEMAP_PROP_DISPLAY_MODE); setGlobalConst(D2D1_HDRTONEMAP_PROP_FORCE_DWORD); setGlobalConst(D2D1_HDRTONEMAP_DISPLAY_MODE_SDR); setGlobalConst(D2D1_HDRTONEMAP_DISPLAY_MODE_HDR); setGlobalConst(D2D1_HDRTONEMAP_DISPLAY_MODE_FORCE_DWORD);
+
+    setGlobalConst(D2D1_COMPOSITE_MODE_SOURCE_OVER);
+    setGlobalConst(D2D1_COMPOSITE_MODE_DESTINATION_OVER);
+    setGlobalConst(D2D1_COMPOSITE_MODE_SOURCE_IN);
+    setGlobalConst(D2D1_COMPOSITE_MODE_DESTINATION_IN);
+    setGlobalConst(D2D1_COMPOSITE_MODE_SOURCE_OUT);
+    setGlobalConst(D2D1_COMPOSITE_MODE_DESTINATION_OUT);
+    setGlobalConst(D2D1_COMPOSITE_MODE_SOURCE_ATOP);
+    setGlobalConst(D2D1_COMPOSITE_MODE_DESTINATION_ATOP);
+    setGlobalConst(D2D1_COMPOSITE_MODE_XOR);
+    setGlobalConst(D2D1_COMPOSITE_MODE_PLUS);
+    setGlobalConst(D2D1_COMPOSITE_MODE_SOURCE_COPY);
+    setGlobalConst(D2D1_COMPOSITE_MODE_BOUNDED_SOURCE_COPY);
+    setGlobalConst(D2D1_COMPOSITE_MODE_MASK_INVERT);
 
     setGlobalWrapper(GetWindowText);
     setGlobalWrapper(SetWindowText);
@@ -15759,6 +16468,7 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrevInstance, PWSTR nCmdList, in
     //print("investigate 3/11 -> why does SetClassLongPtr AND GetWindowLongPtr not work?"); //haha i can change the icons now! (it wasn't working because i was using WINCLASS instead of the EX versions)
     print(/*"GDI CreateFont and CreateWindowExA AND */"use ID2D1BitmapBrush1!");
     print("JUST LEARNED THAT I'VE BEEN USING OBJECT TEMPLATES WRONG AND IT'S BEEN SLOWING DOWN JBS3 THIS ENTIRE TIME CHECK jsEffectOT!!!");
+    print("finish CreateTableTransferEffect when i feel like it");
 
     SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), 7);
 
@@ -15775,7 +16485,8 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrevInstance, PWSTR nCmdList, in
     //1.5.73 BECAUSE THE DIRECT2D + DXGI SAGA IS OVER! (and because i renamed Matrix3x2 to Matrix3x2F and then renamed Matrix3x2F.SetProduct to Multiply and now finished desktop duplication)
     //1.5.74 because i added SetWinEventHook lol
     //1.5.76 idk bruh i added a lot of random stuff for gdi
-    print("JBS3 -> Version 1.5.76"); //so idk how normal version things work so the first number will probably stay one --- i will increment the second number if i change an existing function like when i remade the CreateWindowClass and CreateWindow functions --- i might random increment the third number if i feel like it
+    //1.5.77 i changed the return value of GetDpi
+    print("JBS3 -> Version 1.5.77"); //so idk how normal version things work so the first number will probably stay one --- i will increment the second number if i change an existing function like when i remade the CreateWindowClass and CreateWindow functions --- i might random increment the third number if i feel like it
     print(screenWidth << "x" << screenHeight);
     
 

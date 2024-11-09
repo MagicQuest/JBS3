@@ -187,5 +187,6 @@ function windowProc(hwnd, msg, wp, lp) {
 const wc = CreateWindowClass("winclass", windowProc);
 wc.hbrBackground = COLOR_BACKGROUND;
 wc.hCursor = LoadCursor(NULL, IDC_ARROW);
+wc.style = CS_HREDRAW | CS_VREDRAW; //automatically redraws the window when resizing!
 
 window = CreateWindow(WS_EX_OVERLAPPEDWINDOW, wc, "hopefully this one works", WS_OVERLAPPEDWINDOW | WS_VISIBLE, 500, 500, w+20, h+43, NULL, NULL, hInstance);

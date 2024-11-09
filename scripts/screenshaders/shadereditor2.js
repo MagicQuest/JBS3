@@ -1,5 +1,6 @@
 //lowkey i've already written and changed so much about shadereditor.js that i need to makei t again
 //oh yeah i guess another reason why is because OtherWindow (now BottomPane) was an actual window (that blocked the thread and confused js to the point where it wouldn't stop running when you closed the window)
+//if you are looking at this file to tips and tricks, make sure to release the gradient stop collections you make like every other d2d object yk
 
 //for later:
 //https://learn.microsoft.com/en-us/windows/win32/controls/create-a-list-view-control
@@ -497,6 +498,8 @@ class BottomPane { //https://www.youtube.com/watch?v=24Eh2-DZTgQ
         
         this.clearBrush = d2d.CreateSolidColorBrush(200/255, 200/255, 200/255);
         //this.colorBrush = d2d.CreateSolidColorBrush(1.0, 1.0, 1.0, 1.0);
+
+        //OOPS do NOT do this!!! you have to release gradient brushes AND their gradient stop collections (see shadereditor3.js)
         this.windowGradientBrush = d2d.CreateLinearGradientBrush(0,0,100,100,d2d.CreateGradientStopCollection([0.0, 204/255, 204/255, 204/255], [0.5, 178/255, 212/255, 167/255], [1.0, 178/255, 212/255, 1.0]));
         this.handleGradientBrush = d2d.CreateLinearGradientBrush(0, 0, 0, BottomPane.resizeHeight, d2d.CreateGradientStopCollection([0.0, 0.0, 1.0, 0.0], [1.0, 0.0, 0.0, 1.0])); //ohhhhh the direction of the gradient is based on the upper-left and bottom-right coordinate you put
         //this.handleGradientBrush.SetTransform(Matrix3x2F.Rotation(Math.PI/2, 0, 0));

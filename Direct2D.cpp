@@ -16,8 +16,8 @@ bool Direct2D::Init(HWND window, int type) {
 	RECT rect{ 0 };// GetClientRect(window, &rect);
 	//I DIDN'T INITIALIZE RECT AND IT WAS FULL OF GARBAGE
 	if (window == NULL) {
-		rect.right = 1920;
-		rect.bottom = 1080;
+		rect.right = GetSystemMetrics(SM_CXSCREEN);
+		rect.bottom = GetSystemMetrics(SM_CYSCREEN);
 	}
 	else {
 		GetClientRect(window, &rect);
