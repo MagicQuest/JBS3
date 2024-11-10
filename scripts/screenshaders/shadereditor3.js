@@ -31,6 +31,7 @@ let hit = {};
 let hitblueprint;
 let activeButton;
 let activePin;
+let draws = 0;
 
 const arrow = LoadCursor(NULL, IDC_ARROW);
 const hand = LoadCursor(NULL, IDC_HAND);
@@ -314,7 +315,7 @@ class Blueprint {
     paramText = [];
     outText = [];
 
-    connections = [];
+    connections = {in: [], out: []};
 
     static padding = 16;
     static radius = 4;
@@ -351,9 +352,11 @@ class Blueprint {
         );
 
         for(let i = 0; i < this.parameters.length; i++) {
-            const param = this.parameters[i];
+            const [_, name, param] = this.parameters[i].match(/(.+) *: *(.+)/);
+            //print(_, name, param, Blueprint.paramColors[param]);
+            this.parameters[i] = param; //i don't need the variable name anymore because i store it in the text layout paramText[i]
             const gsc = d2d.CreateGradientStopCollection([0.0, ...Blueprint.paramColors[param]], [0.5, 0.0, 0.0, 0.0, 0.0]);
-            this.paramText.push(d2d.CreateTextLayout(param, font, w, h));
+            this.paramText.push(d2d.CreateTextLayout(name, font, w, h));
             this.gradientStops.push(gsc);
             this.gradients.push(d2d.CreateRadialGradientBrush(Blueprint.padding, (i+1)*Blueprint.captionHeight+Blueprint.padding, 0, 0, this.width/2, Blueprint.captionHeight, gsc));
         }
@@ -379,7 +382,7 @@ class Blueprint {
         colorBrush.SetColor(1.0, 1.0, 1.0);
         d2d.DrawText(this.title, font, 21, 0, this.width, Blueprint.captionHeight, colorBrush);
 
-        d2d.DrawRoundedRectangle(2, 2, this.width-2, Blueprint.captionHeight-2, 4, 4, this.gradients[3], 1);
+        d2d.DrawRoundedRectangle(2, 2, this.width-2, Blueprint.captionHeight-2, 2, 2, this.gradients[3], 1);
         //d2d.FillRectangle(0, Blueprint.captionHeight, this.width, this.height, this.gradients[2]);
         for(let i = 0; i < this.parameters.length; i++) {
             const param = this.parameters[i];
@@ -390,26 +393,83 @@ class Blueprint {
             //d2d.DrawText(param, font, Blueprint.padding, (i+1)*Blueprint.captionHeight + Blueprint.padding, this.width, this.height, colorBrush);
             d2d.DrawTextLayout(Blueprint.padding, (i+1)*Blueprint.captionHeight + Blueprint.padding, this.paramText[i], colorBrush);
             //d2d.DrawRectangle(Blueprint.padding-8-Blueprint.radius-2, (i+1)*Blueprint.captionHeight+Blueprint.padding-Blueprint.radius-2, Blueprint.padding-8-Blueprint.radius-2+(Blueprint.radius*2+2), (i+1)*Blueprint.captionHeight+Blueprint.padding-Blueprint.radius-2+(Blueprint.radius*2+2), colorBrush);
+            const connection = this.connections.in[i];
+            if(connection) {
+                const textHeight = this.paramText[i].GetMetrics().height;
+                
+                d2d.DrawLine(Blueprint.padding, (i+1)*Blueprint.captionHeight + Blueprint.padding+textHeight, 100, (i+1)*Blueprint.captionHeight + Blueprint.padding+textHeight, colorBrush);
+            }
         }
         for(let i = 0; i < this.out.length; i++) {
             const op = this.out[i];
             const tl = this.outText[i];
             const y = (i+1)*Blueprint.captionHeight+Blueprint.padding;
             //print(tl.GetMetrics());
-            d2d.DrawTextLayout(this.width-10-tl.GetMetrics().width, y, tl, colorBrush);
+            const textmetrics = tl.GetMetrics();
+            d2d.DrawTextLayout(this.width-10-textmetrics.width, y, tl, colorBrush);
             colorBrush.SetColor(...Blueprint.paramColors[op]);
             d2d.DrawEllipse(this.width-8, y, Blueprint.radius, Blueprint.radius, colorBrush, 2);
             colorBrush.SetColor(1.0, 1.0, 1.0);
 
-            const connection = this.connections[i];
+            const connection = this.connections.out[i];
             if(connection) {
                 const r = connection.receiver;
                 if(r) {
                     connection.x = r.source.x+Blueprint.padding-8;
                     connection.y = r.source.y+((r.i+1)*Blueprint.captionHeight+Blueprint.padding);
                 }
+                d2d.DrawLine(this.width-10-textmetrics.width, y+textmetrics.height, this.width-8-4, y+textmetrics.height, colorBrush);
                     //remember that i set transform before calling Blueprint.redraw so i gotta do math to get screen coords
-                d2d.DrawLine(this.width-8, y, connection.x-this.x, connection.y-this.y, colorBrush, 4); //maybe there's a drawbezier or something like that for paths or whatevers
+                //d2d.DrawLine(this.width-8, y, connection.x-this.x, connection.y-this.y, colorBrush, 4); //maybe there's a drawbezier or something like that for paths or whatevers
+                //do i have to make this path every time?
+                //i don't think you can save a geometry sink and change it
+
+                //const quarterX = this.width-8 + (connection.x-this.x-this.width-8)/4;
+                //const quarterY = y + (connection.y-this.y)/4;
+                //const halfX = this.width-8 + (connection.x-this.x-this.width-8)/2;
+                //const halfY = y + (connection.y-this.y)/2;
+                //const halfX = ((this.width-8)+connection.x-this.x)/2; //idk how these worked bruh for some reason it took forever for me to understand how exactly my math should be mathing
+                //const halfY = (y+connection.y-this.y)/2;
+                const getXAlong = (function(t) {
+                    return (connection.x-this.x-this.width-8)*t;
+                }).bind(this);
+
+                const getYAlong = (function(t) {
+                    return (connection.y-this.y-y)*t;
+                }).bind(this);
+                //d2d.DrawEllipse(halfX, halfY, 10, 10, colorBrush, 4);
+                //d2d.DrawEllipse(quarterX, quarterY, 5, 5, colorBrush, 4);
+                //print(draws);
+                //d2d.DrawEllipse(this.width-8 + getXAlong(draws/100), y + getYAlong(draws/100), 5, 5, colorBrush, 4);
+                
+                //print(`c: {x: ${connection.x},y: ${connection.y}}\tthis: {x: ${this.x}, y: ${this.y}}`);
+                //print(`clientc: {x: ${connection.x-this.x},y: ${connection.y-this.y}}\tthis: {x: ${this.x}, y: ${this.y}}`);
+
+                const halfX = this.width-8 + getXAlong(.5);
+                const halfY = y + getYAlong(.5);
+
+                const path = d2d.CreatePathGeometry();
+                const sink = path.Open();
+
+                sink.BeginFigure(this.width-8, y, D2D1_FIGURE_BEGIN_HOLLOW);
+                    sink.AddBeziers(
+                        [
+                            [this.width-8, y], //FloatFI(info[0].As<Array>()->Get(context, 0).ToLocalChecked().As<Array>()->Get(context, 0).ToLocalChecked())
+                            [this.width-8 + getXAlong(.4), y],
+                            [halfX, halfY],
+                        ],
+                        [
+                            [halfX, halfY],
+                            [halfX, y + getYAlong(.9)],
+                            [connection.x-this.x, connection.y-this.y],
+                        ]
+                    );
+                sink.EndFigure(D2D1_FIGURE_END_OPEN);
+
+                sink.Close();
+                print(sink.Release(), "sink release?");
+                d2d.DrawGeometry(path, colorBrush, 4);
+                print(path.Release(), "path release?}"); //lowkey idk if this is getting released but idk how to check
             }
         }
     }
@@ -457,8 +517,15 @@ class Blueprint {
 
     preDrag(mouse, data) {
         activePin = {i: data, source: this};
-        this.connections[data] = {x: mouse.x, y: mouse.y};
-        return this.connections[data];
+        if(this.connections.out[data]) {
+            const connection = this.connections.out[data];
+            connection.receiver.source.connections.in[connection.receiver.i] = undefined;
+            //connection.x = mouse.x;
+            //connection.y = mouse.y;
+        }//else {
+            this.connections.out[data] = {x: mouse.x, y: mouse.y};
+        //}
+        return this.connections.out[data];
     }
 
     //onDrag() { //implements DraggableObject (if this were a stronger object oriented language)
@@ -475,11 +542,13 @@ let blueprints = [];
 
 function d2dpaint() {
     d2d.BeginDraw();
-    d2d.Clear(0.0, 0.0, 0.0, 0.1);
+    d2d.Clear(0.0, 0.0, 0.0, 0.25);
+    //d2d.SetTransform(Matrix3x2F.Translation(camera.x, camera.y));
     //d2d.DrawBitmap(drawing, 0, 0, w, h);
     for(const blueprint of blueprints) {
         d2d.SaveDrawingState();
-        d2d.SetTransform(Matrix3x2F.Translation(blueprint.x, blueprint.y));
+        //oh wait you can't do this d2d.GetTransform().Translation as it returns the straight up D2D1_MATRIX_3X2_F 
+        d2d.SetTransform(Matrix3x2F.Translation(blueprint.x+camera.x, blueprint.y+camera.y));
         //defaultBGG.SetTransform(Matrix3x2F.Multiply(Matrix3x2F.Translation(blueprint.x, blueprint.y), Matrix3x2F.Scale(blueprint.width/100, blueprint.height/100, blueprint.x, blueprint.y)));
         //defaultBGG.SetTransform(Matrix3x2F.Scale(blueprint.width, blueprint.height, 0, 0));
         //d2d.FillRectangle(0, 0, blueprint.width, blueprint.height, defaultBGG);
@@ -498,11 +567,14 @@ function windowProc(hwnd, msg, wp, lp) {
         colorBrush = d2d.CreateSolidColorBrush(1.0, 1.0, 1.0, 1.0);
         font = d2d.CreateFont(NULL, 12);
         //font.SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
-
+        
         gl = createCanvas("gl", NULL, hwnd);
         Blueprint.paramColors["FRAGMENT_SHADER"] = [255/255, 42/255, 0.0];
         Blueprint.paramColors["VERTEX_SHADER"] = [136/255, 255/255, 0.0];
         Blueprint.paramColors["SHADER"] = [200/255, 200/255, 200/255];
+        Blueprint.paramColors["string"] = [251/255, 0/255, 209/255];
+        Blueprint.paramColors["number"] = [27/255, 191/255, 147/255];
+        Blueprint.paramColors["bool"] = [146/255, 0.0, 0.0];
         //DragAcceptFiles(hwnd, true); //you can just use WS_EX_ACCEPTFILES
         //uxtheme = DllLoad("UxTheme.dll");
         //print(uxtheme("IsAppThemed", 0, [], [], RETURN_NUMBER)); //oh hell yeah it's one (https://learn.microsoft.com/en-us/windows/win32/api/uxtheme/nf-uxtheme-isappthemed)
@@ -512,8 +584,8 @@ function windowProc(hwnd, msg, wp, lp) {
         DwmSetWindowAttribute(hwnd, DWMWA_CAPTION_COLOR, RGB(24, 24, 24)); //hell yeah this shit tuff asf (dark title bar)[doesn't work if you get rid of the window theme tho]
         
         //otherwnd = new BottomPane(hwnd); //no longer blocks the thread as i make and draw every control myself
-        blueprints.push(new Blueprint(hwnd, "Program", [95/255, 150/255, 187/255], 300, 100, 221, 90*2, ["FRAGMENT_SHADER", "VERTEX_SHADER"], []));
-        blueprints.push(new Blueprint(hwnd, "Shader", [95/255, 150/255, 187/255], 0, 100, 221, 90, [], ["SHADER"]));
+        blueprints.push(new Blueprint(hwnd, "Program", [95/255, 150/255, 187/255], 300, 100, 221, 90*2, ["fragmentShader : FRAGMENT_SHADER", "vertexShader : VERTEX_SHADER"], []));
+        blueprints.push(new Blueprint(hwnd, "Shader", [120/255, 168/255, 115/255], 0, 100, 221, 90, ["filename : string", "type : "], ["SHADER"]));
         d2dpaint();
     }else if(msg == WM_PAINT) {   
         dirty = true;
@@ -559,6 +631,8 @@ function windowProc(hwnd, msg, wp, lp) {
         //print("setcursornigga");
         const mouse = GetCursorPos();//{x: GET_X_LPARAM(lp), y: GET_Y_LPARAM(lp)}; //i was originally using WM_MOUSEMOVE which passed the mouse position in the lp
         ScreenToClient(hwnd, mouse); //fun (returns nothing and modifies the object)
+        mouse.x -= camera.x;
+        mouse.y -= camera.y;
         //let result = 0;
         hit = {};
         //hitblueprint = undefined;
@@ -594,7 +668,7 @@ function windowProc(hwnd, msg, wp, lp) {
         }
     }else if(msg == WM_LBUTTONDOWN) {
         SetCapture(hwnd);
-        const mouse = {x: GET_X_LPARAM(lp), y: GET_Y_LPARAM(lp)}; //lp is client mouse pos
+        const mouse = {x: GET_X_LPARAM(lp)-camera.x, y: GET_Y_LPARAM(lp)-camera.y}; //lp is client mouse pos
         if(hit.result) {
             //if((hit.result & BUTTON) == BUTTON) {
             if(hit.result == BUTTON) {
@@ -623,7 +697,7 @@ function windowProc(hwnd, msg, wp, lp) {
             }
         }
     }else if(msg == WM_RBUTTONDOWN) {
-        const mouse = {x: GET_X_LPARAM(lp), y: GET_Y_LPARAM(lp)}; //lp is client mouse pos
+        const mouse = {x: GET_X_LPARAM(lp)-camera.x, y: GET_Y_LPARAM(lp)-camera.y}; //lp is client mouse pos
 
         if(hit.result == BUTTON) {
             hitblueprint.rightMouseDown?.(mouse);
@@ -645,7 +719,7 @@ function windowProc(hwnd, msg, wp, lp) {
         ReleaseCapture();
         Draggable.mouseUp();
 
-        const mouse = {x: GET_X_LPARAM(lp), y: GET_Y_LPARAM(lp)}; //lp is client mouse pos
+        const mouse = {x: GET_X_LPARAM(lp)-camera.x, y: GET_Y_LPARAM(lp)-camera.y}; //lp is client mouse pos
         //if(hit == BUTTON) {
         //    hitblueprint.mouseUp(mouse);
         //}
@@ -672,9 +746,16 @@ function windowProc(hwnd, msg, wp, lp) {
             }    
     
             if(receiver) {
-                activePin.source.connections[activePin.i].receiver = receiver; //{i: receiver.data, source: receiver.blueprint};
+                activePin.source.connections.out[activePin.i].receiver = receiver; //{i: receiver.data, source: receiver.blueprint};
+                receiver.source.connections.in[receiver.i] = activePin; //.source = activePin;
+                //print(activePin.i, receiver.i);
             }else {
-                activePin.source.connections[activePin.i] = undefined;
+                //if(activePin.source.connections.out[activePin.i]?.receiver) { //moved into preDrag
+                //    const receiver = activePin.source.connections.out[activePin.i].receiver;
+                //    receiver.source.connections.in[receiver.i] = undefined;
+                //    print(activePin.i, "prev", receiver.i);
+                //}
+                activePin.source.connections.out[activePin.i] = undefined;
             }
         }
         activePin = undefined;
@@ -707,6 +788,15 @@ function windowProc(hwnd, msg, wp, lp) {
                 SetForegroundWindow(hwnd);
             }
         }
+    }else if(msg == WM_MBUTTONDOWN) {
+        if(!Draggable.dragging) {
+            SetCapture(hwnd);
+            const mouse = {x: GET_X_LPARAM(lp), y: GET_Y_LPARAM(lp)}; //lp is client mouse pos
+            Draggable.select(camera, mouse, false, false);
+        }
+    }else if(msg == WM_MBUTTONUP) {
+        ReleaseCapture();
+        Draggable.mouseUp();
     }
     else if(msg == WM_DESTROY) {
         PostQuitMessage(0); //but it refused.
@@ -715,6 +805,10 @@ function windowProc(hwnd, msg, wp, lp) {
     if(Draggable.dragging) {
         const mouse = GetCursorPos();
         ScreenToClient(hwnd, mouse);
+        if(Draggable.dragged != camera) {
+            mouse.x -= camera.x;
+            mouse.y -= camera.y;
+        }
         Draggable.update(mouse);
     }
 
@@ -722,6 +816,7 @@ function windowProc(hwnd, msg, wp, lp) {
         print("DIRTY!!!", Int_To_WM(msg), Math.random());
         d2dpaint();
         dirty = false;
+        draws++;
     }
 
     //for(const blueprint of blueprints) {

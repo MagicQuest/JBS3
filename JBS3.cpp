@@ -3404,21 +3404,38 @@ namespace DIRECT2D {
             ID2D1SimplifiedGeometrySink* simplifiedGeoSink = (ID2D1SimplifiedGeometrySink*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
 
             Local<Array> jsLines = info[0].As<Array>();
-            uint32_t len = jsLines->Length();
+            uint32_t len = info.Length() > 1 ? info.Length() : jsLines->Length();
 
             std::vector<D2D1_BEZIER_SEGMENT> beziers(len);
 
             //if (jsLines->Get(context, 0).ToLocalChecked()->IsArray()) { //this points array can be filled with more arrays -> [[[10, 20], [20, 30], [30, 40]], [[40, 50], [50, 60], [60, 70]]]
-            for (int i = 0; i < len; i++) {
-                Local<Array> innerArr = jsLines->Get(context, i).ToLocalChecked().As<Array>();
-                Local<Array> point1 = innerArr->Get(context, 0).ToLocalChecked().As<Array>();
-                Local<Array> point2 = innerArr->Get(context, 1).ToLocalChecked().As<Array>();
-                Local<Array> point3 = innerArr->Get(context, 2).ToLocalChecked().As<Array>();
-                beziers[i] = D2D1::BezierSegment(
-                    D2D1::Point2F(FloatFI(point1->Get(context, 0).ToLocalChecked()), FloatFI(point1->Get(context, 1).ToLocalChecked())),
-                    D2D1::Point2F(FloatFI(point2->Get(context, 0).ToLocalChecked()), FloatFI(point2->Get(context, 1).ToLocalChecked())),
-                    D2D1::Point2F(FloatFI(point3->Get(context, 0).ToLocalChecked()), FloatFI(point3->Get(context, 1).ToLocalChecked()))//,
-                );
+            if (info.Length() == 1) {
+                //assuming you called this function like AddBeziers([[[x1, y1], [x2, y2], [x3, y3]], [[x4, y4], [x5, y5], [x6, y6]]])
+                for (int i = 0; i < len; i++) {
+                    Local<Array> innerArr = jsLines->Get(context, i).ToLocalChecked().As<Array>();
+                    Local<Array> point1 = innerArr->Get(context, 0).ToLocalChecked().As<Array>();
+                    Local<Array> point2 = innerArr->Get(context, 1).ToLocalChecked().As<Array>();
+                    Local<Array> point3 = innerArr->Get(context, 2).ToLocalChecked().As<Array>();
+                    beziers[i] = D2D1::BezierSegment(
+                        D2D1::Point2F(FloatFI(point1->Get(context, 0).ToLocalChecked()), FloatFI(point1->Get(context, 1).ToLocalChecked())),
+                        D2D1::Point2F(FloatFI(point2->Get(context, 0).ToLocalChecked()), FloatFI(point2->Get(context, 1).ToLocalChecked())),
+                        D2D1::Point2F(FloatFI(point3->Get(context, 0).ToLocalChecked()), FloatFI(point3->Get(context, 1).ToLocalChecked()))//,
+                    );
+                }
+            }
+            else {
+                //assuming you called this function like AddBeziers([[x1, y1], [x2, y2], [x3, y3]], [[x4, y4], [x5, y5], [x6, y6]]);
+                for (int i = 0; i < len; i++) {
+                    Local<Array> innerArr = info[i].As<Array>();
+                    Local<Array> point1 = innerArr->Get(context, 0).ToLocalChecked().As<Array>();
+                    Local<Array> point2 = innerArr->Get(context, 1).ToLocalChecked().As<Array>();
+                    Local<Array> point3 = innerArr->Get(context, 2).ToLocalChecked().As<Array>();
+                    beziers[i] = D2D1::BezierSegment(
+                        D2D1::Point2F(FloatFI(point1->Get(context, 0).ToLocalChecked()), FloatFI(point1->Get(context, 1).ToLocalChecked())),
+                        D2D1::Point2F(FloatFI(point2->Get(context, 0).ToLocalChecked()), FloatFI(point2->Get(context, 1).ToLocalChecked())),
+                        D2D1::Point2F(FloatFI(point3->Get(context, 0).ToLocalChecked()), FloatFI(point3->Get(context, 1).ToLocalChecked()))//,
+                    );
+                }
             }
 
             simplifiedGeoSink->AddBeziers(beziers.data(), len);
@@ -3548,7 +3565,7 @@ namespace DIRECT2D {
                 }
             }
 
-            geoSink->AddQuadraticBezier(beziers.data());
+            geoSink->AddQuadraticBeziers(beziers.data(), len); //OOPS! i was calling AddQuadraticBezier instead and almost didn't realize
         }));
         jsGS->Set(isolate, "AddArc", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
             Isolate* isolate = info.GetIsolate();

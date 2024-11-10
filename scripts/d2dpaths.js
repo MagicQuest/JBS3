@@ -17,17 +17,21 @@ function windowProc(hwnd, msg, wp, lp) {
         
         sink.SetFillMode(D2D1_FILL_MODE_WINDING);
         sink.BeginFigure(100, 100, D2D1_FIGURE_BEGIN_HOLLOW);
-        sink.AddBezier(
+        sink.AddBezier( //both functions are valid
             [100, 100],
             [95, 94],
             [86, 96],
         );
         sink.AddBezier(
-            [77, 97],
-            [73, 91],
-            [73, 91],
+            [
+                [77, 97],
+                [73, 91],
+                [73, 91]
+            ],
         );
         sink.EndFigure(D2D1_FIGURE_END_OPEN);
+        //sink.BeginFigure(128, 256, D2D1_FIGURE_BEGIN_HOLLOW);
+        //sink.EndFigure(D2D1_FIGURE_END_OPEN);
         sink.Close();
         print(sink.Release());
         SetTimer(hwnd, 0, 16);
