@@ -949,7 +949,7 @@ namespace fs {
                 jsArrayBuffer->Set(isolate->GetCurrentContext(), i, Number::New(isolate, shit[i]));
             }
 
-            //std::string* fuck = new std::string(shit); //it's giving undefined behavior
+            //std::string* fuck = new std::string(shit); //it's giving undefined behavior (what the hgell was i doing)
 
             //ok i works but i could just pass an array of chars (ints) //probably use arraybuffer because i think thats what browsers do for files maybe idk (yeah so the documentation for arraybuffer literally says a buffer full of bytes)
 
@@ -4814,7 +4814,14 @@ V8FUNC(createCanvas) {
             jsBrush->Set(isolate, "SetColor", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
                 Isolate* isolate = info.GetIsolate();
                 ID2D1SolidColorBrush* newBrush = (ID2D1SolidColorBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                newBrush->SetColor(D2D1::ColorF(FloatFI(info[0]), FloatFI(info[1]), FloatFI(info[2]), info[3]->IsNumber() ? FloatFI(info[3]) : 1.0F));
+                D2D1_COLOR_F color{};
+                if (info.Length() == 1) {
+                    color = D2D1::ColorF(IntegerFI(info[0]));
+                }
+                else {
+                    color = D2D1::ColorF(FloatFI(info[0]), FloatFI(info[1]), FloatFI(info[2]), info[3]->IsNumber() ? FloatFI(info[3]) : 1.0F);
+                }
+                newBrush->SetColor(color);
             }));
             jsBrush->Set(isolate, "GetColor", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
                 Isolate* isolate = info.GetIsolate();
@@ -5813,12 +5820,23 @@ V8FUNC(createCanvas) {
 
             print("lengtrgh >> " << info.Length());//IntegerFI(info[info.Length() - 1]));
 
-            ID2D1GradientStopCollection* gSC;
+            Local<ObjectTemplate> jsGSC;
 
-            d2d->renderTarget->CreateGradientStopCollection(gradientstops.data(), /*IntegerFI(info[info.Length() - 1])*/info.Length(), & gSC);
+            //if (d2d->type >= 2) { https://learn.microsoft.com/en-us/windows/win32/api/d2d1_1/nf-d2d1_1-id2d1devicecontext-creategradientstopcollection
+            //    Direct2D11* d2d11 = (Direct2D11*)d2d;
+            //    ID2D1GradientStopCollection1* gSC;
+            //
+            //    d2d11->d2dcontext->CreateGradientStopCollection(gradientstops.data(), /*IntegerFI(info[info.Length() - 1])*/info.Length(), &gSC);
+            //
+            //    jsGSC = DIRECT2D::getIUnknownImpl(isolate, gSC);//ObjectTemplate::New(isolate);
+            //}
+            //else {
+                ID2D1GradientStopCollection* gSC;
 
-            Local<ObjectTemplate> jsGSC = DIRECT2D::getIUnknownImpl(isolate, gSC);//ObjectTemplate::New(isolate);
+                d2d->renderTarget->CreateGradientStopCollection(gradientstops.data(), /*IntegerFI(info[info.Length() - 1])*/info.Length(), &gSC);
 
+                jsGSC = DIRECT2D::getIUnknownImpl(isolate, gSC);//ObjectTemplate::New(isolate);
+            //}
             //jsGSC->Set(isolate, "internalPtr", Number::New(isolate, (LONG_PTR)gSC));
             //jsGSC->Set(isolate, "Release", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
             //    Isolate* isolate = info.GetIsolate();
@@ -6215,13 +6233,20 @@ V8FUNC(createCanvas) {
         context->Set(isolate, "Clear", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
             Isolate* isolate = info.GetIsolate();
             Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            D2D1_COLOR_F color{};
+            if (info.Length() == 1) {
+                color = D2D1::ColorF(IntegerFI(info[0]));
+            }
+            else {
+                color = D2D1::ColorF(FloatFI(info[0]), FloatFI(info[1]), FloatFI(info[2]), info[3]->IsNumber() ? FloatFI(info[3]) : 1.0F);
+            }
             if (info[3]->IsNumber() && d2d->clearBrush != nullptr && d2d->type < 3) {
-                d2d->clearBrush->SetColor(D2D1::ColorF(FloatFI(info[0]), FloatFI(info[1]), FloatFI(info[2]), FloatFI(info[3])));
+                d2d->clearBrush->SetColor(color);
                 D2D1_SIZE_F size = d2d->renderTarget->GetSize();
                 d2d->renderTarget->FillRectangle(D2D1::RectF(0,0,size.width, size.height), d2d->clearBrush);
             }
             else {
-                d2d->renderTarget->Clear(D2D1::ColorF(FloatFI(info[0]), FloatFI(info[1]), FloatFI(info[2]), info[3]->IsNumber() ? FloatFI(info[3]) : 1.0F));
+                d2d->renderTarget->Clear(color);
             }
         }));
 
@@ -13482,7 +13507,7 @@ V8FUNC(CreateFileWrapper) {
     //SECURITY_ATTRIBUTES attr{ 0 };
     //attr.nLength = sizeof(SECURITY_ATTRIBUTES);
 
-    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)CreateFile(WStringFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), NULL, IntegerFI(info[4]), IntegerFI(info[5]), (HANDLE)IntegerFI(info[6]))));
+    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)CreateFile(WStringFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), NULL, IntegerFI(info[3]), IntegerFI(info[4]), (HANDLE)IntegerFI(info[5]))));
 }
 
 //https://github.com/apetrone/simplefilewatcher/blob/master/source/FileWatcherWin32.cpp
@@ -13589,6 +13614,151 @@ V8FUNC(TrackMouseEventWrapper) {
     }
     else {
         info.GetReturnValue().Set(Number::New(isolate, succ));
+    }
+}
+
+//really excited about these mailslot functions because i was looking for something kinda like this and found it in an unexpected place! https://www.codeproject.com/KB/winsdk/Sigma.aspx
+V8FUNC(CreateMailslotWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)CreateMailslot(WStringFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), NULL)));
+}
+
+V8FUNC(GetMailslotInfoWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    DWORD maxMessageSize = NULL;
+    DWORD nextSize = NULL;
+    DWORD messageCount = NULL;
+    DWORD readTimeout = NULL;
+
+    BOOL result = GetMailslotInfo((HANDLE)IntegerFI(info[0]), &maxMessageSize, &nextSize, &messageCount, &readTimeout);
+
+    if (result) {
+        Local<Context> context = isolate->GetCurrentContext();
+        Local<Object> jsInfo = Object::New(isolate);
+
+        jsInfo->Set(context, LITERAL("maxMessageSize"), Number::New(isolate, maxMessageSize));
+        jsInfo->Set(context, LITERAL("nextSize"), Number::New(isolate, nextSize));
+        jsInfo->Set(context, LITERAL("messageCount"), Number::New(isolate, messageCount));
+        jsInfo->Set(context, LITERAL("readTimeout"), Number::New(isolate, readTimeout));
+
+        info.GetReturnValue().Set(jsInfo);
+    }
+    else {
+        info.GetReturnValue().Set(result);
+    }
+}
+
+V8FUNC(WriteFileWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    void* buffer = nullptr;
+    DWORD length = NULL; //lowkey forgot to change length so i was writing 0 bytes everytime...
+    DWORD written = NULL;
+    
+    OVERLAPPED overlapped{};
+
+    if (!info[2]->IsNullOrUndefined() && !info[2]->IsNumber()) {
+        Local<Context> context = isolate->GetCurrentContext();
+        Local<Object> jsOverlapped = info[2].As<Object>();
+        if (jsOverlapped->Has(context, LITERAL("Internal")).ToChecked()) {
+            overlapped.Internal = IntegerFI(jsOverlapped->Get(context, LITERAL("Internal")).ToLocalChecked());
+        }
+        if (jsOverlapped->Has(context, LITERAL("InternalHigh")).ToChecked()) {
+            overlapped.InternalHigh = IntegerFI(jsOverlapped->Get(context, LITERAL("InternalHigh")).ToLocalChecked());
+        }
+        if (jsOverlapped->Has(context, LITERAL("Offset")).ToChecked()) {
+            overlapped.Offset = IntegerFI(jsOverlapped->Get(context, LITERAL("Offset")).ToLocalChecked());
+        }
+        if (jsOverlapped->Has(context, LITERAL("OffsetHigh")).ToChecked()) {
+            overlapped.OffsetHigh = IntegerFI(jsOverlapped->Get(context, LITERAL("OffsetHigh")).ToLocalChecked());
+        }
+        if (jsOverlapped->Has(context, LITERAL("hEvent")).ToChecked()) {
+            overlapped.hEvent = (HANDLE)IntegerFI(jsOverlapped->Get(context, LITERAL("hEvent")).ToLocalChecked());
+        }
+    }
+
+    Local<Value> data = info[1];
+
+    if (data->IsNumber() || data->IsBoolean()) {
+        long long tempshit = IntegerFI(data);
+        buffer = &tempshit; //don't do this kids...
+        length = sizeof(long long);
+    }
+    else if (data->IsString()) {
+        buffer = (void*)WStringFI(data);
+        length = wcslen(WStringFI(data))*sizeof(wchar_t);
+    }
+    else if (data->IsArrayBufferView()) {
+        Local<ArrayBufferView> abv = data.As<ArrayBufferView>();
+        buffer = abv->Buffer()->Data();
+        length = abv->ByteLength();
+    }
+
+    info.GetReturnValue().Set(Number::New(isolate, WriteFile((HANDLE)IntegerFI(info[0]), buffer, length, &written, &overlapped)));
+}
+
+
+V8FUNC(CreateEventWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    
+    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)CreateEvent(NULL, IntegerFI(info[0]), IntegerFI(info[1]), WStringFI(info[2]))));
+}
+
+V8FUNC(ResetEventWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, ResetEvent((HANDLE)IntegerFI(info[0]))));
+}
+
+V8FUNC(SetEventWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, SetEvent((HANDLE)IntegerFI(info[0]))));
+}
+
+V8FUNC(ReadFileWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    std::wstring s(IntegerFI(info[1]), '\0');
+
+    OVERLAPPED overlapped{};
+
+    if (!info[2]->IsNullOrUndefined() && !info[2]->IsNumber()) {
+        Local<Context> context = isolate->GetCurrentContext();
+        Local<Object> jsOverlapped = info[2].As<Object>();
+        if (jsOverlapped->Has(context, LITERAL("Internal")).ToChecked()) {
+            overlapped.Internal = IntegerFI(jsOverlapped->Get(context, LITERAL("Internal")).ToLocalChecked());
+        }
+        if (jsOverlapped->Has(context, LITERAL("InternalHigh")).ToChecked()) {
+            overlapped.InternalHigh = IntegerFI(jsOverlapped->Get(context, LITERAL("InternalHigh")).ToLocalChecked());
+        }
+        if (jsOverlapped->Has(context, LITERAL("Offset")).ToChecked()) {
+            overlapped.Offset = IntegerFI(jsOverlapped->Get(context, LITERAL("Offset")).ToLocalChecked());
+        }
+        if (jsOverlapped->Has(context, LITERAL("OffsetHigh")).ToChecked()) {
+            overlapped.OffsetHigh = IntegerFI(jsOverlapped->Get(context, LITERAL("OffsetHigh")).ToLocalChecked());
+        }
+        if (jsOverlapped->Has(context, LITERAL("hEvent")).ToChecked()) {
+            overlapped.hEvent = (HANDLE)IntegerFI(jsOverlapped->Get(context, LITERAL("hEvent")).ToLocalChecked());
+        }
+    }
+
+    BOOL res = ReadFile((HANDLE)IntegerFI(info[0]), (void*)s.data(), s.length(), NULL, &overlapped);
+
+    if (res) {
+        info.GetReturnValue().Set(String::NewFromTwoByte(isolate, (const uint16_t*)s.data()).ToLocalChecked());
+    }
+    else {
+        info.GetReturnValue().Set(res);
     }
 }
 
@@ -13808,9 +13978,139 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const wchar_t* filename
     setGlobalWrapper(InitiateSystemShutdown);
     setGlobalWrapper(AbortSystemShutdown);
 
+    setGlobalWrapper(CreateMailslot);
+    setGlobalWrapper(GetMailslotInfo);
+    setGlobalWrapper(WriteFile);
+    setGlobalWrapper(CreateEvent);
+    setGlobalWrapper(ResetEvent);
+    setGlobalWrapper(SetEvent);
+    setGlobalWrapper(ReadFile);
+    setGlobalConstLONGPTR(INVALID_HANDLE_VALUE);
+    setGlobalConst(MAX_PATH);
+
     setGlobalWrapper(CreateFile);
+    setGlobalConst(GENERIC_READ);
+    setGlobalConst(GENERIC_WRITE);
+    setGlobalConst(GENERIC_EXECUTE);
+    setGlobalConst(GENERIC_ALL);
+    setGlobalConst(FILE_READ_DATA);
+    setGlobalConst(FILE_LIST_DIRECTORY);
+    setGlobalConst(FILE_WRITE_DATA);
+    setGlobalConst(FILE_ADD_FILE);
+    setGlobalConst(FILE_APPEND_DATA);
+    setGlobalConst(FILE_ADD_SUBDIRECTORY);
+    setGlobalConst(FILE_CREATE_PIPE_INSTANCE);
+    setGlobalConst(FILE_READ_EA);
+    setGlobalConst(FILE_WRITE_EA);
+    setGlobalConst(FILE_EXECUTE);
+    setGlobalConst(FILE_TRAVERSE);
+    setGlobalConst(FILE_DELETE_CHILD);
+    setGlobalConst(FILE_READ_ATTRIBUTES);
+    setGlobalConst(FILE_WRITE_ATTRIBUTES);
+    setGlobalConst(FILE_ALL_ACCESS);
+    setGlobalConst(FILE_GENERIC_READ);
+    setGlobalConst(FILE_GENERIC_WRITE);
+    setGlobalConst(FILE_GENERIC_EXECUTE);
+    setGlobalConst(FILE_SHARE_READ);
+    setGlobalConst(FILE_SHARE_WRITE);
+    setGlobalConst(FILE_SHARE_DELETE);
+    setGlobalConst(FILE_ATTRIBUTE_READONLY);
+    setGlobalConst(FILE_ATTRIBUTE_HIDDEN);
+    setGlobalConst(FILE_ATTRIBUTE_SYSTEM);
+    setGlobalConst(FILE_ATTRIBUTE_DIRECTORY);
+    setGlobalConst(FILE_ATTRIBUTE_ARCHIVE);
+    setGlobalConst(FILE_ATTRIBUTE_DEVICE);
+    setGlobalConst(FILE_ATTRIBUTE_NORMAL);
+    setGlobalConst(FILE_ATTRIBUTE_TEMPORARY);
+    setGlobalConst(FILE_ATTRIBUTE_SPARSE_FILE);
+    setGlobalConst(FILE_ATTRIBUTE_REPARSE_POINT);
+    setGlobalConst(FILE_ATTRIBUTE_COMPRESSED);
+    setGlobalConst(FILE_ATTRIBUTE_OFFLINE);
+    setGlobalConst(FILE_ATTRIBUTE_NOT_CONTENT_INDEXED);
+    setGlobalConst(FILE_ATTRIBUTE_ENCRYPTED);
+    setGlobalConst(FILE_ATTRIBUTE_INTEGRITY_STREAM);
+    setGlobalConst(FILE_ATTRIBUTE_VIRTUAL);
+    setGlobalConst(FILE_ATTRIBUTE_NO_SCRUB_DATA);
+    setGlobalConst(FILE_ATTRIBUTE_EA);
+    setGlobalConst(FILE_ATTRIBUTE_PINNED);
+    setGlobalConst(FILE_ATTRIBUTE_UNPINNED);
+    setGlobalConst(FILE_ATTRIBUTE_RECALL_ON_OPEN);
+    setGlobalConst(FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS);
+    setGlobalConst(TREE_CONNECT_ATTRIBUTE_PRIVACY);
+    setGlobalConst(TREE_CONNECT_ATTRIBUTE_INTEGRITY);
+    setGlobalConst(TREE_CONNECT_ATTRIBUTE_GLOBAL);
+    setGlobalConst(TREE_CONNECT_ATTRIBUTE_PINNED);
+    setGlobalConst(FILE_ATTRIBUTE_STRICTLY_SEQUENTIAL);
+    //setGlobalConst(FILE_NOTIFY_CHANGE_FILE_NAME);
+    //setGlobalConst(FILE_NOTIFY_CHANGE_DIR_NAME);
+    //setGlobalConst(FILE_NOTIFY_CHANGE_ATTRIBUTES);
+    //setGlobalConst(FILE_NOTIFY_CHANGE_SIZE);
+    //setGlobalConst(FILE_NOTIFY_CHANGE_LAST_WRITE);
+    //setGlobalConst(FILE_NOTIFY_CHANGE_LAST_ACCESS);
+    //setGlobalConst(FILE_NOTIFY_CHANGE_CREATION);
+    //setGlobalConst(FILE_NOTIFY_CHANGE_SECURITY);
+    setGlobalConst(FILE_ACTION_ADDED);
+    setGlobalConst(FILE_ACTION_REMOVED);
+    setGlobalConst(FILE_ACTION_MODIFIED);
+    setGlobalConst(FILE_ACTION_RENAMED_OLD_NAME);
+    setGlobalConst(FILE_ACTION_RENAMED_NEW_NAME);
+    setGlobalConst(MAILSLOT_NO_MESSAGE);
+    setGlobalConst(MAILSLOT_WAIT_FOREVER);
+    setGlobalConst(FILE_CASE_SENSITIVE_SEARCH);
+    setGlobalConst(FILE_CASE_PRESERVED_NAMES);
+    setGlobalConst(FILE_UNICODE_ON_DISK);
+    setGlobalConst(FILE_PERSISTENT_ACLS);
+    setGlobalConst(FILE_FILE_COMPRESSION);
+    setGlobalConst(FILE_VOLUME_QUOTAS);
+    setGlobalConst(FILE_SUPPORTS_SPARSE_FILES);
+    setGlobalConst(FILE_SUPPORTS_REPARSE_POINTS);
+    setGlobalConst(FILE_SUPPORTS_REMOTE_STORAGE);
+    setGlobalConst(FILE_RETURNS_CLEANUP_RESULT_INFO);
+    setGlobalConst(FILE_SUPPORTS_POSIX_UNLINK_RENAME);
+    setGlobalConst(FILE_SUPPORTS_BYPASS_IO);
+    setGlobalConst(FILE_SUPPORTS_STREAM_SNAPSHOTS);
+    setGlobalConst(FILE_SUPPORTS_CASE_SENSITIVE_DIRS);
+    setGlobalConst(FILE_VOLUME_IS_COMPRESSED);
+    setGlobalConst(FILE_SUPPORTS_OBJECT_IDS);
+    setGlobalConst(FILE_SUPPORTS_ENCRYPTION);
+    setGlobalConst(FILE_NAMED_STREAMS);
+    setGlobalConst(FILE_READ_ONLY_VOLUME);
+    setGlobalConst(FILE_SEQUENTIAL_WRITE_ONCE);
+    setGlobalConst(FILE_SUPPORTS_TRANSACTIONS);
+    setGlobalConst(FILE_SUPPORTS_HARD_LINKS);
+    setGlobalConst(FILE_SUPPORTS_EXTENDED_ATTRIBUTES);
+    setGlobalConst(FILE_SUPPORTS_OPEN_BY_FILE_ID);
+    setGlobalConst(FILE_SUPPORTS_USN_JOURNAL);
+    setGlobalConst(FILE_SUPPORTS_INTEGRITY_STREAMS);
+    setGlobalConst(FILE_SUPPORTS_BLOCK_REFCOUNTING);
+    setGlobalConst(FILE_SUPPORTS_SPARSE_VDL);
+    setGlobalConst(FILE_DAX_VOLUME);
+    setGlobalConst(FILE_SUPPORTS_GHOSTING);
+    setGlobalConst(FILE_INVALID_FILE_ID);
+    setGlobalConst(CREATE_NEW);
+    setGlobalConst(CREATE_ALWAYS);
+    setGlobalConst(OPEN_EXISTING);
+    setGlobalConst(OPEN_ALWAYS);
+    setGlobalConst(TRUNCATE_EXISTING);
+    setGlobalConst(INVALID_FILE_SIZE);
+    setGlobalConst(INVALID_SET_FILE_POINTER);
+    setGlobalConst(INVALID_FILE_ATTRIBUTES);
+    setGlobalConst(FILE_FLAG_WRITE_THROUGH);
+    setGlobalConst(FILE_FLAG_OVERLAPPED);
+    setGlobalConst(FILE_FLAG_NO_BUFFERING);
+    setGlobalConst(FILE_FLAG_RANDOM_ACCESS);
+    setGlobalConst(FILE_FLAG_SEQUENTIAL_SCAN);
+    setGlobalConst(FILE_FLAG_DELETE_ON_CLOSE);
+    setGlobalConst(FILE_FLAG_BACKUP_SEMANTICS);
+    setGlobalConst(FILE_FLAG_POSIX_SEMANTICS);
+    setGlobalConst(FILE_FLAG_SESSION_AWARE);
+    setGlobalConst(FILE_FLAG_OPEN_REPARSE_POINT);
+    setGlobalConst(FILE_FLAG_OPEN_NO_RECALL);
+    setGlobalConst(FILE_FLAG_FIRST_PIPE_INSTANCE);
+
     //setGlobalWrapper(CloseHandle);
     //setGlobalWrapper(ReadDirectoryChanges);
+
     setGlobalWrapper(FindFirstChangeNotification);
     setGlobalWrapper(FindNextChangeNotification);
     setGlobalWrapper(FindCloseChangeNotification);
@@ -14709,6 +15009,150 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const wchar_t* filename
     //    global->Set(isolate, "was", jsArrid);
     //}
     //Local<Array> jsArr = Array::New(isolate, elem##id, 13);
+
+    Local<ObjectTemplate> jsColorF = ObjectTemplate::New(isolate);
+    jsColorF->Set(isolate, "AliceBlue", Number::New(isolate, D2D1::ColorF::AliceBlue));
+    jsColorF->Set(isolate, "AntiqueWhite", Number::New(isolate, D2D1::ColorF::AntiqueWhite));
+    jsColorF->Set(isolate, "Aqua", Number::New(isolate, D2D1::ColorF::Aqua));
+    jsColorF->Set(isolate, "Aquamarine", Number::New(isolate, D2D1::ColorF::Aquamarine));
+    jsColorF->Set(isolate, "Azure", Number::New(isolate, D2D1::ColorF::Azure));
+    jsColorF->Set(isolate, "Beige", Number::New(isolate, D2D1::ColorF::Beige));
+    jsColorF->Set(isolate, "Bisque", Number::New(isolate, D2D1::ColorF::Bisque));
+    jsColorF->Set(isolate, "Black", Number::New(isolate, D2D1::ColorF::Black));
+    jsColorF->Set(isolate, "BlanchedAlmond", Number::New(isolate, D2D1::ColorF::BlanchedAlmond));
+    jsColorF->Set(isolate, "Blue", Number::New(isolate, D2D1::ColorF::Blue));
+    jsColorF->Set(isolate, "BlueViolet", Number::New(isolate, D2D1::ColorF::BlueViolet));
+    jsColorF->Set(isolate, "Brown", Number::New(isolate, D2D1::ColorF::Brown));
+    jsColorF->Set(isolate, "BurlyWood", Number::New(isolate, D2D1::ColorF::BurlyWood));
+    jsColorF->Set(isolate, "CadetBlue", Number::New(isolate, D2D1::ColorF::CadetBlue));
+    jsColorF->Set(isolate, "Chartreuse", Number::New(isolate, D2D1::ColorF::Chartreuse));
+    jsColorF->Set(isolate, "Chocolate", Number::New(isolate, D2D1::ColorF::Chocolate));
+    jsColorF->Set(isolate, "Coral", Number::New(isolate, D2D1::ColorF::Coral));
+    jsColorF->Set(isolate, "CornflowerBlue", Number::New(isolate, D2D1::ColorF::CornflowerBlue));
+    jsColorF->Set(isolate, "Cornsilk", Number::New(isolate, D2D1::ColorF::Cornsilk));
+    jsColorF->Set(isolate, "Crimson", Number::New(isolate, D2D1::ColorF::Crimson));
+    jsColorF->Set(isolate, "Cyan", Number::New(isolate, D2D1::ColorF::Cyan));
+    jsColorF->Set(isolate, "DarkBlue", Number::New(isolate, D2D1::ColorF::DarkBlue));
+    jsColorF->Set(isolate, "DarkCyan", Number::New(isolate, D2D1::ColorF::DarkCyan));
+    jsColorF->Set(isolate, "DarkGoldenrod", Number::New(isolate, D2D1::ColorF::DarkGoldenrod));
+    jsColorF->Set(isolate, "DarkGray", Number::New(isolate, D2D1::ColorF::DarkGray));
+    jsColorF->Set(isolate, "DarkGreen", Number::New(isolate, D2D1::ColorF::DarkGreen));
+    jsColorF->Set(isolate, "DarkKhaki", Number::New(isolate, D2D1::ColorF::DarkKhaki));
+    jsColorF->Set(isolate, "DarkMagenta", Number::New(isolate, D2D1::ColorF::DarkMagenta));
+    jsColorF->Set(isolate, "DarkOliveGreen", Number::New(isolate, D2D1::ColorF::DarkOliveGreen));
+    jsColorF->Set(isolate, "DarkOrange", Number::New(isolate, D2D1::ColorF::DarkOrange));
+    jsColorF->Set(isolate, "DarkOrchid", Number::New(isolate, D2D1::ColorF::DarkOrchid));
+    jsColorF->Set(isolate, "DarkRed", Number::New(isolate, D2D1::ColorF::DarkRed));
+    jsColorF->Set(isolate, "DarkSalmon", Number::New(isolate, D2D1::ColorF::DarkSalmon));
+    jsColorF->Set(isolate, "DarkSeaGreen", Number::New(isolate, D2D1::ColorF::DarkSeaGreen));
+    jsColorF->Set(isolate, "DarkSlateBlue", Number::New(isolate, D2D1::ColorF::DarkSlateBlue));
+    jsColorF->Set(isolate, "DarkSlateGray", Number::New(isolate, D2D1::ColorF::DarkSlateGray));
+    jsColorF->Set(isolate, "DarkTurquoise", Number::New(isolate, D2D1::ColorF::DarkTurquoise));
+    jsColorF->Set(isolate, "DarkViolet", Number::New(isolate, D2D1::ColorF::DarkViolet));
+    jsColorF->Set(isolate, "DeepPink", Number::New(isolate, D2D1::ColorF::DeepPink));
+    jsColorF->Set(isolate, "DeepSkyBlue", Number::New(isolate, D2D1::ColorF::DeepSkyBlue));
+    jsColorF->Set(isolate, "DimGray", Number::New(isolate, D2D1::ColorF::DimGray));
+    jsColorF->Set(isolate, "DodgerBlue", Number::New(isolate, D2D1::ColorF::DodgerBlue));
+    jsColorF->Set(isolate, "Firebrick", Number::New(isolate, D2D1::ColorF::Firebrick));
+    jsColorF->Set(isolate, "FloralWhite", Number::New(isolate, D2D1::ColorF::FloralWhite));
+    jsColorF->Set(isolate, "ForestGreen", Number::New(isolate, D2D1::ColorF::ForestGreen));
+    jsColorF->Set(isolate, "Fuchsia", Number::New(isolate, D2D1::ColorF::Fuchsia));
+    jsColorF->Set(isolate, "Gainsboro", Number::New(isolate, D2D1::ColorF::Gainsboro));
+    jsColorF->Set(isolate, "GhostWhite", Number::New(isolate, D2D1::ColorF::GhostWhite));
+    jsColorF->Set(isolate, "Gold", Number::New(isolate, D2D1::ColorF::Gold));
+    jsColorF->Set(isolate, "Goldenrod", Number::New(isolate, D2D1::ColorF::Goldenrod));
+    jsColorF->Set(isolate, "Gray", Number::New(isolate, D2D1::ColorF::Gray));
+    jsColorF->Set(isolate, "Green", Number::New(isolate, D2D1::ColorF::Green));
+    jsColorF->Set(isolate, "GreenYellow", Number::New(isolate, D2D1::ColorF::GreenYellow));
+    jsColorF->Set(isolate, "Honeydew", Number::New(isolate, D2D1::ColorF::Honeydew));
+    jsColorF->Set(isolate, "HotPink", Number::New(isolate, D2D1::ColorF::HotPink));
+    jsColorF->Set(isolate, "IndianRed", Number::New(isolate, D2D1::ColorF::IndianRed));
+    jsColorF->Set(isolate, "Indigo", Number::New(isolate, D2D1::ColorF::Indigo));
+    jsColorF->Set(isolate, "Ivory", Number::New(isolate, D2D1::ColorF::Ivory));
+    jsColorF->Set(isolate, "Khaki", Number::New(isolate, D2D1::ColorF::Khaki));
+    jsColorF->Set(isolate, "Lavender", Number::New(isolate, D2D1::ColorF::Lavender));
+    jsColorF->Set(isolate, "LavenderBlush", Number::New(isolate, D2D1::ColorF::LavenderBlush));
+    jsColorF->Set(isolate, "LawnGreen", Number::New(isolate, D2D1::ColorF::LawnGreen));
+    jsColorF->Set(isolate, "LemonChiffon", Number::New(isolate, D2D1::ColorF::LemonChiffon));
+    jsColorF->Set(isolate, "LightBlue", Number::New(isolate, D2D1::ColorF::LightBlue));
+    jsColorF->Set(isolate, "LightCoral", Number::New(isolate, D2D1::ColorF::LightCoral));
+    jsColorF->Set(isolate, "LightCyan", Number::New(isolate, D2D1::ColorF::LightCyan));
+    jsColorF->Set(isolate, "LightGoldenrodYellow", Number::New(isolate, D2D1::ColorF::LightGoldenrodYellow));
+    jsColorF->Set(isolate, "LightGreen", Number::New(isolate, D2D1::ColorF::LightGreen));
+    jsColorF->Set(isolate, "LightGray", Number::New(isolate, D2D1::ColorF::LightGray));
+    jsColorF->Set(isolate, "LightPink", Number::New(isolate, D2D1::ColorF::LightPink));
+    jsColorF->Set(isolate, "LightSalmon", Number::New(isolate, D2D1::ColorF::LightSalmon));
+    jsColorF->Set(isolate, "LightSeaGreen", Number::New(isolate, D2D1::ColorF::LightSeaGreen));
+    jsColorF->Set(isolate, "LightSkyBlue", Number::New(isolate, D2D1::ColorF::LightSkyBlue));
+    jsColorF->Set(isolate, "LightSlateGray", Number::New(isolate, D2D1::ColorF::LightSlateGray));
+    jsColorF->Set(isolate, "LightSteelBlue", Number::New(isolate, D2D1::ColorF::LightSteelBlue));
+    jsColorF->Set(isolate, "LightYellow", Number::New(isolate, D2D1::ColorF::LightYellow));
+    jsColorF->Set(isolate, "Lime", Number::New(isolate, D2D1::ColorF::Lime));
+    jsColorF->Set(isolate, "LimeGreen", Number::New(isolate, D2D1::ColorF::LimeGreen));
+    jsColorF->Set(isolate, "Linen", Number::New(isolate, D2D1::ColorF::Linen));
+    jsColorF->Set(isolate, "Magenta", Number::New(isolate, D2D1::ColorF::Magenta));
+    jsColorF->Set(isolate, "Maroon", Number::New(isolate, D2D1::ColorF::Maroon));
+    jsColorF->Set(isolate, "MediumAquamarine", Number::New(isolate, D2D1::ColorF::MediumAquamarine));
+    jsColorF->Set(isolate, "MediumBlue", Number::New(isolate, D2D1::ColorF::MediumBlue));
+    jsColorF->Set(isolate, "MediumOrchid", Number::New(isolate, D2D1::ColorF::MediumOrchid));
+    jsColorF->Set(isolate, "MediumPurple", Number::New(isolate, D2D1::ColorF::MediumPurple));
+    jsColorF->Set(isolate, "MediumSeaGreen", Number::New(isolate, D2D1::ColorF::MediumSeaGreen));
+    jsColorF->Set(isolate, "MediumSlateBlue", Number::New(isolate, D2D1::ColorF::MediumSlateBlue));
+    jsColorF->Set(isolate, "MediumSpringGreen", Number::New(isolate, D2D1::ColorF::MediumSpringGreen));
+    jsColorF->Set(isolate, "MediumTurquoise", Number::New(isolate, D2D1::ColorF::MediumTurquoise));
+    jsColorF->Set(isolate, "MediumVioletRed", Number::New(isolate, D2D1::ColorF::MediumVioletRed));
+    jsColorF->Set(isolate, "MidnightBlue", Number::New(isolate, D2D1::ColorF::MidnightBlue));
+    jsColorF->Set(isolate, "MintCream", Number::New(isolate, D2D1::ColorF::MintCream));
+    jsColorF->Set(isolate, "MistyRose", Number::New(isolate, D2D1::ColorF::MistyRose));
+    jsColorF->Set(isolate, "Moccasin", Number::New(isolate, D2D1::ColorF::Moccasin));
+    jsColorF->Set(isolate, "NavajoWhite", Number::New(isolate, D2D1::ColorF::NavajoWhite));
+    jsColorF->Set(isolate, "Navy", Number::New(isolate, D2D1::ColorF::Navy));
+    jsColorF->Set(isolate, "OldLace", Number::New(isolate, D2D1::ColorF::OldLace));
+    jsColorF->Set(isolate, "Olive", Number::New(isolate, D2D1::ColorF::Olive));
+    jsColorF->Set(isolate, "OliveDrab", Number::New(isolate, D2D1::ColorF::OliveDrab));
+    jsColorF->Set(isolate, "Orange", Number::New(isolate, D2D1::ColorF::Orange));
+    jsColorF->Set(isolate, "OrangeRed", Number::New(isolate, D2D1::ColorF::OrangeRed));
+    jsColorF->Set(isolate, "Orchid", Number::New(isolate, D2D1::ColorF::Orchid));
+    jsColorF->Set(isolate, "PaleGoldenrod", Number::New(isolate, D2D1::ColorF::PaleGoldenrod));
+    jsColorF->Set(isolate, "PaleGreen", Number::New(isolate, D2D1::ColorF::PaleGreen));
+    jsColorF->Set(isolate, "PaleTurquoise", Number::New(isolate, D2D1::ColorF::PaleTurquoise));
+    jsColorF->Set(isolate, "PaleVioletRed", Number::New(isolate, D2D1::ColorF::PaleVioletRed));
+    jsColorF->Set(isolate, "PapayaWhip", Number::New(isolate, D2D1::ColorF::PapayaWhip));
+    jsColorF->Set(isolate, "PeachPuff", Number::New(isolate, D2D1::ColorF::PeachPuff));
+    jsColorF->Set(isolate, "Peru", Number::New(isolate, D2D1::ColorF::Peru));
+    jsColorF->Set(isolate, "Pink", Number::New(isolate, D2D1::ColorF::Pink));
+    jsColorF->Set(isolate, "Plum", Number::New(isolate, D2D1::ColorF::Plum));
+    jsColorF->Set(isolate, "PowderBlue", Number::New(isolate, D2D1::ColorF::PowderBlue));
+    jsColorF->Set(isolate, "Purple", Number::New(isolate, D2D1::ColorF::Purple));
+    jsColorF->Set(isolate, "Red", Number::New(isolate, D2D1::ColorF::Red));
+    jsColorF->Set(isolate, "RosyBrown", Number::New(isolate, D2D1::ColorF::RosyBrown));
+    jsColorF->Set(isolate, "RoyalBlue", Number::New(isolate, D2D1::ColorF::RoyalBlue));
+    jsColorF->Set(isolate, "SaddleBrown", Number::New(isolate, D2D1::ColorF::SaddleBrown));
+    jsColorF->Set(isolate, "Salmon", Number::New(isolate, D2D1::ColorF::Salmon));
+    jsColorF->Set(isolate, "SandyBrown", Number::New(isolate, D2D1::ColorF::SandyBrown));
+    jsColorF->Set(isolate, "SeaGreen", Number::New(isolate, D2D1::ColorF::SeaGreen));
+    jsColorF->Set(isolate, "SeaShell", Number::New(isolate, D2D1::ColorF::SeaShell));
+    jsColorF->Set(isolate, "Sienna", Number::New(isolate, D2D1::ColorF::Sienna));
+    jsColorF->Set(isolate, "Silver", Number::New(isolate, D2D1::ColorF::Silver));
+    jsColorF->Set(isolate, "SkyBlue", Number::New(isolate, D2D1::ColorF::SkyBlue));
+    jsColorF->Set(isolate, "SlateBlue", Number::New(isolate, D2D1::ColorF::SlateBlue));
+    jsColorF->Set(isolate, "SlateGray", Number::New(isolate, D2D1::ColorF::SlateGray));
+    jsColorF->Set(isolate, "Snow", Number::New(isolate, D2D1::ColorF::Snow));
+    jsColorF->Set(isolate, "SpringGreen", Number::New(isolate, D2D1::ColorF::SpringGreen));
+    jsColorF->Set(isolate, "SteelBlue", Number::New(isolate, D2D1::ColorF::SteelBlue));
+    jsColorF->Set(isolate, "Tan", Number::New(isolate, D2D1::ColorF::Tan));
+    jsColorF->Set(isolate, "Teal", Number::New(isolate, D2D1::ColorF::Teal));
+    jsColorF->Set(isolate, "Thistle", Number::New(isolate, D2D1::ColorF::Thistle));
+    jsColorF->Set(isolate, "Tomato", Number::New(isolate, D2D1::ColorF::Tomato));
+    jsColorF->Set(isolate, "Turquoise", Number::New(isolate, D2D1::ColorF::Turquoise));
+    jsColorF->Set(isolate, "Violet", Number::New(isolate, D2D1::ColorF::Violet));
+    jsColorF->Set(isolate, "Wheat", Number::New(isolate, D2D1::ColorF::Wheat));
+    jsColorF->Set(isolate, "White", Number::New(isolate, D2D1::ColorF::White));
+    jsColorF->Set(isolate, "WhiteSmoke", Number::New(isolate, D2D1::ColorF::WhiteSmoke));
+    jsColorF->Set(isolate, "Yellow", Number::New(isolate, D2D1::ColorF::Yellow));
+    jsColorF->Set(isolate, "YellowGreen", Number::New(isolate, D2D1::ColorF::YellowGreen));
+
+    global->Set(isolate, "ColorF", jsColorF);
 
     setGlobalConst(DCX_WINDOW);
     setGlobalConst(DCX_CACHE);

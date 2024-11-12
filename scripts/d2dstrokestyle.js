@@ -39,6 +39,7 @@ function windowProc(hwnd, msg, wp, lp) {
         d2d.DrawLine((i*50 + i*10)+5, 5, (i*50+i*10+5)+50, 50+5, colorBrush, 5, customStrokeStyle); i++;
         d2d.DrawGradientLine((i*50 + i*10)+5, 5, (i*50+i*10+5)+50, 50+5, gradientBrush, 0, 5, dashStrokeStyle); i++;
         d2d.DrawGradientLine((i*50 + i*10)+5, 5, (i*50+i*10+5)+50, 50+5, gradientBrush, 0, 5, customStrokeStyle); i++;
+        //no draw geometry here but just trust the process (and by that i mean see d2dpaths.js !)
         //d2d.DrawRectangle(5, 5, 50+5, 50+5, colorBrush, 5, dashStrokeStyle); i++;
         //d2d.DrawRectangle(50+10+5, 5, (50+10+5)+50, 50+5, colorBrush, 5, customStrokeStyle); i++;
         //d2d.DrawRectangle(100+20+5, 5, (100+20+5)+50, 50+5, colorBrush, 5, dashStrokeStyle); i++;

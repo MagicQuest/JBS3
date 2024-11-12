@@ -320,13 +320,13 @@ class Blueprint {
     static padding = 16;
     static radius = 4;
 
-    static create(parent, title, color, x, y, width, height, parameters, out) {
-        const b = new Blueprint(parent, color, title, x, y, width, height, parameters, out);
+    static create(parent, title, color, x, y, width, height, parameters, out, pure) {
+        const b = new Blueprint(parent, color, title, x, y, width, height, parameters, out, pure);
         blueprints.push(b);
         return b;
     }
 
-    constructor(parent, title, color, x, y, width, height, parameters, out) {
+    constructor(parent, title, color, x, y, width, height, parameters, out, pure) {
         this.parent = parent;
         this.title = title;
         this.x = x;
@@ -368,6 +368,14 @@ class Blueprint {
             this.gradientStops.push(gsc);
             this.gradients.push(d2d.CreateRadialGradientBrush(Blueprint.padding, (i+1)*Blueprint.captionHeight+Blueprint.padding, 0, 0, this.width/2, Blueprint.captionHeight, gsc));
         }
+    }
+
+    getXAlong(connection, t) {
+        return (connection.x-this.x-this.width-8)*t;
+    }
+
+    getYAlong(connection, y, t) {
+        return (connection.y-this.y-y)*t;
     }
 
     redraw() { //wait i could lowkey draw basically all of these into a bitmap and draw that instead (efficiency) i was thinking about using a CommandList too //https://learn.microsoft.com/en-us/windows/win32/direct2d/improving-direct2d-performance
@@ -430,13 +438,13 @@ class Blueprint {
                 //const halfY = y + (connection.y-this.y)/2;
                 //const halfX = ((this.width-8)+connection.x-this.x)/2; //idk how these worked bruh for some reason it took forever for me to understand how exactly my math should be mathing
                 //const halfY = (y+connection.y-this.y)/2;
-                const getXAlong = (function(t) {
-                    return (connection.x-this.x-this.width-8)*t;
-                }).bind(this);
+                //const getXAlong = (function(t) {
+                //    return (connection.x-this.x-this.width-8)*t;
+                //}).bind(this);
 
-                const getYAlong = (function(t) {
-                    return (connection.y-this.y-y)*t;
-                }).bind(this);
+                //const getYAlong = (function(t) {
+                //    return (connection.y-this.y-y)*t;
+                //}).bind(this);
                 //d2d.DrawEllipse(halfX, halfY, 10, 10, colorBrush, 4);
                 //d2d.DrawEllipse(quarterX, quarterY, 5, 5, colorBrush, 4);
                 //print(draws);
@@ -445,8 +453,8 @@ class Blueprint {
                 //print(`c: {x: ${connection.x},y: ${connection.y}}\tthis: {x: ${this.x}, y: ${this.y}}`);
                 //print(`clientc: {x: ${connection.x-this.x},y: ${connection.y-this.y}}\tthis: {x: ${this.x}, y: ${this.y}}`);
 
-                const halfX = this.width-8 + getXAlong(.5);
-                const halfY = y + getYAlong(.5);
+                const halfX = this.width-8 + this.getXAlong(connection, .5);
+                const halfY = y + this.getYAlong(connection, y, .5);
 
                 const path = d2d.CreatePathGeometry();
                 const sink = path.Open();
@@ -455,12 +463,12 @@ class Blueprint {
                     sink.AddBeziers(
                         [
                             [this.width-8, y], //FloatFI(info[0].As<Array>()->Get(context, 0).ToLocalChecked().As<Array>()->Get(context, 0).ToLocalChecked())
-                            [this.width-8 + getXAlong(.4), y],
+                            [this.width-8 + this.getXAlong(connection, .4), y],
                             [halfX, halfY],
                         ],
                         [
                             [halfX, halfY],
-                            [halfX, y + getYAlong(.9)],
+                            [halfX, y + this.getYAlong(connection, y, .9)],
                             [connection.x-this.x, connection.y-this.y],
                         ]
                     );
@@ -585,7 +593,7 @@ function windowProc(hwnd, msg, wp, lp) {
         
         //otherwnd = new BottomPane(hwnd); //no longer blocks the thread as i make and draw every control myself
         blueprints.push(new Blueprint(hwnd, "Program", [95/255, 150/255, 187/255], 300, 100, 221, 90*2, ["fragmentShader : FRAGMENT_SHADER", "vertexShader : VERTEX_SHADER"], []));
-        blueprints.push(new Blueprint(hwnd, "Shader", [120/255, 168/255, 115/255], 0, 100, 221, 90, ["filename : string", "type : "], ["SHADER"]));
+        blueprints.push(new Blueprint(hwnd, "Shader", [120/255, 168/255, 115/255], 0, 100, 221, 90, ["filename : string", "type : number"], ["SHADER"]));
         d2dpaint();
     }else if(msg == WM_PAINT) {   
         dirty = true;
