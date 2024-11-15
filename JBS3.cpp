@@ -363,6 +363,93 @@ namespace jsImpl {
         }
     }
 
+    NOTIFYICONDATA fromJSNOTIFYICONDATA(Isolate* isolate, Local<Object> jsNID) {
+        Local<Context> context = isolate->GetCurrentContext();
+        NOTIFYICONDATA data{};
+        data.cbSize = sizeof(data);
+        //Local<Object> jsNID = info[1].As<Object>();
+        if (jsNID->Has(context, LITERAL("hWnd")).ToChecked()) {
+            data.hWnd = (HWND)IntegerFI(jsNID->Get(context, LITERAL("hWnd")).ToLocalChecked());
+        }
+
+        if (jsNID->Has(context, LITERAL("uID")).ToChecked()) {
+            data.uID = IntegerFI(jsNID->Get(context, LITERAL("uID")).ToLocalChecked());
+        }
+
+        if (jsNID->Has(context, LITERAL("uFlags")).ToChecked()) {
+            data.uFlags = IntegerFI(jsNID->Get(context, LITERAL("uFlags")).ToLocalChecked());
+        }
+
+        if (jsNID->Has(context, LITERAL("uCallbackMessage")).ToChecked()) {
+            data.uCallbackMessage = IntegerFI(jsNID->Get(context, LITERAL("uCallbackMessage")).ToLocalChecked());
+        }
+
+        if (jsNID->Has(context, LITERAL("hIcon")).ToChecked()) {
+            data.hIcon = (HICON)IntegerFI(jsNID->Get(context, LITERAL("hIcon")).ToLocalChecked());
+        }
+
+        if (jsNID->Has(context, LITERAL("szTip")).ToChecked()) {
+            //data.szTip = WStringFI(jsNID->Get(context, LITERAL("szTip")).ToLocalChecked());
+            //this seems like a bad idea but at the same time it's already initialized so im good
+            wcscpy(data.szTip, WStringFI(jsNID->Get(context, LITERAL("szTip")).ToLocalChecked()));
+        }
+
+        if (jsNID->Has(context, LITERAL("dwState")).ToChecked()) {
+            data.dwState = IntegerFI(jsNID->Get(context, LITERAL("dwState")).ToLocalChecked());
+        }
+
+        if (jsNID->Has(context, LITERAL("dwStateMask")).ToChecked()) {
+            data.dwStateMask = IntegerFI(jsNID->Get(context, LITERAL("dwStateMask")).ToLocalChecked());
+        }
+
+        if (jsNID->Has(context, LITERAL("szInfo")).ToChecked()) {
+            //data.szInfo = WStringFI(jsNID->Get(context, LITERAL("szInfo")).ToLocalChecked());
+            wcscpy(data.szInfo, WStringFI(jsNID->Get(context, LITERAL("szInfo")).ToLocalChecked()));
+        }
+
+        //if (jsNID->Has(context, LITERAL("uTimeout")).ToChecked()) {
+        //    data.uTimeout = IntegerFI(jsNID->Get(context, LITERAL("uTimeout")).ToLocalChecked());
+        //}
+
+        if (jsNID->Has(context, LITERAL("uVersion")).ToChecked()) {
+            data.uVersion = IntegerFI(jsNID->Get(context, LITERAL("uVersion")).ToLocalChecked());
+        }
+
+        if (jsNID->Has(context, LITERAL("szInfoTitle")).ToChecked()) {
+            //data.szInfoTitle = WStringFI(jsNID->Get(context, LITERAL("szInfoTitle")).ToLocalChecked());
+            wcscpy(data.szInfoTitle, WStringFI(jsNID->Get(context, LITERAL("szInfoTitle")).ToLocalChecked()));
+        }
+
+        if (jsNID->Has(context, LITERAL("dwInfoFlags")).ToChecked()) {
+            data.dwInfoFlags = IntegerFI(jsNID->Get(context, LITERAL("dwInfoFlags")).ToLocalChecked());
+        }
+
+        if (jsNID->Has(context, LITERAL("guidItem")).ToChecked()) {
+            //data.guidItem = IntegerFI(jsNID->Get(context, LITERAL("guidItem")).ToLocalChecked());
+            if (jsNID->Get(context, LITERAL("guidItem")).ToLocalChecked()->IsArray()) {
+                Local<Array> id = jsNID->Get(context, LITERAL("guidItem")).ToLocalChecked().As<Array>();
+                GUID shit = { IntegerFI(id->Get(context, 0).ToLocalChecked()),
+                    IntegerFI(id->Get(context, 1).ToLocalChecked()),
+                    IntegerFI(id->Get(context, 2).ToLocalChecked()),
+                    IntegerFI(id->Get(context, 3).ToLocalChecked()),
+                    IntegerFI(id->Get(context, 4).ToLocalChecked()),
+                    IntegerFI(id->Get(context, 5).ToLocalChecked()),
+                    IntegerFI(id->Get(context, 6).ToLocalChecked()),
+                    IntegerFI(id->Get(context, 7).ToLocalChecked()),
+                    IntegerFI(id->Get(context, 8).ToLocalChecked()),
+                    IntegerFI(id->Get(context, 9).ToLocalChecked()),
+                    IntegerFI(id->Get(context, 10).ToLocalChecked()) };
+                data.guidItem = shit;
+            }
+        }
+
+        if (jsNID->Has(context, LITERAL("hBalloonIcon")).ToChecked()) {
+            data.hBalloonIcon = (HICON)IntegerFI(jsNID->Get(context, LITERAL("hBalloonIcon")).ToLocalChecked());
+        }
+
+        return data;
+    }
+
     Local<ObjectTemplate> JSDWriteFontFamily;
     Local<ObjectTemplate> JSDWriteFont;
     Local<ObjectTemplate> JSD2D1MappedRect;
@@ -786,9 +873,11 @@ void RawPrint(const v8::FunctionCallbackInfo<v8::Value>& info) {
         //}
         v8::String::Utf8Value str(info.GetIsolate(), info[i]);
         const char* cstr = *str ? *str : "<string conversion failed>";
-        print(cstr);
-        print(" ");
+        printf("%s", cstr);
+        printf(" ");
     }
+    printf("\n");
+    fflush(stdout);
 }
 
 void Print(const v8::FunctionCallbackInfo<v8::Value>& info) {
@@ -807,7 +896,7 @@ void Print(const v8::FunctionCallbackInfo<v8::Value>& info) {
         //}
         v8::String::Utf8Value str(info.GetIsolate(), info[i]);
         const char* cstr = *str ? *str: "<string conversion failed>";//ToCString(str);
-        printf("%s", Highlight(info.GetIsolate(), console, info[i])); //print syntax colors for the console
+        printf("%s", Highlight(info.GetIsolate(), console, info[i])); //print syntax colors for the console (actually because if info[i] is an object it returns stuff)
         //const char* color = "";
         //if (!info[i]->IsString()) {
         //    if (info[i]->IsNumber()) {//atoi(cstr)) {
@@ -10579,7 +10668,8 @@ V8FUNC(DwmGetWindowAttributeWrapper) {
             else {
                 //how do i throw an error
                 std::string errorcode = (std::string("HRESULT ERR: ") + std::to_string(hr));
-                info.GetReturnValue().Set(Exception::Error(String::NewFromUtf8(isolate, errorcode.c_str(), NewStringType::kNormal, errorcode.size()).ToLocalChecked())); //idk why it wouldn't except utf8literal
+                isolate->ThrowError(String::NewFromUtf8(isolate, errorcode.data()).ToLocalChecked());
+                //info.GetReturnValue().Set(Exception::Error(String::NewFromUtf8(isolate, errorcode.c_str(), NewStringType::kNormal, errorcode.size()).ToLocalChecked())); //idk why it wouldn't except utf8literal
             }
         }
             break;
@@ -10599,7 +10689,8 @@ V8FUNC(DwmGetWindowAttributeWrapper) {
             else {
                 //how do i throw an error
                 std::string errorcode = (std::string("HRESULT ERR: ") + std::to_string(hr));
-                info.GetReturnValue().Set(Exception::Error(String::NewFromUtf8(isolate, errorcode.c_str(), NewStringType::kNormal, errorcode.size()).ToLocalChecked())); //idk why it wouldn't except utf8literal
+                //info.GetReturnValue().Set(Exception::Error(String::NewFromUtf8(isolate, errorcode.c_str(), NewStringType::kNormal, errorcode.size()).ToLocalChecked())); //idk why it wouldn't except utf8literal
+                isolate->ThrowError(String::NewFromUtf8(isolate, errorcode.data()).ToLocalChecked());
             }
         }
             break;
@@ -10618,7 +10709,8 @@ V8FUNC(DwmGetWindowAttributeWrapper) {
             else {
                 //how do i throw an error
                 std::string errorcode = (std::string("HRESULT ERR: ") + std::to_string(hr));
-                info.GetReturnValue().Set(Exception::Error(String::NewFromUtf8(isolate, errorcode.c_str(), NewStringType::kNormal, errorcode.size()).ToLocalChecked())); //idk why it wouldn't except utf8literal
+                //info.GetReturnValue().Set(Exception::Error(String::NewFromUtf8(isolate, errorcode.c_str(), NewStringType::kNormal, errorcode.size()).ToLocalChecked())); //idk why it wouldn't except utf8literal
+                isolate->ThrowError(String::NewFromUtf8(isolate, errorcode.data()).ToLocalChecked());
             }
         }
         break;
@@ -10631,12 +10723,13 @@ V8FUNC(DwmGetWindowAttributeWrapper) {
                 &thickness,
                 sizeof(thickness));
             if (hr == S_OK) {
-                info.GetReturnValue().Set(Uint32::NewFromUnsigned(isolate, thickness));
+                info.GetReturnValue().Set(Uint32::NewFromUnsigned(isolate, thickness)); //what was i doing here
             }
             else {
                 //how do i throw an error
                 std::string errorcode = (std::string("HRESULT ERR: ") + std::to_string(hr));
-                info.GetReturnValue().Set(Exception::Error(String::NewFromUtf8(isolate, errorcode.c_str(), NewStringType::kNormal, errorcode.size()).ToLocalChecked())); //idk why it wouldn't except utf8literal
+                //info.GetReturnValue().Set(Exception::Error(String::NewFromUtf8(isolate, errorcode.c_str(), NewStringType::kNormal, errorcode.size()).ToLocalChecked())); //idk why it wouldn't except utf8literal
+                isolate->ThrowError(String::NewFromUtf8(isolate, errorcode.data()).ToLocalChecked());
             }
         }
             break;
@@ -12531,6 +12624,8 @@ V8FUNC(ArrayBufferFromPointer) {
     info.GetReturnValue().Set(arr);
 }
 
+//https://stackoverflow.com/questions/25915634/difference-between-microtask-and-macrotask-within-an-event-loop-context
+//https://medium.com/node-gem/learning-v8-tasks-microtasks-f384ec68ac63
 V8FUNC(spawn) {
     //OH YEAH lua(u) spawn use this at your own risk
     using namespace v8;
@@ -13363,11 +13458,17 @@ V8FUNC(getlineWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
 
-    wchar_t wstr[256];
-    std::wcout << WStringFI(info[0]);
-    std::wcin.getline(wstr, 256);
+    uint32_t len = 256;
+    if (info[1]->IsNumber()) {
+        len = IntegerFI(info[1]);
+    }
 
-    info.GetReturnValue().Set(String::NewFromTwoByte(isolate, (const uint16_t*)wstr).ToLocalChecked());
+    std::wstring wstr(len, L'#');
+    //wchar_t wstr[256];
+    std::wcout << WStringFI(info[0]);
+    std::wcin.getline((wchar_t*)wstr.data(), len);
+
+    info.GetReturnValue().Set(String::NewFromTwoByte(isolate, (const uint16_t*)wstr.data()).ToLocalChecked());
 }
 
 //V8FUNC(Animate_OpenWrapper) {
@@ -13684,18 +13785,27 @@ V8FUNC(WriteFileWrapper) {
 
     Local<Value> data = info[1];
 
-    if (data->IsNumber() || data->IsBoolean()) {
+    //union {
+    //    long long number;
+    //    const wchar_t* wstring;
+    //    void* idk;
+    //} mangounion{};
+
+    if (data->IsNumber() || data->IsBoolean()) { //oh snap instead of doing this potential access violation of a move, i could use a union!
         long long tempshit = IntegerFI(data);
         buffer = &tempshit; //don't do this kids...
+        //mangounion.number = tempshit;
         length = sizeof(long long);
     }
     else if (data->IsString()) {
         buffer = (void*)WStringFI(data);
+        //mangounion.wstring = WStringFI(data); //aw man this ain't working (prolly because v8 moves the shitss around and i lose this pointer data)
         length = wcslen(WStringFI(data))*sizeof(wchar_t);
     }
     else if (data->IsArrayBufferView()) {
         Local<ArrayBufferView> abv = data.As<ArrayBufferView>();
         buffer = abv->Buffer()->Data();
+        //mangounion.idk = abv->Buffer()->Data();
         length = abv->ByteLength();
     }
 
@@ -13762,6 +13872,149 @@ V8FUNC(ReadFileWrapper) {
     }
 }
 
+V8FUNC(Shell_NotifyIconWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    //Local<Context> context = isolate->GetCurrentContext();
+
+    NOTIFYICONDATA data = jsImpl::fromJSNOTIFYICONDATA(isolate, info[1].As<Object>());
+
+    //https://stackoverflow.com/questions/6270539/how-to-shell-notifyicon-without-adding-an-icon-in-the-notification-area
+    info.GetReturnValue().Set(Shell_NotifyIcon(IntegerFI(info[0]), &data));
+}
+
+V8FUNC(Shell_NotifyIconGetRectWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    Local<Context> context = isolate->GetCurrentContext();
+
+    NOTIFYICONIDENTIFIER identifier{};
+    identifier.cbSize = sizeof(identifier);
+    Local<Object> jsNII = info[0].As<Object>();
+    if (jsNII->Has(context, LITERAL("hWnd")).ToChecked()) {
+        identifier.hWnd = (HWND)IntegerFI(jsNII->Get(context, LITERAL("hWnd")).ToLocalChecked());
+    }
+    if (jsNII->Has(context, LITERAL("uID")).ToChecked()) {
+        identifier.uID = IntegerFI(jsNII->Get(context, LITERAL("uID")).ToLocalChecked());
+    }
+    if (jsNII->Has(context, LITERAL("guidItem")).ToChecked()) {
+        if (jsNII->Get(context, LITERAL("guidItem")).ToLocalChecked()->IsArray()) {
+            Local<Array> id = jsNII->Get(context, LITERAL("guidItem")).ToLocalChecked().As<Array>();
+            GUID shit = { IntegerFI(id->Get(context, 0).ToLocalChecked()),
+                IntegerFI(id->Get(context, 1).ToLocalChecked()),
+                IntegerFI(id->Get(context, 2).ToLocalChecked()),
+                IntegerFI(id->Get(context, 3).ToLocalChecked()),
+                IntegerFI(id->Get(context, 4).ToLocalChecked()),
+                IntegerFI(id->Get(context, 5).ToLocalChecked()),
+                IntegerFI(id->Get(context, 6).ToLocalChecked()),
+                IntegerFI(id->Get(context, 7).ToLocalChecked()),
+                IntegerFI(id->Get(context, 8).ToLocalChecked()),
+                IntegerFI(id->Get(context, 9).ToLocalChecked()),
+                IntegerFI(id->Get(context, 10).ToLocalChecked()) };
+            identifier.guidItem = shit;
+        }
+    }
+
+    RECT r{};
+    RetPrintIfFailed(Shell_NotifyIconGetRect(&identifier, &r), "Shell_NotifyIconGetRect failed");
+
+    info.GetReturnValue().Set(jsImpl::createWinRect(isolate, r));
+}
+
+V8FUNC(NOTIFYICONIDENTIFIERWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    Local<Context> context = isolate->GetCurrentContext();
+
+    Local<Object> jsNII = Object::New(isolate);
+    jsNII->Set(context, LITERAL("hWnd"), info[0]);
+    jsNII->Set(context, LITERAL("uID"), info[1]);
+    jsNII->Set(context, LITERAL("guidItem"), info[2]);
+
+    info.GetReturnValue().Set(jsNII);
+}
+
+V8FUNC(NOTIFYICONDATAWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    Local<Context> context = isolate->GetCurrentContext();
+
+    Local<Object> jsNID = Object::New(isolate);
+    jsNID->Set(context, LITERAL("hWnd"), info[0]);
+    jsNID->Set(context, LITERAL("uID"), info[1]);
+    jsNID->Set(context, LITERAL("uFlags"), info[2]);
+    jsNID->Set(context, LITERAL("uCallbackMessage"), info[3]);
+    jsNID->Set(context, LITERAL("hIcon"), info[4]);
+    jsNID->Set(context, LITERAL("szTip"), info[5]);
+    jsNID->Set(context, LITERAL("dwState"), info[6]);
+    jsNID->Set(context, LITERAL("dwStateMask"), info[7]);
+    jsNID->Set(context, LITERAL("szInfo"), info[8]);
+    //jsNID->Set(context, LITERAL("uTimeout"), info[9]);
+    jsNID->Set(context, LITERAL("uVersion"), info[9]);
+    jsNID->Set(context, LITERAL("szInfoTitle"), info[10]);
+    jsNID->Set(context, LITERAL("dwInfoFlags"), info[11]);
+    jsNID->Set(context, LITERAL("guidItem"), info[12]); //.As<Array>());
+    jsNID->Set(context, LITERAL("hBalloonIcon"), info[13]);
+
+    info.GetReturnValue().Set(jsNID);
+}
+
+V8FUNC(OVERLAPPEDWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    Local<Context> context = isolate->GetCurrentContext();
+
+    Local<Object> jsOverlapped = Object::New(isolate);
+    jsOverlapped->Set(context, LITERAL("Internal"), info[0]);
+    jsOverlapped->Set(context, LITERAL("InternalHigh"), info[1]);
+    jsOverlapped->Set(context, LITERAL("Offset"), info[2]);
+    jsOverlapped->Set(context, LITERAL("OffsetHigh"), info[3]);
+    jsOverlapped->Set(context, LITERAL("hEvent"), info[4]);
+
+    info.GetReturnValue().Set(jsOverlapped);
+}
+
+//V8FUNC(ObjectTest) {
+//    using namespace v8;
+//    Isolate* isolate = info.GetIsolate();
+//
+//    //if(info.IsConstructCall()) //wait nevermind you can call a function with new and just return an object like it would automatically do if you used this
+//    Local<Object> jsIdk = Object::New(isolate);
+//
+//}
+
+V8FUNC(RtlGetLastNtStatusWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    HINSTANCE ntdll = LoadLibrary(L"ntdll.dll");
+    if (!ntdll) {
+        info.GetReturnValue().Set(0);
+    }
+    else {
+        typedef NTSTATUS(WINAPI* RtlFunc)();
+
+        RtlFunc RtlGetLastNtStatus = (RtlFunc)GetProcAddress(ntdll, "RtlGetLastNtStatus");
+        if (!RtlGetLastNtStatus) {
+            FreeLibrary(ntdll);
+            info.GetReturnValue().Set(0);
+        }
+
+        info.GetReturnValue().Set((int32_t)RtlGetLastNtStatus());
+
+        FreeLibrary(ntdll);
+    }
+}
+
+//V8FUNC(CompareObjectHandlesWrapper) { //why is this not linked already like what do i have left to link with jbs
+//    using namespace v8;
+//    Isolate* isolate = info.GetIsolate();
+//
+//    info.GetReturnValue().Set(CompareObjectHandles((HANDLE)IntegerFI(info[0]), (HANDLE)IntegerFI(info[1])));
+//}
+
+//i think im allowed to use a snapshot thing to load these quicker
+//https://github.com/danbev/learning-v8/blob/master/notes/snapshots.md
 v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const wchar_t* filename, int nCmdShow) {
     using namespace v8;
 
@@ -13988,6 +14241,7 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const wchar_t* filename
     setGlobalConstLONGPTR(INVALID_HANDLE_VALUE);
     setGlobalConst(MAX_PATH);
 
+    setGlobalWrapper(OVERLAPPED);
     setGlobalWrapper(CreateFile);
     setGlobalConst(GENERIC_READ);
     setGlobalConst(GENERIC_WRITE);
@@ -14107,6 +14361,35 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const wchar_t* filename
     setGlobalConst(FILE_FLAG_OPEN_REPARSE_POINT);
     setGlobalConst(FILE_FLAG_OPEN_NO_RECALL);
     setGlobalConst(FILE_FLAG_FIRST_PIPE_INSTANCE);
+
+    setGlobalWrapper(Shell_NotifyIcon);
+    setGlobalWrapper(Shell_NotifyIconGetRect);
+    setGlobalWrapper(NOTIFYICONDATA);
+    setGlobalWrapper(NOTIFYICONIDENTIFIER);
+    setGlobalConst(NIM_ADD);
+    setGlobalConst(NIM_MODIFY);
+    setGlobalConst(NIM_DELETE);
+    setGlobalConst(NIM_SETFOCUS);
+    setGlobalConst(NIM_SETVERSION);
+    setGlobalConst(NIF_MESSAGE);
+    setGlobalConst(NIF_ICON);
+    setGlobalConst(NIF_TIP);
+    setGlobalConst(NIF_STATE);
+    setGlobalConst(NIF_INFO);
+    setGlobalConst(NIF_GUID);
+    setGlobalConst(NIF_REALTIME);
+    setGlobalConst(NIF_SHOWTIP);
+    setGlobalConst(NIS_HIDDEN);
+    setGlobalConst(NIS_SHAREDICON);
+    setGlobalConst(NIIF_NONE);
+    setGlobalConst(NIIF_INFO);
+    setGlobalConst(NIIF_WARNING);
+    setGlobalConst(NIIF_ERROR);
+    setGlobalConst(NIIF_USER);
+    setGlobalConst(NIIF_ICON_MASK);
+    setGlobalConst(NIIF_NOSOUND);
+    setGlobalConst(NIIF_LARGE_ICON);
+    setGlobalConst(NIIF_RESPECT_QUIET_TIME);
 
     //setGlobalWrapper(CloseHandle);
     //setGlobalWrapper(ReadDirectoryChanges);
@@ -14668,6 +14951,7 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const wchar_t* filename
     setGlobalWrapper(GetModuleBaseName);
     setGlobalWrapper(GetModuleFileName);
     setGlobalWrapper(GetModuleFileNameEx);
+    //setGlobalWrapper(CompareObjectHandles);
     setGlobalWrapper(CloseHandle);
     setGlobalConst(PROCESS_TERMINATE);
     setGlobalConst(PROCESS_CREATE_THREAD);
@@ -15670,6 +15954,8 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const wchar_t* filename
     setGlobalConst(LBS_COMBOBOX);
     setGlobalConst(LBS_STANDARD);
 
+    setGlobalConst(WM_APP);
+    setGlobalConst(WM_USER);
     setGlobalConst(WM_NULL); setGlobalConst(WM_CREATE); setGlobalConst(WM_DESTROY); setGlobalConst(WM_MOVE); setGlobalConst(WM_SIZE); setGlobalConst(WM_ACTIVATE); setGlobalConst(WM_SETFOCUS); setGlobalConst(WM_KILLFOCUS); setGlobalConst(WM_ENABLE); setGlobalConst(WM_SETREDRAW); setGlobalConst(WM_SETTEXT); setGlobalConst(WM_GETTEXT); setGlobalConst(WM_GETTEXTLENGTH); setGlobalConst(WM_PAINT); setGlobalConst(WM_CLOSE); setGlobalConst(WM_QUERYENDSESSION); setGlobalConst(WM_QUIT); setGlobalConst(WM_QUERYOPEN); setGlobalConst(WM_ERASEBKGND); setGlobalConst(WM_SYSCOLORCHANGE); setGlobalConst(WM_ENDSESSION); setGlobalConst(WM_SHOWWINDOW); setGlobalConst(WM_WININICHANGE); setGlobalConst(WM_DEVMODECHANGE); setGlobalConst(WM_ACTIVATEAPP); setGlobalConst(WM_FONTCHANGE); setGlobalConst(WM_TIMECHANGE); setGlobalConst(WM_CANCELMODE); setGlobalConst(WM_SETCURSOR); setGlobalConst(WM_MOUSEACTIVATE); setGlobalConst(WM_CHILDACTIVATE); setGlobalConst(WM_QUEUESYNC); setGlobalConst(WM_GETMINMAXINFO); setGlobalConst(WM_PAINTICON); setGlobalConst(WM_ICONERASEBKGND); setGlobalConst(WM_NEXTDLGCTL); setGlobalConst(WM_SPOOLERSTATUS); setGlobalConst(WM_DRAWITEM); setGlobalConst(WM_MEASUREITEM); setGlobalConst(WM_DELETEITEM); setGlobalConst(WM_VKEYTOITEM); setGlobalConst(WM_CHARTOITEM); setGlobalConst(WM_SETFONT); setGlobalConst(WM_GETFONT); setGlobalConst(WM_SETHOTKEY); setGlobalConst(WM_GETHOTKEY); setGlobalConst(WM_QUERYDRAGICON); setGlobalConst(WM_COMPAREITEM); setGlobalConst(WM_GETOBJECT); setGlobalConst(WM_COMPACTING); setGlobalConst(WM_COMMNOTIFY); setGlobalConst(WM_WINDOWPOSCHANGING); setGlobalConst(WM_WINDOWPOSCHANGED); setGlobalConst(WM_POWER); setGlobalConst(WM_COPYDATA); setGlobalConst(WM_CANCELJOURNAL); setGlobalConst(WM_NOTIFY); setGlobalConst(WM_INPUTLANGCHANGEREQUEST); setGlobalConst(WM_INPUTLANGCHANGE); setGlobalConst(WM_TCARD); setGlobalConst(WM_HELP); setGlobalConst(WM_USERCHANGED); setGlobalConst(WM_NOTIFYFORMAT); setGlobalConst(WM_CONTEXTMENU); setGlobalConst(WM_STYLECHANGING); setGlobalConst(WM_STYLECHANGED); setGlobalConst(WM_DISPLAYCHANGE); setGlobalConst(WM_GETICON); setGlobalConst(WM_SETICON); setGlobalConst(WM_NCCREATE); setGlobalConst(WM_NCDESTROY); setGlobalConst(WM_NCCALCSIZE); setGlobalConst(WM_NCHITTEST); setGlobalConst(WM_NCPAINT); setGlobalConst(WM_NCACTIVATE); setGlobalConst(WM_GETDLGCODE); setGlobalConst(WM_SYNCPAINT); setGlobalConst(WM_NCMOUSEMOVE); setGlobalConst(WM_NCLBUTTONDOWN); setGlobalConst(WM_NCLBUTTONUP); setGlobalConst(WM_NCLBUTTONDBLCLK); setGlobalConst(WM_NCRBUTTONDOWN); setGlobalConst(WM_NCRBUTTONUP); setGlobalConst(WM_NCRBUTTONDBLCLK); setGlobalConst(WM_NCMBUTTONDOWN); setGlobalConst(WM_NCMBUTTONUP); setGlobalConst(WM_NCMBUTTONDBLCLK); setGlobalConst(WM_NCXBUTTONDOWN); setGlobalConst(WM_NCXBUTTONUP); setGlobalConst(WM_NCXBUTTONDBLCLK); setGlobalConst(WM_INPUT); setGlobalConst(WM_KEYDOWN); setGlobalConst(WM_KEYFIRST); setGlobalConst(WM_KEYUP); setGlobalConst(WM_CHAR); setGlobalConst(WM_DEADCHAR); setGlobalConst(WM_SYSKEYDOWN); setGlobalConst(WM_SYSKEYUP); setGlobalConst(WM_SYSCHAR); setGlobalConst(WM_SYSDEADCHAR); setGlobalConst(WM_UNICHAR / WM_KEYLAST); setGlobalConst(WM_IME_STARTCOMPOSITION); setGlobalConst(WM_IME_ENDCOMPOSITION); setGlobalConst(WM_IME_COMPOSITION); setGlobalConst(WM_IME_KEYLAST); setGlobalConst(WM_INITDIALOG); setGlobalConst(WM_COMMAND); setGlobalConst(WM_SYSCOMMAND); setGlobalConst(WM_TIMER); setGlobalConst(WM_HSCROLL); setGlobalConst(WM_VSCROLL); setGlobalConst(WM_INITMENU); setGlobalConst(WM_INITMENUPOPUP); setGlobalConst(WM_MENUSELECT); setGlobalConst(WM_MENUCHAR); setGlobalConst(WM_ENTERIDLE); setGlobalConst(WM_MENURBUTTONUP); setGlobalConst(WM_MENUDRAG); setGlobalConst(WM_MENUGETOBJECT); setGlobalConst(WM_UNINITMENUPOPUP); setGlobalConst(WM_MENUCOMMAND); setGlobalConst(WM_CHANGEUISTATE); setGlobalConst(WM_UPDATEUISTATE); setGlobalConst(WM_QUERYUISTATE); setGlobalConst(WM_CTLCOLORMSGBOX); setGlobalConst(WM_CTLCOLOREDIT); setGlobalConst(WM_CTLCOLORLISTBOX); setGlobalConst(WM_CTLCOLORBTN); setGlobalConst(WM_CTLCOLORDLG); setGlobalConst(WM_CTLCOLORSCROLLBAR); setGlobalConst(WM_CTLCOLORSTATIC); setGlobalConst(WM_MOUSEFIRST); setGlobalConst(WM_MOUSEMOVE); setGlobalConst(WM_LBUTTONDOWN); setGlobalConst(WM_LBUTTONUP); setGlobalConst(WM_LBUTTONDBLCLK); setGlobalConst(WM_RBUTTONDOWN); setGlobalConst(WM_RBUTTONUP); setGlobalConst(WM_RBUTTONDBLCLK); setGlobalConst(WM_MBUTTONDOWN); setGlobalConst(WM_MBUTTONUP); setGlobalConst(WM_MBUTTONDBLCLK); setGlobalConst(WM_MOUSELAST); setGlobalConst(WM_MOUSEWHEEL); setGlobalConst(WM_XBUTTONDOWN); setGlobalConst(WM_XBUTTONUP); setGlobalConst(WM_XBUTTONDBLCLK); setGlobalConst(WM_MOUSEHWHEEL); setGlobalConst(WM_PARENTNOTIFY); setGlobalConst(WM_ENTERMENULOOP); setGlobalConst(WM_EXITMENULOOP); setGlobalConst(WM_NEXTMENU); setGlobalConst(WM_SIZING); setGlobalConst(WM_CAPTURECHANGED); setGlobalConst(WM_MOVING); setGlobalConst(WM_POWERBROADCAST); setGlobalConst(WM_DEVICECHANGE); setGlobalConst(WM_MDICREATE); setGlobalConst(WM_MDIDESTROY); setGlobalConst(WM_MDIACTIVATE); setGlobalConst(WM_MDIRESTORE); setGlobalConst(WM_MDINEXT); setGlobalConst(WM_MDIMAXIMIZE); setGlobalConst(WM_MDITILE); setGlobalConst(WM_MDICASCADE); setGlobalConst(WM_MDIICONARRANGE); setGlobalConst(WM_MDIGETACTIVE); setGlobalConst(WM_MDISETMENU); setGlobalConst(WM_ENTERSIZEMOVE); setGlobalConst(WM_EXITSIZEMOVE); setGlobalConst(WM_DROPFILES); setGlobalConst(WM_MDIREFRESHMENU); setGlobalConst(WM_IME_SETCONTEXT); setGlobalConst(WM_IME_NOTIFY); setGlobalConst(WM_IME_CONTROL); setGlobalConst(WM_IME_COMPOSITIONFULL); setGlobalConst(WM_IME_SELECT); setGlobalConst(WM_IME_CHAR); setGlobalConst(WM_IME_REQUEST); setGlobalConst(WM_IME_KEYDOWN); setGlobalConst(WM_IME_KEYUP); setGlobalConst(WM_NCMOUSEHOVER); setGlobalConst(WM_MOUSEHOVER); setGlobalConst(WM_NCMOUSELEAVE); setGlobalConst(WM_MOUSELEAVE); setGlobalConst(WM_CUT); setGlobalConst(WM_COPY); setGlobalConst(WM_PASTE); setGlobalConst(WM_CLEAR); setGlobalConst(WM_UNDO); setGlobalConst(WM_RENDERFORMAT); setGlobalConst(WM_RENDERALLFORMATS); setGlobalConst(WM_DESTROYCLIPBOARD); setGlobalConst(WM_DRAWCLIPBOARD); setGlobalConst(WM_PAINTCLIPBOARD); setGlobalConst(WM_VSCROLLCLIPBOARD); setGlobalConst(WM_SIZECLIPBOARD); setGlobalConst(WM_ASKCBFORMATNAME); setGlobalConst(WM_CHANGECBCHAIN); setGlobalConst(WM_HSCROLLCLIPBOARD); setGlobalConst(WM_QUERYNEWPALETTE); setGlobalConst(WM_PALETTEISCHANGING); setGlobalConst(WM_PALETTECHANGED); setGlobalConst(WM_HOTKEY); setGlobalConst(WM_PRINT); setGlobalConst(WM_PRINTCLIENT); setGlobalConst(WM_APPCOMMAND); setGlobalConst(WM_HANDHELDFIRST); setGlobalConst(WM_HANDHELDLAST); setGlobalConst(WM_AFXFIRST); setGlobalConst(WM_AFXLAST); setGlobalConst(WM_PENWINFIRST); setGlobalConst(WM_PENWINLAST); setGlobalConst(WM_PSD_PAGESETUPDLG); setGlobalConst(WM_USER); setGlobalConst(WM_CHOOSEFONT_GETLOGFONT); setGlobalConst(WM_PSD_FULLPAGERECT); setGlobalConst(WM_PSD_MINMARGINRECT); setGlobalConst(WM_PSD_MARGINRECT); setGlobalConst(WM_PSD_GREEKTEXTRECT); setGlobalConst(WM_PSD_ENVSTAMPRECT); setGlobalConst(WM_PSD_YAFULLPAGERECT); setGlobalConst(WM_CHOOSEFONT_SETLOGFONT); setGlobalConst(WM_CHOOSEFONT_SETFLAGS);
     setGlobalConst(HTERROR);
     setGlobalConst(HTTRANSPARENT);
@@ -16826,6 +17112,7 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
     setGlobalWrapper(GetClassLongPtr);
     setGlobalWrapper(GetWindowLongPtr);
     
+    setGlobalWrapper(RtlGetLastNtStatus);
     setGlobalWrapper(GetLastError);
     setGlobalWrapper(_com_error);
     setGlobalWrapper(Beep);
@@ -16911,6 +17198,10 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrevInstance, PWSTR nCmdList, in
     //outbuf ob;
     //std::streambuf* sb = std::cout.rdbuf(&ob);
 
+    //wait apparently (since the new terminal came out like way before i started making jbs LOL) you are supposed to create a console differently (idk how exactly yet lol plus i like the good ol' classic console)
+    //https://learn.microsoft.com/en-us/windows/console/getconsolewindow
+    //https://learn.microsoft.com/en-us/windows/console/classic-vs-vt
+    //https://learn.microsoft.com/en-us/windows/console/creating-a-pseudoconsole-session
     AllocConsole();
 
     BindCrtHandlesToStdHandles(true, true, true); //redirrect console output?!

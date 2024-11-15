@@ -38,7 +38,7 @@ const hand = LoadCursor(NULL, IDC_HAND);
 
 const Int_To_WM = function() { //this gotta be the only good reason to use a closure
     const wm = {}; //with a closure im using wm like it's static!!!
-    Object.entries(globalThis).filter(([key, value]) => {
+    Object.entries(globalThis).filter(([key, value]) => { //wait why am i doing a filter instead of just forEach
         let k = key.indexOf("WM_") == 0;
         k && (wm[value] = key); //since Object.entries returns stuff like [["WM_PAINT", 0], ["WM_CREATE", 1]] im just setting the values directly (also im swapping key and value here so it's easier to get the name of the message by the number)
         return k;

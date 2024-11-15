@@ -1,3 +1,5 @@
+//taskslikeifoundamongus.js' big brother
+
 const fs = require("fs");
 
 let window, dc, compat, font, fheight;

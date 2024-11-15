@@ -112,6 +112,8 @@ function windowProc(hwnd, msg, wp, lp) {
         StretchBlt(dc, 0, 0, screenWidth, screenHeight, memDC, 0, 0, vwidth, vheight, SRCCOPY);
         //TransparentBlt(screen, 0, 0, screenWidth, screenHeight, memDC, 0, 0, width, height, RGB(255,255,255)); //wait im moving this to badapple.js
         DeleteDC(memDC);
+
+        print(GetGuiResources(GetCurrentProcess(), GR_GDIOBJECTS));
     }
     else if(msg == WM_DESTROY) {
         PostQuitMessage(0);

@@ -1,3 +1,5 @@
+//aw it doesn't look like a normal progress bar because i have to enable common controls 6 when compiling
+
 let prog;
 
 function windowProc(hwnd, msg, wp, lp) {
