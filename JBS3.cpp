@@ -272,6 +272,28 @@ namespace jsImpl {
         return menuiinfo;
     }
 
+    GUID fromJSGUID(Isolate* isolate, Local<Value> jsGUID) {
+        if (jsGUID->IsArray()) {
+            Local<Array> id = jsGUID.As<Array>();
+            Local<Context> context = isolate->GetCurrentContext();
+            return GUID{ (unsigned long)IntegerFI(id->Get(context, 0).ToLocalChecked()),
+                    (unsigned short)IntegerFI(id->Get(context, 1).ToLocalChecked()),
+                    (unsigned short)IntegerFI(id->Get(context, 2).ToLocalChecked()),
+                    (unsigned char)IntegerFI(id->Get(context, 3).ToLocalChecked()),
+                    (unsigned char)IntegerFI(id->Get(context, 4).ToLocalChecked()),
+                    (unsigned char)IntegerFI(id->Get(context, 5).ToLocalChecked()),
+                    (unsigned char)IntegerFI(id->Get(context, 6).ToLocalChecked()),
+                    (unsigned char)IntegerFI(id->Get(context, 7).ToLocalChecked()),
+                    (unsigned char)IntegerFI(id->Get(context, 8).ToLocalChecked()),
+                    (unsigned char)IntegerFI(id->Get(context, 9).ToLocalChecked()),
+                    (unsigned char)IntegerFI(id->Get(context, 10).ToLocalChecked()) };
+        }
+        else {
+            print("bad guid passed (lowkey don't know from where tho...)");
+            return GUID_NULL;
+        }
+    }
+
     //template<typename T>
     //void aDA(Isolate* isolate, Local<Object>& jsArray, T t) {
         //jsArray->Set(isolate->GetCurrentContext(), )
@@ -426,21 +448,22 @@ namespace jsImpl {
 
         if (jsNID->Has(context, LITERAL("guidItem")).ToChecked()) {
             //data.guidItem = IntegerFI(jsNID->Get(context, LITERAL("guidItem")).ToLocalChecked());
-            if (jsNID->Get(context, LITERAL("guidItem")).ToLocalChecked()->IsArray()) {
-                Local<Array> id = jsNID->Get(context, LITERAL("guidItem")).ToLocalChecked().As<Array>();
-                GUID shit = { IntegerFI(id->Get(context, 0).ToLocalChecked()),
-                    IntegerFI(id->Get(context, 1).ToLocalChecked()),
-                    IntegerFI(id->Get(context, 2).ToLocalChecked()),
-                    IntegerFI(id->Get(context, 3).ToLocalChecked()),
-                    IntegerFI(id->Get(context, 4).ToLocalChecked()),
-                    IntegerFI(id->Get(context, 5).ToLocalChecked()),
-                    IntegerFI(id->Get(context, 6).ToLocalChecked()),
-                    IntegerFI(id->Get(context, 7).ToLocalChecked()),
-                    IntegerFI(id->Get(context, 8).ToLocalChecked()),
-                    IntegerFI(id->Get(context, 9).ToLocalChecked()),
-                    IntegerFI(id->Get(context, 10).ToLocalChecked()) };
+            //if (jsNID->Get(context, LITERAL("guidItem")).ToLocalChecked()->IsArray()) {
+                //Local<Array> id = jsNID->Get(context, LITERAL("guidItem")).ToLocalChecked().As<Array>();
+                //GUID shit = { IntegerFI(id->Get(context, 0).ToLocalChecked()),
+                //    IntegerFI(id->Get(context, 1).ToLocalChecked()),
+                //    IntegerFI(id->Get(context, 2).ToLocalChecked()),
+                //    IntegerFI(id->Get(context, 3).ToLocalChecked()),
+                //    IntegerFI(id->Get(context, 4).ToLocalChecked()),
+                //    IntegerFI(id->Get(context, 5).ToLocalChecked()),
+                //    IntegerFI(id->Get(context, 6).ToLocalChecked()),
+                //    IntegerFI(id->Get(context, 7).ToLocalChecked()),
+                //    IntegerFI(id->Get(context, 8).ToLocalChecked()),
+                //    IntegerFI(id->Get(context, 9).ToLocalChecked()),
+                //    IntegerFI(id->Get(context, 10).ToLocalChecked()) };
+                GUID shit = jsImpl::fromJSGUID(isolate, jsNID->Get(context, LITERAL("guidItem")).ToLocalChecked());
                 data.guidItem = shit;
-            }
+            //}
         }
 
         if (jsNID->Has(context, LITERAL("hBalloonIcon")).ToChecked()) {
@@ -1680,6 +1703,29 @@ V8FUNC(GetMousePos) {
     info.GetReturnValue().Set(mouse);
 }
 
+V8FUNC(GetCursorInfoWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    CURSORINFO ci{};
+    ci.cbSize = sizeof(ci);
+    
+    BOOL res = GetCursorInfo(&ci);
+
+    if (res) {
+        Local<Context> context = isolate->GetCurrentContext();
+        Local<Object> jsCI = Object::New(isolate);
+        jsCI->Set(context, LITERAL("flags"), Number::New(isolate, ci.flags));
+        jsCI->Set(context, LITERAL("hCursor"), Number::New(isolate, (LONG_PTR)ci.hCursor));
+        jsCI->Set(context, LITERAL("ptScreenPos"), jsImpl::createWinPoint(isolate, ci.ptScreenPos));
+
+        info.GetReturnValue().Set(jsCI);
+    }
+    else {
+        info.GetReturnValue().Set(res);
+    }
+}
+
 V8FUNC(SetMousePos) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
@@ -2218,7 +2264,7 @@ V8FUNC(MessageBeepWrapper) {
 #pragma comment(lib, "dcomp.lib")
 #pragma comment(lib, "D3D11.lib")
 #pragma comment(lib, "dxguid.lib")
-//#pragma comment(lib, "dxgi.lib")
+#pragma comment(lib, "dxgi.lib")
 
 //float lerp(float a, float b, float f)
 //{
@@ -2226,7 +2272,7 @@ V8FUNC(MessageBeepWrapper) {
 //}
 
 #include <limits>
-//#include <dxgidebug.h>
+#include <dxgidebug.h>
 
 namespace DIRECT2D {
     using namespace v8;
@@ -2833,18 +2879,19 @@ namespace DIRECT2D {
 
             //bruh you gotta do some GYMNASTICS to get the bitcount from a GUID (https://stackoverflow.com/questions/25797536/getting-a-bitmap-bitsperpixel-from-iwicbitmapsource-iwicbitmap-iwicbitmapdecod)
             //lemme store the guid real quick
-            Local<Array> id = info.This()->GetRealNamedProperty(context, LITERAL("GUID")).ToLocalChecked().As<Array>();
-            GUID shit = { IntegerFI(id->Get(context, 0).ToLocalChecked()),
-    IntegerFI(id->Get(context, 1).ToLocalChecked()),
-    IntegerFI(id->Get(context, 2).ToLocalChecked()),
-    IntegerFI(id->Get(context, 3).ToLocalChecked()),
-    IntegerFI(id->Get(context, 4).ToLocalChecked()),
-    IntegerFI(id->Get(context, 5).ToLocalChecked()),
-    IntegerFI(id->Get(context, 6).ToLocalChecked()),
-    IntegerFI(id->Get(context, 7).ToLocalChecked()),
-    IntegerFI(id->Get(context, 8).ToLocalChecked()),
-    IntegerFI(id->Get(context, 9).ToLocalChecked()),
-    IntegerFI(id->Get(context, 10).ToLocalChecked()) };
+    //        Local<Array> id = info.This()->GetRealNamedProperty(context, LITERAL("GUID")).ToLocalChecked().As<Array>();
+    //        GUID shit = { IntegerFI(id->Get(context, 0).ToLocalChecked()),
+    //IntegerFI(id->Get(context, 1).ToLocalChecked()),
+    //IntegerFI(id->Get(context, 2).ToLocalChecked()),
+    //IntegerFI(id->Get(context, 3).ToLocalChecked()),
+    //IntegerFI(id->Get(context, 4).ToLocalChecked()),
+    //IntegerFI(id->Get(context, 5).ToLocalChecked()),
+    //IntegerFI(id->Get(context, 6).ToLocalChecked()),
+    //IntegerFI(id->Get(context, 7).ToLocalChecked()),
+    //IntegerFI(id->Get(context, 8).ToLocalChecked()),
+    //IntegerFI(id->Get(context, 9).ToLocalChecked()),
+    //IntegerFI(id->Get(context, 10).ToLocalChecked()) };
+            GUID shit = jsImpl::fromJSGUID(isolate, info.This()->GetRealNamedProperty(context, LITERAL("GUID")).ToLocalChecked());
 
             IWICComponentInfo* pIComponentInfo = NULL;
             RetIfFailed(wic->wicFactory->CreateComponentInfo(shit, &pIComponentInfo), "CreateComponentInfo failed (use to get bitcount to calculate ArrayBuffer length)");
@@ -3704,6 +3751,19 @@ namespace DIRECT2D {
             info.GetReturnValue().Set(Number::New(isolate, count));
         }));
         return jsPG->NewInstance(isolate->GetCurrentContext()).ToLocalChecked();
+    }
+
+    Local<Object> getDXGIDebug1Impl(Isolate* isolate, IDXGIDebug1* dbg) {
+        Local<ObjectTemplate> jsDbg = DIRECT2D::getIUnknownImpl(isolate, dbg);
+
+        jsDbg->Set(isolate, "ReportLiveObjects", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            IDXGIDebug1* dbg = (IDXGIDebug1*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+            
+            RetIfFailed(dbg->ReportLiveObjects(jsImpl::fromJSGUID(isolate, info[0]), (DXGI_DEBUG_RLO_FLAGS)IntegerFI(info[1])), "ReportLiveObjects failed...");
+        }));
+
+        return jsDbg->NewInstance(isolate->GetCurrentContext()).ToLocalChecked();
     }
 
     float f(float x) {
@@ -4779,6 +4839,8 @@ void GLAPIENTRY glMessageCallback(GLenum source, GLenum type, GLuint id, GLenum 
 v8::Local<v8::ObjectTemplate> jsEffectOT;
 v8::Local<v8::ObjectTemplate> js2DRenderingContextCopy;
 
+#define setObjectGUID(id, global) { Local<Value> elem##id[] = {Number::New(isolate, id.Data1), Number::New(isolate, id.Data2), Number::New(isolate, id.Data3), Number::New(isolate, id.Data4[0]), Number::New(isolate, id.Data4[1]), Number::New(isolate, id.Data4[2]), Number::New(isolate, id.Data4[3]), Number::New(isolate, id.Data4[4]), Number::New(isolate, id.Data4[5]), Number::New(isolate, id.Data4[6]), Number::New(isolate, id.Data4[7])}; Local<Array> jsArr##id = Array::New(isolate, elem##id, 11); global->Set(context, LITERAL(#id), jsArr##id); }
+
 V8FUNC(createCanvas) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
@@ -4786,8 +4848,10 @@ V8FUNC(createCanvas) {
     Local<ObjectTemplate> context = ObjectTemplate::New(isolate);
 
     const char* contextType = CStringFI(info[0]);
+    //bool isd2d = false;
     bool d2d11 = false;
     if (strcmp(contextType, "d2d") == 0 || strcmp(contextType, "direct2d") == 0) {
+        //isd2d = true;
         //print("d2d");
         //https://cpp.sh/?source=%2F%2F+Example+program%0A%23include+%3Ciostream%3E%0A%23include+%3Cstring%3E%0A%0Aint+main()%0A%7B%0A++std%3A%3Astring+name%3B%0A++std%3A%3Acout+%3C%3C+%22What+is+your+name%3F+%22%3B%0A++getline+(std%3A%3Acin%2C+name)%3B%0A++std%3A%3Acout+%3C%3C+%22Hello%2C+%22+%3C%3C+name+%3C%3C+%22!%5Cn%22%3B%0A%7D
         //void* d2d;
@@ -4942,6 +5006,17 @@ V8FUNC(createCanvas) {
 
             info.GetReturnValue().Set(jsBrush->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
         }));
+        context->Set(isolate, "DXGIGetDebugInterface1", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+            IDXGIDebug1* dbg = nullptr;
+
+            RetIfFailed(DXGIGetDebugInterface1(NULL, __uuidof(IDXGIDebug1), (void**)&dbg), "DXGIGetDebugInterface1 failed (this function usually fails with E_NOINTERFACE if you don't have the windows SDK installed...)");
+
+            info.GetReturnValue().Set(DIRECT2D::getDXGIDebug1Impl(isolate, dbg));
+        }));
+        
         context->Set(isolate, "CreatePathGeometry", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
             Isolate* isolate = info.GetIsolate();
             Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
@@ -6355,21 +6430,21 @@ V8FUNC(createCanvas) {
                 Local<Context> context = isolate->GetCurrentContext();
                 HandleScope handle_scope(isolate);
                 ID2D1Effect* effect;
-                GUID shit;
+                GUID shit = jsImpl::fromJSGUID(isolate, info[0]);
                 //if (!info[0]->IsNumber()) {
                     //print("NOT NUMBER");
-                    Local<Array> id = info[0].As<Array>();
-                    shit = GUID{ (unsigned long)IntegerFI(id->Get(context, 0).ToLocalChecked()),
-                        (unsigned short)IntegerFI(id->Get(context, 1).ToLocalChecked()),
-                        (unsigned short)IntegerFI(id->Get(context, 2).ToLocalChecked()),
-                        (unsigned char)IntegerFI(id->Get(context, 3).ToLocalChecked()),
-                        (unsigned char)IntegerFI(id->Get(context, 4).ToLocalChecked()),
-                        (unsigned char)IntegerFI(id->Get(context, 5).ToLocalChecked()),
-                        (unsigned char)IntegerFI(id->Get(context, 6).ToLocalChecked()),
-                        (unsigned char)IntegerFI(id->Get(context, 7).ToLocalChecked()),
-                        (unsigned char)IntegerFI(id->Get(context, 8).ToLocalChecked()),
-                        (unsigned char)IntegerFI(id->Get(context, 9).ToLocalChecked()),
-                        (unsigned char)IntegerFI(id->Get(context, 10).ToLocalChecked()) };
+                    //Local<Array> id = info[0].As<Array>();
+                    //shit = GUID{ (unsigned long)IntegerFI(id->Get(context, 0).ToLocalChecked()),
+                    //    (unsigned short)IntegerFI(id->Get(context, 1).ToLocalChecked()),
+                    //    (unsigned short)IntegerFI(id->Get(context, 2).ToLocalChecked()),
+                    //    (unsigned char)IntegerFI(id->Get(context, 3).ToLocalChecked()),
+                    //    (unsigned char)IntegerFI(id->Get(context, 4).ToLocalChecked()),
+                    //    (unsigned char)IntegerFI(id->Get(context, 5).ToLocalChecked()),
+                    //    (unsigned char)IntegerFI(id->Get(context, 6).ToLocalChecked()),
+                    //    (unsigned char)IntegerFI(id->Get(context, 7).ToLocalChecked()),
+                    //    (unsigned char)IntegerFI(id->Get(context, 8).ToLocalChecked()),
+                    //    (unsigned char)IntegerFI(id->Get(context, 9).ToLocalChecked()),
+                    //    (unsigned char)IntegerFI(id->Get(context, 10).ToLocalChecked()) };
                 //}
                 //else {
                 //    //print("UIS NUMBER");
@@ -7639,7 +7714,13 @@ V8FUNC(createCanvas) {
     //Local<Object> result = wndclass->NewInstance(isolate->GetCurrentContext()).ToLocalChecked();
 
     Local<Object> contextObject = context->NewInstance(isolate->GetCurrentContext()).ToLocalChecked();
-
+    //if (isd2d) {
+    //    Local<Context> context = isolate->GetCurrentContext();
+    //    setObjectGUID(DXGI_DEBUG_ALL, contextObject);
+    //    setObjectGUID(DXGI_DEBUG_DX, contextObject);
+    //    setObjectGUID(DXGI_DEBUG_DXGI, contextObject);
+    //    setObjectGUID(DXGI_DEBUG_APP, contextObject);
+    //}
     if (d2d11) {
         Local<Context> c = isolate->GetCurrentContext();
 #define setGUID(id) { Local<Value> elem##id[] = {Number::New(isolate, id.Data1), Number::New(isolate, id.Data2), Number::New(isolate, id.Data3), Number::New(isolate, id.Data4[0]), Number::New(isolate, id.Data4[1]), Number::New(isolate, id.Data4[2]), Number::New(isolate, id.Data4[3]), Number::New(isolate, id.Data4[4]), Number::New(isolate, id.Data4[5]), Number::New(isolate, id.Data4[6]), Number::New(isolate, id.Data4[7])}; Local<Array> jsArr##id = Array::New(isolate, elem##id, 11); contextObject->Set(c, LITERAL(#id), jsArr##id); }
@@ -7708,6 +7789,11 @@ V8FUNC(createCanvas) {
         setGUID(CLSID_D2D1Tint);
         setGUID(CLSID_D2D1WhiteLevelAdjustment);
         setGUID(CLSID_D2D1HdrToneMap);
+
+        setGUID(DXGI_DEBUG_ALL);
+            setGUID(DXGI_DEBUG_DX);
+                setGUID(DXGI_DEBUG_DXGI);
+                    setGUID(DXGI_DEBUG_APP);
 #undef setGUID
     }
 
@@ -11793,18 +11879,19 @@ V8FUNC(InitializeWIC) {
                     return;// nullptr;
                 }
 
-                Local<Array> id = info[2].As<Array>();
-                GUID shit = { IntegerFI(id->Get(context, 0).ToLocalChecked()),
-                    IntegerFI(id->Get(context, 1).ToLocalChecked()),
-                    IntegerFI(id->Get(context, 2).ToLocalChecked()),
-                    IntegerFI(id->Get(context, 3).ToLocalChecked()),
-                    IntegerFI(id->Get(context, 4).ToLocalChecked()),
-                    IntegerFI(id->Get(context, 5).ToLocalChecked()),
-                    IntegerFI(id->Get(context, 6).ToLocalChecked()),
-                    IntegerFI(id->Get(context, 7).ToLocalChecked()),
-                    IntegerFI(id->Get(context, 8).ToLocalChecked()),
-                    IntegerFI(id->Get(context, 9).ToLocalChecked()),
-                    IntegerFI(id->Get(context, 10).ToLocalChecked()) };
+                //Local<Array> id = info[2].As<Array>();
+                //GUID shit = { IntegerFI(id->Get(context, 0).ToLocalChecked()),
+                //    IntegerFI(id->Get(context, 1).ToLocalChecked()),
+                //    IntegerFI(id->Get(context, 2).ToLocalChecked()),
+                //    IntegerFI(id->Get(context, 3).ToLocalChecked()),
+                //    IntegerFI(id->Get(context, 4).ToLocalChecked()),
+                //    IntegerFI(id->Get(context, 5).ToLocalChecked()),
+                //    IntegerFI(id->Get(context, 6).ToLocalChecked()),
+                //    IntegerFI(id->Get(context, 7).ToLocalChecked()),
+                //    IntegerFI(id->Get(context, 8).ToLocalChecked()),
+                //    IntegerFI(id->Get(context, 9).ToLocalChecked()),
+                //    IntegerFI(id->Get(context, 10).ToLocalChecked()) };
+                GUID shit = jsImpl::fromJSGUID(isolate, info[2]);
 
                 IWICFormatConverter* wicConverter = WICObj->LoadBitmapFromFrame(wicDecoder, wicFrame, shit, false);
                 info.GetReturnValue().Set(DIRECT2D::getWICBitmapImpl(isolate, wicConverter, shit));//(Number::New(isolate, (LONG_PTR)wicConverter));
@@ -11877,18 +11964,19 @@ V8FUNC(InitializeWIC) {
             if (!info[1]->IsArray()) {
                 MessageBox(NULL, L"yo you forgot to pass a pixel format (jbs will crash now ??)", L"usually you should just use GUID_WICPixelFormat32bppPBGRA", MB_ICONERROR | MB_OK);
             }
-            Local<Array> id = info[1].As<Array>();
-            GUID shit = { IntegerFI(id->Get(context, 0).ToLocalChecked()),
-                IntegerFI(id->Get(context, 1).ToLocalChecked()),
-                IntegerFI(id->Get(context, 2).ToLocalChecked()),
-                IntegerFI(id->Get(context, 3).ToLocalChecked()),
-                IntegerFI(id->Get(context, 4).ToLocalChecked()),
-                IntegerFI(id->Get(context, 5).ToLocalChecked()),
-                IntegerFI(id->Get(context, 6).ToLocalChecked()),
-                IntegerFI(id->Get(context, 7).ToLocalChecked()),
-                IntegerFI(id->Get(context, 8).ToLocalChecked()),
-                IntegerFI(id->Get(context, 9).ToLocalChecked()),
-                IntegerFI(id->Get(context, 10).ToLocalChecked())};
+            //Local<Array> id = info[1].As<Array>();
+            //GUID shit = { IntegerFI(id->Get(context, 0).ToLocalChecked()),
+            //    IntegerFI(id->Get(context, 1).ToLocalChecked()),
+            //    IntegerFI(id->Get(context, 2).ToLocalChecked()),
+            //    IntegerFI(id->Get(context, 3).ToLocalChecked()),
+            //    IntegerFI(id->Get(context, 4).ToLocalChecked()),
+            //    IntegerFI(id->Get(context, 5).ToLocalChecked()),
+            //    IntegerFI(id->Get(context, 6).ToLocalChecked()),
+            //    IntegerFI(id->Get(context, 7).ToLocalChecked()),
+            //    IntegerFI(id->Get(context, 8).ToLocalChecked()),
+            //    IntegerFI(id->Get(context, 9).ToLocalChecked()),
+            //    IntegerFI(id->Get(context, 10).ToLocalChecked())};
+            GUID shit = jsImpl::fromJSGUID(isolate, info[1]);
             //unsigned long  Data1;
             //unsigned short Data2;
             //unsigned short Data3;
@@ -11908,32 +11996,33 @@ V8FUNC(InitializeWIC) {
             Isolate* isolate = info.GetIsolate();
             Local<Context> context = isolate->GetCurrentContext();
             WICHelper* WICObj = (WICHelper*)info.This()->GetRealNamedProperty(context, LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-            Local<Array> id = info[1].As<Array>();
-            GUID shit = { IntegerFI(id->Get(context, 0).ToLocalChecked()),
-                IntegerFI(id->Get(context, 1).ToLocalChecked()),
-                IntegerFI(id->Get(context, 2).ToLocalChecked()),
-                IntegerFI(id->Get(context, 3).ToLocalChecked()),
-                IntegerFI(id->Get(context, 4).ToLocalChecked()),
-                IntegerFI(id->Get(context, 5).ToLocalChecked()),
-                IntegerFI(id->Get(context, 6).ToLocalChecked()),
-                IntegerFI(id->Get(context, 7).ToLocalChecked()),
-                IntegerFI(id->Get(context, 8).ToLocalChecked()),
-                IntegerFI(id->Get(context, 9).ToLocalChecked()),
-                IntegerFI(id->Get(context, 10).ToLocalChecked())};
+            //Local<Array> id = info[1].As<Array>();
+            GUID shit = jsImpl::fromJSGUID(isolate, info[1]);
+            //GUID shit = { IntegerFI(id->Get(context, 0).ToLocalChecked()),
+            //    IntegerFI(id->Get(context, 1).ToLocalChecked()),
+            //    IntegerFI(id->Get(context, 2).ToLocalChecked()),
+            //    IntegerFI(id->Get(context, 3).ToLocalChecked()),
+            //    IntegerFI(id->Get(context, 4).ToLocalChecked()),
+            //    IntegerFI(id->Get(context, 5).ToLocalChecked()),
+            //    IntegerFI(id->Get(context, 6).ToLocalChecked()),
+            //    IntegerFI(id->Get(context, 7).ToLocalChecked()),
+            //    IntegerFI(id->Get(context, 8).ToLocalChecked()),
+            //    IntegerFI(id->Get(context, 9).ToLocalChecked()),
+            //    IntegerFI(id->Get(context, 10).ToLocalChecked())};
 
-            Local<Array> id2 = info[3].As<Array>();
-            GUID shit2 = { IntegerFI(id2->Get(context, 0).ToLocalChecked()),
-                IntegerFI(id2->Get(context, 1).ToLocalChecked()),
-                IntegerFI(id2->Get(context, 2).ToLocalChecked()),
-                IntegerFI(id2->Get(context, 3).ToLocalChecked()),
-                IntegerFI(id2->Get(context, 4).ToLocalChecked()),
-                IntegerFI(id2->Get(context, 5).ToLocalChecked()),
-                IntegerFI(id2->Get(context, 6).ToLocalChecked()),
-                IntegerFI(id2->Get(context, 7).ToLocalChecked()),
-                IntegerFI(id2->Get(context, 8).ToLocalChecked()),
-                IntegerFI(id2->Get(context, 9).ToLocalChecked()),
-                IntegerFI(id2->Get(context, 10).ToLocalChecked()) };
-
+            //Local<Array> id2 = info[3].As<Array>();
+            //GUID shit2 = { IntegerFI(id2->Get(context, 0).ToLocalChecked()),
+            //    IntegerFI(id2->Get(context, 1).ToLocalChecked()),
+            //    IntegerFI(id2->Get(context, 2).ToLocalChecked()),
+            //    IntegerFI(id2->Get(context, 3).ToLocalChecked()),
+            //    IntegerFI(id2->Get(context, 4).ToLocalChecked()),
+            //    IntegerFI(id2->Get(context, 5).ToLocalChecked()),
+            //    IntegerFI(id2->Get(context, 6).ToLocalChecked()),
+            //    IntegerFI(id2->Get(context, 7).ToLocalChecked()),
+            //    IntegerFI(id2->Get(context, 8).ToLocalChecked()),
+            //    IntegerFI(id2->Get(context, 9).ToLocalChecked()),
+            //    IntegerFI(id2->Get(context, 10).ToLocalChecked()) };
+            GUID shit2 = jsImpl::fromJSGUID(isolate, info[3]);
             //unsigned long  Data1;
             //unsigned short Data2;
             //unsigned short Data3;
@@ -11953,18 +12042,19 @@ V8FUNC(InitializeWIC) {
             Local<Context> context = isolate->GetCurrentContext();
             WICHelper* WICObj = (WICHelper*)info.This()->GetRealNamedProperty(context, LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
             IWICBitmapSource* src = (IWICBitmapSource*)IntegerFI(info[1].As<Object>()->GetRealNamedProperty(context, LITERAL("internalPtr")).ToLocalChecked());
-            Local<Array> id = info[0].As<Array>();
-            GUID shit = { IntegerFI(id->Get(context, 0).ToLocalChecked()),
-                IntegerFI(id->Get(context, 1).ToLocalChecked()),
-                IntegerFI(id->Get(context, 2).ToLocalChecked()),
-                IntegerFI(id->Get(context, 3).ToLocalChecked()),
-                IntegerFI(id->Get(context, 4).ToLocalChecked()),
-                IntegerFI(id->Get(context, 5).ToLocalChecked()),
-                IntegerFI(id->Get(context, 6).ToLocalChecked()),
-                IntegerFI(id->Get(context, 7).ToLocalChecked()),
-                IntegerFI(id->Get(context, 8).ToLocalChecked()),
-                IntegerFI(id->Get(context, 9).ToLocalChecked()),
-                IntegerFI(id->Get(context, 10).ToLocalChecked()) };
+            //Local<Array> id = info[0].As<Array>();
+            //GUID shit = { IntegerFI(id->Get(context, 0).ToLocalChecked()),
+            //    IntegerFI(id->Get(context, 1).ToLocalChecked()),
+            //    IntegerFI(id->Get(context, 2).ToLocalChecked()),
+            //    IntegerFI(id->Get(context, 3).ToLocalChecked()),
+            //    IntegerFI(id->Get(context, 4).ToLocalChecked()),
+            //    IntegerFI(id->Get(context, 5).ToLocalChecked()),
+            //    IntegerFI(id->Get(context, 6).ToLocalChecked()),
+            //    IntegerFI(id->Get(context, 7).ToLocalChecked()),
+            //    IntegerFI(id->Get(context, 8).ToLocalChecked()),
+            //    IntegerFI(id->Get(context, 9).ToLocalChecked()),
+            //    IntegerFI(id->Get(context, 10).ToLocalChecked()) };
+            GUID shit = jsImpl::fromJSGUID(isolate, info[0]);
             IWICBitmapSource* dst;
             RetIfFailed(WICConvertBitmapSource(shit, src, &dst), "ConvertBitmapSource failed LO!");
 
@@ -11990,18 +12080,19 @@ V8FUNC(InitializeWIC) {
             IWICBitmap* wicBitmap;
 
             RetIfFailed(WICObj->wicFactory->CreateBitmapFromHBITMAP((HBITMAP)IntegerFI(info[0]), (HPALETTE)IntegerFI(info[1]), (WICBitmapAlphaChannelOption)IntegerFI(info[2]), &wicBitmap), "wicFactory->CreateBitmapFromHBITMAP failed");
-            Local<Array> id = info[3].As<Array>();
-            GUID shit = { IntegerFI(id->Get(context, 0).ToLocalChecked()),
-                IntegerFI(id->Get(context, 1).ToLocalChecked()),
-                IntegerFI(id->Get(context, 2).ToLocalChecked()),
-                IntegerFI(id->Get(context, 3).ToLocalChecked()),
-                IntegerFI(id->Get(context, 4).ToLocalChecked()),
-                IntegerFI(id->Get(context, 5).ToLocalChecked()),
-                IntegerFI(id->Get(context, 6).ToLocalChecked()),
-                IntegerFI(id->Get(context, 7).ToLocalChecked()),
-                IntegerFI(id->Get(context, 8).ToLocalChecked()),
-                IntegerFI(id->Get(context, 9).ToLocalChecked()),
-                IntegerFI(id->Get(context, 10).ToLocalChecked()) };
+            //Local<Array> id = info[3].As<Array>();
+            //GUID shit = { IntegerFI(id->Get(context, 0).ToLocalChecked()),
+            //    IntegerFI(id->Get(context, 1).ToLocalChecked()),
+            //    IntegerFI(id->Get(context, 2).ToLocalChecked()),
+            //    IntegerFI(id->Get(context, 3).ToLocalChecked()),
+            //    IntegerFI(id->Get(context, 4).ToLocalChecked()),
+            //    IntegerFI(id->Get(context, 5).ToLocalChecked()),
+            //    IntegerFI(id->Get(context, 6).ToLocalChecked()),
+            //    IntegerFI(id->Get(context, 7).ToLocalChecked()),
+            //    IntegerFI(id->Get(context, 8).ToLocalChecked()),
+            //    IntegerFI(id->Get(context, 9).ToLocalChecked()),
+            //    IntegerFI(id->Get(context, 10).ToLocalChecked()) };
+            GUID shit = jsImpl::fromJSGUID(isolate, info[3]);
 
             info.GetReturnValue().Set(DIRECT2D::getWICBitmapImpl(isolate, wicBitmap, shit));
         }));
@@ -12013,18 +12104,20 @@ V8FUNC(InitializeWIC) {
             IWICBitmap* wicBitmap;
 
             RetIfFailed(WICObj->wicFactory->CreateBitmapFromHICON((HICON)IntegerFI(info[0]), &wicBitmap), "wicFactory->CreateBitmapFromHICON failed");
-            Local<Array> id = info[1].As<Array>();
-            GUID shit = { IntegerFI(id->Get(context, 0).ToLocalChecked()),
-                IntegerFI(id->Get(context, 1).ToLocalChecked()),
-                IntegerFI(id->Get(context, 2).ToLocalChecked()),
-                IntegerFI(id->Get(context, 3).ToLocalChecked()),
-                IntegerFI(id->Get(context, 4).ToLocalChecked()),
-                IntegerFI(id->Get(context, 5).ToLocalChecked()),
-                IntegerFI(id->Get(context, 6).ToLocalChecked()),
-                IntegerFI(id->Get(context, 7).ToLocalChecked()),
-                IntegerFI(id->Get(context, 8).ToLocalChecked()),
-                IntegerFI(id->Get(context, 9).ToLocalChecked()),
-                IntegerFI(id->Get(context, 10).ToLocalChecked()) };
+            //Local<Array> id = info[1].As<Array>();
+            //GUID shit = { IntegerFI(id->Get(context, 0).ToLocalChecked()),
+            //    IntegerFI(id->Get(context, 1).ToLocalChecked()),
+            //    IntegerFI(id->Get(context, 2).ToLocalChecked()),
+            //    IntegerFI(id->Get(context, 3).ToLocalChecked()),
+            //    IntegerFI(id->Get(context, 4).ToLocalChecked()),
+            //    IntegerFI(id->Get(context, 5).ToLocalChecked()),
+            //    IntegerFI(id->Get(context, 6).ToLocalChecked()),
+            //    IntegerFI(id->Get(context, 7).ToLocalChecked()),
+            //    IntegerFI(id->Get(context, 8).ToLocalChecked()),
+            //    IntegerFI(id->Get(context, 9).ToLocalChecked()),
+            //    IntegerFI(id->Get(context, 10).ToLocalChecked()) };
+
+            GUID shit = jsImpl::fromJSGUID(isolate, info[1]);
 
             info.GetReturnValue().Set(DIRECT2D::getWICBitmapImpl(isolate, wicBitmap, shit));
         }));
@@ -12037,111 +12130,109 @@ V8FUNC(InitializeWIC) {
     }
 }
 
-#define setGlobalGUID(id) { Local<Value> elem##id[] = {Number::New(isolate, id.Data1), Number::New(isolate, id.Data2), Number::New(isolate, id.Data3), Number::New(isolate, id.Data4[0]), Number::New(isolate, id.Data4[1]), Number::New(isolate, id.Data4[2]), Number::New(isolate, id.Data4[3]), Number::New(isolate, id.Data4[4]), Number::New(isolate, id.Data4[5]), Number::New(isolate, id.Data4[6]), Number::New(isolate, id.Data4[7])}; Local<Array> jsArr##id = Array::New(isolate, elem##id, 11); global->Set(context, LITERAL(#id), jsArr##id); }
-
 V8FUNC(ScopeGUIDs) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
     Local<Context> context = isolate->GetCurrentContext();
     Local<Object> global = info[0].As<Object>(); //uhh idk about this one
     //global->Set(context, LITERAL("was"), LITERAL("GYTAT"));
-    setGlobalGUID(GUID_WICPixelFormatDontCare); //i had a little regex help on this hoe /GUID_\w+/g regexr.com/80jco
-    setGlobalGUID(GUID_WICPixelFormat1bppIndexed);
-    setGlobalGUID(GUID_WICPixelFormat2bppIndexed);
-    setGlobalGUID(GUID_WICPixelFormat4bppIndexed);
-    setGlobalGUID(GUID_WICPixelFormat8bppIndexed);
-    setGlobalGUID(GUID_WICPixelFormatBlackWhite);
-    setGlobalGUID(GUID_WICPixelFormat2bppGray);
-    setGlobalGUID(GUID_WICPixelFormat4bppGray);
-    setGlobalGUID(GUID_WICPixelFormat8bppGray);
-    setGlobalGUID(GUID_WICPixelFormat8bppAlpha);
-    setGlobalGUID(GUID_WICPixelFormat16bppBGR555);
-    setGlobalGUID(GUID_WICPixelFormat16bppBGR565);
-    setGlobalGUID(GUID_WICPixelFormat16bppBGRA5551);
-    setGlobalGUID(GUID_WICPixelFormat16bppGray);
-    setGlobalGUID(GUID_WICPixelFormat24bppBGR);
-    setGlobalGUID(GUID_WICPixelFormat24bppRGB);
-    setGlobalGUID(GUID_WICPixelFormat32bppBGR);
-    setGlobalGUID(GUID_WICPixelFormat32bppBGRA);
-    setGlobalGUID(GUID_WICPixelFormat32bppPBGRA);
-    setGlobalGUID(GUID_WICPixelFormat32bppGrayFloat);
-    setGlobalGUID(GUID_WICPixelFormat32bppRGB);
-    setGlobalGUID(GUID_WICPixelFormat32bppRGBA);
-    setGlobalGUID(GUID_WICPixelFormat32bppPRGBA);
-    setGlobalGUID(GUID_WICPixelFormat48bppRGB);
-    setGlobalGUID(GUID_WICPixelFormat48bppBGR);
-    setGlobalGUID(GUID_WICPixelFormat64bppRGB);
-    setGlobalGUID(GUID_WICPixelFormat64bppRGBA);
-    setGlobalGUID(GUID_WICPixelFormat64bppBGRA);
-    setGlobalGUID(GUID_WICPixelFormat64bppPRGBA);
-    setGlobalGUID(GUID_WICPixelFormat64bppPBGRA);
-    setGlobalGUID(GUID_WICPixelFormat16bppGrayFixedPoint);
-    setGlobalGUID(GUID_WICPixelFormat32bppBGR101010);
-    setGlobalGUID(GUID_WICPixelFormat48bppRGBFixedPoint);
-    setGlobalGUID(GUID_WICPixelFormat48bppBGRFixedPoint);
-    setGlobalGUID(GUID_WICPixelFormat96bppRGBFixedPoint);
-    setGlobalGUID(GUID_WICPixelFormat96bppRGBFloat);
-    setGlobalGUID(GUID_WICPixelFormat128bppRGBAFloat);
-    setGlobalGUID(GUID_WICPixelFormat128bppPRGBAFloat);
-    setGlobalGUID(GUID_WICPixelFormat128bppRGBFloat);
-    setGlobalGUID(GUID_WICPixelFormat32bppCMYK);
-    setGlobalGUID(GUID_WICPixelFormat64bppRGBAFixedPoint);
-    setGlobalGUID(GUID_WICPixelFormat64bppBGRAFixedPoint);
-    setGlobalGUID(GUID_WICPixelFormat64bppRGBFixedPoint);
-    setGlobalGUID(GUID_WICPixelFormat128bppRGBAFixedPoint);
-    setGlobalGUID(GUID_WICPixelFormat128bppRGBFixedPoint);
-    setGlobalGUID(GUID_WICPixelFormat64bppRGBAHalf);
-    setGlobalGUID(GUID_WICPixelFormat64bppPRGBAHalf);
-    setGlobalGUID(GUID_WICPixelFormat64bppRGBHalf);
-    setGlobalGUID(GUID_WICPixelFormat48bppRGBHalf);
-    setGlobalGUID(GUID_WICPixelFormat32bppRGBE);
-    setGlobalGUID(GUID_WICPixelFormat16bppGrayHalf);
-    setGlobalGUID(GUID_WICPixelFormat32bppGrayFixedPoint);
-    setGlobalGUID(GUID_WICPixelFormat32bppRGBA1010102);
-    setGlobalGUID(GUID_WICPixelFormat32bppRGBA1010102XR);
-    setGlobalGUID(GUID_WICPixelFormat32bppR10G10B10A2);
-    setGlobalGUID(GUID_WICPixelFormat32bppR10G10B10A2HDR10);
-    setGlobalGUID(GUID_WICPixelFormat64bppCMYK);
-    setGlobalGUID(GUID_WICPixelFormat24bpp3Channels);
-    setGlobalGUID(GUID_WICPixelFormat32bpp4Channels);
-    setGlobalGUID(GUID_WICPixelFormat40bpp5Channels);
-    setGlobalGUID(GUID_WICPixelFormat48bpp6Channels);
-    setGlobalGUID(GUID_WICPixelFormat56bpp7Channels);
-    setGlobalGUID(GUID_WICPixelFormat64bpp8Channels);
-    setGlobalGUID(GUID_WICPixelFormat48bpp3Channels);
-    setGlobalGUID(GUID_WICPixelFormat64bpp4Channels);
-    setGlobalGUID(GUID_WICPixelFormat80bpp5Channels);
-    setGlobalGUID(GUID_WICPixelFormat96bpp6Channels);
-    setGlobalGUID(GUID_WICPixelFormat112bpp7Channels);
-    setGlobalGUID(GUID_WICPixelFormat128bpp8Channels);
-    setGlobalGUID(GUID_WICPixelFormat40bppCMYKAlpha);
-    setGlobalGUID(GUID_WICPixelFormat80bppCMYKAlpha);
-    setGlobalGUID(GUID_WICPixelFormat32bpp3ChannelsAlpha);
-    setGlobalGUID(GUID_WICPixelFormat40bpp4ChannelsAlpha);
-    setGlobalGUID(GUID_WICPixelFormat48bpp5ChannelsAlpha);
-    setGlobalGUID(GUID_WICPixelFormat56bpp6ChannelsAlpha);
-    setGlobalGUID(GUID_WICPixelFormat64bpp7ChannelsAlpha);
-    setGlobalGUID(GUID_WICPixelFormat72bpp8ChannelsAlpha);
-    setGlobalGUID(GUID_WICPixelFormat64bpp3ChannelsAlpha);
-    setGlobalGUID(GUID_WICPixelFormat80bpp4ChannelsAlpha);
-    setGlobalGUID(GUID_WICPixelFormat96bpp5ChannelsAlpha);
-    setGlobalGUID(GUID_WICPixelFormat112bpp6ChannelsAlpha);
-    setGlobalGUID(GUID_WICPixelFormat128bpp7ChannelsAlpha);
-    setGlobalGUID(GUID_WICPixelFormat144bpp8ChannelsAlpha);
-    setGlobalGUID(GUID_WICPixelFormat8bppY);
-    setGlobalGUID(GUID_WICPixelFormat8bppCb);
-    setGlobalGUID(GUID_WICPixelFormat8bppCr);
-    setGlobalGUID(GUID_WICPixelFormat16bppCbCr);
-    setGlobalGUID(GUID_WICPixelFormat16bppYQuantizedDctCoefficients);
-    setGlobalGUID(GUID_WICPixelFormat16bppCbQuantizedDctCoefficients);
-    setGlobalGUID(GUID_WICPixelFormat16bppCrQuantizedDctCoefficients);
-    setGlobalGUID(GUID_ContainerFormatBmp);
-    setGlobalGUID(GUID_ContainerFormatPng);
-    setGlobalGUID(GUID_ContainerFormatIco);
-    setGlobalGUID(GUID_ContainerFormatJpeg);
-    setGlobalGUID(GUID_ContainerFormatTiff);
-    setGlobalGUID(GUID_ContainerFormatGif);
-    setGlobalGUID(GUID_ContainerFormatWmp);
+    setObjectGUID(GUID_WICPixelFormatDontCare, global); //i had a little regex help on this hoe /GUID_\w+/g regexr.com/80jco
+    setObjectGUID(GUID_WICPixelFormat1bppIndexed, global);
+    setObjectGUID(GUID_WICPixelFormat2bppIndexed, global);
+    setObjectGUID(GUID_WICPixelFormat4bppIndexed, global);
+    setObjectGUID(GUID_WICPixelFormat8bppIndexed, global);
+    setObjectGUID(GUID_WICPixelFormatBlackWhite, global);
+    setObjectGUID(GUID_WICPixelFormat2bppGray, global);
+    setObjectGUID(GUID_WICPixelFormat4bppGray, global);
+    setObjectGUID(GUID_WICPixelFormat8bppGray, global);
+    setObjectGUID(GUID_WICPixelFormat8bppAlpha, global);
+    setObjectGUID(GUID_WICPixelFormat16bppBGR555, global);
+    setObjectGUID(GUID_WICPixelFormat16bppBGR565, global);
+    setObjectGUID(GUID_WICPixelFormat16bppBGRA5551, global);
+    setObjectGUID(GUID_WICPixelFormat16bppGray, global);
+    setObjectGUID(GUID_WICPixelFormat24bppBGR, global);
+    setObjectGUID(GUID_WICPixelFormat24bppRGB, global);
+    setObjectGUID(GUID_WICPixelFormat32bppBGR, global);
+    setObjectGUID(GUID_WICPixelFormat32bppBGRA, global);
+    setObjectGUID(GUID_WICPixelFormat32bppPBGRA, global);
+    setObjectGUID(GUID_WICPixelFormat32bppGrayFloat, global);
+    setObjectGUID(GUID_WICPixelFormat32bppRGB, global);
+    setObjectGUID(GUID_WICPixelFormat32bppRGBA, global);
+    setObjectGUID(GUID_WICPixelFormat32bppPRGBA, global);
+    setObjectGUID(GUID_WICPixelFormat48bppRGB, global);
+    setObjectGUID(GUID_WICPixelFormat48bppBGR, global);
+    setObjectGUID(GUID_WICPixelFormat64bppRGB, global);
+    setObjectGUID(GUID_WICPixelFormat64bppRGBA, global);
+    setObjectGUID(GUID_WICPixelFormat64bppBGRA, global);
+    setObjectGUID(GUID_WICPixelFormat64bppPRGBA, global);
+    setObjectGUID(GUID_WICPixelFormat64bppPBGRA, global);
+    setObjectGUID(GUID_WICPixelFormat16bppGrayFixedPoint, global);
+    setObjectGUID(GUID_WICPixelFormat32bppBGR101010, global);
+    setObjectGUID(GUID_WICPixelFormat48bppRGBFixedPoint, global);
+    setObjectGUID(GUID_WICPixelFormat48bppBGRFixedPoint, global);
+    setObjectGUID(GUID_WICPixelFormat96bppRGBFixedPoint, global);
+    setObjectGUID(GUID_WICPixelFormat96bppRGBFloat, global);
+    setObjectGUID(GUID_WICPixelFormat128bppRGBAFloat, global);
+    setObjectGUID(GUID_WICPixelFormat128bppPRGBAFloat, global);
+    setObjectGUID(GUID_WICPixelFormat128bppRGBFloat, global);
+    setObjectGUID(GUID_WICPixelFormat32bppCMYK, global);
+    setObjectGUID(GUID_WICPixelFormat64bppRGBAFixedPoint, global);
+    setObjectGUID(GUID_WICPixelFormat64bppBGRAFixedPoint, global);
+    setObjectGUID(GUID_WICPixelFormat64bppRGBFixedPoint, global);
+    setObjectGUID(GUID_WICPixelFormat128bppRGBAFixedPoint, global);
+    setObjectGUID(GUID_WICPixelFormat128bppRGBFixedPoint, global);
+    setObjectGUID(GUID_WICPixelFormat64bppRGBAHalf, global);
+    setObjectGUID(GUID_WICPixelFormat64bppPRGBAHalf, global);
+    setObjectGUID(GUID_WICPixelFormat64bppRGBHalf, global);
+    setObjectGUID(GUID_WICPixelFormat48bppRGBHalf, global);
+    setObjectGUID(GUID_WICPixelFormat32bppRGBE, global);
+    setObjectGUID(GUID_WICPixelFormat16bppGrayHalf, global);
+    setObjectGUID(GUID_WICPixelFormat32bppGrayFixedPoint, global);
+    setObjectGUID(GUID_WICPixelFormat32bppRGBA1010102, global);
+    setObjectGUID(GUID_WICPixelFormat32bppRGBA1010102XR, global);
+    setObjectGUID(GUID_WICPixelFormat32bppR10G10B10A2, global);
+    setObjectGUID(GUID_WICPixelFormat32bppR10G10B10A2HDR10, global);
+    setObjectGUID(GUID_WICPixelFormat64bppCMYK, global);
+    setObjectGUID(GUID_WICPixelFormat24bpp3Channels, global);
+    setObjectGUID(GUID_WICPixelFormat32bpp4Channels, global);
+    setObjectGUID(GUID_WICPixelFormat40bpp5Channels, global);
+    setObjectGUID(GUID_WICPixelFormat48bpp6Channels, global);
+    setObjectGUID(GUID_WICPixelFormat56bpp7Channels, global);
+    setObjectGUID(GUID_WICPixelFormat64bpp8Channels, global);
+    setObjectGUID(GUID_WICPixelFormat48bpp3Channels, global);
+    setObjectGUID(GUID_WICPixelFormat64bpp4Channels, global);
+    setObjectGUID(GUID_WICPixelFormat80bpp5Channels, global);
+    setObjectGUID(GUID_WICPixelFormat96bpp6Channels, global);
+    setObjectGUID(GUID_WICPixelFormat112bpp7Channels, global);
+    setObjectGUID(GUID_WICPixelFormat128bpp8Channels, global);
+    setObjectGUID(GUID_WICPixelFormat40bppCMYKAlpha, global);
+    setObjectGUID(GUID_WICPixelFormat80bppCMYKAlpha, global);
+    setObjectGUID(GUID_WICPixelFormat32bpp3ChannelsAlpha, global);
+    setObjectGUID(GUID_WICPixelFormat40bpp4ChannelsAlpha, global);
+    setObjectGUID(GUID_WICPixelFormat48bpp5ChannelsAlpha, global);
+    setObjectGUID(GUID_WICPixelFormat56bpp6ChannelsAlpha, global);
+    setObjectGUID(GUID_WICPixelFormat64bpp7ChannelsAlpha, global);
+    setObjectGUID(GUID_WICPixelFormat72bpp8ChannelsAlpha, global);
+    setObjectGUID(GUID_WICPixelFormat64bpp3ChannelsAlpha, global);
+    setObjectGUID(GUID_WICPixelFormat80bpp4ChannelsAlpha, global);
+    setObjectGUID(GUID_WICPixelFormat96bpp5ChannelsAlpha, global);
+    setObjectGUID(GUID_WICPixelFormat112bpp6ChannelsAlpha, global);
+    setObjectGUID(GUID_WICPixelFormat128bpp7ChannelsAlpha, global);
+    setObjectGUID(GUID_WICPixelFormat144bpp8ChannelsAlpha, global);
+    setObjectGUID(GUID_WICPixelFormat8bppY, global);
+    setObjectGUID(GUID_WICPixelFormat8bppCb, global);
+    setObjectGUID(GUID_WICPixelFormat8bppCr, global);
+    setObjectGUID(GUID_WICPixelFormat16bppCbCr, global);
+    setObjectGUID(GUID_WICPixelFormat16bppYQuantizedDctCoefficients, global);
+    setObjectGUID(GUID_WICPixelFormat16bppCbQuantizedDctCoefficients, global);
+    setObjectGUID(GUID_WICPixelFormat16bppCrQuantizedDctCoefficients, global);
+    setObjectGUID(GUID_ContainerFormatBmp, global);
+    setObjectGUID(GUID_ContainerFormatPng, global);
+    setObjectGUID(GUID_ContainerFormatIco, global);
+    setObjectGUID(GUID_ContainerFormatJpeg, global);
+    setObjectGUID(GUID_ContainerFormatTiff, global);
+    setObjectGUID(GUID_ContainerFormatGif, global);
+    setObjectGUID(GUID_ContainerFormatWmp, global);
     //#undef setGlobalGUID
 }
 
@@ -13898,21 +13989,22 @@ V8FUNC(Shell_NotifyIconGetRectWrapper) {
         identifier.uID = IntegerFI(jsNII->Get(context, LITERAL("uID")).ToLocalChecked());
     }
     if (jsNII->Has(context, LITERAL("guidItem")).ToChecked()) {
-        if (jsNII->Get(context, LITERAL("guidItem")).ToLocalChecked()->IsArray()) {
-            Local<Array> id = jsNII->Get(context, LITERAL("guidItem")).ToLocalChecked().As<Array>();
-            GUID shit = { IntegerFI(id->Get(context, 0).ToLocalChecked()),
-                IntegerFI(id->Get(context, 1).ToLocalChecked()),
-                IntegerFI(id->Get(context, 2).ToLocalChecked()),
-                IntegerFI(id->Get(context, 3).ToLocalChecked()),
-                IntegerFI(id->Get(context, 4).ToLocalChecked()),
-                IntegerFI(id->Get(context, 5).ToLocalChecked()),
-                IntegerFI(id->Get(context, 6).ToLocalChecked()),
-                IntegerFI(id->Get(context, 7).ToLocalChecked()),
-                IntegerFI(id->Get(context, 8).ToLocalChecked()),
-                IntegerFI(id->Get(context, 9).ToLocalChecked()),
-                IntegerFI(id->Get(context, 10).ToLocalChecked()) };
+        //if (jsNII->Get(context, LITERAL("guidItem")).ToLocalChecked()->IsArray()) {
+            //Local<Array> id = jsNII->Get(context, LITERAL("guidItem")).ToLocalChecked().As<Array>();
+            //GUID shit = { IntegerFI(id->Get(context, 0).ToLocalChecked()),
+            //    IntegerFI(id->Get(context, 1).ToLocalChecked()),
+            //    IntegerFI(id->Get(context, 2).ToLocalChecked()),
+            //    IntegerFI(id->Get(context, 3).ToLocalChecked()),
+            //    IntegerFI(id->Get(context, 4).ToLocalChecked()),
+            //    IntegerFI(id->Get(context, 5).ToLocalChecked()),
+            //    IntegerFI(id->Get(context, 6).ToLocalChecked()),
+            //    IntegerFI(id->Get(context, 7).ToLocalChecked()),
+            //    IntegerFI(id->Get(context, 8).ToLocalChecked()),
+            //    IntegerFI(id->Get(context, 9).ToLocalChecked()),
+            //    IntegerFI(id->Get(context, 10).ToLocalChecked()) };
+            GUID shit = jsImpl::fromJSGUID(isolate, jsNII->Get(context, LITERAL("guidItem")).ToLocalChecked());
             identifier.guidItem = shit;
-        }
+        //}
     }
 
     RECT r{};
@@ -16329,6 +16421,9 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
 
     setGlobal(GetMousePos);
     global->Set(isolate, "GetCursorPos", FunctionTemplate::New(isolate, GetMousePos));
+    setGlobalWrapper(GetCursorInfo);
+    setGlobalConst(CURSOR_SHOWING);
+    setGlobalConst(CURSOR_SUPPRESSED);
 
     setGlobal(SetMousePos);
     global->Set(isolate, "SetCursorPos", FunctionTemplate::New(isolate, SetMousePos));
@@ -16780,6 +16875,11 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
 #undef ID2D1DCRenderTarget
 #undef ID2D1DeviceContext
 #undef ID2D1DeviceContextDComposition
+
+    setGlobalConst(DXGI_DEBUG_RLO_SUMMARY);
+    setGlobalConst(DXGI_DEBUG_RLO_DETAIL);
+    setGlobalConst(DXGI_DEBUG_RLO_IGNORE_INTERNAL);
+    setGlobalConst(DXGI_DEBUG_RLO_ALL);
 
     setGlobalConst(D2D1_CAP_STYLE_FLAT);
     setGlobalConst(D2D1_CAP_STYLE_SQUARE);

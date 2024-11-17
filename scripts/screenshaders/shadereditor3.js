@@ -28,7 +28,7 @@ let wic, d2d, font, colorBrush;
 let gl;
 let dirty = false;
 let hit = {};
-let hitblueprint;
+//let hitblueprint;
 let activeButton;
 let activePin;
 let draws = 0;
@@ -256,6 +256,11 @@ const hittestarr = [
     [DRAG, hand],
 ];
 
+const BPTYPE_PURE = 0;
+const BPTYPE_NOTPURE = 1;
+const BPTYPE_EVENT = 2;
+const BPTYPE_DATATYPE = 3;
+
 class Draggable { //not to be confused with Draggable from jbstudio3 (this shit is elegant as fuck)
     static lockX = false;
     static lockY = false;
@@ -296,6 +301,28 @@ class Draggable { //not to be confused with Draggable from jbstudio3 (this shit 
     }
 }
 
+class Gradient {
+    static LinearGradientBrush(gradientStop, ...args) {
+        return new Gradient(gradientStop, d2d.CreateLinearGradientBrush(...args, gradientStop));
+    }
+
+    static RadialGradientBrush(gradientStop, ...args) {
+        return new Gradient(gradientStop, d2d.CreateRadialGradientBrush(...args, gradientStop));
+    }
+
+    constructor(gradientStop, gradient) {
+        this.gradientStop = gradientStop;
+        this.gradient = gradient;
+        //haha lowkey i just remembered that if i actually made an internalPtr property on this object it would be valid to pass this object directly into a d2d function!
+        this.internalPtr = this.gradient.internalPtr; //LNMAO
+    }
+
+    Release() {
+        this.gradient.Release();
+        this.gradientStop.Release();
+    }
+}
+
 class Blueprint {
     static paramColors = {};
     //static captionHeight = GetSystemMetrics(SM_CYCAPTION) + GetSystemMetrics(SM_CYEDGE)*2; //27
@@ -310,7 +337,7 @@ class Blueprint {
     parameters = [];
     out = [];
 
-    gradientStops = [];
+    //gradientStops = [];
     gradients = [];
     paramText = [];
     outText = [];
@@ -320,13 +347,13 @@ class Blueprint {
     static padding = 16;
     static radius = 4;
 
-    static create(parent, title, color, x, y, width, height, parameters, out, pure) {
-        const b = new Blueprint(parent, color, title, x, y, width, height, parameters, out, pure);
+    static create(parent, title, color, x, y, width, height, parameters, out, type) {
+        const b = new Blueprint(parent, color, title, x, y, width, height, parameters, out, type);
         blueprints.push(b);
         return b;
     }
 
-    constructor(parent, title, color, x, y, width, height, parameters, out, pure) {
+    constructor(parent, title, color, x, y, width, height, parameters, out, type) {
         this.parent = parent;
         this.title = title;
         this.x = x;
@@ -335,39 +362,109 @@ class Blueprint {
         this.height = height;
         this.parameters = parameters;
         this.out = out;
+        this.type = type;
 
-        this.gradientStops.push(
-            //d2d.CreateGradientStopCollection([0.0, 0.0, 67/255, 255/255], [0.8, 32/255, 32/255, 32/255]),
-            d2d.CreateGradientStopCollection([0.0, ...color], [0.85, 32/255, 32/255, 32/255]),
-            d2d.CreateGradientStopCollection([0.0, 32/255, 32/255, 32/255], [0.4, 0.0, 0.0, 0.0, 0.0]),
-            d2d.CreateGradientStopCollection([0.0, 27/255, 28/255, 27/255], [0.4, 19/255, 21/255, 19/255], [.8, 15/255, 17/255, 15/255]),
-            d2d.CreateGradientStopCollection([0.0, ...color], [0.2, 0.0, 0.0, 0.0, 0.0]),
-        );
-        
-        this.gradients.push( //https://learn.microsoft.com/en-us/windows/win32/api/d2d1/ns-d2d1-d2d1_linear_gradient_brush_properties
-            d2d.CreateLinearGradientBrush(0,0,this.width,/*this.height*/ Blueprint.captionHeight, this.gradientStops[0]),
-            d2d.CreateRadialGradientBrush(this.width/3, Blueprint.captionHeight/2, 0, 0, this.width, Blueprint.captionHeight, this.gradientStops[1]),
-            d2d.CreateLinearGradientBrush(0, Blueprint.captionHeight, this.width, this.height, this.gradientStops[2]),
-            d2d.CreateLinearGradientBrush(2, 2, 2, Blueprint.captionHeight-2, this.gradientStops[3]), //pointing down
-        );
+        //this.gradientStops.push(
+        //    //d2d.CreateGradientStopCollection([0.0, 0.0, 67/255, 255/255], [0.8, 32/255, 32/255, 32/255]),
+        //    d2d.CreateGradientStopCollection([0.0, ...color], [0.85, 32/255, 32/255, 32/255]),
+        //    d2d.CreateGradientStopCollection([0.0, 32/255, 32/255, 32/255], [0.4, 0.0, 0.0, 0.0, 0.0]),
+        //    d2d.CreateGradientStopCollection([0.0, 27/255, 28/255, 27/255], [0.4, 19/255, 21/255, 19/255], [.8, 15/255, 17/255, 15/255]),
+        //    d2d.CreateGradientStopCollection([0.0, ...color], [0.2, 0.0, 0.0, 0.0, 0.0]),
+        //);
+        //
+        //this.gradients.push( //https://learn.microsoft.com/en-us/windows/win32/api/d2d1/ns-d2d1-d2d1_linear_gradient_brush_properties
+        //    d2d.CreateLinearGradientBrush(0,0,this.width,/*this.height*/ Blueprint.captionHeight, this.gradientStops[0]),
+        //    d2d.CreateRadialGradientBrush(this.width/3, Blueprint.captionHeight/2, 0, 0, this.width, Blueprint.captionHeight, this.gradientStops[1]),
+        //    d2d.CreateLinearGradientBrush(0, Blueprint.captionHeight, this.width, this.height, this.gradientStops[2]),
+        //    d2d.CreateLinearGradientBrush(2, 2, 2, Blueprint.captionHeight-2, this.gradientStops[3]), //pointing down
+        //);
+
+        this.gradients.push(
+            Gradient.LinearGradientBrush(
+                d2d.CreateGradientStopCollection([0.0, ...color], [0.85, 32/255, 32/255, 32/255]),
+                0,0,this.width,/*this.height*/ Blueprint.captionHeight, //CreateLinearGradientBrush args (don't include the gradientStop because Gradient.LinearGradientBrush does it for you)
+            ),
+            Gradient.RadialGradientBrush(
+                d2d.CreateGradientStopCollection([0.0, 32/255, 32/255, 32/255], [0.4, 0.0, 0.0, 0.0, 0.0]),
+                this.width/3, Blueprint.captionHeight/2, 0, 0, this.width, Blueprint.captionHeight,
+            ),
+            Gradient.LinearGradientBrush(
+                d2d.CreateGradientStopCollection([0.0, 27/255, 28/255, 27/255], [0.4, 19/255, 21/255, 19/255], [.8, 15/255, 17/255, 15/255]),
+                0, Blueprint.captionHeight, this.width, this.height,
+            ),
+            Gradient.LinearGradientBrush(
+                d2d.CreateGradientStopCollection([0.0, ...color], [0.2, 0.0, 0.0, 0.0, 0.0]),
+                2, 2, 2, Blueprint.captionHeight-2, //pointing down
+            ),
+        )
+
+        if(this.type == BPTYPE_NOTPURE || this.type == BPTYPE_EVENT) {
+            if(this.type == BPTYPE_NOTPURE) {
+                //this.parameters[i] = "exec"; //i don't need the variable name anymore because i store it in the text layout paramText[i]
+                //const gsc = d2d.CreateGradientStopCollection([0.0, ...Blueprint.paramColors[param]], [0.5, 0.0, 0.0, 0.0, 0.0]);
+                //this.paramText.push(d2d.CreateTextLayout("", font, w, h));
+                ////this.gradientStops.push(gsc);
+                ////this.gradients.push(d2d.CreateRadialGradientBrush(Blueprint.padding, (i+1)*Blueprint.captionHeight+Blueprint.padding, 0, 0, this.width/2, Blueprint.captionHeight, gsc));
+                //this.gradients.push(
+                //    Gradient.RadialGradientBrush(
+                //        gsc,
+                //        Blueprint.padding, (i+1)*Blueprint.captionHeight+Blueprint.padding, 0, 0, this.width/2, Blueprint.captionHeight,
+                //    )
+                //);
+                this.parameters.splice(0, 0, " : exec");
+            }
+            this.out.splice(0, 0, "exec");
+        }
 
         for(let i = 0; i < this.parameters.length; i++) {
             const [_, name, param] = this.parameters[i].match(/(.+) *: *(.+)/);
+
+            this.addPin(false, i, param, name);
             //print(_, name, param, Blueprint.paramColors[param]);
-            this.parameters[i] = param; //i don't need the variable name anymore because i store it in the text layout paramText[i]
-            const gsc = d2d.CreateGradientStopCollection([0.0, ...Blueprint.paramColors[param]], [0.5, 0.0, 0.0, 0.0, 0.0]);
-            this.paramText.push(d2d.CreateTextLayout(name, font, w, h));
-            this.gradientStops.push(gsc);
-            this.gradients.push(d2d.CreateRadialGradientBrush(Blueprint.padding, (i+1)*Blueprint.captionHeight+Blueprint.padding, 0, 0, this.width/2, Blueprint.captionHeight, gsc));
+            //this.parameters[i] = param; //i don't need the variable name anymore because i store it in the text layout paramText[i]
+            //const gsc = d2d.CreateGradientStopCollection([0.0, ...Blueprint.paramColors[param]], [0.5, 0.0, 0.0, 0.0, 0.0]);
+            //this.paramText.push(d2d.CreateTextLayout(name, font, w, h));
+            ////this.gradientStops.push(gsc);
+            ////this.gradients.push(d2d.CreateRadialGradientBrush(Blueprint.padding, (i+1)*Blueprint.captionHeight+Blueprint.padding, 0, 0, this.width/2, Blueprint.captionHeight, gsc));
+            //this.gradients.push(
+            //    Gradient.RadialGradientBrush(
+            //        gsc,
+            //        Blueprint.padding, (i+1)*Blueprint.captionHeight+Blueprint.padding, 0, 0, this.width/2, Blueprint.captionHeight,
+            //    )
+            //);
         }
 
         for(let i = 0; i < this.out.length; i++) {
             const op = this.out[i];
-            const gsc = d2d.CreateGradientStopCollection([0.0, ...Blueprint.paramColors[op]], [0.5, 0.0, 0.0, 0.0, 0.0]);
-            this.outText.push(d2d.CreateTextLayout(op, font, w, h));
-            this.gradientStops.push(gsc);
-            this.gradients.push(d2d.CreateRadialGradientBrush(Blueprint.padding, (i+1)*Blueprint.captionHeight+Blueprint.padding, 0, 0, this.width/2, Blueprint.captionHeight, gsc));
+            this.addPin(true, i, op, op);
+            //const gsc = d2d.CreateGradientStopCollection([0.0, ...Blueprint.paramColors[op]], [0.5, 0.0, 0.0, 0.0, 0.0]);
+            //this.outText.push(d2d.CreateTextLayout(op, font, w, h));
+            ////this.gradientStops.push(gsc);
+            ////this.gradients.push(d2d.CreateRadialGradientBrush(Blueprint.padding, (i+1)*Blueprint.captionHeight+Blueprint.padding, 0, 0, this.width/2, Blueprint.captionHeight, gsc));
+            //this.gradients.push(
+            //    Gradient.RadialGradientBrush(
+            //        gsc,
+            //        Blueprint.padding, (i+1)*Blueprint.captionHeight+Blueprint.padding, 0, 0, this.width/2, Blueprint.captionHeight,
+            //    )
+            //);
         }
+    }
+
+    addPin(out, i, param, name) { //lol can't use in as a param name
+        if(!out) {
+            this.parameters[i] = param; //i don't need the variable name anymore because i store it in the text layout paramText[i]
+            this.paramText.push(d2d.CreateTextLayout(name, font, w, h));
+        }else {
+            this.outText.push(d2d.CreateTextLayout(name, font, w, h));
+        }
+        const gsc = d2d.CreateGradientStopCollection([0.0, ...Blueprint.paramColors[param]], [0.5, 0.0, 0.0, 0.0, 0.0]);
+
+        this.gradients.push(
+            Gradient.RadialGradientBrush(
+                gsc,
+                Blueprint.padding, (i+1)*Blueprint.captionHeight+Blueprint.padding, 0, 0, this.width/2, Blueprint.captionHeight,
+            )
+        );
     }
 
     getXAlong(connection, t) {
@@ -510,8 +607,11 @@ class Blueprint {
     }
 
     destroy() {
-        for(let i = 0; i < this.gradientStops.length; i++) {
-            this.gradientStops[i].Release();
+        //for(let i = 0; i < this.gradientStops.length; i++) {
+        //    this.gradientStops[i].Release();
+        //    this.gradients[i].Release();
+        //}
+        for(let i = 0; i < this.gradients.length; i++) {
             this.gradients[i].Release();
         }
         for(let i = 0; i < this.paramText.length; i++) {
@@ -527,7 +627,7 @@ class Blueprint {
         activePin = {i: data, source: this};
         if(this.connections.out[data]) {
             const connection = this.connections.out[data];
-            connection.receiver.source.connections.in[connection.receiver.i] = undefined;
+            connection.receiver.source.connections.in[connection.receiver.i] = undefined; //lowkey convoluted
             //connection.x = mouse.x;
             //connection.y = mouse.y;
         }//else {
@@ -577,6 +677,7 @@ function windowProc(hwnd, msg, wp, lp) {
         //font.SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
         
         gl = createCanvas("gl", NULL, hwnd);
+        Blueprint.paramColors["exec"] = [1.0, 1.0, 1.0];
         Blueprint.paramColors["FRAGMENT_SHADER"] = [255/255, 42/255, 0.0];
         Blueprint.paramColors["VERTEX_SHADER"] = [136/255, 255/255, 0.0];
         Blueprint.paramColors["SHADER"] = [200/255, 200/255, 200/255];
@@ -592,8 +693,9 @@ function windowProc(hwnd, msg, wp, lp) {
         DwmSetWindowAttribute(hwnd, DWMWA_CAPTION_COLOR, RGB(24, 24, 24)); //hell yeah this shit tuff asf (dark title bar)[doesn't work if you get rid of the window theme tho]
         
         //otherwnd = new BottomPane(hwnd); //no longer blocks the thread as i make and draw every control myself
-        blueprints.push(new Blueprint(hwnd, "Program", [95/255, 150/255, 187/255], 300, 100, 221, 90*2, ["fragmentShader : FRAGMENT_SHADER", "vertexShader : VERTEX_SHADER"], []));
-        blueprints.push(new Blueprint(hwnd, "Shader", [120/255, 168/255, 115/255], 0, 100, 221, 90, ["filename : string", "type : number"], ["SHADER"]));
+        blueprints.push(new Blueprint(hwnd, "Event Start", [162/255, 38/255, 30/255], 0, 0, 190, 72, [], [], BPTYPE_EVENT)); //bptype_event adds exec and delegate pin
+        blueprints.push(new Blueprint(hwnd, "Program", [95/255, 150/255, 187/255], 300, 100, 221, 90*2, ["fragmentShader : FRAGMENT_SHADER", "vertexShader : VERTEX_SHADER"], [], BPTYPE_NOTPURE));
+        blueprints.push(new Blueprint(hwnd, "Shader", [120/255, 168/255, 115/255], 0, 100, 221, 90, ["filename : string", "type : number"], ["SHADER"], BPTYPE_PURE));
         d2dpaint();
     }else if(msg == WM_PAINT) {   
         dirty = true;
@@ -708,11 +810,11 @@ function windowProc(hwnd, msg, wp, lp) {
         const mouse = {x: GET_X_LPARAM(lp)-camera.x, y: GET_Y_LPARAM(lp)-camera.y}; //lp is client mouse pos
 
         if(hit.result == BUTTON) {
-            hitblueprint.rightMouseDown?.(mouse);
+            hit.blueprint.rightMouseDown?.(mouse);
         }else if(hit.result == CONTEXTMENU) {
             const screenmousepos = GetCursorPos();
-            hitblueprint.preContextMenu?.(screenmousepos);
-            TrackPopupMenu(hitblueprint.contextMenu, TPM_BOTTOMALIGN | TPM_LEFTALIGN, screenmousepos.x, screenmousepos.y, hwnd);
+            hit.blueprint.preContextMenu?.(screenmousepos);
+            TrackPopupMenu(hit.blueprint.contextMenu, TPM_BOTTOMALIGN | TPM_LEFTALIGN, screenmousepos.x, screenmousepos.y, hwnd);
         }
 
         for(const blueprint of blueprints) {
