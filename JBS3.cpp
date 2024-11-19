@@ -14098,11 +14098,358 @@ V8FUNC(RtlGetLastNtStatusWrapper) {
     }
 }
 
+V8FUNC(RegQueryInfoKeyWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    DWORD length = info.Length() > 2 ? IntegerFI(info[2]) : 256;
+    length = length == 0 ? 256 : length;
+
+    DWORD classLength = length;
+
+    //wchar_t wsclass[256]{};
+    std::wstring wsclass(length, '#');
+
+    DWORD subKeysCount = NULL;
+    DWORD maxSubKeyLen = NULL;
+    DWORD maxClassLen = NULL;
+    DWORD valuesCount = NULL;
+    DWORD maxValueNameLen = NULL;
+    DWORD maxValueLen = NULL;
+
+    FILETIME lastWriteTime{};
+
+    LSTATUS result = RegQueryInfoKey((HKEY)IntegerFI(info[0]), &wsclass[0], &classLength, NULL, &subKeysCount, &maxSubKeyLen, &maxClassLen, &valuesCount, &maxValueNameLen, &maxValueLen, NULL, &lastWriteTime);
+
+    //wsclass.shrink_to_fit();
+
+    if (result != ERROR_SUCCESS) {
+        info.GetReturnValue().Set(Number::New(isolate, result));
+    }
+    else {
+        Local<Context> context = isolate->GetCurrentContext();
+        Local<Object> jsKeyInfo = Object::New(isolate);
+        //jsKeyInfo->Set(context, LITERAL("$1"), Number::New(isolate, $1));
+        jsKeyInfo->Set(context, LITERAL("class"), String::NewFromTwoByte(isolate, (const uint16_t*)wsclass.data()).ToLocalChecked());
+        
+        jsKeyInfo->Set(context, LITERAL("subKeysCount"), Number::New(isolate, subKeysCount));
+        jsKeyInfo->Set(context, LITERAL("maxSubKeyLen"), Number::New(isolate, maxSubKeyLen));
+        jsKeyInfo->Set(context, LITERAL("maxClassLen"), Number::New(isolate, maxClassLen));
+        jsKeyInfo->Set(context, LITERAL("valuesCount"), Number::New(isolate, valuesCount));
+        jsKeyInfo->Set(context, LITERAL("maxValueNameLen"), Number::New(isolate, maxValueNameLen));
+        jsKeyInfo->Set(context, LITERAL("maxValueLen"), Number::New(isolate, maxValueLen));
+
+        Local<Object> jsFileTime = Object::New(isolate);
+        jsFileTime->Set(context, LITERAL("dwLowDateTime"), Number::New(isolate, lastWriteTime.dwLowDateTime));
+        jsFileTime->Set(context, LITERAL("dwHighDateTime"), Number::New(isolate, lastWriteTime.dwHighDateTime));
+        jsKeyInfo->Set(context, LITERAL("fileTime"), jsFileTime);
+
+        info.GetReturnValue().Set(jsKeyInfo);
+    }
+}
+
+V8FUNC(RegGetValueWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    DWORD dwType = 0;
+    //void* vData = nullptr;
+    DWORD dataLength = IntegerFI(info[4])+2;
+    std::vector<BYTE> vData(dataLength);
+
+    LSTATUS result = RegGetValue((HKEY)IntegerFI(info[0]), WStringFI(info[1]), WStringFI(info[2]), IntegerFI(info[3]), &dwType, vData.data(), &dataLength);
+
+    if (result != ERROR_SUCCESS) {
+        info.GetReturnValue().Set(Number::New(isolate, result));
+    }
+    else {
+        vData.resize(dataLength);
+
+        Local<Value> jsData;
+
+        if (dwType == REG_SZ) { //oops i thought REG_SZ was char* and REG_MULTI_SZ was wchar_t*
+            //jsData = String::NewFromUtf8(isolate, (const char*)data.data(), NewStringType::kNormal, dataLength).ToLocalChecked();
+            jsData = String::NewFromTwoByte(isolate, (const uint16_t*)vData.data(), NewStringType::kNormal, dataLength).ToLocalChecked();
+        }
+        //else if (dwType == REG_MULTI_SZ) {
+        //    jsData = String::NewFromTwoByte(isolate, (const uint16_t*)data.data(), NewStringType::kNormal, dataLength).ToLocalChecked();
+        //}
+        else if (dwType == REG_DWORD) {
+            jsData = Number::New(isolate, *(int*)vData.data());
+        }
+        else if (dwType == REG_QWORD) {
+            jsData = Number::New(isolate, *(int64_t*)vData.data());
+        }
+        else {
+            Local<ArrayBuffer> ab = ArrayBuffer::New(isolate, dataLength);
+            memcpy(ab->Data(), vData.data(), dataLength); //GULP
+
+            jsData = Uint8Array::New(ab, 0, dataLength);
+            //jsData = Undefined(isolate);//Object::New(isolate);
+        }
+
+        info.GetReturnValue().Set(jsData);
+    }
+
+    //info.GetReturnValue().Set();
+}
+
+V8FUNC(RegCreateKeyExWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    HKEY key = NULL;
+
+    DWORD disposition = NULL;
+
+    LSTATUS result = RegCreateKeyEx((HKEY)IntegerFI(info[0]), WStringFI(info[1]), 0, (wchar_t*)*String::Value(isolate, info[2]), IntegerFI(info[3]), IntegerFI(info[4]), NULL, &key, &disposition);
+
+    if (result != ERROR_SUCCESS) {
+        info.GetReturnValue().Set(Number::New(isolate, result));
+    }
+    else {
+        if (info.Length() == 6) {
+            Local<Context> context = isolate->GetCurrentContext();
+            Local<Object> jsOut = info[5].As<Object>();
+            jsOut->Set(context, LITERAL("disposition"), Number::New(isolate, disposition));
+        }
+        info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)key));
+    }
+}
+
+V8FUNC(RegOpenKeyExWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    HKEY key = NULL;
+
+    LSTATUS result = RegOpenKeyEx((HKEY)IntegerFI(info[0]), WStringFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]), &key);
+
+    if (result != ERROR_SUCCESS) {
+        info.GetReturnValue().Set(Number::New(isolate, result));
+    }
+    else {
+        info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)key));
+    }
+}
+
+V8FUNC(RegCloseKeyWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    LSTATUS result = RegCloseKey((HKEY)IntegerFI(info[0]));
+    info.GetReturnValue().Set(Number::New(isolate, result));
+}
+
+V8FUNC(memcpyWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    memcpy((void*)IntegerFI(info[0]), (void*)IntegerFI(info[1]), IntegerFI(info[2]));
+}
+
+V8FUNC(RegEnumKeyExWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    DWORD length = info.Length() > 2 ? IntegerFI(info[2]) : 256;
+    length = length == 0 ? 256 : length;
+
+    DWORD nameLength = length;
+    DWORD classLength = length;
+    //wchar_t name[256]{};
+    std::wstring name(length, '#');
+    //wchar_t wsclass[256]{};
+    std::wstring wsclass(length, '#');
+
+    FILETIME lastWriteTime{};
+
+    LSTATUS result = RegEnumKeyEx((HKEY)IntegerFI(info[0]), IntegerFI(info[1]), &name[0], &nameLength, NULL, &wsclass[0], &classLength, &lastWriteTime);
+
+    //name.shrink_to_fit();
+    //wsclass.shrink_to_fit();
+
+    if (result != ERROR_SUCCESS) {
+        info.GetReturnValue().Set(Number::New(isolate, result));
+    }
+    else {
+        Local<Context> context = isolate->GetCurrentContext();
+        Local<Object> jsKeyInfo = Object::New(isolate);
+        jsKeyInfo->Set(context, LITERAL("name"), String::NewFromTwoByte(isolate, (const uint16_t*)name.data()).ToLocalChecked());
+        jsKeyInfo->Set(context, LITERAL("class"), String::NewFromTwoByte(isolate, (const uint16_t*)wsclass.data()).ToLocalChecked());
+
+        Local<Object> jsFileTime = Object::New(isolate);
+        jsFileTime->Set(context, LITERAL("dwLowDateTime"), Number::New(isolate, lastWriteTime.dwLowDateTime));
+        jsFileTime->Set(context, LITERAL("dwHighDateTime"), Number::New(isolate, lastWriteTime.dwHighDateTime));
+        jsKeyInfo->Set(context, LITERAL("fileTime"), jsFileTime);
+
+        info.GetReturnValue().Set(jsKeyInfo);
+    }
+}
+
+V8FUNC(RegEnumValueWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    DWORD length = info.Length() > 3 ? IntegerFI(info[3]) : 256;
+    length = length == 0 ? 256 : length;
+
+    DWORD nameLength = length;
+    //wchar_t name[256]{};
+    std::wstring name(length, '#');
+    //wchar_t wsclass[256]{};
+
+    FILETIME lastWriteTime{};
+
+    DWORD dwType = NULL;
+
+    DWORD dataLength = IntegerFI(info[2]) + 2; //+2 just in case for null terminated wide strings or something idk
+
+    std::vector<BYTE> data(dataLength);
+
+    LRESULT result = NULL;
+
+    if (info[2]->BooleanValue(isolate)) {
+        result = RegEnumValue((HKEY)IntegerFI(info[0]), IntegerFI(info[1]), &name[0], &nameLength, NULL, &dwType, data.data(), &dataLength);
+        data.resize(dataLength);
+    }
+    else {
+        result = RegEnumValue((HKEY)IntegerFI(info[0]), IntegerFI(info[1]), &name[0], &nameLength, NULL, &dwType, NULL, NULL);
+        dataLength = NULL;
+    }
+
+    //name.shrink_to_fit();
+
+    if (result != ERROR_SUCCESS) {
+        info.GetReturnValue().Set(Number::New(isolate, result));
+    }
+    else {
+        Local<Context> context = isolate->GetCurrentContext();
+        Local<Object> jsValueInfo = Object::New(isolate);
+        jsValueInfo->Set(context, LITERAL("name"), String::NewFromTwoByte(isolate, (const uint16_t*)name.data()).ToLocalChecked());
+        jsValueInfo->Set(context, LITERAL("type"), Number::New(isolate, dwType));
+        Local<Value> jsData;
+        if (dataLength != NULL) {
+            if (dwType == REG_SZ) { //oops i thought REG_SZ was char* and REG_MULTI_SZ was wchar_t*
+                //jsData = String::NewFromUtf8(isolate, (const char*)data.data(), NewStringType::kNormal, dataLength).ToLocalChecked();
+                jsData = String::NewFromTwoByte(isolate, (const uint16_t*)data.data(), NewStringType::kNormal, dataLength).ToLocalChecked();
+            }
+            //else if (dwType == REG_MULTI_SZ) {
+            //    jsData = String::NewFromTwoByte(isolate, (const uint16_t*)data.data(), NewStringType::kNormal, dataLength).ToLocalChecked();
+            //}
+            else if (dwType == REG_DWORD) {
+                jsData = Number::New(isolate, *(int*)data.data());
+            }
+            else if (dwType == REG_QWORD) {
+                jsData = Number::New(isolate, *(int64_t*)data.data());
+            }
+            else {
+                Local<ArrayBuffer> ab = ArrayBuffer::New(isolate, dataLength);
+                memcpy(ab->Data(), data.data(), dataLength); //GULP
+
+                jsData = Uint8Array::New(ab, 0, dataLength);
+                //jsData = Undefined(isolate);//Object::New(isolate);
+            }
+        }
+        else {
+            jsData = Undefined(isolate);
+        }
+        jsValueInfo->Set(context, LITERAL("data"), jsData);
+        jsValueInfo->Set(context, LITERAL("dataLength"), Number::New(isolate, dataLength));
+        info.GetReturnValue().Set(jsValueInfo);
+    }
+}
+
+V8FUNC(RegSetValueExWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    DWORD dwType = IntegerFI(info[2]);
+    std::vector<BYTE> data;
+    UINT length = 0;
+
+    //if (dwType == REG_SZ) {
+    //    Local<String> sz = info[3].As<String>();
+    //    length = sz->Length()+1;
+    //    data = std::vector<BYTE>(length);
+    //    memcpy(data.data(), CStringFI(sz), length);
+    //}
+    //else if(dwType == REG_MULTI_SZ) {
+    if(dwType == REG_SZ) {
+        Local<String> msz = info[3].As<String>();
+        length = msz->Length()*2 + 2;
+        data = std::vector<BYTE>(length);
+        memcpy(data.data(), WStringFI(msz), length);
+    }
+    else if (dwType == REG_DWORD) {
+        //Local<Number> num = info[3].As<Number>();
+        length = sizeof(DWORD);
+        data = std::vector<BYTE>(length);
+        DWORD value = IntegerFI(info[3]);
+        memcpy(data.data(), &value, length);
+    }
+    else if (dwType == REG_QWORD) {
+        length = sizeof(int64_t);
+        data = std::vector<BYTE>(length);
+        int64_t value = IntegerFI(info[3]);
+        memcpy(data.data(), &value, length);
+    }
+    else if (dwType == REG_BINARY) {
+        if (info[3]->IsArrayBufferView()) {
+            Local<ArrayBufferView> jsdata = info[3].As<ArrayBufferView>();
+            length = jsdata->ByteLength();
+            memcpy(data.data(), jsdata->Buffer()->Data(), length);
+        }
+    }
+    else {
+        data = std::vector<BYTE>();
+    }
+
+    LSTATUS result = RegSetValueEx((HKEY)IntegerFI(info[0]), WStringFI(info[1]), 0, dwType, data.data(), length); //well i was gonna slip a fun one in (&data[0]) but idk what would happen if the vector was empty
+    info.GetReturnValue().Set(Number::New(isolate, result));
+}
+
 //V8FUNC(CompareObjectHandlesWrapper) { //why is this not linked already like what do i have left to link with jbs
 //    using namespace v8;
 //    Isolate* isolate = info.GetIsolate();
 //
 //    info.GetReturnValue().Set(CompareObjectHandles((HANDLE)IntegerFI(info[0]), (HANDLE)IntegerFI(info[1])));
+//}
+
+//wow when i was searched for SystemParametersInfo i found a jbs like thing for lua
+//https://github.com/luapower/winapi/blob/master/winapi/spi.lua
+//V8FUNC(SystemParametersInfoWrapper) { //ok im starting to see why i haven't done this yet... (you have to know the type of data being set/get and i can't be bothered to do allat)
+//    using namespace v8;
+//    Isolate* isolate = info.GetIsolate();
+//
+//    //PVOID pvParam = NULL;
+//
+//    std::vector<BYTE> pvParam;
+//
+//    Local<Value> jsData = info[2];
+//    if (jsData->IsNumber()) {
+//        LONG num = IntegerFI(jsData);
+//        pvParam = std::vector<BYTE>
+//        //pvParam = &num;
+//    }
+//    else if (jsData->IsString()) {
+//        
+//    }
+//    else if (jsData->IsArrayBufferView()) {
+//
+//    }
+//        
+//    BOOL res = SystemParametersInfo(IntegerFI(info[0]), IntegerFI(info[1]), pvParam.data(), IntegerFI(info[3]));
+//
+//    pvParam.shrink_to_fit();
+//
+//    if (res) {
+//        info.GetReturnValue().Set(Number::New(isolate, ));
+//    }
+//    else {
+//        info.GetReturnValue().Set(res);
+//    }
+//
 //}
 
 //i think im allowed to use a snapshot thing to load these quicker
@@ -14184,6 +14531,8 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const wchar_t* filename
     setGlobal(NewWCharStrPtr);
     setGlobal(DeletePtr);
     setGlobal(DeleteArrayPtr);
+
+    //setGlobalWrapper(SystemParametersInfo);
     
     setGlobalWrapper(VirtualProtect);
     setGlobalConst(PAGE_NOACCESS);
@@ -14242,7 +14591,76 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const wchar_t* filename
     setGlobalConst(MEM_EXTENDED_PARAMETER_SOFT_FAULT_PAGES);
     setGlobalConst(MEM_EXTENDED_PARAMETER_EC_CODE);
     setGlobalConst(MEM_EXTENDED_PARAMETER_NUMA_NODE_MANDATORY);
-    
+
+    setGlobalWrapper(memcpy);
+    setGlobalWrapper(RegQueryInfoKey);
+    setGlobalWrapper(RegOpenKeyEx);
+    setGlobalWrapper(RegGetValue);
+    setGlobalWrapper(RegSetValueEx);
+    setGlobalWrapper(RegEnumKeyEx);
+    setGlobalWrapper(RegEnumValue);
+    setGlobalWrapper(RegCloseKey);
+    setGlobalWrapper(RegCreateKeyEx);
+    setGlobalConstLONGPTR(HKEY_CLASSES_ROOT);
+    setGlobalConstLONGPTR(HKEY_CURRENT_USER);
+    setGlobalConstLONGPTR(HKEY_LOCAL_MACHINE);
+    setGlobalConstLONGPTR(HKEY_USERS);
+    setGlobalConstLONGPTR(HKEY_PERFORMANCE_DATA);
+    setGlobalConstLONGPTR(HKEY_PERFORMANCE_TEXT);
+    setGlobalConstLONGPTR(HKEY_PERFORMANCE_NLSTEXT);
+    setGlobalConstLONGPTR(HKEY_CURRENT_CONFIG);
+    setGlobalConstLONGPTR(HKEY_DYN_DATA);
+    setGlobalConstLONGPTR(HKEY_CURRENT_USER_LOCAL_SETTINGS);
+    setGlobalConst(REG_OPTION_RESERVED);
+    setGlobalConst(REG_OPTION_NON_VOLATILE);
+    setGlobalConst(REG_OPTION_VOLATILE);
+    setGlobalConst(REG_OPTION_CREATE_LINK);
+    setGlobalConst(REG_OPTION_BACKUP_RESTORE);
+    setGlobalConst(REG_OPTION_OPEN_LINK);
+    setGlobalConst(REG_OPTION_DONT_VIRTUALIZE);
+    setGlobalConst(KEY_QUERY_VALUE);
+    setGlobalConst(KEY_SET_VALUE);
+    setGlobalConst(KEY_CREATE_SUB_KEY);
+    setGlobalConst(KEY_ENUMERATE_SUB_KEYS);
+    setGlobalConst(KEY_NOTIFY);
+    setGlobalConst(KEY_CREATE_LINK);
+    setGlobalConst(KEY_WOW64_32KEY);
+    setGlobalConst(KEY_WOW64_64KEY);
+    setGlobalConst(KEY_WOW64_RES);
+    setGlobalConst(KEY_READ);
+    setGlobalConst(KEY_WRITE);
+    setGlobalConst(KEY_EXECUTE);
+    setGlobalConst(KEY_ALL_ACCESS);
+    setGlobalConst(REG_NONE);
+    setGlobalConst(REG_SZ);
+    setGlobalConst(REG_EXPAND_SZ);
+    setGlobalConst(REG_BINARY);
+    setGlobalConst(REG_DWORD);
+    setGlobalConst(REG_DWORD_LITTLE_ENDIAN);
+    setGlobalConst(REG_DWORD_BIG_ENDIAN);
+    setGlobalConst(REG_LINK);
+    setGlobalConst(REG_MULTI_SZ);
+    setGlobalConst(REG_RESOURCE_LIST);
+    setGlobalConst(REG_FULL_RESOURCE_DESCRIPTOR);
+    setGlobalConst(REG_RESOURCE_REQUIREMENTS_LIST);
+    setGlobalConst(REG_QWORD);
+    setGlobalConst(REG_QWORD_LITTLE_ENDIAN);
+    setGlobalConst(RRF_RT_REG_NONE);
+    setGlobalConst(RRF_RT_REG_SZ);
+    setGlobalConst(RRF_RT_REG_EXPAND_SZ);
+    setGlobalConst(RRF_RT_REG_BINARY);
+    setGlobalConst(RRF_RT_REG_DWORD);
+    setGlobalConst(RRF_RT_REG_MULTI_SZ);
+    setGlobalConst(RRF_RT_REG_QWORD);
+    setGlobalConst(RRF_RT_DWORD);
+    setGlobalConst(RRF_RT_QWORD);
+    setGlobalConst(RRF_RT_ANY);
+    setGlobalConst(RRF_SUBKEY_WOW6464KEY);
+    setGlobalConst(RRF_SUBKEY_WOW6432KEY);
+    setGlobalConst(RRF_WOW64_MASK);
+    setGlobalConst(RRF_NOEXPAND);
+    setGlobalConst(RRF_ZEROONFAILURE);
+
     setGlobalWrapper(FlushInstructionCache);
 
     global->Set(isolate, "BeginPaint", FunctionTemplate::New(isolate, BeginPaintWrapper));
@@ -17288,7 +17706,7 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrevInstance, PWSTR nCmdList, in
     screenHeight = GetSystemMetrics(SM_CYSCREEN); //only used for SendInput
     //uv_loop = uv_default_loop(); //LO!
     //RedirectIOToConsole();
-    
+
     //if (AllocConsole()) {
     //    freopen("CONOUT$", "w", stdout);
     //    SetConsoleTitle(L"Ligature Debug Console");
@@ -17302,9 +17720,27 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrevInstance, PWSTR nCmdList, in
     //https://learn.microsoft.com/en-us/windows/console/getconsolewindow
     //https://learn.microsoft.com/en-us/windows/console/classic-vs-vt
     //https://learn.microsoft.com/en-us/windows/console/creating-a-pseudoconsole-session
-    AllocConsole();
+    //https://learn.microsoft.com/en-us/windows/console/console-virtual-terminal-sequences
+    //https://stackoverflow.com/questions/66861340/problem-with-using-createpseudoconsole-to-create-a-pty-pipe-in-python
+    AllocConsole(); //yeah hell no apparently i don't know enough about this pseudoconsole business bruh
+    //SetUpPseudoConsole(COORD{ 128, 96 });
 
+    //HPCON hPC{ INVALID_HANDLE_VALUE };
+    
+    //  Create the Pseudo Console and pipes to it
+    //HANDLE hPipeIn{ INVALID_HANDLE_VALUE };
+    //HANDLE hPipeOut{ INVALID_HANDLE_VALUE };
+    //HRESULT hr = CreatePseudoConsoleAndPipes(&hPC, &hPipeIn, &hPipeOut);
+    //if (S_OK != hr) {
+    //    return hr;
+    //}
+    //SetStdHandle(STD_INPUT_HANDLE, hPipeOut);
+    //SetStdHandle(STD_OUTPUT_HANDLE, hPipeIn);
+    
     BindCrtHandlesToStdHandles(true, true, true); //redirrect console output?!
+    
+    //WriteFile(hPipeOut, "what OUTthe sigma mangos!", 20, NULL, NULL);
+    //WriteFile(hPipeIn, "what INthe sigma mangos!", 20, NULL, NULL);
 
     SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), 4); //https://stackoverflow.com/questions/4053837/colorizing-text-in-the-console-with-c
 

@@ -1,7 +1,7 @@
 //const rp = print;
 //print = function(...args) {};
 
-let wic, d2d, font, colorBrush, roundStrokeStyle;
+let wic, d2d, font, colorBrush, roundStrokeStyle, specialBitmap;
 
 let dirty = false;
 let hit = {}; // {result, pane, data}
@@ -157,6 +157,7 @@ class Blueprint {
     height = 100;
     parameters = [];
     out = [];
+    type = BPTYPE_PURE;
 
     //gradientStops = [];
     gradients = [];
@@ -175,7 +176,7 @@ class Blueprint {
     }
 
     constructor(parent, title, color, x, y, width, height, parameters, out, type) {
-        this.parent = parent;
+        this.parent = parent; //just in case?
         this.title = title;
         this.x = x;
         this.y = y;
@@ -184,6 +185,7 @@ class Blueprint {
         this.parameters = parameters;
         this.out = out;
         this.type = type;
+        this._special = false;
 
         //this.gradientStops.push(
         //    //d2d.CreateGradientStopCollection([0.0, 0.0, 67/255, 255/255], [0.8, 32/255, 32/255, 32/255]),
@@ -361,6 +363,11 @@ class Blueprint {
         d2d.DrawText(this.title, font, 21, 0, this.width, Blueprint.captionHeight, colorBrush);
 
         d2d.DrawRoundedRectangle(2, 2, this.width-2, Blueprint.captionHeight-2, 2, 2, this.gradients[3], 1);
+
+        if(this._special) {
+            d2d.DrawBitmap(specialBitmap, this.width-16-2, 2.5, this.width-2, 16+2.5);
+        }
+
         //d2d.FillRectangle(0, Blueprint.captionHeight, this.width, this.height, this.gradients[2]);
         for(let i = 0; i < this.parameters.length; i++) {
             const param = this.parameters[i];
@@ -519,32 +526,80 @@ function executeBlueprints() {
     //print(start.connections.out[0]);
     //start.connections.out[0] //we can assume that for every object connected from event start has an exec pin as the first out pin
     
-    function loopthroughparameters(source) {
+    const cache = {};
+
+    for(const pane of panes) {
+        (pane instanceof Blueprint) && (pane._special = false);
+    }
+
+    function interpretParametersAndExecute(source) { //holy MOlY i just learned the pure functions DON'T cache their result! https://raharuu.github.io/unreal/blueprint-pure-functions-complicated/
+        //source._special = false;
         const args = [];
-        const j = source.type == BPTYPE_NOTPURE ? 1 : 0;
-        for(let i = j; i < source.parameters.length; i++) {
-            const param = source.parameters[i];
-            let val = 0;
-            if(source.connections.in[i]) {
-                const inpin = source.connections.in[i];
-                if(inpin.source.type == BPTYPE_PURE) {
-                    val = globalThis[inpin.source.title](...loopthroughparameters(inpin.source)); //random alternative to eval-ing that i accidently wrote
+        const notpure = source.type == BPTYPE_NOTPURE;
+        const j = notpure ? 1 : 0;
+        const paneIndex = panes.indexOf(source);
+        let result;
+        if(!cache[paneIndex]?.value) {
+            for(let i = j; i < source.parameters.length; i++) {
+                const param = source.parameters[i];
+                let val = 0;
+                const cachedData = cache[paneIndex];
+                if(!cachedData?.[i]) { //if cachedData is undefined or (?.) if cachedData[i] is undefined
+                    if(source.connections.in[i]) {
+                        const inpin = source.connections.in[i];
+                        //const inPaneIndex = panes.indexOf(inpin.source);
+                        //const inCachedData = cache[inPaneIndex];
+                        //if(!cache[inPaneIndex]) {
+                        //    if(inpin.source.type == BPTYPE_PURE) {
+                        //        val = globalThis[inpin.source.title](...loopthroughparameters(inpin.source)); //random alternative to eval-ing that i accidently wrote
+                        //    }
+                        //    cache[inPaneIndex] = val;
+                        //}else {
+                        //    val = cache[inPaneIndex];
+                        //}
+                        val = interpretParametersAndExecute(inpin.source);
+                    }else if(param == "string") {
+                        val = "";
+                    }
+
+                    if(notpure) {
+                        if(!cachedData) {
+                            cache[paneIndex] = {};
+                        }
+                        cache[paneIndex][i] = val;
+                    }
+                }else {
+                    val = cachedData[i];
                 }
-            }else if(param == "string") {
-                val = "";
+                args.push(val);
             }
-            args.push(val);
+            //return args;
+            //if this is a datatype blueprint then don't do this lmao
+            print("exec", source.title);
+            print("args", args);
+            result = globalThis[source.title](...args);
+            if(notpure) {
+                if(!cache[paneIndex]) {
+                    cache[paneIndex] = {};
+                }
+                cache[paneIndex].value = result;
+                source._special = true;
+                dirty = true;
+            }
+        }else {
+            result = cache[paneIndex].value;
         }
-        return args;
+        return result;
     }
     
     while(current) {
         //print(current);
-        print("exec", current.title);
+        //print("exec", current.title);
         //scan le tree
-        args = loopthroughparameters(current);
-        print("args", args);
-        globalThis[current.title](...args); //store results in cache somehow and make primitive input boxes type shit
+        //args = loopthroughparameters(current);
+        //print("args", args);
+        //globalThis[current.title](...args); //store results in cache somehow and make primitive input boxes type shit
+        interpretParametersAndExecute(current);
         current = current.connections.out[0]?.receiver?.source; //traverse to the next blueprint connected
     }
 }
@@ -576,12 +631,14 @@ function d2dpaint() {
 
 function windowProc(hwnd, msg, wp, lp) {
     if(msg == WM_CREATE) {
+        wic = InitializeWIC(); ScopeGUIDs(wic);
         d2d = createCanvas("d2d", ID2D1RenderTarget, hwnd);
         //defaultBGG = d2d.CreateLinearGradientBrush(0,0,1,1,d2d.CreateGradientStopCollection([1.0, 204/255, 204/255, 204/255], [0.0, 178/255, 212/255, 1.0]));
         colorBrush = d2d.CreateSolidColorBrush(1.0, 1.0, 1.0, 1.0);
         font = d2d.CreateFont(NULL, 12);
         roundStrokeStyle = d2d.CreateStrokeStyle(D2D1_CAP_STYLE_ROUND, D2D1_CAP_STYLE_ROUND, D2D1_CAP_STYLE_ROUND, D2D1_LINE_JOIN_ROUND, NULL, D2D1_DASH_STYLE_SOLID, 0, D2D1_STROKE_TRANSFORM_TYPE_NORMAL);
         //font.SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
+        specialBitmap = d2d.CreateBitmapFromWicBitmap(wic.LoadBitmapFromFilename(__dirname+"/../imagine.bmp", wic.GUID_WICPixelFormat32bppPBGRA), true);
         
         gl = createCanvas("gl", NULL, hwnd);
         Blueprint.paramColors["exec"] = [1.0, 1.0, 1.0];
@@ -602,13 +659,16 @@ function windowProc(hwnd, msg, wp, lp) {
         DwmSetWindowAttribute(hwnd, DWMWA_CAPTION_COLOR, RGB(24, 24, 24)); //hell yeah this shit tuff asf (dark title bar)[doesn't work if you get rid of the window theme tho]
         
         //otherwnd = new BottomPane(hwnd); //no longer blocks the thread as i make and draw every control myself
+        //this list is not permanant and im just gonna loop through JBSExtension's extension.ts to get every function and stuff like that
         panes.push(new Blueprint(hwnd, "Event Start", [162/255, 38/255, 30/255], 0, 0, 190, 72, [], [], BPTYPE_EVENT)); //bptype_event adds exec and delegate pin
         panes.push(new Blueprint(hwnd, "SetWindowText", [120/255, 168/255, 115/255], 300, 300, 221, 105, ["window : HWND", "text : string"], ["success : BOOL"], BPTYPE_NOTPURE));
-        panes.push(new Blueprint(hwnd, "GetConsoleWindow", [120/255, 168/255, 115/255], 400, 400, 150, 64, [], ["console : HWND"], BPTYPE_PURE));
+        panes.push(new Blueprint(hwnd, "GetWindowText", [120/255, 168/255, 115/255], 300, 300, 221, 105, ["window : HWND"], ["text : string"], BPTYPE_PURE));
+        panes.push(new Blueprint(hwnd, "GetConsoleWindow", [120/255, 168/255, 115/255], 400, 400, 150, 64, [], ["console : HWND"], BPTYPE_NOTPURE));
         panes.push(new Blueprint(hwnd, "FindWindow", [120/255, 168/255, 115/255], 400, 400, 150, 90, ["className? : string", "windowTitle : string"], ["window : HWND"], BPTYPE_PURE));
         panes.push(new Blueprint(hwnd, "version", [251/255, 0/255, 209/255], 400, 400, 150, 64, [], ["version : string"], BPTYPE_PURE));
         panes.push(new Blueprint(hwnd, "Program", [95/255, 150/255, 187/255], 300, 100, 221, 90*2, ["fragmentShader : FRAGMENT_SHADER", "vertexShader : VERTEX_SHADER"], [], BPTYPE_NOTPURE));
         panes.push(new Blueprint(hwnd, "Shader", [120/255, 168/255, 115/255], 0, 100, 221, 90, ["filename : string", "type : number"], ["shader : SHADER"], BPTYPE_PURE));
+        panes.push(new Blueprint(hwnd, "print", [95/255, 150/255, 187/255], 500, 500, 150, 90, ["In String : string"], [], BPTYPE_NOTPURE));
         d2dpaint();
     }else if(msg == WM_PAINT) {   
         dirty = true;
@@ -703,12 +763,25 @@ function windowProc(hwnd, msg, wp, lp) {
             }else if(hit.result == CONTEXTMENU) {
                 //no
             }else if(hit.result == DRAG) {
-                Draggable.select(hit.pane.preDrag?.(mouse, hit.data) ?? hit.pane, mouse, false, false);
+                if(GetKey(VK_MENU)) {
+                    if(hit.pane.connections.out[hit.data]) {
+                        const out = hit.pane.connections.out[hit.data].receiver;
+                        out.source.connections.in[out.i] = undefined;
+                        hit.pane.connections.out[hit.data] = undefined;
+                    }
+                }else {
+                    Draggable.select(hit.pane.preDrag?.(mouse, hit.data) ?? hit.pane, mouse, false, false);
+                }
             }else if(hit.result == DROP) {
                 print(hit.data);
+                
                 if(hit.pane.connections.in[hit.data]) {
-                    const {i, source} = hit.pane.connections.in[hit.data];
-                    Draggable.select(source.preDrag?.(mouse, i) ?? source, mouse, false, false);
+                    if(GetKey(VK_MENU)) {
+                        //hit.pane.connections.in[hit.data]
+                    }else {
+                        const {i, source} = hit.pane.connections.in[hit.data];
+                        Draggable.select(source.preDrag?.(mouse, i) ?? source, mouse, false, false);
+                    }
                 }
             }
             else {
@@ -850,7 +923,7 @@ function windowProc(hwnd, msg, wp, lp) {
         print(colorBrush.Release());
         print(roundStrokeStyle.Release());
         print(d2d.Release());
-        //wic.Release();
+        wic.Release();
         PostQuitMessage(0); //but it refused.
     }
 
