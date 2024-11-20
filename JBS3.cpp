@@ -5227,6 +5227,7 @@ V8FUNC(createCanvas) {
             Local<ObjectTemplate> jsLayout = DIRECT2D::getTextFormatImpl(isolate, d2d, (IDWriteTextFormat*)layout, false); //ObjectTemplate::New(isolate);
             //
             //jsFont->Set(isolate, )
+            jsLayout->Set(isolate, "text", info[0]);
 
             jsLayout->Set(isolate, "DetermineMinWidth", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
                 Isolate* isolate = info.GetIsolate();
@@ -5414,10 +5415,10 @@ V8FUNC(createCanvas) {
 
                 RetIfFailed(layout->HitTestPoint(FloatFI(info[0]), FloatFI(info[1]), &isTrailingHit, &isInside, &hitTestMetrics), "HitTestPoint failed");
 
-                Local<ObjectTemplate> ykykyk = ObjectTemplate::New(isolate);
+                Local<Object> ykykyk = Object::New(isolate);
 
-                ykykyk->Set(isolate, "isTrailingHit", Number::New(isolate, isTrailingHit));
-                ykykyk->Set(isolate, "isInside", Number::New(isolate, isInside));
+                ykykyk->Set(context, LITERAL("isTrailingHit"), Number::New(isolate, isTrailingHit));
+                ykykyk->Set(context, LITERAL("isInside"), Number::New(isolate, isInside));
                 
                 Local<Object> jsMetrics = Object::New(isolate);
 
@@ -5431,9 +5432,9 @@ V8FUNC(createCanvas) {
                 jsMetrics->Set(context, LITERAL("isText"), Number::New(isolate, hitTestMetrics.isText));
                 jsMetrics->Set(context, LITERAL("isTrimmed"), Number::New(isolate, hitTestMetrics.isTrimmed));
 
-                ykykyk->Set(isolate, "hitTestMetrics", jsMetrics);
+                ykykyk->Set(context, LITERAL("hitTestMetrics"), jsMetrics);
 
-                info.GetReturnValue().Set(ykykyk->NewInstance(context).ToLocalChecked());
+                info.GetReturnValue().Set(ykykyk);
             }));
 
             jsLayout->Set(isolate, "HitTestTextPosition", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
@@ -5448,10 +5449,10 @@ V8FUNC(createCanvas) {
 
                 RetIfFailed(layout->HitTestTextPosition(IntegerFI(info[0]), IntegerFI(info[1]), &pointX, &pointY, &hitTestMetrics), "HitTestTextPosition failed");
 
-                Local<ObjectTemplate> ykykyk = ObjectTemplate::New(isolate);
+                Local<Object> ykykyk = Object::New(isolate);
 
-                ykykyk->Set(isolate, "x", Number::New(isolate, pointX));
-                ykykyk->Set(isolate, "y", Number::New(isolate, pointY));
+                ykykyk->Set(context, LITERAL("x"), Number::New(isolate, pointX));
+                ykykyk->Set(context, LITERAL("y"), Number::New(isolate, pointY));
 
                 Local<Object> jsMetrics = Object::New(isolate);
 
@@ -5465,9 +5466,9 @@ V8FUNC(createCanvas) {
                 jsMetrics->Set(context, LITERAL("isText"), Number::New(isolate, hitTestMetrics.isText));
                 jsMetrics->Set(context, LITERAL("isTrimmed"), Number::New(isolate, hitTestMetrics.isTrimmed));
 
-                ykykyk->Set(isolate, "hitTestMetrics", jsMetrics);
+                ykykyk->Set(context, LITERAL("hitTestMetrics"), jsMetrics);
 
-                info.GetReturnValue().Set(ykykyk->NewInstance(context).ToLocalChecked());
+                info.GetReturnValue().Set(ykykyk);
             }));
 
             jsLayout->Set(isolate, "HitTestTextRange", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
@@ -5482,9 +5483,9 @@ V8FUNC(createCanvas) {
 
                 RetIfFailed(layout->HitTestTextRange(IntegerFI(info[0]), IntegerFI(info[1]), FloatFI(info[2]), FloatFI(info[3]), hitTestMetrics.data(), IntegerFI(info[4]), &actualHitTestMetricsCount), "HitTestTextPosition failed");
 
-                Local<ObjectTemplate> ykykyk = ObjectTemplate::New(isolate);
+                Local<Object> ykykyk = Object::New(isolate);
 
-                ykykyk->Set(isolate, "actualHitTestMetricsCount", Number::New(isolate, actualHitTestMetricsCount));
+                ykykyk->Set(context, LITERAL("actualHitTestMetricsCount"), Number::New(isolate, actualHitTestMetricsCount));
 
                 Local<Array> metricss = Array::New(isolate, actualHitTestMetricsCount);
 
@@ -5504,9 +5505,9 @@ V8FUNC(createCanvas) {
                     metricss->Set(context, i, jsMetrics);
                 }
 
-                ykykyk->Set(isolate, "hitTestMetrics", metricss);
+                ykykyk->Set(context, LITERAL("hitTestMetrics"), metricss);
 
-                info.GetReturnValue().Set(ykykyk->NewInstance(context).ToLocalChecked());
+                info.GetReturnValue().Set(ykykyk);
             }));
 
             jsLayout->Set(isolate, "SetDrawingEffect", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {

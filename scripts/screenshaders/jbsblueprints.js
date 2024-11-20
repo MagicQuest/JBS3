@@ -55,15 +55,16 @@ function withinBounds({x, y, width, height}, pair) {
     return pair.x > x && pair.y > y && pair.x < x+width && pair.y < y+height;
 }
 
-const TOP = 0b000000001;
-const LEFT = 0b000000010;
-const RIGHT = 0b000000100;
-const BOTTOM = 0b000001000;
-const BUTTON  = 0b000010000;
-const MOVE     = 0b000100000;
-const CONTEXTMENU=0b001000000;
-const DROP        =0b010000000;
-const DRAG         =0b100000000;
+const TOP = 0b0000000001;
+const LEFT = 0b0000000010;
+const RIGHT = 0b0000000100;
+const BOTTOM = 0b0000001000;
+const BUTTON  = 0b0000010000;
+const MOVE     = 0b0000100000;
+const CONTEXTMENU=0b0001000000;
+const DROP        =0b0010000000;
+const DRAG         =0b0100000000;
+const TEXT          =0b1000000000;
 
 const hittestarr = [
     [TOP, LoadCursor(NULL, IDC_SIZENS)],
@@ -75,6 +76,7 @@ const hittestarr = [
     [CONTEXTMENU, LoadCursor(NULL, IDC_HELP)],
     [DROP, hand],
     [DRAG, hand],
+    [TEXT, LoadCursor(NULL, IDC_IBEAM)],
 ];
 
 const BPTYPE_PURE = 0;
@@ -122,6 +124,150 @@ class Draggable { //not to be confused with Draggable from jbstudio3 (this shit 
     }
 }
 
+class Editable { //for text :smirk:
+    static caret = 0;
+    static editing = false;
+    static edited = undefined;
+    static returntoquit = true;
+
+    static ctrlDelimiters = [".", " "]; //points where using ctrl+backspace/delete will stop
+    //static ctrlDelimiters = /[."]/;
+
+    static beginInput(caret = 0, tobeedited, returntoquit = true) {
+        Editable.caret = caret;
+        Editable.edited = tobeedited;
+        Editable.edited.value = Editable.edited.value.toString(); //just in case lol
+        Editable.editing = true;
+        Editable.returntoquit = returntoquit;
+        print("HELL YEAH BEGIN INPUT");
+    }
+
+    static ctrlMoveBack() {
+        for(let j = Editable.caret-2; j >= 0; j--) { //lowkey idk why i have to subtract 2
+            for(const delim of Editable.ctrlDelimiters) {
+                if(Editable.edited.value[j] == delim) {
+                    //print("delim nigga", j, Editable.edited.value[j], delim);
+                    const i = j+1;
+                    const count = (Editable.caret-i);
+                    //break; //god damn it i swear in js break would work in nested loops
+                    //break bruh;
+                    return {i, count};
+                }
+            }
+            if(j == 0) {
+                const i = 0;
+                const count = Editable.caret;
+                return {i, count};
+            }
+        }
+        return {i: 0, count: 0}
+    }
+
+    static ctrlMoveForward() {
+        for(let j = Editable.caret+1; j < Editable.edited.value.length; j++) { //plus one here to skip the possible delim in front
+            for(const delim of Editable.ctrlDelimiters) {
+                if(Editable.edited.value[j] == delim) {
+                    //print("delim nigga", j, Editable.edited.value[j], delim);
+                    const count = j-(Editable.caret+1);
+                    //break; //god damn it i swear in js break would work in nested loops
+                    //break bruh;
+                    return count;
+                }
+            }
+            if(j == Editable.edited.value.length) {
+                return (Editable.caret+1)-j;
+            }
+        }
+        return Editable.edited.value.length-(Editable.caret+1);
+    }
+
+    static modify(keycode) { //modify is for delete and page up and what not
+        if(keycode == VK_LEFT || keycode == VK_BACK) {
+            //Editable.caret = Math.max(0, Editable.caret-1);
+            //Editable.caret--;
+            //if(Editable.caret < 0) {
+            //    Editable.caret = 0;
+            //}
+            let i = Editable.caret-1;
+
+            if(keycode == VK_BACK) {
+                //Editable.edited.value = Editable.edited.value.split("").splice(Editable.caret, 1).join();
+                let count = 1;
+                if(GetKey(VK_CONTROL)) {
+                    const ret = Editable.ctrlMoveBack();
+                    i = ret.i;
+                    count = ret.count;
+                }
+                const arr = Editable.edited.value.split("");
+                //print("post", arr, i, count);
+                arr.splice(i, count);
+                Editable.edited.value = arr.join("");
+            }else {
+                if(GetKey(VK_CONTROL)) {
+                    const ret = Editable.ctrlMoveBack();
+                    i = ret.i;
+                }
+            }
+
+            Editable.caret = Math.max(0, i);
+        }else if(keycode == VK_RIGHT) {
+            //Editable.caret = Math.min(Editable.edited.value.length, Editable.caret+1);
+            //Editable.caret++;
+            //if(Editable.caret > Editable.edited.value.length) {
+            //    Editable.caret = Editable.edited.value.length;
+            //}
+            
+            let i = Editable.caret+1;
+            if(GetKey(VK_CONTROL)) {
+                i += Editable.ctrlMoveForward();
+            }
+
+            Editable.caret = Math.min(Editable.edited.value.length, i);
+        }else if(keycode == VK_UP || keycode == VK_PRIOR || keycode == VK_HOME) { //page up
+            Editable.caret = Editable.edited.value.length;
+        }else if(keycode == VK_DOWN || keycode == VK_NEXT || keycode == VK_END) { //page down
+            Editable.caret = 0;
+        }else if(keycode == VK_DELETE) {
+            //damn i thought you could chain them
+            //Editable.edited.value = Editable.edited.value.split("").splice(Editable.caret, 1).join();
+            let count = 1;
+            if(GetKey(VK_CONTROL)) {
+                count += Editable.ctrlMoveForward();
+            }
+            const arr = Editable.edited.value.split("");
+            arr.splice(Editable.caret, count);
+            Editable.edited.value = arr.join("");
+        }else if(keycode == VK_RETURN && Editable.returntoquit) {
+            return Editable.endInput();
+        }
+
+        dirty = true;
+    }
+
+    static writechar(char) {
+        if(GetKey(VK_CONTROL) && char == "a") {
+            //lowkey idk about highlighting like that so im just moving the carot
+        }
+        //Editable.edited.value = Editable.edited.value.split("").splice(Editable.caret, 0, char).join();
+        const arr = Editable.edited.value.split("");
+        arr.splice(Editable.caret, 0, char);
+        Editable.edited.value = arr.join("");
+
+        Editable.caret++;
+
+        dirty = true;
+    }
+
+    static endInput() {
+        Editable.edited.endInput?.();
+        Editable.edited = undefined;
+        Editable.editing = false;
+        print("END INPUT");
+        
+        dirty = true;
+    }
+}
+
 class Gradient {
     static LinearGradientBrush(gradientStop, ...args) {
         return new Gradient(gradientStop, d2d.CreateLinearGradientBrush(...args, gradientStop));
@@ -144,6 +290,108 @@ class Gradient {
     }
 }
 
+const PRIMITIVE_TOGGLE = 0;
+const PRIMITIVE_INPUT = 1;
+const PRIMITIVE_DROPDOWN = 2; //maybe...
+
+class PrimitiveControl { //hell yeah brother (this object isn't meant to be on its own and is used in Blueprint)
+    static validPrimitives = {string: [PRIMITIVE_INPUT], number: [PRIMITIVE_INPUT, "number"], boolean: [PRIMITIVE_TOGGLE]};
+
+    type = PRIMITIVE_TOGGLE;
+    value = undefined;
+    data = undefined; //data for PRIMITIVE_DROPDOWN
+    geometry = undefined; //random additional d2d stuff like a path geometry (for toggle) or a text layout (for input)
+    width = 16;
+    height = 16;
+
+    constructor(type, data) {
+        this.type = type;
+        this.data = data;
+
+        if(this.type == PRIMITIVE_TOGGLE) {
+            this.geometry = d2d.CreatePathGeometry();
+            const sink = this.geometry.Open();
+            sink.BeginFigure(4, 9, D2D1_FIGURE_BEGIN_HOLLOW); //lowkey just looked a picture of a checked boolean parameter
+            sink.AddLine(7, 11);
+            sink.AddLine(13, 5);
+            sink.EndFigure(D2D1_FIGURE_END_OPEN);
+            sink.Close();
+            sink.Release();
+
+            this.value = 0;
+        }else if(type == PRIMITIVE_INPUT) {
+            this.value = "";
+            this.geometry = d2d.CreateTextLayout(this.value, font, 100, 16);
+        }
+    }
+
+    redraw() {
+        if(this.type == PRIMITIVE_TOGGLE) {
+            colorBrush.SetColor(.3, .3, .3);
+            d2d.FillRoundedRectangle(0, 0, 16, 16, 2, 2, colorBrush);
+            colorBrush.SetColor(1.0, 1.0, 1.0);
+            if(this.value) {
+                d2d.DrawGeometry(this.geometry, colorBrush, 2); //no round stroke style for htis one
+            }
+            d2d.DrawRoundedRectangle(0, 0, 16, 16, 2, 2, colorBrush, 2, roundStrokeStyle);
+        }else if(this.type == PRIMITIVE_INPUT) {
+            //damn i might have to draw the caret myself in here
+            if(this.geometry.text != this.value) { //haha just now added this property
+                const {widthIncludingTrailingWhitespace} = this.geometry.GetMetrics();
+                this.geometry.Release();
+                this.geometry = d2d.CreateTextLayout(this.value, font, 100, 16);
+                this.width = Math.max(16, 16+widthIncludingTrailingWhitespace);
+            }
+            
+            if(Editable.edited == this) {
+                //const t = d2d.CreateTextLayout(this.value.slice(0, Editable.caret), font, 100, 16);
+                //const {widthIncludingTrailingWhitespace} = t.GetMetrics(); //if there are trailing spaces it doesn't show that and it's weird
+
+                
+                const hit = this.geometry.HitTestTextPosition(Editable.caret, false); //who knew this function's main purpose was this use case
+                //print(hit.x, hit.hitTestMetrics.width);
+                const caretX = hit.x;
+
+                
+                //const pos = ; //lowkey might have to make a text layout to see how wide each character is
+                d2d.DrawLine(caretX, 0, caretX, 16, colorBrush, 1, roundStrokeStyle);
+                //t.Release();
+            }
+            d2d.DrawRoundedRectangle(0, 0, this.width, 16, 2, 2, colorBrush, 1, roundStrokeStyle);
+            d2d.DrawTextLayout(0, 0, this.geometry, colorBrush);
+        }
+    }
+
+    buttonDown(mouse) {
+        if(this.type == PRIMITIVE_TOGGLE) {
+            this.value = !this.value;
+        }
+    }
+
+    endInput() {
+        if(this.type == PRIMITIVE_INPUT && this.data == "number") {
+            this.value = Number(this.value) || 0; //NaN is falsy but not nullish (no nullish coalescing today)
+        }
+    }
+
+    hittest(mouse) {
+        //print(mouse);
+        if(withinBounds({x: 0, y: 0, width: this.width, height: this.height}, mouse)) {
+            if(this.type == PRIMITIVE_TOGGLE) {
+                return [BUTTON, this];
+            }else if(this.type == PRIMITIVE_INPUT) {
+                const i = this.geometry.HitTestPoint(mouse.x, mouse.y).hitTestMetrics.textPosition; //calculate...
+                //print(i);
+                return [TEXT, [i, this]];
+            }
+        }
+    }
+
+    destroy() {
+        this.geometry?.Release();
+    }
+}
+
 class Blueprint {
     static paramColors = {};
     //static captionHeight = GetSystemMetrics(SM_CYCAPTION) + GetSystemMetrics(SM_CYEDGE)*2; //27
@@ -155,14 +403,14 @@ class Blueprint {
     y = 0;
     width = 256;
     height = 100;
-    parameters = [];
+    parameters = []; //i JUST realized that parameters should be an array of objects
     out = [];
     type = BPTYPE_PURE;
 
     //gradientStops = [];
     gradients = [];
-    paramText = [];
-    outText = [];
+    //paramText = []; //efficientcy
+    //outText = [];
 
     connections = {in: [], out: []};
 
@@ -182,7 +430,7 @@ class Blueprint {
         this.y = y;
         this.width = width;
         this.height = height;
-        this.parameters = parameters;
+        this.parameters = parameters; //parameters and out come in as arrays of strings but are stored as arrays of objects
         this.out = out;
         this.type = type;
         this._special = false;
@@ -276,12 +524,16 @@ class Blueprint {
     }
 
     addPin(out, i, param, name) { //lol in js you can't use 'in' as the name of a function parameter
+        const pobj = {type: param, text: d2d.CreateTextLayout(name, font, w, h)}; //pobj
         if(!out) {
-            this.parameters[i] = param; //i don't need the variable name anymore because i store it in the text layout paramText[i]
-            this.paramText.push(d2d.CreateTextLayout(name, font, w, h));
+            if(PrimitiveControl.validPrimitives[param] != undefined) { //oops
+                pobj.control = new PrimitiveControl(...PrimitiveControl.validPrimitives[param]);
+            }
+            this.parameters[i] = pobj; //i don't need the variable name anymore because i store it in the text layout paramText[i]
+            //this.paramText.push(d2d.CreateTextLayout(name, font, w, h));
         }else {
-            this.out[i] = param;
-            this.outText.push(d2d.CreateTextLayout(name, font, w, h));
+            this.out[i] = pobj;
+            //this.outText.push(d2d.CreateTextLayout(name, font, w, h));
         }
         const gsc = d2d.CreateGradientStopCollection([0.0, ...Blueprint.paramColors[param]], [0.5, 0.0, 0.0, 0.0, 0.0]);
 
@@ -299,23 +551,23 @@ class Blueprint {
         if(!out) {
             ex = Blueprint.padding-8;
             d2d.FillRectangle(Blueprint.padding, y, 100, this.height, this.gradients[4+i]);
-            colorBrush.SetColor(...Blueprint.paramColors[param]);
+            colorBrush.SetColor(...Blueprint.paramColors[param.type]);
             //d2d.DrawEllipse(Blueprint.padding-8, y, Blueprint.radius, Blueprint.radius, colorBrush, 2);
             //colorBrush.SetColor(1.0, 1.0, 1.0);
             //d2d.DrawText(param, font, Blueprint.padding, (i+1)*Blueprint.captionHeight + Blueprint.padding, this.width, this.height, colorBrush);
-            d2d.DrawTextLayout(Blueprint.padding, y, this.paramText[i], colorBrush);
+            d2d.DrawTextLayout(Blueprint.padding, y, /*this.paramText[i]*/ param.text, colorBrush);
             //d2d.DrawRectangle(Blueprint.padding-8-Blueprint.radius-2, (i+1)*Blueprint.captionHeight+Blueprint.padding-Blueprint.radius-2, Blueprint.padding-8-Blueprint.radius-2+(Blueprint.radius*2+2), (i+1)*Blueprint.captionHeight+Blueprint.padding-Blueprint.radius-2+(Blueprint.radius*2+2), colorBrush);
         }else {
-            const tl = this.outText[i];
+            const tl = param.text; //this.outText[i];
             //print(tl.GetMetrics());
             const {width} = tl.GetMetrics();
             d2d.DrawTextLayout(this.width-10-width, y, tl, colorBrush);
-            colorBrush.SetColor(...Blueprint.paramColors[param]);
+            colorBrush.SetColor(...Blueprint.paramColors[param.type]);
             ex = this.width-8;
             //d2d.DrawEllipse(this.width-8, y, Blueprint.radius, Blueprint.radius, colorBrush, 2);
             //colorBrush.SetColor(1.0, 1.0, 1.0);
         }
-        if(param == "exec") {
+        if(param.type == "exec") {
             //draw traingel 
             //(why doesn't d2d have an easy triangle primitive function type hsit)
             const path = d2d.CreatePathGeometry();
@@ -373,77 +625,87 @@ class Blueprint {
             const param = this.parameters[i];
             const connection = this.connections.in[i];
             this.drawPin(false, i, param, connection);
+            const tl = param.text.GetMetrics(); //this.paramText[i].GetMetrics();
             if(connection) {
-                const tl = this.paramText[i].GetMetrics();
                 d2d.DrawLine(Blueprint.padding, (i+1)*Blueprint.captionHeight + Blueprint.padding+tl.height, Blueprint.padding+tl.width, (i+1)*Blueprint.captionHeight + Blueprint.padding+tl.height, colorBrush);
+            }else if(param.control) {
+                d2d.SetTransform(Matrix3x2F.Translation(this.x+camera.x+Blueprint.padding+tl.width+8, this.y+camera.y+(i+1)*Blueprint.captionHeight + Blueprint.padding));
+                param.control.redraw();
+                d2d.SetTransform(Matrix3x2F.Translation(this.x+camera.x, this.y+camera.y));
             }
         }
         for(let i = 0; i < this.out.length; i++) {
             const op = this.out[i];
-            const connection = this.connections.out[i];
-            this.drawPin(true, i, op, connection);
-            if(connection) {
-                const textmetrics = this.outText[i].GetMetrics();
+            const anyconnections = Object.values(this.connections.out[i] ?? {});
+            this.drawPin(true, i, op, anyconnections.length);
+            if(anyconnections.length) { //now there can be multiple out
+                const textmetrics = op.text.GetMetrics(); //this.outText[i].GetMetrics();
                 const y = (i+1)*Blueprint.captionHeight+Blueprint.padding;
-                const r = connection.receiver;
-                if(r) {
-                    connection.x = r.source.x+Blueprint.padding-8;
-                    connection.y = r.source.y+((r.i+1)*Blueprint.captionHeight+Blueprint.padding);
-                }
                 d2d.DrawLine(this.width-10-textmetrics.width, y+textmetrics.height, this.width-8-4, y+textmetrics.height, colorBrush);
-                    //remember that i set transform before calling Blueprint.redraw so i gotta do math to get screen coords
-                //d2d.DrawLine(this.width-8, y, connection.x-this.x, connection.y-this.y, colorBrush, 4); //maybe there's a drawbezier or something like that for paths or whatevers
-                //do i have to make this path every time?
-                //i don't think you can save a geometry sink and change it
-
-                //const quarterX = this.width-8 + (connection.x-this.x-this.width-8)/4;
-                //const quarterY = y + (connection.y-this.y)/4;
-                //const halfX = this.width-8 + (connection.x-this.x-this.width-8)/2;
-                //const halfY = y + (connection.y-this.y)/2;
-                //const halfX = ((this.width-8)+connection.x-this.x)/2; //idk how these worked bruh for some reason it took forever for me to understand how exactly my math should be mathing
-                //const halfY = (y+connection.y-this.y)/2;
-                //const getXAlong = (function(t) {
-                //    return (connection.x-this.x-this.width-8)*t;
-                //}).bind(this);
-
-                //const getYAlong = (function(t) {
-                //    return (connection.y-this.y-y)*t;
-                //}).bind(this);
-                //d2d.DrawEllipse(halfX, halfY, 10, 10, colorBrush, 4);
-                //d2d.DrawEllipse(quarterX, quarterY, 5, 5, colorBrush, 4);
-                //print(draws);
-                //d2d.DrawEllipse(this.width-8 + getXAlong(draws/100), y + getYAlong(draws/100), 5, 5, colorBrush, 4);
                 
-                //print(`c: {x: ${connection.x},y: ${connection.y}}\tthis: {x: ${this.x}, y: ${this.y}}`);
-                //print(`clientc: {x: ${connection.x-this.x},y: ${connection.y-this.y}}\tthis: {x: ${this.x}, y: ${this.y}}`);
+                for(const connection of anyconnections) {
+                    const r = connection.receiver;
+                    if(r) {
+                        connection.x = r.source.x+Blueprint.padding-8;
+                        connection.y = r.source.y+((r.i+1)*Blueprint.captionHeight+Blueprint.padding);
+                    }
+                        //remember that i set transform before calling Blueprint.redraw so i gotta do math to get screen coords
+                    //d2d.DrawLine(this.width-8, y, connection.x-this.x, connection.y-this.y, colorBrush, 4); //maybe there's a drawbezier or something like that for paths or whatevers
+                    //do i have to make this path every time?
+                    //i don't think you can save a geometry sink and change it
 
-                const halfX = this.width-8 + this.getXAlong(connection, .5);
-                const halfY = y + this.getYAlong(connection, y, .5);
+                    //const quarterX = this.width-8 + (connection.x-this.x-this.width-8)/4;
+                    //const quarterY = y + (connection.y-this.y)/4;
+                    //const halfX = this.width-8 + (connection.x-this.x-this.width-8)/2;
+                    //const halfY = y + (connection.y-this.y)/2;
+                    //const halfX = ((this.width-8)+connection.x-this.x)/2; //idk how these worked bruh for some reason it took forever for me to understand how exactly my math should be mathing
+                    //const halfY = (y+connection.y-this.y)/2;
+                    //const getXAlong = (function(t) {
+                    //    return (connection.x-this.x-this.width-8)*t;
+                    //}).bind(this);
 
-                const path = d2d.CreatePathGeometry();
-                const sink = path.Open();
+                    //const getYAlong = (function(t) {
+                    //    return (connection.y-this.y-y)*t;
+                    //}).bind(this);
+                    //d2d.DrawEllipse(halfX, halfY, 10, 10, colorBrush, 4);
+                    //d2d.DrawEllipse(quarterX, quarterY, 5, 5, colorBrush, 4);
+                    //print(draws);
+                    //d2d.DrawEllipse(this.width-8 + getXAlong(draws/100), y + getYAlong(draws/100), 5, 5, colorBrush, 4);
+                    
+                    //print(`c: {x: ${connection.x},y: ${connection.y}}\tthis: {x: ${this.x}, y: ${this.y}}`);
+                    //print(`clientc: {x: ${connection.x-this.x},y: ${connection.y-this.y}}\tthis: {x: ${this.x}, y: ${this.y}}`);
 
-                sink.BeginFigure(this.width-8, y, D2D1_FIGURE_BEGIN_HOLLOW);
-                    sink.AddBeziers(
-                        [
-                            [this.width-8, y], //FloatFI(info[0].As<Array>()->Get(context, 0).ToLocalChecked().As<Array>()->Get(context, 0).ToLocalChecked())
-                            [this.width-8 + this.getXAlong(connection, .4), y],
-                            [halfX, halfY],
-                        ],
-                        [
-                            [halfX, halfY],
-                            [halfX, y + this.getYAlong(connection, y, .9)],
-                            [connection.x-this.x, connection.y-this.y],
-                        ]
-                    );
-                sink.EndFigure(D2D1_FIGURE_END_OPEN);
+                    const halfX = this.width-8 + this.getXAlong(connection, .5);
+                    const halfY = y + this.getYAlong(connection, y, .5);
 
-                sink.Close();
-                sink.Release();
-                //print(sink.Release(), "sink release?");
-                d2d.DrawGeometry(path, colorBrush, 4, roundStrokeStyle);
-                //print(path.Release(), "path release?}"); //lowkey idk if this is getting released but idk how to check
-                throwawayObjects.push(path);
+                    const path = d2d.CreatePathGeometry();
+                    const sink = path.Open();
+
+                    sink.BeginFigure(this.width-8, y, D2D1_FIGURE_BEGIN_HOLLOW);
+                        sink.AddBeziers(
+                            [
+                                [this.width-8, y], //FloatFI(info[0].As<Array>()->Get(context, 0).ToLocalChecked().As<Array>()->Get(context, 0).ToLocalChecked())
+                                [this.width-8 + this.getXAlong(connection, .4), y],
+                                [halfX, halfY],
+                            ],
+                            [
+                                [halfX, halfY],
+                                [halfX, y + this.getYAlong(connection, y, .9)],
+                                [connection.x-this.x, connection.y-this.y],
+                            ]
+                        );
+                    sink.EndFigure(D2D1_FIGURE_END_OPEN);
+
+                    sink.Close();
+                    sink.Release();
+                    //print(sink.Release(), "sink release?");
+                    d2d.DrawGeometry(path, colorBrush, 4, roundStrokeStyle);
+
+                    //d2d.DrawText(`${path.ComputeLength()}`, font, halfX+16, halfY+16, halfX+80, halfY+80, colorBrush);
+                    //r&&d2d.DrawText(`${r.id}`, font, halfX+16, halfY+16, halfX+80, halfY+80, colorBrush);
+                    //print(path.Release(), "path release?}"); //lowkey idk if this is getting released but idk how to check
+                    throwawayObjects.push(path);
+                }
             }
         }
     }
@@ -462,13 +724,22 @@ class Blueprint {
             //    return [RIGHT];
             //}
             for(let i = 0; i < this.parameters.length; i++) {
-                const tl = this.paramText[i].GetMetrics();
+                const {text, control} = this.parameters[i];
+                const tl = text.GetMetrics(); //this.paramText[i].GetMetrics();
                 if(withinBounds({x: Blueprint.padding-8-Blueprint.radius-2, y: (i+1)*Blueprint.captionHeight+Blueprint.padding-Blueprint.radius-2, width: Blueprint.radius*2+2+tl.width, height: Blueprint.radius*2+2+tl.height}, mouse)) {
                     return [DROP, i];
+                }else if(control && !this.connections.in[i]) {
+                    //this.x+camera.x+Blueprint.padding+tl.width+8
+                    //this.y+camera.y+(i+1)*Blueprint.captionHeight + Blueprint.padding
+                                                            //oops i didn't use parethesis here and it was not doing what i expected
+                    const ht = control.hittest({x: mouse.x-(Blueprint.padding+tl.width+8), y: mouse.y-((i+1)*Blueprint.captionHeight + Blueprint.padding)});
+                    if(ht) {
+                        return ht;
+                    }
                 }
             }
             for(let i = 0; i < this.out.length; i++) {
-                const tl = this.outText[i].GetMetrics();
+                const tl = this.out[i].text.GetMetrics(); //this.outText[i].GetMetrics();
                 if(withinBounds({x: this.width-8-Blueprint.radius, y: (i+1)*Blueprint.captionHeight+Blueprint.padding-Blueprint.radius-2, width: Blueprint.radius*2+2+tl.width, height: Blueprint.radius*2+2+tl.height}, mouse)) {
                     return [DRAG, i];
                 }
@@ -485,26 +756,57 @@ class Blueprint {
         for(let i = 0; i < this.gradients.length; i++) {
             this.gradients[i].Release();
         }
-        for(let i = 0; i < this.paramText.length; i++) {
-            this.paramText[i].Release();
+        //for(let i = 0; i < this.paramText.length; i++) {
+        //    this.paramText[i].Release();
+        //}
+        //for(let i = 0; i < this.outText.length; i++) {
+        //    this.outText[i].Release();
+        //}
+        for(let i = 0; i < this.parameters.length; i++) {
+            const {type, text, control} = this.parameters[i];
+            text.Release();
+            if(control) {
+                control.destroy(); //lol i could've done control?.destroy() but i don't mattedr
+            }
         }
-        for(let i = 0; i < this.outText.length; i++) {
-            this.outText[i].Release();
+        for(let i = 0; i < this.out.length; i++) {
+            this.out[i].text.Release();
         }
         panes.splice(panes.indexOf(this), 1);
     }
 
-    preDrag(mouse, data) {
-        activePin = {i: data, source: this};
-        if(this.connections.out[data]) {
-            const connection = this.connections.out[data];
-            connection.receiver.source.connections.in[connection.receiver.i] = undefined; //lowkey convoluted
-            //connection.x = mouse.x;
-            //connection.y = mouse.y;
-        }//else {
-            this.connections.out[data] = {x: mouse.x, y: mouse.y};
-        //}
-        return this.connections.out[data];
+    preDrag(mouse, data, id) { //act like the id parameter is some fancy overload or something
+        //if(this.connections.out[data]) {
+        //    const connection = this.connections.out[data];
+        //    //connection.receiver.source.connections.in[connection.receiver.i] = undefined; //lowkey convoluted
+        //    //connection.x = mouse.x;
+        //    //connection.y = mouse.y;
+        //}//else {
+        //    this.connections.out[data] = {x: mouse.x, y: mouse.y};
+        ////}
+        if(!this.connections.out[data]) {
+            this.connections.out[data] = {}; //not gonna make it an array because then i'd have to push and delete elements and i don't need all that
+        }
+        
+        
+        //const i = this.connections.out[data].push({x: mouse.x, y: mouse.y}); //wait i guess i could just pass mouse
+        
+        //since i've got this basically random number (increments every frame) i'll just use that
+        if(!id) {
+            if(this.out[data].type == "exec") {
+                id = 0;
+                //if we pulling an exec pin and it was already connected to something we gotta disconnect that
+                if(this.connections.out[data][id]) {
+                    const receiver = this.connections.out[data][id].receiver;
+                    receiver.source.connections.in[receiver.i] = undefined;
+                }
+            }else {
+                id = draws;
+            }
+        }
+        this.connections.out[data][id] = {x: mouse.x, y: mouse.y};
+        activePin = {i: data, source: this, id};
+        return this.connections.out[data][id];
     }
 
     //onDrag() { //implements DraggableObject (if this were a stronger object oriented language)
@@ -519,18 +821,34 @@ const camera = {x: 0, y: 0, zoom: 1}; //idk if im gonna do zoom lowkey but just 
 
 let panes = []; //not calling it blueprints anymore because i might make additional window types like a custom context menu or like a popup to choose what blueprint to add
 
+function recur(obj, name="") {
+    let list = [];
+    for(const [key, value] of Object.entries(obj)) {
+        if(value instanceof Object && !(value instanceof Blueprint)) {
+            list.push(...recur(value, key));
+        }else {
+            //print(name, key, value.toString());
+            list.push({name, key, v: value.toString()});
+        }
+    }
+    return list;
+}
+
 function executeBlueprints() {
     //assuming panes[0] is the event start blueprint because it's the first one i make
-    const start = panes[0];                                                         //the first 'i' is the index of the out pin
-    let current = start.connections.out[0]?.receiver?.source; //connections.out : Array<{i : number, receiver : {i : number, source : Blueprint}}>
+    const start = panes[0];                                                         //the first 'i' is the index of the out pin (why?)
+    let current = start.connections.out[0]?.[0]?.receiver?.source; //connections.out : Array<{i : number, receiver : {i : number, source : Blueprint}}>
     //print(start.connections.out[0]);
     //start.connections.out[0] //we can assume that for every object connected from event start has an exec pin as the first out pin
+    //print(recur(start.connections));
     
     const cache = {};
-
+    
     for(const pane of panes) {
         (pane instanceof Blueprint) && (pane._special = false);
     }
+
+    //recur(start.connections);
 
     function interpretParametersAndExecute(source) { //holy MOlY i just learned the pure functions DON'T cache their result! https://raharuu.github.io/unreal/blueprint-pure-functions-complicated/
         //source._special = false;
@@ -547,20 +865,25 @@ function executeBlueprints() {
                 if(!cachedData?.[i]) { //if cachedData is undefined or (?.) if cachedData[i] is undefined
                     if(source.connections.in[i]) {
                         const inpin = source.connections.in[i];
-                        //const inPaneIndex = panes.indexOf(inpin.source);
-                        //const inCachedData = cache[inPaneIndex];
-                        //if(!cache[inPaneIndex]) {
-                        //    if(inpin.source.type == BPTYPE_PURE) {
-                        //        val = globalThis[inpin.source.title](...loopthroughparameters(inpin.source)); //random alternative to eval-ing that i accidently wrote
-                        //    }
-                        //    cache[inPaneIndex] = val;
-                        //}else {
-                        //    val = cache[inPaneIndex];
+                        //if(inpin.source instanceof Blueprint) { //inpin.source could be a primitive value like true or false (nope nevermind i changed it lol)
+                            //const inPaneIndex = panes.indexOf(inpin.source);
+                            //const inCachedData = cache[inPaneIndex];
+                            //if(!cache[inPaneIndex]) {
+                            //    if(inpin.source.type == BPTYPE_PURE) {
+                            //        val = globalThis[inpin.source.title](...loopthroughparameters(inpin.source)); //random alternative to eval-ing that i accidently wrote
+                            //    }
+                            //    cache[inPaneIndex] = val;
+                            //}else {
+                            //    val = cache[inPaneIndex];
+                            //}
+                            val = interpretParametersAndExecute(inpin.source);
                         //}
-                        val = interpretParametersAndExecute(inpin.source);
-                    }else if(param == "string") {
-                        val = "";
+                    }else if(param.control) {
+                        val = param.control.value;
                     }
+                    //}else if(param == "string") {
+                    //    val = "";
+                    //}
 
                     if(notpure) {
                         if(!cachedData) {
@@ -600,7 +923,7 @@ function executeBlueprints() {
         //print("args", args);
         //globalThis[current.title](...args); //store results in cache somehow and make primitive input boxes type shit
         interpretParametersAndExecute(current);
-        current = current.connections.out[0]?.receiver?.source; //traverse to the next blueprint connected
+        current = current.connections.out[0]?.[0]?.receiver?.source; //traverse to the next blueprint connected
     }
 }
 
@@ -624,7 +947,10 @@ function d2dpaint() {
     d2d.EndDraw();
 
     for(const obj of throwawayObjects) {
-        print(obj.Release(), "throwaway release");
+        //print(obj.Release(), "throwaway release");
+        if((r = obj.Release()) != 0) {
+            print(r, "throwaway release");
+        }
     }
     throwawayObjects = [];
 }
@@ -669,6 +995,7 @@ function windowProc(hwnd, msg, wp, lp) {
         panes.push(new Blueprint(hwnd, "Program", [95/255, 150/255, 187/255], 300, 100, 221, 90*2, ["fragmentShader : FRAGMENT_SHADER", "vertexShader : VERTEX_SHADER"], [], BPTYPE_NOTPURE));
         panes.push(new Blueprint(hwnd, "Shader", [120/255, 168/255, 115/255], 0, 100, 221, 90, ["filename : string", "type : number"], ["shader : SHADER"], BPTYPE_PURE));
         panes.push(new Blueprint(hwnd, "print", [95/255, 150/255, 187/255], 500, 500, 150, 90, ["In String : string"], [], BPTYPE_NOTPURE));
+        panes.push(new Blueprint(hwnd, "Beep", [120/255, 168/255, 115/255], 100, 500, 200, 130, ["frequency : number", "durationMs : number", "nonblocking? : boolean"], ["success : BOOL"], BPTYPE_NOTPURE));
         d2dpaint();
     }else if(msg == WM_PAINT) {   
         dirty = true;
@@ -755,7 +1082,7 @@ function windowProc(hwnd, msg, wp, lp) {
         if(hit.result) {
             //if((hit.result & BUTTON) == BUTTON) {
             if(hit.result == BUTTON) {
-                hit.data.mouseDown(mouse);
+                hit.data.buttonDown(mouse);
                 activeButton = hit.data;
             }else //if((hit.result & MOVE) == MOVE) {
             if(hit.result == MOVE) {
@@ -764,25 +1091,33 @@ function windowProc(hwnd, msg, wp, lp) {
                 //no
             }else if(hit.result == DRAG) {
                 if(GetKey(VK_MENU)) {
-                    if(hit.pane.connections.out[hit.data]) {
-                        const out = hit.pane.connections.out[hit.data].receiver;
-                        out.source.connections.in[out.i] = undefined;
-                        hit.pane.connections.out[hit.data] = undefined;
+                    const anyoutconnections = Object.values(hit.pane.connections.out[hit.data] ?? {});
+                    if(anyoutconnections.length) {
+                        for(const connection of Object.values(anyoutconnections)) {
+                            const out = connection.receiver;
+                            out.source.connections.in[out.i] = undefined;
+                        }
                     }
+                    hit.pane.connections.out[hit.data] = undefined;
                 }else {
                     Draggable.select(hit.pane.preDrag?.(mouse, hit.data) ?? hit.pane, mouse, false, false);
                 }
             }else if(hit.result == DROP) {
                 print(hit.data);
-                
-                if(hit.pane.connections.in[hit.data]) {
+
+                const inpin = hit.pane.connections.in[hit.data]; //{i, source, id}
+                if(inpin) {
                     if(GetKey(VK_MENU)) {
-                        //hit.pane.connections.in[hit.data]
+                        delete inpin.source.connections.out[inpin.i][inpin.id];
+                        hit.pane.connections.in[hit.data] = undefined;
                     }else {
-                        const {i, source} = hit.pane.connections.in[hit.data];
-                        Draggable.select(source.preDrag?.(mouse, i) ?? source, mouse, false, false);
+                        const {i, source, id} = inpin;
+                        hit.pane.connections.in[hit.data] = undefined;
+                        Draggable.select(source.preDrag?.(mouse, i, id) ?? source, mouse, false, false);
                     }
                 }
+            }else if(hit.result == TEXT) {
+                Editable.beginInput(hit.data[0], hit.data[1]); //haha i made hit.data = [i, object]
             }
             else {
                 //const updown = ((hit.result & TOP) == TOP) || ((hit.result & BOTTOM) == BOTTOM);
@@ -799,11 +1134,15 @@ function windowProc(hwnd, msg, wp, lp) {
                 pane.mouseDown?.(mouse);
             }
         }
+
+        if(hit.result != TEXT && Editable.editing) {
+            Editable.endInput();
+        }
     }else if(msg == WM_RBUTTONDOWN) {
         const mouse = {x: GET_X_LPARAM(lp)-camera.x, y: GET_Y_LPARAM(lp)-camera.y}; //lp is client mouse pos
 
         if(hit.result == BUTTON) {
-            hit.pane.rightMouseDown?.(mouse);
+            hit.pane.buttonRightMouseDown?.(mouse);
         }else if(hit.result == CONTEXTMENU) {
             const screenmousepos = GetCursorPos();
             hit.pane.preContextMenu?.(screenmousepos);
@@ -827,7 +1166,7 @@ function windowProc(hwnd, msg, wp, lp) {
         //    hitpane.mouseUp(mouse);
         //}
         if(activeButton) {
-            activeButton.mouseUp?.(mouse);
+            activeButton.buttonUp?.(mouse);
             dirty = true;
         }
         if(activePin) {
@@ -849,11 +1188,13 @@ function windowProc(hwnd, msg, wp, lp) {
             }    
     
             if(receiver) {
-                activePin.source.connections.out[activePin.i].receiver = receiver; //{i: receiver.data, source: receiver.blueprint};
-                const receiverpin = receiver.source.connections.in[receiver.i];
-                if(receiverpin) {
+                                            //boy this is looking confusing...
+                activePin.source.connections.out[activePin.i][activePin.id].receiver = receiver; //{i: receiver.data, source: receiver.blueprint};
+                const receiverpin = receiver.source.connections.in[receiver.i]; //{i, source, id}
+                if(receiverpin) { //if A was connected to B and C wants to connect to B, then i tell A that it's no longer connected
                     //this happens when something is already connected and you connect ANOTHER thing to this one
-                    receiverpin.source.connections.out[receiverpin.i] = undefined; //receiverpin.i (i think?)
+                    //receiverpin.source.connections.out[receiverpin.i] = undefined; //receiverpin.i (i think?)
+                    delete receiverpin.source.connections.out[receiverpin.i][receiverpin.id];
                 }
                 receiver.source.connections.in[receiver.i] = activePin; //.source = activePin;
                 //print(activePin.i, receiver.i);
@@ -863,7 +1204,7 @@ function windowProc(hwnd, msg, wp, lp) {
                 //    receiver.source.connections.in[receiver.i] = undefined;
                 //    print(activePin.i, "prev", receiver.i);
                 //}
-                activePin.source.connections.out[activePin.i] = undefined;
+                delete activePin.source.connections.out[activePin.i][activePin.id];// = undefined;
             }
         }
         activePin = undefined;
@@ -905,6 +1246,18 @@ function windowProc(hwnd, msg, wp, lp) {
                 executeBlueprints();
             }
         }
+
+        if(wp == VK_ESCAPE) {
+            Editable.endInput();
+        }
+        if(Editable.editing && (wp > VK_SPACE || wp <= VK_DELETE)) {
+            Editable.modify(wp);
+        }
+    }else if(msg == WM_CHAR) {
+        if(Editable.editing && (wp != VK_RETURN && wp != VK_BACK && wp != 127)) { //for some reason ctrl+backspace puts this random character down (and windows controls always put it instead of backspacing words and it makes me mad)
+            print("char", wp, String.fromCharCode(wp));
+            Editable.writechar(String.fromCharCode(wp));
+        }
     }else if(msg == WM_MBUTTONDOWN) {
         if(!Draggable.dragging) {
             SetCapture(hwnd);
@@ -923,7 +1276,7 @@ function windowProc(hwnd, msg, wp, lp) {
         print(colorBrush.Release());
         print(roundStrokeStyle.Release());
         print(d2d.Release());
-        wic.Release();
+        print(wic.Release());
         PostQuitMessage(0); //but it refused.
     }
 
