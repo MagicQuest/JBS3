@@ -124,7 +124,7 @@ class Draggable { //not to be confused with Draggable from jbstudio3 (this shit 
     }
 }
 
-class Editable { //for text :smirk:
+class Editable { //for text :smirk: (unfortunately you must draw the text and caret yourself)
     static caret = 0;
     static editing = false;
     static edited = undefined;
@@ -136,7 +136,7 @@ class Editable { //for text :smirk:
     static beginInput(caret = 0, tobeedited, returntoquit = true) {
         Editable.caret = caret;
         Editable.edited = tobeedited;
-        Editable.edited.value = Editable.edited.value.toString(); //just in case lol
+        Editable.edited.value = Editable.edited.value?.toString() ?? "undefined"; //just in case lol
         Editable.editing = true;
         Editable.returntoquit = returntoquit;
         print("HELL YEAH BEGIN INPUT");
@@ -164,18 +164,25 @@ class Editable { //for text :smirk:
     }
 
     static ctrlMoveForward() {
-        for(let j = Editable.caret+1; j < Editable.edited.value.length; j++) { //plus one here to skip the possible delim in front
-            for(const delim of Editable.ctrlDelimiters) {
-                if(Editable.edited.value[j] == delim) {
-                    //print("delim nigga", j, Editable.edited.value[j], delim);
-                    const count = j-(Editable.caret+1);
-                    //break; //god damn it i swear in js break would work in nested loops
-                    //break bruh;
-                    return count;
-                }
-            }
-            if(j == Editable.edited.value.length) {
-                return (Editable.caret+1)-j;
+        //for(let j = Editable.caret+1; j < Editable.edited.value.length; j++) { //plus one here to skip the possible delim in front
+        //    for(const delim of Editable.ctrlDelimiters) {
+        //        if(Editable.edited.value[j] == delim) {
+        //            //print("delim nigga", j, Editable.edited.value[j], delim);
+        //            const count = j-(Editable.caret+1);
+        //            //break; //god damn it i swear in js break would work in nested loops
+        //            //break bruh;
+        //            return count;
+        //        }
+        //    }
+        //    if(j == Editable.edited.value.length) {
+        //        return (Editable.caret+1)-j;
+        //    }
+        //}
+        //return Editable.edited.value.length-(Editable.caret+1);
+        for(const delim of Editable.ctrlDelimiters) {
+            const index = Editable.edited.value.indexOf(delim, Editable.caret+1); //plus one here so if the caret is on a space we skip it
+            if(index != -1) {
+                return index-(Editable.caret+1);
             }
         }
         return Editable.edited.value.length-(Editable.caret+1);
@@ -246,7 +253,7 @@ class Editable { //for text :smirk:
 
     static writechar(char) {
         if(GetKey(VK_CONTROL) && char == "a") {
-            //lowkey idk about highlighting like that so im just moving the carot
+            //lowkey idk about highlighting like that so im just moving the caret
         }
         //Editable.edited.value = Editable.edited.value.split("").splice(Editable.caret, 0, char).join();
         const arr = Editable.edited.value.split("");
@@ -295,7 +302,7 @@ const PRIMITIVE_INPUT = 1;
 const PRIMITIVE_DROPDOWN = 2; //maybe...
 
 class PrimitiveControl { //hell yeah brother (this object isn't meant to be on its own and is used in Blueprint)
-    static validPrimitives = {string: [PRIMITIVE_INPUT], number: [PRIMITIVE_INPUT, "number"], boolean: [PRIMITIVE_TOGGLE]};
+    static validPrimitives = {string: [PRIMITIVE_INPUT], number: [PRIMITIVE_INPUT, "number"], boolean: [PRIMITIVE_TOGGLE], BOOL: [PRIMITIVE_TOGGLE], float: [PRIMITIVE_INPUT, "float"]};
 
     type = PRIMITIVE_TOGGLE;
     value = undefined;
@@ -320,7 +327,11 @@ class PrimitiveControl { //hell yeah brother (this object isn't meant to be on i
 
             this.value = 0;
         }else if(type == PRIMITIVE_INPUT) {
-            this.value = "";
+            if(data == "number" || data == "float") {
+                this.value = 0;
+            }else {
+                this.value = "";
+            }
             this.geometry = d2d.CreateTextLayout(this.value, font, 100, 16);
         }
     }
@@ -350,15 +361,16 @@ class PrimitiveControl { //hell yeah brother (this object isn't meant to be on i
                 
                 const hit = this.geometry.HitTestTextPosition(Editable.caret, false); //who knew this function's main purpose was this use case
                 //print(hit.x, hit.hitTestMetrics.width);
-                const caretX = hit.x;
+                const caretX = hit.x+2; //plus 2 because im drawing the text 2 pixels away from 0
+                const caretY = hit.y;
 
                 
                 //const pos = ; //lowkey might have to make a text layout to see how wide each character is
-                d2d.DrawLine(caretX, 0, caretX, 16, colorBrush, 1, roundStrokeStyle);
+                d2d.DrawLine(caretX, caretY, caretX, caretY+16, colorBrush, 1, roundStrokeStyle);
                 //t.Release();
             }
             d2d.DrawRoundedRectangle(0, 0, this.width, 16, 2, 2, colorBrush, 1, roundStrokeStyle);
-            d2d.DrawTextLayout(0, 0, this.geometry, colorBrush);
+            d2d.DrawTextLayout(2, 0, this.geometry, colorBrush);
         }
     }
 
@@ -369,8 +381,14 @@ class PrimitiveControl { //hell yeah brother (this object isn't meant to be on i
     }
 
     endInput() {
-        if(this.type == PRIMITIVE_INPUT && this.data == "number") {
-            this.value = Number(this.value) || 0; //NaN is falsy but not nullish (no nullish coalescing today)
+        if(this.type == PRIMITIVE_INPUT) {
+            if(this.value == "NULL" || this.value == "null" || this.value == "undefined"){
+                this.value = undefined;
+            }else if(this.data == "number") {
+                this.value = Number(this.value) || 0; //NaN is falsy but not nullish (no nullish coalescing today)
+            }else if(this.data == "float") {
+                this.value = parseFloat(this.value) || 0.0;
+            }
         }
     }
 
@@ -417,14 +435,85 @@ class Blueprint {
     static padding = 16;
     static radius = 4;
 
-    static create(parent, title, color, x, y, width, height, parameters, out, type) {
-        const b = new Blueprint(parent, color, title, x, y, width, height, parameters, out, type);
+    static getColorByTitle(title, type) {
+        let color;
+        let lower = title.toLowerCase();
+        if(lower.includes("set") || type == BPTYPE_NOTPURE) {
+            color = [95/255, 150/255, 187/255];
+        }else if(lower.includes("get") || type == BPTYPE_PURE) {
+            color = [120/255, 168/255, 115/255];
+        }
+        return color;
+    }
+
+    //static create(parent, title, color, x, y, width, height, parameters, out, type) {
+    static create(parent, title, x, y, parameters, out, type) {
+        const color = Blueprint.getColorByTitle(title, type);
+        const {width, height} = Blueprint.getAppropriateSize(title, parameters, out, type);
+        const b = new Blueprint(parent, title, color, x, y, width, height, parameters, out, type);
         panes.push(b);
         return b;
     }
 
+    static getAppropriateSize(title, parameters, out, type) {
+        const execpins = type == BPTYPE_NOTPURE;
+        let width = 21+32; //when drawing the title i start it 21 pixels out and want to leave 32 pixels of space
+        
+        const reservedheight = Blueprint.captionHeight+Blueprint.padding; //titlebar + padding
+        //const outheight = reservedheight+(Blueprint.captionHeight*(out.length+execpins))+5;
+        let height = reservedheight;
+        if(parameters.length+execpins > out.length+execpins) {
+            height += (Blueprint.captionHeight*(parameters.length+execpins))+5
+        }else {
+            height += (Blueprint.captionHeight*(out.length+execpins))+5;
+        }
+        //if(height < outheight) {
+        //    height = outheight;
+        //}
+        const temp = d2d.CreateTextLayout(title, font, w, h);
+        width += temp.GetMetrics().width;
+        temp.Release();
+
+        //width plus the length of the longest parameter (including its control)
+        let widestparam = 0;
+        for(const pstr of parameters) { //not including the exec pin
+            const [_, name, param] = pstr.match(typeRegex);
+            const controlArgs = PrimitiveControl.validPrimitives[param];
+            let temp = d2d.CreateTextLayout(name, font, w, h);
+            let pwidth = temp.GetMetrics().width;
+            temp.Release();
+            if(controlArgs) {
+                let tempcontrol = new PrimitiveControl(...controlArgs);
+                pwidth += tempcontrol.width;
+                tempcontrol.destroy();
+            }
+            if(pwidth > widestparam) {
+                widestparam = pwidth;
+            }
+        }
+
+        let widestout = 0;
+        for(const ostr of out) { //not including the exec pin
+            const [_, name, op] = ostr.match(typeRegex);
+            let temp = d2d.CreateTextLayout(name, font, w, h);
+            let owidth = temp.GetMetrics().width;
+            temp.Release();
+            if(widestout < owidth) {
+                widestout = owidth;
+            }
+        }
+
+        if(width < widestparam) {
+            width += widestparam-width+widestout;
+        }
+
+        width += widestout;
+
+        return {width, height};
+    }
+
     constructor(parent, title, color, x, y, width, height, parameters, out, type) {
-        this.parent = parent; //just in case?
+        this.parent = parent; //just in case? (nevermind lol it seems like i don't need it)
         this.title = title;
         this.x = x;
         this.y = y;
@@ -526,8 +615,9 @@ class Blueprint {
     addPin(out, i, param, name) { //lol in js you can't use 'in' as the name of a function parameter
         const pobj = {type: param, text: d2d.CreateTextLayout(name, font, w, h)}; //pobj
         if(!out) {
-            if(PrimitiveControl.validPrimitives[param] != undefined) { //oops
-                pobj.control = new PrimitiveControl(...PrimitiveControl.validPrimitives[param]);
+            const controlArgs = PrimitiveControl.validPrimitives[param];
+            if(controlArgs != undefined) { //oops
+                pobj.control = new PrimitiveControl(...controlArgs);
             }
             this.parameters[i] = pobj; //i don't need the variable name anymore because i store it in the text layout paramText[i]
             //this.paramText.push(d2d.CreateTextLayout(name, font, w, h));
@@ -814,6 +904,185 @@ class Blueprint {
     //}
 }
 
+Blueprint.paramColors["exec"] = [1.0, 1.0, 1.0];
+Blueprint.paramColors["FRAGMENT_SHADER"] = [255/255, 42/255, 0.0];
+Blueprint.paramColors["VERTEX_SHADER"] = [136/255, 255/255, 0.0];
+Blueprint.paramColors["SHADER"] = [200/255, 200/255, 200/255];
+Blueprint.paramColors["string"] = [251/255, 0/255, 209/255];
+Blueprint.paramColors["number"] = [27/255, 191/255, 147/255];
+Blueprint.paramColors["BOOL"] = Blueprint.paramColors.number; //WinAPI's BOOL type is actually just an int
+Blueprint.paramColors["HWND"] = Blueprint.paramColors.number;
+Blueprint.paramColors["boolean"] = [146/255, 0.0, 0.0];
+Blueprint.paramColors["float"] = [161/255, 1.0, 69/255];
+
+
+class BlueprintMenu {
+    x = 0;
+    y = 0;
+    width = 410;
+    height = 410;
+    
+    contextSensitive = undefined;
+    gradients = [];
+    text = [];
+
+    value = ""; //i could make editable configurable in that, i could tell it which variable to edit, but idgaf
+    valueText = undefined;
+
+    scrollX = 0;
+
+    static singleton = undefined;
+
+    static commandList = [
+        //{name, desc, parameters, out}
+        //i was gonna use this regex but i realized i could eval it instead -> /registerFunc *\( *(["'`])(\w+)\1 *, *(["'`])function \2\(([A-z0-9:_, ]+)\) *: *(\w+)\3/
+        //damn well i already wanted to add some networking functions for a custom discord client burt wwteverf
+    ]; //haha not the d2d one
+
+    static open(hwnd) {
+        const mouse = GetCursorPos();
+        ScreenToClient(hwnd, mouse);
+        mouse.x -= camera.x;
+        mouse.y -= camera.y;
+        if(BlueprintMenu.singleton) {
+            BlueprintMenu.singleton.x = mouse.x;
+            BlueprintMenu.singleton.y = mouse.y;
+        }else {
+            panes.push(new BlueprintMenu(mouse));
+        }
+        Editable.beginInput(0, BlueprintMenu.singleton);
+        dirty = true;
+    }
+
+    static close() {
+        BlueprintMenu.singleton.destroy();
+        BlueprintMenu.singleton = undefined;
+    }
+
+    constructor(mouse) {
+        //if(BlueprintMenu.singleton) {
+        //    print("oops there were 2 Blueprint menus already but idgaf rn");
+        //}
+        this.x = mouse.x;
+        this.y = mouse.y;
+        BlueprintMenu.singleton = this;
+        this.contextSensitive = new PrimitiveControl(PRIMITIVE_TOGGLE);
+        this.contextSensitive.value = true;
+        this.gradients.push(
+            Gradient.LinearGradientBrush(
+                d2d.CreateGradientStopCollection([0.0, 41/255, 41/255, 41/255], [4/this.height, 38/255, 38/255, 38/255], [8/this.height, 33/255, 33/255, 33/255], [31/this.height, 32/255, 32/255, 32/255], [34/this.height, 31/255, 31/255, 31/255], [56/this.height, 30/255, 30/255, 30/255], [80/this.height, 29/255, 29/255, 29/255], [154/this.height, 28/255, 28/255, 28/255], [179/this.height, 27/255, 27/255, 27/255], [236/this.height, 26/255, 26/255, 26/255], [369/this.height, 25/255, 25/255, 25/255], [393/this.height, 26/255, 26/255, 26/255], [401/this.height, 27/255, 27/255, 27/255], [405/this.height, 29/255, 29/255, 29/255], [410/this.height, 32/255, 32/255, 32/255]),
+                0, 0, 0, this.height,
+            ),
+            Gradient.LinearGradientBrush(
+                d2d.CreateGradientStopCollection([0.0, 26/255, 26/255, 26/255], [1.0, 13/255, 13/255, 13/255]),
+                0, 398, 0, 404,
+            ),
+        );
+        this.text.push(
+            d2d.CreateTextLayout("Context Sensitive", font, w, h),
+        );
+        this.valueText = d2d.CreateTextLayout(this.value, font, this.width, this.height);
+    }
+
+    redraw() { //lowkey idj why i called it redraw
+        colorBrush.SetColor(0.0, 0.0, 0.0);
+        d2d.FillRectangle(0, 0, this.width, this.height, this.gradients[0]);
+        d2d.DrawRectangle(0, 0, this.width, this.height, colorBrush, 1);
+
+        d2d.SetTransform(Matrix3x2F.Translation(this.x+camera.x+280, this.y+camera.y+10));
+        this.contextSensitive.redraw();
+        d2d.SetTransform(Matrix3x2F.Translation(this.x+camera.x, this.y+camera.y));
+        
+        colorBrush.SetColor(229/255, 229/255, 229/255);
+        d2d.DrawTextLayout(280+16+4, 10, this.text[0], colorBrush); //Context Sensitive
+        d2d.DrawText("All Actions for this Blueprint", font, 7, 10, this.width, this.height, colorBrush);
+
+        d2d.DrawText("Select some bullshit and it'll be added yk", font, 20, 54+4, this.width, this.height, colorBrush);
+        d2d.DrawLine(17, 75+8, 388, 75+8, colorBrush, 1);
+
+        colorBrush.SetColor(204/255, 204/255, 204/255);
+        d2d.FillRoundedRectangle(8, 34, 400, 34+18, 2, 2, colorBrush);
+        colorBrush.SetColor(229/255, 229/255, 229/255);
+        d2d.DrawRoundedRectangle(8, 34, 400, 34+18, 2, 2, colorBrush, 2, roundStrokeStyle);
+
+        if(this.valueText.text != this.value) {
+            this.valueText.Release();
+            this.valueText = d2d.CreateTextLayout(this.value, font, this.width, this.height);
+        }
+
+        colorBrush.SetColor(0.0, 0.0, 0.0);
+        
+        if(Editable.edited == this) {
+            //const t = d2d.CreateTextLayout(this.value.slice(0, Editable.caret), font, 100, 16);
+            //const {widthIncludingTrailingWhitespace} = t.GetMetrics(); //if there are trailing spaces it doesn't show that and it's weird
+
+            
+            const hit = this.valueText.HitTestTextPosition(Editable.caret, false); //who knew this function's main purpose was this use case
+            //print(hit.x, hit.hitTestMetrics.width);
+            const caretX = hit.x+8; //plus 4 because im drawing the text 4 pixels away from 0
+            const caretY = hit.y+34;
+
+            
+            //const pos = ; //lowkey might have to make a text layout to see how wide each character is
+            d2d.DrawLine(caretX, caretY, caretX, caretY+16, colorBrush, 1, roundStrokeStyle);
+            //t.Release();
+        }
+        d2d.DrawTextLayout(8, 34, this.valueText, colorBrush);
+
+        colorBrush.SetColor(229/255, 229/255, 229/255);
+
+        for(let i = 0; i < (400-92)/12; i++) {
+            const j = this.scrollX + i;
+            d2d.DrawText(BlueprintMenu.commandList[j].name, font, 14, 92+(i*12), w, h, colorBrush);
+        }
+    }
+
+    hittest(mouse) {
+        if(withinBounds({x: 4, y: 30, width: 400, height: 18}, mouse)) {
+            const i = this.valueText.HitTestPoint(mouse.x, mouse.y).hitTestMetrics.textPosition; //calculate...
+            return [TEXT, [i, this]];
+        }
+        //print({x: mouse.x-(280), y: mouse.y-(10)});
+        const ht = this.contextSensitive.hittest({x: mouse.x-280, y: mouse.y-10}); //ermmm this is kinda weird lowkey (nah but PrimitiveControl was really made for Blueprint so i'm still a genius)
+        if(ht) {
+            return ht;
+        }
+        return [NULL];
+    }
+
+    destroy() {
+        for(let i = 0; i < this.gradients.length; i++) {
+            this.gradients[i].Release();
+        }
+        this.contextSensitive.destroy();
+        this.valueText.Release();
+        panes.splice(panes.indexOf(this), 1);
+    }
+}
+
+function parseCommandList() {
+    function registerFunc(name, signature, desc) {
+        let startI = signature.indexOf("(")+1;
+        let endI = signature.indexOf(")");
+        let parameters = signature.slice(startI, endI).split(",");
+        let out = signature.slice(endI+1);
+
+        //print(parameters, out);
+
+        BlueprintMenu.commandList.push({name, desc, parameters, out});
+    }
+    const extension = system("curl -i https://raw.githubusercontent.com/MagicQuest/JBS3Extension/refs/heads/main/src/extension.ts").split("\n"); //well i would use fetch but right now it only works with HTTP bruh
+    for(const line of extension) {
+        if(line.includes("registerFunc")) {
+            try {
+                eval(line); //im using eval here instead of regex so i can hijack registerFunc
+            }catch(e) {
+                print(e.toString());
+            }
+        }
+    }
+}
+
 let w = 800;
 let h = 600;
 
@@ -841,7 +1110,9 @@ function executeBlueprints() {
     //print(start.connections.out[0]);
     //start.connections.out[0] //we can assume that for every object connected from event start has an exec pin as the first out pin
     //print(recur(start.connections));
+    print("spacebar exec");
     
+
     const cache = {};
     
     for(const pane of panes) {
@@ -966,16 +1237,9 @@ function windowProc(hwnd, msg, wp, lp) {
         //font.SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
         specialBitmap = d2d.CreateBitmapFromWicBitmap(wic.LoadBitmapFromFilename(__dirname+"/../imagine.bmp", wic.GUID_WICPixelFormat32bppPBGRA), true);
         
-        gl = createCanvas("gl", NULL, hwnd);
-        Blueprint.paramColors["exec"] = [1.0, 1.0, 1.0];
-        Blueprint.paramColors["FRAGMENT_SHADER"] = [255/255, 42/255, 0.0];
-        Blueprint.paramColors["VERTEX_SHADER"] = [136/255, 255/255, 0.0];
-        Blueprint.paramColors["SHADER"] = [200/255, 200/255, 200/255];
-        Blueprint.paramColors["string"] = [251/255, 0/255, 209/255];
-        Blueprint.paramColors["number"] = [27/255, 191/255, 147/255];
-        Blueprint.paramColors["BOOL"] = Blueprint.paramColors.number; //WinAPI's BOOL type is actually just an int
-        Blueprint.paramColors["HWND"] = Blueprint.paramColors.number;
-        Blueprint.paramColors["boolean"] = [146/255, 0.0, 0.0];
+        parseCommandList();
+        //gl = createCanvas("gl", NULL, hwnd);
+        
         //DragAcceptFiles(hwnd, true); //you can just use WS_EX_ACCEPTFILES
         //uxtheme = DllLoad("UxTheme.dll");
         //print(uxtheme("IsAppThemed", 0, [], [], RETURN_NUMBER)); //oh hell yeah it's one (https://learn.microsoft.com/en-us/windows/win32/api/uxtheme/nf-uxtheme-isappthemed)
@@ -987,8 +1251,15 @@ function windowProc(hwnd, msg, wp, lp) {
         //otherwnd = new BottomPane(hwnd); //no longer blocks the thread as i make and draw every control myself
         //this list is not permanant and im just gonna loop through JBSExtension's extension.ts to get every function and stuff like that
         panes.push(new Blueprint(hwnd, "Event Start", [162/255, 38/255, 30/255], 0, 0, 190, 72, [], [], BPTYPE_EVENT)); //bptype_event adds exec and delegate pin
+        //let size = Blueprint.getAppropriateSize("SetWindowText", ["window : HWND", "text : string"], ["success : BOOL"], BPTYPE_NOTPURE);
+        //print(size);
+        //Blueprint.create(hwnd, "SetWindowText", [120/255, 168/255, 115/255], 300, 300, size.width, size.height, ["window : HWND", "text : string"], ["success : BOOL"], BPTYPE_NOTPURE);
+        Blueprint.create(hwnd, "SetWindowText", 300, 300, ["window : HWND", "text : string"], ["success : BOOL"], BPTYPE_NOTPURE);
         panes.push(new Blueprint(hwnd, "SetWindowText", [120/255, 168/255, 115/255], 300, 300, 221, 105, ["window : HWND", "text : string"], ["success : BOOL"], BPTYPE_NOTPURE));
         panes.push(new Blueprint(hwnd, "GetWindowText", [120/255, 168/255, 115/255], 300, 300, 221, 105, ["window : HWND"], ["text : string"], BPTYPE_PURE));
+        //size = Blueprint.getAppropriateSize("GetConsoleWindow", [], ["console : HWND"], BPTYPE_NOTPURE);
+        //Blueprint.create(hwnd, "GetConsoleWindow", [120/255, 168/255, 115/255], 400, 400, size.width, size.height, [], ["console : HWND"], BPTYPE_NOTPURE);
+        Blueprint.create(hwnd, "GetConsoleWindow", 400, 400, [], ["console : HWND"], BPTYPE_NOTPURE);
         panes.push(new Blueprint(hwnd, "GetConsoleWindow", [120/255, 168/255, 115/255], 400, 400, 150, 64, [], ["console : HWND"], BPTYPE_NOTPURE));
         panes.push(new Blueprint(hwnd, "FindWindow", [120/255, 168/255, 115/255], 400, 400, 150, 90, ["className? : string", "windowTitle : string"], ["window : HWND"], BPTYPE_PURE));
         panes.push(new Blueprint(hwnd, "version", [251/255, 0/255, 209/255], 400, 400, 150, 64, [], ["version : string"], BPTYPE_PURE));
@@ -1141,12 +1412,18 @@ function windowProc(hwnd, msg, wp, lp) {
     }else if(msg == WM_RBUTTONDOWN) {
         const mouse = {x: GET_X_LPARAM(lp)-camera.x, y: GET_Y_LPARAM(lp)-camera.y}; //lp is client mouse pos
 
+        if(Editable.editing) {
+            Editable.endInput(); //hahai have to end inpout here just in case i call BlueprintMenu.open
+        }
+
         if(hit.result == BUTTON) {
             hit.pane.buttonRightMouseDown?.(mouse);
         }else if(hit.result == CONTEXTMENU) {
             const screenmousepos = GetCursorPos();
             hit.pane.preContextMenu?.(screenmousepos);
             TrackPopupMenu(hit.pane.contextMenu, TPM_BOTTOMALIGN | TPM_LEFTALIGN, screenmousepos.x, screenmousepos.y, hwnd);
+        }else if(!hit.result) {
+            BlueprintMenu.open(hwnd);
         }
 
         for(const pane of panes) {
@@ -1241,19 +1518,23 @@ function windowProc(hwnd, msg, wp, lp) {
             //print(d2d.DXGI_DEBUG_ALL);
             //dbg.ReportLiveObjects(d2d.DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_ALL); //dang it bruh this only logs d3d and dxgi related object (no d2d)
             //dbg.Release();
-        }else if(wp == " ".charCodeAt(0)) {
+        }else if(wp == " ".charCodeAt(0) && !Editable.editing) {
             if(GetKey(VK_SHIFT)) {
                 executeBlueprints();
+            }else {
+                BlueprintMenu.open(hwnd);
             }
         }
 
         if(wp == VK_ESCAPE) {
-            Editable.endInput();
+            if(Editable.editing) Editable.endInput();
+            if(BlueprintMenu.singleton) BlueprintMenu.close();
         }
         if(Editable.editing && (wp > VK_SPACE || wp <= VK_DELETE)) {
             Editable.modify(wp);
         }
-    }else if(msg == WM_CHAR) {
+    }else if(msg == WM_CHAR) { //WM_CHAR will send the keycode of actual characters (like abc or !@#) but WM_KEYDOWN will send the keycode for every character BUT it won't send characters modified by shift (so if you hit shift+1 it will only send 1 instead of ! like WM_CHAR) also not to mention WM_KEYDOWN sends the capitalized keycode for letters (idk why)
+        //so clearly i should've used WM_CHAR in jbstudio3.js
         if(Editable.editing && (wp != VK_RETURN && wp != VK_BACK && wp != 127)) { //for some reason ctrl+backspace puts this random character down (and windows controls always put it instead of backspacing words and it makes me mad)
             print("char", wp, String.fromCharCode(wp));
             Editable.writechar(String.fromCharCode(wp));

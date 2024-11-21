@@ -11,7 +11,7 @@ print(imaginebmp);
 const imagineico = HICONFromHBITMAP(imaginebmp);
 const trollico = HICONFromHBITMAP(trollbmp);
 
-DeleteObject(imaginebmp);
+//DeleteObject(imaginebmp); //nah don't delete this thang yet we using that later (in WM_TIMER)
 DeleteObject(trollbmp);
 
 const imagineID = 21;
@@ -24,13 +24,30 @@ const popup = CreatePopupMenu();
 
 let notifydata, notifydata2;
 
+class GDI {
+    static Matrix3x2FToXFORM(matrix) {
+        //print(matrix);
+        return {
+            "eM11": matrix._11,
+            "eM12": matrix._12,
+            "eM21": matrix._21,
+            "eM22": matrix._22,
+            "eDx": matrix.dx,
+            "eDy": matrix.dy,
+        };
+    }
+}
+
+let i = 0;
+let lastIco = 0;
+
 function windowProc(hwnd, msg, wp, lp) {
     if(msg == WM_CREATE) {
         InsertMenu(popup, 0, MF_BYPOSITION | MF_STRING, MANGOID, "MANGO");
         InsertMenu(popup, 1, MF_BYPOSITION | MF_STRING, PHONKID, "PHONK 🗿🍷");
 
                                 //uID is the WPARAM value of callbackCommand                                                                    seems like most of these are unused
-        notifydata = new NOTIFYICONDATA(hwnd, imagineID, NIF_ICON | NIF_MESSAGE | NIF_TIP, callbackCommand, imagineico, "standard tooltip max 128", NULL, NULL, "balloon notification max 2546", NULL, "title balloon notification 64", NIIF_USER, NULL, NULL);
+        notifydata = new NOTIFYICONDATA(hwnd, imagineID, NIF_ICON | NIF_MESSAGE | NIF_TIP, callbackCommand, trollico, "standard tooltip max 128", NULL, NULL, "balloon notification max 2546", NULL, "title balloon notification 64", NIIF_USER, NULL, NULL);
         //https://www.codeproject.com/Articles/4768/Basic-use-of-Shell-NotifyIcon-in-Win32
         //https://www.codeproject.com/KB/winsdk/Sigma.aspx
         print(Shell_NotifyIcon(NIM_ADD, notifydata), "shelly"); //lowkey idk what exactly this is gonna do (ohhh it added it to the system tray)
@@ -41,6 +58,50 @@ function windowProc(hwnd, msg, wp, lp) {
         
         print(Shell_NotifyIconGetRect(new NOTIFYICONIDENTIFIER(hwnd, imagineID)), "nintendo");
         print(Shell_NotifyIconGetRect(new NOTIFYICONIDENTIFIER(hwnd, trollID)), "nintendo 2");
+
+        SetTimer(hwnd, NULL, 16);
+    }else if(msg == WM_TIMER) {
+        //update the troll face ico for the lols
+        print(i);
+        //const screen = GetDC(NULL);
+        const dc = GetDC(hwnd);
+        const bmp = CreateCompatibleBitmap(dc, 528, 566);
+        const memDC = CreateCompatibleDC(dc);
+        SelectObject(memDC, bmp);
+        const memDC2 = CreateCompatibleDC(dc);
+        SelectObject(memDC2, imaginebmp);
+        SetGraphicsMode(memDC, GM_ADVANCED);
+        SetWorldTransform(memDC, GDI.Matrix3x2FToXFORM(Matrix3x2F.Rotation(i, 528/2, 566/2)));
+        BitBlt(memDC, 0, 0, 528, 566, memDC2, 0, 0, SRCCOPY);
+        SetWorldTransform(memDC, GDI.Matrix3x2FToXFORM(Matrix3x2F.Identity())); //i had to reset the transform if i wanted to draw it on dc
+        DeleteDC(memDC2);
+
+        //SetGraphicsMode(dc, GM_ADVANCED);
+        BitBlt(dc, ((i*5)%(h*2))-h, 0, 528, 566, memDC, 0, 0, SRCCOPY); //idk why the transformation doesn't carry over here (wait it only draws it once? (no it only draws it when it's right-side up lol what...))
+        
+        //const hbitmap = CopyImage(bmp, IMAGE_BITMAP, 528, 566, LR_COPYDELETEORG); //haha delete originsl
+        if(lastIco) {
+            DeleteObject(lastIco);
+        }
+        const nico = HICONFromHBITMAP(bmp); //oh wait i didn't need to make a copy! i was rotating the dc instead of storing it in the bitmap!
+        lastIco = nico;
+        //SelectObject(memDC, nico);
+        //BitBlt(dc, 0, 0, 528, 566, memDC, 0, 0, SRCCOPY);
+        //Shell_NotifyIcon(NIM_MODIFY, new NOTIFYICONDATA(hwnd, imagineID, NIF_ICON, NULL, nico, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, nico));
+        Shell_NotifyIcon(NIM_MODIFY, new NOTIFYICONDATA(hwnd, imagineID, NIF_ICON, NULL, nico, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL));
+        
+
+        DeleteObject(bmp);
+        //const memDC2 = CreateCompatibleDC(dc);
+        //SelectObject(memDC2, imaginebmp);
+
+        //BitBlt(memDC, 0, 0, 528, 566, memDC2, 0, 0, SRCCOPY);
+        //DeleteDC(memDC2);
+        //BitBlt(screen, 0, 0, 528, 566, memDC, 0, 0, SRCCOPY);
+        DeleteDC(memDC);
+        ReleaseDC(hwnd, dc);
+        //ReleaseDC(NULL, screen);
+        i++;
     }else if(msg == callbackCommand) {
         print(wp, lp); //wp is uID (21)    lp is the message
         if(wp == imagineID) {
@@ -66,6 +127,7 @@ function windowProc(hwnd, msg, wp, lp) {
     else if(msg == WM_DESTROY) {
         print(Shell_NotifyIcon(NIM_DELETE, notifydata), "cleanup shelly"); //cleanup
         print(Shell_NotifyIcon(NIM_DELETE, notifydata2), "cleanup shelly2"); //cleanup
+        DeleteObject(imaginebmp); //clerannup
         PostQuitMessage(0);
     }
     //print(msg);

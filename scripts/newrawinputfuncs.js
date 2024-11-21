@@ -84,7 +84,7 @@ function windowProc(hwnd, msg, wp, lp) {
     else if(msg == WM_DESTROY) {
         ReleaseDC(dc, hwnd);
         //quick GetRegisteredRawInputDevices check
-        print(GetRegisteredRawInputDevices());
+        print(GetRegisteredRawInputDevices()); //oops lol the extension doesn't have a signature for this one
         //oops i forgot to unregistser the shits
         for(const device of rawinputdevicelist) {
             let flag = RIDEV_REMOVE;

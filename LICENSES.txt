@@ -4,6 +4,7 @@ EasyTab: https://github.com/ApoorvaJ/EasyTab (for drawing tablet type devices)
 HIDAPI: https://github.com/libusb/hidapi (for HID usb type shit)
 glew v2.1.0: https://glew.sourceforge.net/
 libffi https://github.com/winlibs/libffi/tree/master (im using this version because i couldn't figure how to configure it with the makefiles)
+HTTPRequest.hpp: https://github.com/elnormous/HTTPRequest?tab=Unlicense-1-ov-file#readme
 
 ================================================================================
 

@@ -4,7 +4,7 @@
 let w = 1280;
 let h = 720;
 
-let dc, bmp;
+let wic, dc, bmp;
 
 let rawmouseinfo = {x: 0, y: 0, buttons: 0, pressure: 0, lastX: 0, lastY: 0};
 
@@ -95,8 +95,29 @@ function windowProc(hwnd, msg, wp, lp) {
 
         DeleteDC(memDC);
     }else if(msg == WM_KEYDOWN) {
+        print("char", wp, String.fromCharCode(wp), GetKey(VK_CONTROL));
         if(wp == VK_ESCAPE) {
             DestroyWindow(hwnd);
+        }else if(wp == "S".charCodeAt(0) && GetKey(VK_CONTROL)) {
+            const picker = showOpenFilePicker({
+                multiple: false,
+                excludeAcceptAllOption: false,
+                types: [
+                    {
+                        description: "Images",
+                        accept: [".png"]
+                    }
+                ]
+            });
+            if(picker) {
+                const filename = picker[0];
+                if(!wic) {
+                    wic = InitializeWIC(); ScopeGUIDs(wic);
+                }
+                const wicbmp = wic.CreateBitmapFromHBITMAP(bmp, NULL, WICBitmapIgnoreAlpha, wic.GUID_WICPixelFormat32bppPBGRA);
+                wic.SaveBitmapToFilename(wicbmp, wic.GUID_ContainerFormatPng, filename); //keep in mind you can do other types of images but i just want a png lol
+                wicbmp.Release();
+            }
         }
     }else if(msg == WM_MOUSEMOVE) {
         rawmouseinfo.x = LOWORD(lp);
@@ -114,6 +135,7 @@ function windowProc(hwnd, msg, wp, lp) {
             device.hwndTarget = NULL;
         }
         print(RegisterRawInputDevices(rawinputdevicelist) == 1);
+        wic?.Release();
         PostQuitMessage(0);
     }
 }

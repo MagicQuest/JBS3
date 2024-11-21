@@ -22,6 +22,7 @@
 #define USING_FFI
 #define V8_ENABLE_SANDBOX
 #define _CRT_SECURE_NO_WARNINGS
+#define _WINSOCKAPI_
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -44,10 +45,11 @@
 #include "libuv/src/uv-common.h"
 
 
-#pragma comment(lib, "Ws2_32.lib")
 #pragma comment(lib, "Iphlpapi.lib")
 #pragma comment(lib, "Userenv.lib")
 #endif
+
+#pragma comment(lib, "Ws2_32.lib")
 
 #include <comdef.h> //_com_error
 
@@ -12122,6 +12124,62 @@ V8FUNC(InitializeWIC) {
 
             info.GetReturnValue().Set(DIRECT2D::getWICBitmapImpl(isolate, wicBitmap, shit));
         }));
+        wic->Set(isolate, "SaveBitmapToFilename", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            Local<Context> context = isolate->GetCurrentContext();
+            WICHelper* WICObj = (WICHelper*)IntegerFI(info.This()->Get(context, LITERAL("internalPtr")).ToLocalChecked());
+            
+            IWICBitmapSource* source = (IWICBitmapSource*)IntegerFI(info[0].As<Object>()->Get(context, LITERAL("internalPtr")).ToLocalChecked());
+
+            HRESULT hr = S_OK;
+
+            GUID shit = jsImpl::fromJSGUID(isolate, info[1]);
+            IWICBitmapEncoder* encoder = nullptr;
+            RetIfFailed(WICObj->wicFactory->CreateEncoder(shit, NULL, &encoder), "CreateEncoder failed... (SaveBitmapToFilename)");
+
+            IWICStream* fileStream = nullptr;
+            hr = WICObj->wicFactory->CreateStream(&fileStream);
+            if (FAILED(hr)) {
+                encoder->Release();
+                RetPrintIfFailed(hr, "CreateStream failed... (SaveBitmapToFilename)");
+            }
+            fileStream->InitializeFromFilename(WStringFI(info[2]), GENERIC_WRITE);
+            encoder->Initialize(fileStream, WICBitmapEncoderNoCache);
+            
+            IWICBitmapFrameEncode* frameEncode = nullptr;
+            IPropertyBag2* pb2;
+            hr = encoder->CreateNewFrame(&frameEncode, &pb2);
+            if (FAILED(hr)) {
+                encoder->Release();
+                fileStream->Release();
+                RetPrintIfFailed(hr, "CreateNewFrame failed... (SaveBitmapToFilename) moog city oouughhhhh,,,");
+            }
+            UINT width = 0;
+            UINT height = 0;
+            ContIfFailed(source->GetSize(&width, &height), "GetSize failed (carrying on...)");
+            if (info[3]->BooleanValue(isolate)) {
+                width = IntegerFI(info[3]);
+            }
+            if (info[4]->BooleanValue(isolate)) {
+                height = IntegerFI(info[4]);
+            }
+            frameEncode->Initialize(pb2);
+            PrintIfFailed(frameEncode->SetSize(width, height), "frameEncode->SetSize(width, height) failed... (SaveBitmapToFilename)");
+            WICRect wr{0, 0, width, height};
+            hr = frameEncode->WriteSource(source, &wr);
+            if (FAILED(hr)) {
+                encoder->Release();
+                fileStream->Release();
+                frameEncode->Release();
+                RetPrintIfFailed(hr, "WriteSource failed... (SaveBitmapToFile)");
+            }
+            PrintIfFailed(frameEncode->Commit(), "frameEncode->Commit() failed... (SaveBitmapToFilename)");
+            PrintIfFailed(encoder->Commit(), "encoder->Commit() failed... (SaveBitmapToFilename)");
+
+            encoder->Release();
+            fileStream->Release();
+            frameEncode->Release();
+        }));
         wic->Set(isolate, "Release", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
             Isolate* isolate = info.GetIsolate();
             WICHelper* WICObj = (WICHelper*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
@@ -14452,6 +14510,87 @@ V8FUNC(RegSetValueExWrapper) {
 //    }
 //
 //}
+
+#include "HTTPRequest.hpp"
+//#pragma comment(lib, "ws2_32.lib")
+V8FUNC(fetch) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    Local<Context> context = isolate->GetCurrentContext();
+    
+    Local<Promise::Resolver> pp = Promise::Resolver::New(isolate->GetCurrentContext()).ToLocalChecked();
+    info.GetReturnValue().Set(pp->GetPromise());
+
+    try {
+        http::Request request{ CStringFI(info[0]) };
+
+
+        std::string method = "GET";
+        std::string body = "";
+
+        http::HeaderFields headerFields{};
+        if (info.Length() > 1) {
+            Local<Object> options = info[1].As<Object>(); //lmao i wrote info[1].As<Object()>();
+            MaybeLocal<Value> maybeJSMethod = options->Get(context, LITERAL("method"));
+            MaybeLocal<Value> maybeJSBody = options->Get(context, LITERAL("body"));
+            MaybeLocal<Value> maybeJSHeaders = options->Get(context, LITERAL("headers"));
+            if (!maybeJSMethod.IsEmpty()) {
+                method = CStringFI(maybeJSMethod.ToLocalChecked());
+            }
+            if (!maybeJSBody.IsEmpty()) {
+                body = CStringFI(maybeJSBody.ToLocalChecked());
+            }
+            if (!maybeJSHeaders.IsEmpty()) {
+                Local<Object> jsHeaders = maybeJSHeaders.ToLocalChecked().As<Object>();
+                bool ikv = false;
+                Local<Array> entries = jsHeaders->PreviewEntries(&ikv).ToLocalChecked();
+                print(ikv);
+                for (int i = 0; i < entries->Length(); i++) {
+                    Local<Array> kvpair = entries->Get(context, i).ToLocalChecked().As<Array>();
+                    Local<Value> key = kvpair->Get(context, 0).ToLocalChecked();
+                    Local<Value> value = kvpair->Get(context, 1).ToLocalChecked();
+                    headerFields.push_back({CStringFI(key), CStringFI(value)});
+                }
+            }
+        }
+
+        http::Response response = request.send(method, body, headerFields);
+        
+        Local<Object> jsResponse = Object::New(isolate); //https://developer.mozilla.org/en-US/docs/Web/API/Response
+        Local<Object> jsHeaders = Object::New(isolate);
+        for (http::HeaderField headerField : response.headerFields) {
+            jsHeaders->Set(context, String::NewFromUtf8(isolate, headerField.first.c_str()).ToLocalChecked(), String::NewFromUtf8(isolate, headerField.second.c_str()).ToLocalChecked());
+        }
+        Local<Value> jsBody = Undefined(isolate);
+        Local<Value> jsBodyText = Undefined(isolate);
+        if (!response.body.empty()) {
+            Local<ArrayBuffer> ab = ArrayBuffer::New(isolate, response.body.size());
+            memcpy(ab->Data(), response.body.data(), response.body.size()); //GULP
+            jsBody = Uint8Array::New(ab, 0, response.body.size());
+            jsBodyText = String::NewFromUtf8(isolate, (const char*)response.body.data()).ToLocalChecked();
+        }
+        //jsData = Undefined(isolate);//Object::New(isolate);
+        jsResponse->Set(context, LITERAL("body"), jsBody);
+        jsResponse->Set(context, LITERAL("bodyText"), jsBodyText);
+        //bodyUsed
+        jsResponse->Set(context, LITERAL("headers"), jsHeaders);
+        jsResponse->Set(context, LITERAL("ok"), Number::New(isolate, (response.status.code >= 200 && response.status.code <= 299)));
+        //redirected
+        jsResponse->Set(context, LITERAL("status"), Number::New(isolate, response.status.code));
+        jsResponse->Set(context, LITERAL("statusText"), String::NewFromUtf8(isolate, response.status.reason.c_str()).ToLocalChecked());
+        //type
+        //url
+        pp->Resolve(context, jsResponse);
+    }
+    catch (const std::exception& e) {
+        HANDLE console = GetStdHandle(STD_OUTPUT_HANDLE);
+        SetConsoleTextAttribute(console, 4);
+        print(e.what() << "\x07");
+        SetConsoleTextAttribute(console, 7);
+        pp->Reject(context, String::NewFromUtf8(isolate, e.what()).ToLocalChecked());
+    }
+
+}
 
 //i think im allowed to use a snapshot thing to load these quicker
 //https://github.com/danbev/learning-v8/blob/master/notes/snapshots.md
@@ -16829,6 +16968,7 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
     //setGlobalWrapper(GetKeyboardState);
     setGlobal(GetAsyncKeyboardState);
 
+    setGlobal(fetch); //im more of an xhr guy...
     setGlobal(setTimeout);
     setGlobal(setInterval);
     setGlobal(clearTimeout);
@@ -17758,6 +17898,7 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrevInstance, PWSTR nCmdList, in
     print(/*"GDI CreateFont and CreateWindowExA AND */"use ID2D1BitmapBrush1!");
     print("JUST LEARNED THAT I'VE BEEN USING OBJECT TEMPLATES WRONG AND IT'S BEEN SLOWING DOWN JBS3 THIS ENTIRE TIME CHECK jsEffectOT!!!");
     print("finish CreateTableTransferEffect when i feel like it");
+    print("oh yeah i don't have to use GetRealNamedProperty and i can just use Get instead (my bad)");
 
     SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), 7);
 
