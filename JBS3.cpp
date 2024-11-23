@@ -1103,13 +1103,13 @@ namespace fs {
 }
 
 void Require(const v8::FunctionCallbackInfo<v8::Value>& info) {
-    const char* type = *v8::String::Utf8Value(info.GetIsolate(), info[0]); //insert tocstring here (dumb)
-    v8::HandleScope handle_scope(info.GetIsolate());
+    v8::Isolate* isolate = info.GetIsolate();
+    v8::HandleScope handle_scope(isolate);
+    const char* type = *v8::String::Utf8Value(isolate, info[0]); //insert tocstring here (dumb)
     //print(type << " " << LONG_PTR(type)); //bruh i was trying to use WinDbg to debug dllstuffs/asmloop.js but for some reason this string wouldn't go through and when i checked it in memory it was garbage
     if (strcmp(type, "fs") == 0) {
         print("typenigger");
         using namespace v8; //lol idk why you can do this right here
-        Isolate* isolate = info.GetIsolate();
         
         Local<ObjectTemplate> filesys = ObjectTemplate::New(isolate);
         filesys->Set(isolate, "read", FunctionTemplate::New(isolate, fs::read));
@@ -12124,6 +12124,12 @@ V8FUNC(InitializeWIC) {
 
             info.GetReturnValue().Set(DIRECT2D::getWICBitmapImpl(isolate, wicBitmap, shit));
         }));
+	//https://learn.microsoft.com/en-us/windows/win32/wic/-wic-creating-encoder
+	//https://learn.microsoft.com/en-us/windows/win32/api/wincodec/nf-wincodec-iwicbitmapencoder-createnewframe
+	//https://learn.microsoft.com/en-us/windows/win32/api/wincodec/nf-wincodec-iwicbitmapframeencode-writesource
+	//https://learn.microsoft.com/en-us/windows/win32/api/wincodec/nf-wincodec-iwicimagingfactory-createencoder
+	//https://github.com/ReneSlijkhuis/example-wic-applications/blob/master/example_7/WicClient.cpp
+	//https://github.com/ReneSlijkhuis/example-wic-codec (cool) https://github.com/ReneSlijkhuis/example-wic-applications (cool)
         wic->Set(isolate, "SaveBitmapToFilename", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
             Isolate* isolate = info.GetIsolate();
             Local<Context> context = isolate->GetCurrentContext();

@@ -55,16 +55,17 @@ function withinBounds({x, y, width, height}, pair) {
     return pair.x > x && pair.y > y && pair.x < x+width && pair.y < y+height;
 }
 
-const TOP = 0b0000000001;
-const LEFT = 0b0000000010;
-const RIGHT = 0b0000000100;
-const BOTTOM = 0b0000001000;
-const BUTTON  = 0b0000010000;
-const MOVE     = 0b0000100000;
-const CONTEXTMENU=0b0001000000;
-const DROP        =0b0010000000;
-const DRAG         =0b0100000000;
-const TEXT          =0b1000000000;
+const TOP = 0b00000000001;
+const LEFT = 0b00000000010;
+const RIGHT = 0b00000000100;
+const BOTTOM = 0b00000001000;
+const BUTTON  = 0b00000010000;
+const MOVE     = 0b00000100000;
+const CONTEXTMENU=0b00001000000;
+const DROP        =0b00010000000;
+const DRAG         =0b00100000000;
+const TEXT          =0b01000000000;
+const WHEEL          =0b10000000000;
 
 const hittestarr = [
     [TOP, LoadCursor(NULL, IDC_SIZENS)],
@@ -77,6 +78,7 @@ const hittestarr = [
     [DROP, hand],
     [DRAG, hand],
     [TEXT, LoadCursor(NULL, IDC_IBEAM)],
+    [WHEEL, LoadCursor(NULL, 32652)], //idk why 32652 isn't named
 ];
 
 const BPTYPE_PURE = 0;
@@ -410,6 +412,34 @@ class PrimitiveControl { //hell yeah brother (this object isn't meant to be on i
     }
 }
 
+const baseTypes = {
+    HWND: "number",
+    DWORD: "number",
+    SHORT: "number",
+    HMENU: "number",
+    BOOL: "number",
+    HDC: "number",
+    HBITMAP: "number",
+    HBRUSH: "number",
+    HFONT: "number",
+    HPEN: "number",
+    HRGN: "number",
+    HICON: "number",
+    RGB: "number",
+    COLORREF: "number",
+    HGDIOBJ: "number",
+    HCURSOR: "number",
+    HANDLE: "number",
+    LRESULT: "number",
+    HRESULT: "number",
+    HMODULE: "number",
+    FARPROC: "number",
+    NTSTATUS: "number",
+    HKEY: "number",
+
+    wstring: "string",
+}
+
 class Blueprint {
     static paramColors = {};
     //static captionHeight = GetSystemMetrics(SM_CYCAPTION) + GetSystemMetrics(SM_CYEDGE)*2; //27
@@ -447,10 +477,10 @@ class Blueprint {
     }
 
     //static create(parent, title, color, x, y, width, height, parameters, out, type) {
-    static create(parent, title, x, y, parameters, out, type) {
+    static create(parent, title, x, y, parameters, out, type, desc) {
         const color = Blueprint.getColorByTitle(title, type);
         const {width, height} = Blueprint.getAppropriateSize(title, parameters, out, type);
-        const b = new Blueprint(parent, title, color, x, y, width, height, parameters, out, type);
+        const b = new Blueprint(parent, title, color, x, y, width, height, parameters, out, type, desc);
         panes.push(b);
         return b;
     }
@@ -496,15 +526,15 @@ class Blueprint {
         for(const ostr of out) { //not including the exec pin
             const [_, name, op] = ostr.match(typeRegex);
             let temp = d2d.CreateTextLayout(name, font, w, h);
-            let owidth = temp.GetMetrics().width;
+            let owidth = temp.GetMetrics().width+10; //plus 10 because it's 10 pixels away from the right border
             temp.Release();
             if(widestout < owidth) {
                 widestout = owidth;
             }
         }
 
-        if(width < widestparam) {
-            width += widestparam-width+widestout;
+        if(width < widestparam+widestout) {
+            width += (widestparam+widestout)-width;//+widestout;
         }
 
         width += widestout;
@@ -512,7 +542,7 @@ class Blueprint {
         return {width, height};
     }
 
-    constructor(parent, title, color, x, y, width, height, parameters, out, type) {
+    constructor(parent, title, color, x, y, width, height, parameters, out, type, desc) {
         this.parent = parent; //just in case? (nevermind lol it seems like i don't need it)
         this.title = title;
         this.x = x;
@@ -522,6 +552,7 @@ class Blueprint {
         this.parameters = parameters; //parameters and out come in as arrays of strings but are stored as arrays of objects
         this.out = out;
         this.type = type;
+        this.desc = desc; ///hover and show it
         this._special = false;
 
         //this.gradientStops.push(
@@ -558,7 +589,7 @@ class Blueprint {
             ),
         )
 
-        if(this.type == BPTYPE_NOTPURE || this.type == BPTYPE_EVENT) {
+        if(this.type == BPTYPE_NOTPURE || this.type == BPTYPE_EVENT) { //lowkey still no delegate pin
             if(this.type == BPTYPE_NOTPURE) {
                 //this.parameters[i] = "exec"; //i don't need the variable name anymore because i store it in the text layout paramText[i]
                 //const gsc = d2d.CreateGradientStopCollection([0.0, ...Blueprint.paramColors[param]], [0.5, 0.0, 0.0, 0.0, 0.0]);
@@ -625,7 +656,8 @@ class Blueprint {
             this.out[i] = pobj;
             //this.outText.push(d2d.CreateTextLayout(name, font, w, h));
         }
-        const gsc = d2d.CreateGradientStopCollection([0.0, ...Blueprint.paramColors[param]], [0.5, 0.0, 0.0, 0.0, 0.0]);
+        const color = Blueprint.paramColors[param] ?? [.8, .8, .8];
+        const gsc = d2d.CreateGradientStopCollection([0.0, ...color], [0.5, 0.0, 0.0, 0.0, 0.0]);
 
         this.gradients.push(
             Gradient.RadialGradientBrush(
@@ -638,10 +670,11 @@ class Blueprint {
     drawPin(out, i, param, connection) {
         const y = (i+1)*Blueprint.captionHeight+Blueprint.padding;
         let ex;
+        const color = Blueprint.paramColors[param.type] ?? [.8, .8, .8];
         if(!out) {
             ex = Blueprint.padding-8;
             d2d.FillRectangle(Blueprint.padding, y, 100, this.height, this.gradients[4+i]);
-            colorBrush.SetColor(...Blueprint.paramColors[param.type]);
+            colorBrush.SetColor(...color); //lmao what is the color before this line (oh wait it doesn't matter because FillRectangle is using a gradient brush)
             //d2d.DrawEllipse(Blueprint.padding-8, y, Blueprint.radius, Blueprint.radius, colorBrush, 2);
             //colorBrush.SetColor(1.0, 1.0, 1.0);
             //d2d.DrawText(param, font, Blueprint.padding, (i+1)*Blueprint.captionHeight + Blueprint.padding, this.width, this.height, colorBrush);
@@ -652,7 +685,7 @@ class Blueprint {
             //print(tl.GetMetrics());
             const {width} = tl.GetMetrics();
             d2d.DrawTextLayout(this.width-10-width, y, tl, colorBrush);
-            colorBrush.SetColor(...Blueprint.paramColors[param.type]);
+            colorBrush.SetColor(...color); //oh i do this after DrawTextLayout so the text is white and the ellipse is the actual color
             ex = this.width-8;
             //d2d.DrawEllipse(this.width-8, y, Blueprint.radius, Blueprint.radius, colorBrush, 2);
             //colorBrush.SetColor(1.0, 1.0, 1.0);
@@ -667,7 +700,7 @@ class Blueprint {
             sink.AddLine(ex-2.5, y+5);
             sink.EndFigure(D2D1_FIGURE_END_CLOSED);
             sink.Close();
-            sink.Release();
+            print(sink.Release() == 0, "sink true hawk two");
             const args = [path, colorBrush];
             
             if(connection) {
@@ -679,6 +712,7 @@ class Blueprint {
             //path.Release(); //ok this is a HUGE leak bruh this shit isn't getting released!!!
             throwawayObjects.push(path);
         }else {
+            //check if param type is any and then make rainbowe graident
             d2d[`${connection ? "Fill" : "Draw"}Ellipse`](ex, y, Blueprint.radius, Blueprint.radius, colorBrush, 2, roundStrokeStyle); //passing 2 as the 6th parameter for FillEllipse will not do anything because it doesn't have a 6th parameter (it is for DrawEllipse's strokeWidth)
         }
         colorBrush.SetColor(1.0, 1.0, 1.0);
@@ -787,7 +821,8 @@ class Blueprint {
                     sink.EndFigure(D2D1_FIGURE_END_OPEN);
 
                     sink.Close();
-                    sink.Release();
+                    //sink.Release();
+                    print(sink.Release() == 0, "hawk one sink down");
                     //print(sink.Release(), "sink release?");
                     d2d.DrawGeometry(path, colorBrush, 4, roundStrokeStyle);
 
@@ -910,11 +945,15 @@ Blueprint.paramColors["VERTEX_SHADER"] = [136/255, 255/255, 0.0];
 Blueprint.paramColors["SHADER"] = [200/255, 200/255, 200/255];
 Blueprint.paramColors["string"] = [251/255, 0/255, 209/255];
 Blueprint.paramColors["number"] = [27/255, 191/255, 147/255];
-Blueprint.paramColors["BOOL"] = Blueprint.paramColors.number; //WinAPI's BOOL type is actually just an int
-Blueprint.paramColors["HWND"] = Blueprint.paramColors.number;
+//Blueprint.paramColors["BOOL"] = Blueprint.paramColors.number; //WinAPI's BOOL type is actually just an int
+//Blueprint.paramColors["HWND"] = Blueprint.paramColors.number;
 Blueprint.paramColors["boolean"] = [146/255, 0.0, 0.0];
 Blueprint.paramColors["float"] = [161/255, 1.0, 69/255];
 
+for(const key in baseTypes) {
+    Blueprint.paramColors[key] = Blueprint.paramColors[baseTypes[key]];
+    PrimitiveControl.validPrimitives[key] = PrimitiveControl.validPrimitives[baseTypes[key]];
+}
 
 class BlueprintMenu {
     x = 0;
@@ -929,15 +968,28 @@ class BlueprintMenu {
     value = ""; //i could make editable configurable in that, i could tell it which variable to edit, but idgaf
     valueText = undefined;
 
-    scrollX = 0;
+    scrollY = 0;
+    scrollVelocity = 0;
 
     static singleton = undefined;
 
-    static commandList = [
+    static commandList = [ //haha not the d2d one
         //{name, desc, parameters, out}
         //i was gonna use this regex but i realized i could eval it instead -> /registerFunc *\( *(["'`])(\w+)\1 *, *(["'`])function \2\(([A-z0-9:_, ]+)\) *: *(\w+)\3/
         //damn well i already wanted to add some networking functions for a custom discord client burt wwteverf
-    ]; //haha not the d2d one
+    ];
+
+    static searchSort(a, b) {
+        let bv = 0;
+        let av = 0;
+        const value = BlueprintMenu.singleton.value.toLowerCase();
+        for(let i = 0; i < value.length; i++) { //came up with this bad boy meself
+            const snip = value.substring(0, i+1);
+            bv += (b.name.toLowerCase()).includes(snip);
+            av += (a.name.toLowerCase()).includes(snip);
+        }
+        return bv - av;    
+    }
 
     static open(hwnd) {
         const mouse = GetCursorPos();
@@ -1008,6 +1060,13 @@ class BlueprintMenu {
         if(this.valueText.text != this.value) {
             this.valueText.Release();
             this.valueText = d2d.CreateTextLayout(this.value, font, this.width, this.height);
+            //lowkey feel weird about doing this in the drawing function but the way i made it is kinda asking for it
+            if(this.value == "") {
+                BlueprintMenu.commandList.sort((a, b) => a.name.localeCompare(b.name));
+            }else {
+                BlueprintMenu.commandList.sort(BlueprintMenu.searchSort);
+            }
+            this.scrollY = 0;
         }
 
         colorBrush.SetColor(0.0, 0.0, 0.0);
@@ -1031,9 +1090,17 @@ class BlueprintMenu {
 
         colorBrush.SetColor(229/255, 229/255, 229/255);
 
+        if(Math.abs(this.scrollVelocity) > 0.01) {
+            this.scrollY = Math.min(BlueprintMenu.commandList.length, Math.max(0, this.scrollY+this.scrollVelocity));
+            this.scrollVelocity *= .95;
+            //dirty = true; //lol! (aw damn wait it's already true)
+        }
+
         for(let i = 0; i < (400-92)/12; i++) {
-            const j = this.scrollX + i;
-            d2d.DrawText(BlueprintMenu.commandList[j].name, font, 14, 92+(i*12), w, h, colorBrush);
+            const j = Math.floor(this.scrollY) + i; //had to think about this one in bed
+            if(j < BlueprintMenu.commandList.length) {
+                d2d.DrawText(BlueprintMenu.commandList[j].name/* + " " + i + " " + j*/, font, 14, 92+((i-(this.scrollY%1))*12), w, h, colorBrush);
+            }
         }
     }
 
@@ -1041,13 +1108,39 @@ class BlueprintMenu {
         if(withinBounds({x: 4, y: 30, width: 400, height: 18}, mouse)) {
             const i = this.valueText.HitTestPoint(mouse.x, mouse.y).hitTestMetrics.textPosition; //calculate...
             return [TEXT, [i, this]];
+        }else if(withinBounds({x: 0, y: 0, width: 270, height: 30}, mouse)) {
+            return [MOVE];
+        }else {
+            //print({x: mouse.x-(280), y: mouse.y-(10)});
+            const ht = this.contextSensitive.hittest({x: mouse.x-280, y: mouse.y-10}); //ermmm this is kinda weird lowkey (nah but PrimitiveControl was really made for Blueprint so i'm still a genius)
+            if(ht) {
+                return ht;
+            }else if(mouse.y > 92) {
+                return [WHEEL]
+            }
+            return [NULL];
         }
-        //print({x: mouse.x-(280), y: mouse.y-(10)});
-        const ht = this.contextSensitive.hittest({x: mouse.x-280, y: mouse.y-10}); //ermmm this is kinda weird lowkey (nah but PrimitiveControl was really made for Blueprint so i'm still a genius)
-        if(ht) {
-            return ht;
+    }
+
+    wheel(wp) {
+        let scrollY = -wp/120; //idk why it's 120 (also im negating it because i want scrolling up to be -1)
+        print(scrollY);
+        this.scrollVelocity += scrollY/5;
+    }
+
+    mouseDown(mouse) {
+        print(mouse);
+        const checkY = 92-(this.scrollY%1)*12;
+        if(mouse.y > checkY) {
+            //const i = (400-92)/12;
+            const i = Math.floor((mouse.y-checkY)/12);    //(mouse.y-92)/12; //i think?
+            const j = Math.floor(this.scrollY) + i;
+            //print(i, j);
+            const {name, desc, parameters, out} = BlueprintMenu.commandList[j];
+            print(name, desc, parameters, out);
+            Blueprint.create(undefined, name, this.x, this.y, parameters, out, BPTYPE_NOTPURE, desc); //ok putting undefined here is a real sign that i really don't need to hold on to the hwnd in Blueprint lmao
+            BlueprintMenu.close();
         }
-        return [NULL];
     }
 
     destroy() {
@@ -1065,11 +1158,28 @@ function parseCommandList() {
         let startI = signature.indexOf("(")+1;
         let endI = signature.indexOf(")");
         let parameters = signature.slice(startI, endI).split(",");
-        let out = signature.slice(endI+1);
+        let outstr = signature.slice(endI+1);
 
         //print(parameters, out);
+        let out = outstr.match(typeRegex)?.[2];
 
-        BlueprintMenu.commandList.push({name, desc, parameters, out});
+        if(!Blueprint.paramColors[out]) {
+            if(out.includes("void")) {
+                out = [];
+            /*}else if(out.includes('wstring')) {
+                out = out.replaceAll("wstring", "string"); //lol
+            */}else {
+                out = out.split(" |")[0].trimEnd();
+                print(name, outstr, "o;", out, out.length);
+            }
+        }
+
+        for(let i = 0; i < parameters.length; i++) {
+            //oops some parameters are like HWND | number so im stripping the ' |'
+            parameters[i] = parameters[i].split(" |")[0].trimEnd(); //just in case
+        }
+
+        BlueprintMenu.commandList.push({name, desc, parameters, out: [`${out} : ${out}`]});
     }
     const extension = system("curl -i https://raw.githubusercontent.com/MagicQuest/JBS3Extension/refs/heads/main/src/extension.ts").split("\n"); //well i would use fetch but right now it only works with HTTP bruh
     for(const line of extension) {
@@ -1220,10 +1330,10 @@ function d2dpaint() {
     for(const obj of throwawayObjects) {
         //print(obj.Release(), "throwaway release");
         if((r = obj.Release()) != 0) {
-            print(r, "throwaway release");
+            print(r, "throwaway release still has references!!!");
         }
     }
-    throwawayObjects = [];
+    throwawayObjects = []; //SHOULD be garbage collected
 }
 
 function windowProc(hwnd, msg, wp, lp) {
@@ -1268,7 +1378,8 @@ function windowProc(hwnd, msg, wp, lp) {
         panes.push(new Blueprint(hwnd, "print", [95/255, 150/255, 187/255], 500, 500, 150, 90, ["In String : string"], [], BPTYPE_NOTPURE));
         panes.push(new Blueprint(hwnd, "Beep", [120/255, 168/255, 115/255], 100, 500, 200, 130, ["frequency : number", "durationMs : number", "nonblocking? : boolean"], ["success : BOOL"], BPTYPE_NOTPURE));
         d2dpaint();
-    }else if(msg == WM_PAINT) {   
+        SetTimer(hwnd, 0, 16); //lowkey this is only for BlueprintMenu smooth scrolling lmao
+    }else if(msg == WM_PAINT) {
         dirty = true;
         //const ps = BeginPaint(hwnd);
         //StretchDIBits(ps.hdc, 0, 0, w, h, 0, 0, w, h, drawing, w, h, 32, BI_RGB, SRCCOPY); //using stretchdibits because i didn't add SetDIBitsToDevice lol
@@ -1350,6 +1461,11 @@ function windowProc(hwnd, msg, wp, lp) {
     }else if(msg == WM_LBUTTONDOWN) {
         SetCapture(hwnd);
         const mouse = {x: GET_X_LPARAM(lp)-camera.x, y: GET_Y_LPARAM(lp)-camera.y}; //lp is client mouse pos
+        
+        if(BlueprintMenu.singleton && hit.pane != BlueprintMenu.singleton) {
+            BlueprintMenu.close();
+        }
+
         if(hit.result) {
             //if((hit.result & BUTTON) == BUTTON) {
             if(hit.result == BUTTON) {
@@ -1358,7 +1474,7 @@ function windowProc(hwnd, msg, wp, lp) {
             }else //if((hit.result & MOVE) == MOVE) {
             if(hit.result == MOVE) {
                 Draggable.select(hit.pane, mouse, false, false);
-            }else if(hit.result == CONTEXTMENU) {
+            }else if(hit.result == CONTEXTMENU || hit.result == WHEEL) {
                 //no
             }else if(hit.result == DRAG) {
                 if(GetKey(VK_MENU)) {
@@ -1398,11 +1514,12 @@ function windowProc(hwnd, msg, wp, lp) {
         }
 
         for(const pane of panes) {
-            if(pane.x <= mouse.x && pane.y <= mouse.y) {
-                mouse.x -= pane.x;
-                mouse.y -= pane.y; //to client
+            //if(pane.x <= mouse.x && pane.y <= mouse.y) { //bruh what i haven't been checking if it's within the size AND i've been decrementing mouse
+            if(withinBounds(pane, mouse)) {
+                //mouse.x -= pane.x;
+                //mouse.y -= pane.y; //to client
                 //hit |= pane.hittest(mouse);
-                pane.mouseDown?.(mouse);
+                pane.mouseDown?.({x: mouse.x-pane.x, y: mouse.y-pane.y});
             }
         }
 
@@ -1427,11 +1544,11 @@ function windowProc(hwnd, msg, wp, lp) {
         }
 
         for(const pane of panes) {
-            if(pane.x <= mouse.x && pane.y <= mouse.y) {
-                mouse.x -= pane.x;
-                mouse.y -= pane.y; //to client
+            if(withinBounds(pane, mouse)) {
+                //mouse.x -= pane.x;
+                //mouse.y -= pane.y; //to client
                 //hit |= pane.hittest(mouse);
-                pane.rightMouseDown?.(mouse);
+                pane.rightMouseDown?.({x: mouse.x-pane.x, y: mouse.y-pane.y});
             }
         }
     }else if(msg == WM_LBUTTONUP) {
@@ -1548,6 +1665,22 @@ function windowProc(hwnd, msg, wp, lp) {
     }else if(msg == WM_MBUTTONUP) {
         ReleaseCapture();
         Draggable.mouseUp();
+    }else if(msg == WM_MOUSEWHEEL) {
+        //print(wp, GET_WHEEL_DELTA_WPARAM(wp), lp); //ok no lie i had to make GET_WHEEL_DELTA_WPARAM for this
+        if(hit.result == WHEEL) {
+            hit.pane?.wheel(GET_WHEEL_DELTA_WPARAM(wp));
+        }
+        //if(dragging) {
+        //            //oh yeah dragging is a string holding either cPos or c2Pos
+        //    let i = +(dragging[1] == "2"); //if dragging[1] == "2" then dragging is c2Pos meaning the radii index must be 1
+        //    radii[i] += (GET_WHEEL_DELTA_WPARAM(wp)*.0001);
+        //    console.log(radii);
+        //    gl.uniform2fv(uniformLocations["radii"], radii);
+        //}
+    }else if(msg == WM_TIMER) {
+        if(Math.abs(BlueprintMenu.singleton?.scrollVelocity) > 0.01) { //Math.abs(undefined) == NaN
+            dirty = true;
+        }
     }
     else if(msg == WM_DESTROY) {
         for(const pane of panes) {
