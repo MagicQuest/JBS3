@@ -96,4 +96,3 @@ public:
 	//	renderTarget->EndDraw();
 	//}
 };
-

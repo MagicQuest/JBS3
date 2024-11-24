@@ -483,7 +483,9 @@ namespace jsImpl {
     Local<ObjectTemplate> DrawItemHandler;
     Local<ObjectTemplate> DIBSection; //interf
     //Local<ObjectTemplate> JSRawInputDeviceList;
+    Local<ObjectTemplate> mt_testot;
     void initObjectTemplates(Isolate* isolate) {
+        mt_testot = ObjectTemplate::New(isolate);
         DIBSection = ObjectTemplate::New(isolate);
         //Local<ObjectTemplate> jsBobject = ObjectTemplate::New(isolate);
         DIBSection->Set(isolate, "SetBit", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
@@ -850,7 +852,7 @@ namespace jsImpl {
 //    return *value ? *value : "<string conversion failed>";
 //}
 
-const char* Highlight(v8::Isolate* isolate, HANDLE console, v8::Local<v8::Value> value) {
+const char* Highlight(v8::Isolate* isolate, HANDLE console, const v8::Local<v8::Value>& value) {
     using namespace v8;
     if (!value->IsString()) {
         if (value->IsNumber()) {//atoi(cstr)) {
@@ -870,6 +872,8 @@ const char* Highlight(v8::Isolate* isolate, HANDLE console, v8::Local<v8::Value>
             SetConsoleTextAttribute(console, 8);
             //std::string obj = "{\n";
             printf("{\n");
+            //HandleScope handle_scope(isolate); //i feel like this is the best place to put this (but im not even creating anything in here...)
+            //nevermind i already define a handle_scope earlier (in Print)
             v8::Local<v8::Array> varNames = value.As<v8::Object>()->GetPropertyNames(isolate->GetCurrentContext()).ToLocalChecked();
             for (uint32_t j = 0; j < varNames->Length(); j++) {
                 v8::Local<v8::Value> name = varNames->Get(isolate->GetCurrentContext(), j).ToLocalChecked()->ToString(isolate->GetCurrentContext()).ToLocalChecked();
@@ -2466,15 +2470,15 @@ namespace DIRECT2D {
         return jsMatrix;
     }
 
-    D2D1_MATRIX_3X2_F fromJSMatrixF(Isolate* isolate, Local<Object> jsMatrix) {//D2D1_MATRIX_3X2_F matrix) {
+    D2D1_MATRIX_3X2_F fromJSMatrixF(Isolate* isolate, const Local<Object>& jsMatrix) {//D2D1_MATRIX_3X2_F matrix) {
         D2D1_MATRIX_3X2_F matrix{};
 
         Local<Context> context = isolate->GetCurrentContext();
-        matrix.dx = FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("dx")).ToLocalChecked());
-        matrix.dy = FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("dy")).ToLocalChecked());
+        matrix.dx = FloatFI(jsMatrix->Get(context, LITERAL("dx")).ToLocalChecked());
+        matrix.dy = FloatFI(jsMatrix->Get(context, LITERAL("dy")).ToLocalChecked());
         //FLOAT m[3][2] = { {10,10},{10,01},{10,10} };
 
-        Local<Array> jsM = jsMatrix->GetRealNamedProperty(context, LITERAL("m")).ToLocalChecked().As<Array>();
+        Local<Array> jsM = jsMatrix->Get(context, LITERAL("m")).ToLocalChecked().As<Array>();
         //matrix.m = { {10,10}, {10,10}, {10,10} };
 #define randomidc(x,y) FloatFI(jsM->Get(context, x).ToLocalChecked().As<Array>()->Get(context, y).ToLocalChecked())
             //matrix.m = { {randomidc(0,0), randomidc(0, 1)}, {randomidc(1,0), randomidc(1,1)}, {randomidc(2,0), randomidc(2, 1)} };
@@ -2485,22 +2489,22 @@ namespace DIRECT2D {
         matrix.m[2][0] = randomidc(2, 0);
         matrix.m[2][1] = randomidc(2, 1);
 #undef randomidc
-        matrix.m11 = FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("m11")).ToLocalChecked());
-        matrix.m12 = FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("m12")).ToLocalChecked());
-        matrix.m21 = FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("m21")).ToLocalChecked());
-        matrix.m22 = FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("m22")).ToLocalChecked());
+        matrix.m11 = FloatFI(jsMatrix->Get(context, LITERAL("m11")).ToLocalChecked());
+        matrix.m12 = FloatFI(jsMatrix->Get(context, LITERAL("m12")).ToLocalChecked());
+        matrix.m21 = FloatFI(jsMatrix->Get(context, LITERAL("m21")).ToLocalChecked());
+        matrix.m22 = FloatFI(jsMatrix->Get(context, LITERAL("m22")).ToLocalChecked());
 
-        matrix._11 = FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_11")).ToLocalChecked());
-        matrix._12 = FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_12")).ToLocalChecked());
-        matrix._21 = FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_21")).ToLocalChecked());
-        matrix._22 = FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_22")).ToLocalChecked());
-        matrix._31 = FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_31")).ToLocalChecked());
-        matrix._32 = FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_32")).ToLocalChecked());
+        matrix._11 = FloatFI(jsMatrix->Get(context, LITERAL("_11")).ToLocalChecked());
+        matrix._12 = FloatFI(jsMatrix->Get(context, LITERAL("_12")).ToLocalChecked());
+        matrix._21 = FloatFI(jsMatrix->Get(context, LITERAL("_21")).ToLocalChecked());
+        matrix._22 = FloatFI(jsMatrix->Get(context, LITERAL("_22")).ToLocalChecked());
+        matrix._31 = FloatFI(jsMatrix->Get(context, LITERAL("_31")).ToLocalChecked());
+        matrix._32 = FloatFI(jsMatrix->Get(context, LITERAL("_32")).ToLocalChecked());
 
         return matrix;
     }
 
-    void setJSMatrixF(Isolate* isolate, D2D1_MATRIX_3X2_F matrix, Local<Object> jsMatrix) {//D2D1_MATRIX_3X2_F matrix) {
+    void setJSMatrixF(Isolate* isolate, D2D1_MATRIX_3X2_F matrix, const Local<Object>& jsMatrix) {//D2D1_MATRIX_3X2_F matrix) {
         Local<Context> context = isolate->GetCurrentContext();
 
         jsMatrix->Set(context, LITERAL("dx"), Number::New(isolate, matrix.dx));
@@ -2537,14 +2541,14 @@ namespace DIRECT2D {
         jsMatrix->Set(context, LITERAL("_32"), Number::New(isolate, matrix._32));
     }
 
-    D2D1::Matrix3x2F fromJSMatrix3x2(Isolate* isolate, Local<Object> jsMatrix) {//D2D1_MATRIX_3X2_F matrix) {
+    D2D1::Matrix3x2F fromJSMatrix3x2(Isolate* isolate, const Local<Object>& jsMatrix) {//D2D1_MATRIX_3X2_F matrix) {
         Local<Context> context = isolate->GetCurrentContext();
 
         D2D1::Matrix3x2F matrix(FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_11")).ToLocalChecked()), FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_12")).ToLocalChecked()), FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_21")).ToLocalChecked()), FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_22")).ToLocalChecked()), FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_31")).ToLocalChecked()), FloatFI(jsMatrix->GetRealNamedProperty(context, LITERAL("_32")).ToLocalChecked()));
         return matrix;
     }
 
-    D2D1::Matrix4x4F fromJSMatrix4x4(Isolate* isolate, Local<Object> jsMatrix) {//D2D1_MATRIX_3X2_F matrix) {
+    D2D1::Matrix4x4F fromJSMatrix4x4(Isolate* isolate, const Local<Object>& jsMatrix) {//D2D1_MATRIX_3X2_F matrix) {
         Local<Context> context = isolate->GetCurrentContext();
 
         D2D1::Matrix4x4F matrix(
@@ -2568,7 +2572,7 @@ namespace DIRECT2D {
         return matrix;
     }
 
-    D2D1::Matrix5x4F fromJSMatrix5x4(Isolate* isolate, Local<Object> jsMatrix) {//D2D1_MATRIX_3X2_F matrix) {
+    D2D1::Matrix5x4F fromJSMatrix5x4(Isolate* isolate, const Local<Object>& jsMatrix) {//D2D1_MATRIX_3X2_F matrix) {
         Local<Context> context = isolate->GetCurrentContext();
 
         D2D1::Matrix5x4F matrix(
@@ -2596,441 +2600,6 @@ namespace DIRECT2D {
         return matrix;
     }
 
-    Local<ObjectTemplate> getIUnknownImpl(Isolate* isolate, void* ptr) {
-        Local<ObjectTemplate> jsGenericIU = ObjectTemplate::New(isolate);
-
-        jsGenericIU->Set(isolate, "internalPtr", Number::New(isolate, (LONG_PTR)ptr));
-        jsGenericIU->Set(isolate, "Release", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            IUnknown* ptr = (IUnknown*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-            //print("IUnknownImpl Release -> " << ptr << " " << refCount);
-            //ptr->Release();
-            //ComPtr<IDXGIDebug> dbg;
-            //RetIfFailed(ptr->QueryInterface(dbg.GetAddressOf()), "QueryInterface");
-            //ComPtr<IDXGIDebug1> dbg2;
-            //RetIfFailed(DXGIGetDebugInterface1(NULL, __uuidof(IDXGIDebug1), (void**)dbg2.GetAddressOf()), "GetDebugInterface1");
-            //RetIfFailed(dbg2->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_DETAIL), "ReportLiveObjects");
-
-            ULONG refCount = ptr->Release();
-            info.GetReturnValue().Set(Number::New(isolate, refCount));
-        }));
-
-        return jsGenericIU;
-    }
-
-    Local<ObjectTemplate> getTextFormatImpl(Isolate* isolate, Direct2D* d2d, IDWriteTextFormat* font, bool parent) {
-        Local<ObjectTemplate> jsFont = getIUnknownImpl(isolate, font);
-//        jsFont->Set(isolate, "internalPtr", Number::New(isolate, (LONG_PTR)font));
-        jsFont->Set(isolate, "internalDXPtr", Number::New(isolate, (LONG_PTR)d2d));
-        //jsFont->Set(isolate, "family", String::NewFromUtf8(isolate, fontFamily).ToLocalChecked());
-        jsFont->Set(isolate, "GetFontSize", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-            info.GetReturnValue().Set(font->GetFontSize());
-        }));
-        jsFont->Set(isolate, "GetFlowDirection", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-            info.GetReturnValue().Set(font->GetFlowDirection());
-        }));
-        //jsFont->Set(isolate, "GetFontCollection", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-        //    Isolate* isolate = info.GetIsolate();
-        //    IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-        //
-        //    info.GetReturnValue().Set(font->GetFontCollection());
-        //}));
-        //font->GetFontCollection;
-        jsFont->Set(isolate, "GetFontFamilyName", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-            UINT32 length = font->GetFontFamilyNameLength() + 1;
-            //oh shoot yeah i guess i could use a string instead of a new wchar_t[length]
-            std::wstring fontfamily(length, '\0');
-            RetIfFailed(font->GetFontFamilyName(&fontfamily[0], length), "GetFontFamilyName failed");
-            info.GetReturnValue().Set(String::NewFromTwoByte(isolate, (const uint16_t*)fontfamily.data()).ToLocalChecked());
-            ///*wchar_t* wfontfamily;*/std::wstring wfontfamily(length, '#'); font->GetFontFamilyName(&wfontfamily[0], length);
-            ////char fontfamily;
-            //std::string fontfamily(length, '#');
-            //wcstombs(&fontfamily[0], wfontfamily.c_str(), length); //FUCK THIS SHIT DAWG
-            //info.GetReturnValue().Set(String::NewFromUtf8(isolate, fontfamily.c_str()).ToLocalChecked());
-        }));
-        jsFont->Set(isolate, "GetFontFamilyNameLength", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-            info.GetReturnValue().Set(font->GetFontFamilyNameLength());
-        }));
-        jsFont->Set(isolate, "GetFontStretch", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-            info.GetReturnValue().Set(font->GetFontStretch());
-        }));
-        jsFont->Set(isolate, "GetFontStyle", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-            info.GetReturnValue().Set(font->GetFontStyle());
-        }));
-        jsFont->Set(isolate, "GetFontWeight", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-            info.GetReturnValue().Set(font->GetFontWeight());
-        }));
-        jsFont->Set(isolate, "GetIncrementalTabStop", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-            info.GetReturnValue().Set(font->GetIncrementalTabStop());
-        }));
-        jsFont->Set(isolate, "GetLineSpacing", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-            DWRITE_LINE_SPACING_METHOD lineSpacingMehtod; //keeping this mispelling LO!
-            FLOAT lineSpacing, baseline;
-
-            font->GetLineSpacing(&lineSpacingMehtod, &lineSpacing, &baseline);
-
-            Local<Object> jsLineSpacingInfo = Object::New(isolate);
-
-            jsLineSpacingInfo->Set(isolate->GetCurrentContext(), LITERAL("lineSpacingMethod"), Number::New(isolate, lineSpacingMehtod));
-            jsLineSpacingInfo->Set(isolate->GetCurrentContext(), LITERAL("lineSpacing"), Number::New(isolate, lineSpacing));
-            jsLineSpacingInfo->Set(isolate->GetCurrentContext(), LITERAL("baseline"), Number::New(isolate, baseline));
-
-            info.GetReturnValue().Set(jsLineSpacingInfo);
-        }));
-        jsFont->Set(isolate, "GetParagraphAlignment", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-            info.GetReturnValue().Set(font->GetParagraphAlignment());
-        }));
-        jsFont->Set(isolate, "GetReadingDirection", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-            info.GetReturnValue().Set(font->GetReadingDirection());
-        }));
-        jsFont->Set(isolate, "GetTextAlignment", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-            info.GetReturnValue().Set(font->GetTextAlignment());
-        }));
-        jsFont->Set(isolate, "GetWordWrapping", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-            info.GetReturnValue().Set(font->GetWordWrapping());
-        }));
-        //font->GetLocaleName;
-        //font->GetLocaleNameLength;
-        jsFont->Set(isolate, "GetTrimming", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-            DWRITE_TRIMMING trimmingOptions;
-            font->GetTrimming(&trimmingOptions, NULL);
-
-            Local<Object> jsTrimmingOpt = Object::New(isolate);
-
-            jsTrimmingOpt->Set(isolate->GetCurrentContext(), LITERAL("granularity"), Number::New(isolate, trimmingOptions.granularity));
-            jsTrimmingOpt->Set(isolate->GetCurrentContext(), LITERAL("delimiter"), Number::New(isolate, trimmingOptions.delimiter));
-            jsTrimmingOpt->Set(isolate->GetCurrentContext(), LITERAL("delimiterCount"), Number::New(isolate, trimmingOptions.delimiterCount));
-
-            info.GetReturnValue().Set(jsTrimmingOpt);
-        }));
-
-        jsFont->Set(isolate, "SetFlowDirection", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-            font->SetFlowDirection((DWRITE_FLOW_DIRECTION)IntegerFI(info[0]));
-        }));
-        jsFont->Set(isolate, "SetIncrementalTabStop", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-            font->SetIncrementalTabStop(FloatFI(info[0]));
-        }));
-        jsFont->Set(isolate, "SetLineSpacing", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-            font->SetLineSpacing((DWRITE_LINE_SPACING_METHOD)IntegerFI(info[0]), FloatFI(info[1]), FloatFI(info[2]));
-        }));
-        jsFont->Set(isolate, "SetParagraphAlignment", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-            font->SetParagraphAlignment((DWRITE_PARAGRAPH_ALIGNMENT)IntegerFI(info[0]));
-        }));
-        jsFont->Set(isolate, "SetReadingDirection", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-            font->SetReadingDirection((DWRITE_READING_DIRECTION)IntegerFI(info[0]));
-        }));
-        jsFont->Set(isolate, "SetTextAlignment", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-            font->SetTextAlignment((DWRITE_TEXT_ALIGNMENT)IntegerFI(info[0]));
-        }));
-        jsFont->Set(isolate, "SetTrimming", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-            DWRITE_TRIMMING trimmingOptions{ (DWRITE_TRIMMING_GRANULARITY)IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]) };
-
-            font->SetTrimming(&trimmingOptions, nullptr);
-            //WOAH JUST SAW THIS ON THE NET! https://stackoverflow.com/questions/51009082/display-text-in-a-specified-rectangle-with-directwrite
-            //font->SetTrimming(&DWRITE_TRIMMING{ (DWRITE_TRIMMING_GRANULARITY)IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]) }, nullptr);
-            //nvm it didn't work :sob:
-        }));
-        jsFont->Set(isolate, "SetWordWrapping", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-            font->SetWordWrapping((DWRITE_WORD_WRAPPING)IntegerFI(info[0]));
-        }));
-        if (parent) {
-            jsFont->Set(isolate, "SetFontSize", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-                UINT32 length = font->GetFontFamilyNameLength() + 1;
-                //oh shoot yeah i guess i could use a string instead of a new wchar_t[length]
-                std::wstring fontfamily(length, '#');
-                RetIfFailed(font->GetFontFamilyName(&fontfamily[0], length), "GetFontFamilyName failed (SetFontSize)");
-
-                IDWriteTextFormat* font2;
-
-                //wprint(fontfamily.data() << L" wfamily darta");
-
-                if (FloatFI(info[0]) <= 0.0) {
-                    HANDLE console = GetStdHandle(STD_OUTPUT_HANDLE);
-                    SetConsoleTextAttribute(console, 4);
-                    print("you CANNOT use SetFontSize with a value smaller than or equal to 0 (it will explode)" << "\007");
-                    SetConsoleTextAttribute(console, 7);
-                    return;
-                }
-
-                RetIfFailed(d2d->textfactory->CreateTextFormat(
-                    fontfamily.data(),
-                    NULL,
-                    font->GetFontWeight(),
-                    font->GetFontStyle(),
-                    font->GetFontStretch(),
-                    FloatFI(info[0]),
-                    L"en-us", //locale
-                    &font2
-                ), "CreateTextFormat failed (SetFontSize)");
-
-                font->Release();
-                info.This()->Set(isolate->GetCurrentContext(), LITERAL("internalPtr"), Number::New(isolate, (LONG_PTR)font2));
-                //remakefontonbjecnts
-            }));
-        }
-        //jsFont->Set(isolate, "Release", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-        //    Isolate* isolate = info.GetIsolate();
-        //    IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-        //
-        //    font->Release();
-        //}));
-        return jsFont;
-    }
-
-    Local<Object> getDWriteFontFamilyImpl(Isolate* isolate, IDWriteFontFamily* fontFamily) {
-        Local<Context> context = isolate->GetCurrentContext();
-        Local<Object> jsFontFamily = jsImpl::JSDWriteFontFamily->NewInstance(isolate->GetCurrentContext()).ToLocalChecked();
-        
-        jsFontFamily->Set(context, LITERAL("internalPtr"), Number::New(isolate, (LONG_PTR)fontFamily));
-        return jsFontFamily;
-    }
-
-    Local<Object> getWICBitmapImpl(Isolate* isolate, /*IWICBitmapSource*/IWICBitmapSource* wicBitmap, GUID format) {
-        Local<ObjectTemplate> jsConverter = getIUnknownImpl(isolate, wicBitmap);
-
-        //{
-            //Local<Value> elem[] = { Number::New(isolate, format.Data1), Number::New(isolate, format.Data2), Number::New(isolate, format.Data3), Number::New(isolate, format.Data4[0]), Number::New(isolate, format.Data4[1]), Number::New(isolate, format.Data4[2]), Number::New(isolate, format.Data4[3]), Number::New(isolate, format.Data4[4]), Number::New(isolate, format.Data4[5]), Number::New(isolate, format.Data4[6]), Number::New(isolate, format.Data4[7]) };
-            //jsConverter->Set(isolate, "OKNIGGAWHAT", Array::New(isolate, elem, 11)); //for some reason can't pass jsGUID into getWICBitmapImpl or i get some vague ahh error (v8-template line 990)
-        //}
-        //HandleScope handle_scope(isolate); //aw shit chatgpt-4o just told me that handle_scopes are actually pretty important for memory management (and i haven't really been using any (BUT ALSO when i use jbs my memory doesn't go off the charts so im gonna act like it ain't no probrem)) 
-
-        //Local<Array> su = Array::New(isolate, 1);
-        //su->Set(isolate->GetCurrentContext(), 0, LITERAL("HELP"));
-        //jsConverter->Set(isolate, "FUCKE", su);
-
-        jsConverter->Set(isolate, "GetPixels", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            Local<Context> context = isolate->GetCurrentContext();
-            IWICBitmapSource* wicConverter = (IWICBitmapSource*)info.This()->GetRealNamedProperty(context, LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(context).FromJust();
-            //ok im not gonna lie everytime i use GetPixels i forget i need to pass wic
-            if (!info[0]->BooleanValue(isolate)) {
-                MessageBoxA(NULL, "ay bro i think you forgot to pass wic as the first argument bro", "GetPixels", MB_OK | MB_ICONHAND);
-            }
-            WICHelper* wic = (WICHelper*)IntegerFI(info[0].As<Object>()->GetRealNamedProperty(context, LITERAL("internalPtr")).ToLocalChecked());
-
-            UINT width, height;
-
-            RetIfFailed(wicConverter->GetSize(&width, &height), "GetSize failed (i need to get the size of the bitmap to calculate the ArrayBuffer's length)");
-
-            //bruh you gotta do some GYMNASTICS to get the bitcount from a GUID (https://stackoverflow.com/questions/25797536/getting-a-bitmap-bitsperpixel-from-iwicbitmapsource-iwicbitmap-iwicbitmapdecod)
-            //lemme store the guid real quick
-    //        Local<Array> id = info.This()->GetRealNamedProperty(context, LITERAL("GUID")).ToLocalChecked().As<Array>();
-    //        GUID shit = { IntegerFI(id->Get(context, 0).ToLocalChecked()),
-    //IntegerFI(id->Get(context, 1).ToLocalChecked()),
-    //IntegerFI(id->Get(context, 2).ToLocalChecked()),
-    //IntegerFI(id->Get(context, 3).ToLocalChecked()),
-    //IntegerFI(id->Get(context, 4).ToLocalChecked()),
-    //IntegerFI(id->Get(context, 5).ToLocalChecked()),
-    //IntegerFI(id->Get(context, 6).ToLocalChecked()),
-    //IntegerFI(id->Get(context, 7).ToLocalChecked()),
-    //IntegerFI(id->Get(context, 8).ToLocalChecked()),
-    //IntegerFI(id->Get(context, 9).ToLocalChecked()),
-    //IntegerFI(id->Get(context, 10).ToLocalChecked()) };
-            GUID shit = jsImpl::fromJSGUID(isolate, info.This()->GetRealNamedProperty(context, LITERAL("GUID")).ToLocalChecked());
-
-            IWICComponentInfo* pIComponentInfo = NULL;
-            RetIfFailed(wic->wicFactory->CreateComponentInfo(shit, &pIComponentInfo), "CreateComponentInfo failed (use to get bitcount to calculate ArrayBuffer length)");
-
-            // Get IWICPixelFormatInfo from IWICComponentInfo
-            IWICPixelFormatInfo* pIPixelFormatInfo;
-
-            RetIfFailed(pIComponentInfo->QueryInterface(__uuidof(IWICPixelFormatInfo), reinterpret_cast<void**>(&pIPixelFormatInfo)), "QueryInterface failed");
-
-            // Now get the Bits Per Pixel
-            UINT bitCount;
-            RetIfFailed(pIPixelFormatInfo->GetBitsPerPixel(&bitCount), "GetBitsPerPixel failed (literally right there what happened)");
-
-            if (info[1]->BooleanValue(isolate)) {
-                IWICBitmapFlipRotator* pIFlipRotator = NULL;
-                RetIfFailed(wic->wicFactory->CreateBitmapFlipRotator(&pIFlipRotator), "CreateBitmapFlipRotator failed (GetPixels)");
-                RetIfFailed(pIFlipRotator->Initialize(wicConverter, (WICBitmapTransformOptions)IntegerFI(info[1])), "pIFlipRotator->Initialize error");
-                //pIFlipRotator->Release();
-                wicConverter = pIFlipRotator; //luckily IWICBitmapFlipRotator is a child of IWICBitmapSource
-            }
-
-            auto stride = ((((width * bitCount) + 31) & ~31) >> 3);
-            DWORD* bits = new DWORD[width * height]; //bruh i just had to initialize it with a chunk of mem
-
-            RetIfFailed(wicConverter->CopyPixels(NULL, width*4, width*height*4, (BYTE*)bits), "CopyPixels failed bruh what happened"); //ok i know this sounds bad BUT IDC
-
-            //print(bits[0]);
-            Local<ArrayBuffer> ab = ArrayBuffer::New(isolate, height * stride); //honestly this math is a guess especially the sizeof part
-            memcpy(ab->Data(), bits, height * stride); //GULP
-            delete[] bits;
-            Local<Uint32Array> arr = Uint32Array::New(ab, 0, width * height); //weird if i multiply this one by sizeof(DWORD) v8 spits out garbage and crashes bad
-            info.GetReturnValue().Set(arr);
-            if (info[1]->BooleanValue(isolate)) {
-                wicConverter->Release(); //release the internal pIFlipRotator
-            }
-        }));
-
-        jsConverter->Set(isolate, "GetResolution", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            IWICBitmapSource* wicConverter = (IWICBitmapSource*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-            double dpiX, dpiY;
-
-            RetIfFailed(wicConverter->GetResolution(&dpiX, &dpiY), "GetResolution failed?!");
-
-            Local<Object> jsPoint = Object::New(isolate);
-
-            jsPoint->Set(isolate->GetCurrentContext(), LITERAL("x"), Number::New(isolate, dpiX));
-            jsPoint->Set(isolate->GetCurrentContext(), LITERAL("y"), Number::New(isolate, dpiY));
-
-            info.GetReturnValue().Set(jsPoint);
-        }));
-
-        jsConverter->Set(isolate, "GetSize", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            IWICBitmapSource* wicConverter = (IWICBitmapSource*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-            UINT width, height;
-
-            RetIfFailed(wicConverter->GetSize(&width, &height), "GetSize failed?1");
-
-            Local<Object> jsSize = Object::New(isolate);
-
-            jsSize->Set(isolate->GetCurrentContext(), LITERAL("width"), Number::New(isolate, width));
-            jsSize->Set(isolate->GetCurrentContext(), LITERAL("height"), Number::New(isolate, height));
-
-            info.GetReturnValue().Set(jsSize);
-        }));
-
-        jsConverter->Set(isolate, "GetPixelFormat", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            IWICBitmapSource* wicConverter = (IWICBitmapSource*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-            GUID format{};
-            RetIfFailed(wicConverter->GetPixelFormat(&format), "GetPixelFormat failed LO!"); //bruh i don't even say LO! anymore i just put it around ironically now
-            Local<Value> elem[] = { Number::New(isolate, format.Data1), Number::New(isolate, format.Data2), Number::New(isolate, format.Data3), Number::New(isolate, format.Data4[0]), Number::New(isolate, format.Data4[1]), Number::New(isolate, format.Data4[2]), Number::New(isolate, format.Data4[3]), Number::New(isolate, format.Data4[4]), Number::New(isolate, format.Data4[5]), Number::New(isolate, format.Data4[6]), Number::New(isolate, format.Data4[7]) };
-            info.GetReturnValue().Set(Array::New(isolate, elem, 11));
-        }));
-
-        jsConverter->Set(isolate, "Resize", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            Local<Context> context = isolate->GetCurrentContext();
-            WICHelper* WICObj = (WICHelper*)IntegerFI(info[0].As<Object>()->GetRealNamedProperty(context, LITERAL("internalPtr")).ToLocalChecked());
-            IWICBitmapSource* wicConverter = (IWICBitmapSource*)info.This()->GetRealNamedProperty(context, LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(context).FromJust();
-            IWICBitmapScaler* pIScaler = NULL;
-        
-            RetIfFailed(WICObj->wicFactory->CreateBitmapScaler(&pIScaler), "CreateBitmapScaler (ResizeBitmap)");
-            RetIfFailed(pIScaler->Initialize(
-                wicConverter,                    // Bitmap source to scale.
-                IntegerFI(info[1]),                         // Scale width to half of original.
-                IntegerFI(info[2]),                        // Scale height to half of original.
-                (WICBitmapInterpolationMode)IntegerFI(info[3])), "pIScaler Initialize");   // Use Fant mode interpolation.
-            wicConverter->Release();
-            info.This()->Set(context, LITERAL("internalPtr"), Number::New(isolate, (LONG_PTR)pIScaler)); //kinda crazy LO!
-        }));
-        //ok chatgpt said i should convert the objecttemplate to an object before setting an array?
-
-        Local<Object> jsConverterObj = jsConverter->NewInstance(isolate->GetCurrentContext()).ToLocalChecked();
-        Local<Value> elem[] = { Number::New(isolate, format.Data1), Number::New(isolate, format.Data2), Number::New(isolate, format.Data3), Number::New(isolate, format.Data4[0]), Number::New(isolate, format.Data4[1]), Number::New(isolate, format.Data4[2]), Number::New(isolate, format.Data4[3]), Number::New(isolate, format.Data4[4]), Number::New(isolate, format.Data4[5]), Number::New(isolate, format.Data4[6]), Number::New(isolate, format.Data4[7]) };
-        jsConverterObj->Set(isolate->GetCurrentContext(), LITERAL("GUID"), Array::New(isolate, elem, 11)); //yeah ok v8 is just retarded bruh i can't do this (why tf did this work and why was the error so VAGEU)
-
-        return jsConverterObj;
-    }
-
-    Local<ObjectTemplate> getDefaultBrushImpl(Isolate* isolate, ID2D1Brush* newBrush, const char* type = "solid") {
-        Local<ObjectTemplate> jsBrush = DIRECT2D::getIUnknownImpl(isolate, newBrush);//ObjectTemplate::New(isolate);
-
-        //jsBrush->Set(isolate, "internalPtr", Number::New(isolate, (LONG_PTR)newBrush));
-
-        jsBrush->Set(isolate, "brush", String::NewFromUtf8(isolate, type).ToLocalChecked());
-
-        jsBrush->Set(isolate, "SetOpacity", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            ID2D1Brush* newBrush = (ID2D1Brush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-            
-            newBrush->SetOpacity(FloatFI(info[0]));
-        }));
-        jsBrush->Set(isolate, "GetOpacity", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            ID2D1Brush* newBrush = (ID2D1Brush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-            info.GetReturnValue().Set(newBrush->GetOpacity());
-        }));
-        jsBrush->Set(isolate, "GetTransform", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            ID2D1Brush* newBrush = (ID2D1Brush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-            D2D1::Matrix3x2F::D2D_MATRIX_3X2_F matrix;
-            newBrush->GetTransform(&matrix);
-            info.GetReturnValue().Set(DIRECT2D::getMatrix3x2FImpl(isolate, matrix));
-        }));
-        jsBrush->Set(isolate, "SetTransform", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            ID2D1Brush* newBrush = (ID2D1Brush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-            newBrush->SetTransform(DIRECT2D::fromJSMatrixF(isolate, info[0].As<Object>()));
-        }));
-
-        return jsBrush;
-    }
-
     Local<Object> getColorFImpl(Isolate* isolate, D2D1_COLOR_F color) {
         Local<Object> jsColor = Object::New(isolate);
 
@@ -3051,734 +2620,2674 @@ namespace DIRECT2D {
         return jsPoint;
     }
 
-    Local<ObjectTemplate> getBitmapImpl(Isolate* isolate, ID2D1Image* bmp) {
-        Local<ObjectTemplate> jsBitmap = DIRECT2D::getIUnknownImpl(isolate, bmp);
+    Local<Object> getDWriteFontFamilyImpl(Isolate* isolate, IDWriteFontFamily* fontFamily) {
+        Local<Context> context = isolate->GetCurrentContext();
+        Local<Object> jsFontFamily = jsImpl::JSDWriteFontFamily->NewInstance(context).ToLocalChecked();
 
-        jsBitmap->Set(isolate, "GetDpi", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            ID2D1Bitmap* bmp = (ID2D1Bitmap*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-            float x, y;
-
-            bmp->GetDpi(&x, &y);
-
-            //Local<Array> jsArray = Array::New(isolate, 2);
-            //jsArray->Set(isolate->GetCurrentContext(), 0, Number::New(isolate,x));
-            //jsArray->Set(isolate->GetCurrentContext(), 1, Number::New(isolate,y));
-
-            info.GetReturnValue().Set(DIRECT2D::getPoint2FImpl(isolate, D2D1::Point2F(x, y)));//jsArray);
-            }));
-
-        jsBitmap->Set(isolate, "GetPixelFormat", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            ID2D1Bitmap* bmp = (ID2D1Bitmap*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-            D2D1_PIXEL_FORMAT pf = bmp->GetPixelFormat();
-
-
-            Local<Object> jsPixelFormat = Object::New(isolate);
-            jsPixelFormat->Set(isolate->GetCurrentContext(), LITERAL("format"), Number::New(isolate, pf.format));
-            jsPixelFormat->Set(isolate->GetCurrentContext(), LITERAL("alphaMode"), Number::New(isolate, pf.alphaMode));
-
-            info.GetReturnValue().Set(jsPixelFormat);
-            }));
-
-        jsBitmap->Set(isolate, "GetPixelSize", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            ID2D1Bitmap* bmp = (ID2D1Bitmap*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-            D2D1_SIZE_U size = bmp->GetPixelSize();
-
-            Local<Object> jsPixelSize = Object::New(isolate);
-            jsPixelSize->Set(isolate->GetCurrentContext(), LITERAL("width"), Number::New(isolate, size.width));
-            jsPixelSize->Set(isolate->GetCurrentContext(), LITERAL("height"), Number::New(isolate, size.height));
-
-            info.GetReturnValue().Set(jsPixelSize);
-            }));
-        //jsBitmap->Set(isolate, "internalPtr", Number::New(isolate, (LONG_PTR)bmp));
-        jsBitmap->Set(isolate, "GetSize", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            ID2D1Bitmap* bmp = (ID2D1Bitmap*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-            D2D1_SIZE_F bmpSize = bmp->GetSize();
-
-            Local<Object> sizeF = Object::New(isolate);
-            sizeF->Set(isolate->GetCurrentContext(), LITERAL("width"), Number::New(isolate, bmpSize.width));
-            sizeF->Set(isolate->GetCurrentContext(), LITERAL("height"), Number::New(isolate, bmpSize.height));
-            info.GetReturnValue().Set(sizeF);
-            }));
-        jsBitmap->Set(isolate, "CopyFromBitmap", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            ID2D1Bitmap* bmp = (ID2D1Bitmap*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-            D2D1_POINT_2U point = D2D1::Point2U(IntegerFI(info[0]), IntegerFI(info[1]));
-            D2D1_RECT_U rect = D2D1::RectU(IntegerFI(info[3]), IntegerFI(info[4]), IntegerFI(info[5]), IntegerFI(info[6]));
-
-            ID2D1Bitmap* copyFrom = (ID2D1Bitmap*)(IntegerFI(info[2].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()));
-
-            //print(bmp << " " << point.x << "<-x  y->" << point.y << " left->" << rect.left << " top->" << rect.top << " right->" << rect.right << " bottom->" << rect.bottom << " " << copyFrom);
-
-            //https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-erref/705fb797-2175-4a90-b5a3-3918024b10b8?redirectedfrom=MSDN
-            //getting -2147024809
-            //FFFF FFFF 8007 0057
-            //0x80070057 -> E_INVALIDARG
-            //it did NOT need all that effort to get the code
-            //ok i just found the solution
-        //https://stackoverflow.com/questions/22493524/decode-hresult-2147467259
-        https://stackoverflow.com/questions/7008047/is-there-a-way-to-get-the-string-representation-of-hresult-value-using-win-api
-            //IT THINKS MY UNCOMMENTED LINKS ARE LABELS FOR GOTO!
-            //info.GetReturnValue().Set(Number::New(isolate, bmp->CopyFromBitmap(&point, /*(ID2D1Bitmap*)IntegerFI(info[2])*/copyFrom, &rect)));
-            RetIfFailed(bmp->CopyFromBitmap(&point, copyFrom, &rect), "CopyFromBitmap failed!");
-            }));
-        jsBitmap->Set(isolate, "CopyFromRenderTarget", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            ID2D1Bitmap* bmp = (ID2D1Bitmap*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-            D2D1_POINT_2U point = D2D1::Point2U(IntegerFI(info[0]), IntegerFI(info[1]));
-            D2D1_RECT_U rect = D2D1::RectU(IntegerFI(info[3]), IntegerFI(info[4]), IntegerFI(info[5]), IntegerFI(info[6]));
-
-            ID2D1RenderTarget* rt = (ID2D1RenderTarget*)IntegerFI(info[2]);//info[2].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()->IntegerValue(isolate->GetCurrentContext()).FromJust();
-            RetIfFailed(bmp->CopyFromRenderTarget(&point, rt, &rect), "CopyFromRenderTarget failed!~");
-            }));
-        jsBitmap->Set(isolate, "CopyFromMemory", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) { //oops i made this because i wanted to convert HICON to ID2D1Bitmap BUT wic can already basically do that with CreateBitmapFromHICON
-            Isolate* isolate = info.GetIsolate();
-            ID2D1Bitmap* bmp = (ID2D1Bitmap*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-            //D2D1_POINT_2U point = D2D1::Point2U(IntegerFI(info[0]), IntegerFI(info[1]));
-            D2D1_RECT_U rect = D2D1::RectU(IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]));
-
-            DWORD* data = nullptr;//new DWORD[jsBits->Length()];
-            Local<Uint32Array> jsBits = info[4].As<Uint32Array>();
-            data = new DWORD[jsBits->Length()]; //genius code stolen from my StretchDIBits func
-            jsBits->CopyContents(data, jsBits->ByteLength()); //hell yeah (i was using jsBits->Length() instead of ByteLength)
-
-
-            RetIfFailed(bmp->CopyFromMemory(&rect, data, sizeof(DWORD) * (rect.right - rect.left)), "CopyFromMemory failed!");
-            }));
-        jsBitmap->Set(isolate, "Map", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) { //oops i made this because i wanted to convert HICON to ID2D1Bitmap BUT wic can already basically do that with CreateBitmapFromHICON
-            Isolate* isolate = info.GetIsolate();
-            ID2D1Bitmap* bmp = (ID2D1Bitmap*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-            ID2D1Bitmap1* gooder; RetIfFailed(bmp->QueryInterface(&gooder), "i don't REALLY know how QueryInterface works so im assuming it failed because this bitmap wasn't already a ID2D1Bitmap1");
-
-            D2D1_MAPPED_RECT mapped;
-
-            RetIfFailed(gooder->Map((D2D1_MAP_OPTIONS)IntegerFI(info[0]), &mapped), "ID2D1Bitmap1 Map failed (probably because you used something other than D2D1_MAP_OPTIONS_READ but don't worry you can still write to it with only D2D1_MAP_OPTIONS_READ (i think, check DIBitsToD2D.js))");
-
-            Local<Context> context = isolate->GetCurrentContext();
-            Local<Object> jsMapped = jsImpl::JSD2D1MappedRect->NewInstance(context).ToLocalChecked();//Object::New(isolate);
-            jsMapped->Set(context, LITERAL("pitch"), Number::New(isolate, mapped.pitch));
-            jsMapped->Set(context, LITERAL("_bits"), Number::New(isolate, (LONG_PTR)mapped.bits)); //i feel like i've done this before but i passed &mapped.bits instead of mapped.bits directly (it's those DAMN pointers)
-            jsMapped->Set(context, LITERAL("internalBmpPtr"), info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
-
-            gooder->Release();
-            //D2D1_SIZE_U size = gooder->GetPixelSize();
-            //print("w " << size.width << " h " << size.height);
-            //D2D1_SIZE_F size2 = gooder->GetSize();
-            //print("w " << size2.width << " h " << size2.height);
-
-            info.GetReturnValue().Set(jsMapped);
-            }));
-        jsBitmap->Set(isolate, "Unmap", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) { //oops i made this because i wanted to convert HICON to ID2D1Bitmap BUT wic can already basically do that with CreateBitmapFromHICON
-            Isolate* isolate = info.GetIsolate();
-            ID2D1Bitmap* bmp = (ID2D1Bitmap*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-            ID2D1Bitmap1* gooder; RetIfFailed(bmp->QueryInterface(&gooder), "i don't REALLY know how QueryInterface works so im assuming it failed because this bitmap wasn't already a ID2D1Bitmap1");
-
-            RetIfFailed(gooder->Unmap(), "Unmap failed for some reason but maybe because the bitmap wasn't already mapped idk");
-            gooder->Release();
-            }));
-        //jsBitmap->Set(isolate, "Release", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-        //    Isolate* isolate = info.GetIsolate();
-        //    ID2D1Bitmap* bmp = (ID2D1Bitmap*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-        //    bmp->Release();
-        //}));
-
-        return jsBitmap;
+        jsFontFamily->Set(context, LITERAL("internalPtr"), Number::New(isolate, (LONG_PTR)fontFamily));
+        return jsFontFamily;
     }
 
-    Local<ObjectTemplate> getCompositionEffectImpl(Isolate* isolate, IDCompositionFilterEffect* effect) {
-        Local<ObjectTemplate> jsDCompEffect = DIRECT2D::getIUnknownImpl(isolate, effect);
-        jsDCompEffect->Set(isolate, "SetInput", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            IDCompositionFilterEffect* effect = (IDCompositionFilterEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+    Local<Object> getIUnknownImpl(Isolate* isolate, void* ptr);
+    Local<Object> getTextFormatImpl(Isolate* isolate, Direct2D* d2d, IDWriteTextFormat* ptr);
+    Local<Object> getTextLayoutImpl(Isolate* isolate, const Local<Value>& text, IDWriteTextLayout* ptr);
+    Local<Object> getWICBitmapImpl(Isolate* isolate, IWICBitmapSource* ptr, GUID format);
+    Local<Object> getIWICBitmapDecoderImpl(Isolate* isolate, IWICBitmapDecoder* ptr);
+    Local<Object> getID2D1SolidColorBrushImpl(Isolate* isolate, ID2D1SolidColorBrush* ptr);
+    Local<Object> getBitmapBrushImpl(Isolate* isolate, ID2D1BitmapBrush* ptr);
+    Local<Object> getID2D1LinearGradientBrush(Isolate* isolate, ID2D1LinearGradientBrush* ptr);
+    Local<Object> getID2D1RadialGradientBrush(Isolate* isolate, ID2D1RadialGradientBrush* ptr);
+    Local<Object> getImageBrushImpl(Isolate* isolate, ID2D1ImageBrush* ptr);
+    Local<Object> getBitmapImpl(Isolate* isolate, ID2D1Image* ptr);
+    Local<Object> getIDCompositionGaussianBlurEffectImpl(Isolate* isolate, IDCompositionGaussianBlurEffect* ptr);
+    Local<Object> getIDCompositionBrightnessEffectImpl(Isolate* isolate, IDCompositionBrightnessEffect* ptr);
+    Local<Object> getIDCompositionColorMatrixEffectImpl(Isolate* isolate, IDCompositionColorMatrixEffect* ptr);
+    Local<Object> getIDCompositionShadowEffectImpl(Isolate* isolate, IDCompositionShadowEffect* ptr);
+    Local<Object> getIDCompositionHueRotationEffectImpl(Isolate* isolate, IDCompositionHueRotationEffect* ptr);
+    Local<Object> getIDCompositionSaturationEffectImpl(Isolate* isolate, IDCompositionSaturationEffect* ptr);
+    Local<Object> getIDCompositionTurbulenceEffectImpl(Isolate* isolate, IDCompositionTurbulenceEffect* ptr);
+    Local<Object> getIDCompositionLinearTransferEffectImpl(Isolate* isolate, IDCompositionLinearTransferEffect* ptr);
+    Local<Object> getIDCompositionTableTransferEffectImpl(Isolate* isolate, IDCompositionTableTransferEffect* ptr);
+    Local<Object> getIDCompositionCompositeEffectImpl(Isolate* isolate, IDCompositionCompositeEffect* ptr);
+    Local<Object> getIDCompositionBlendEffectImpl(Isolate* isolate, IDCompositionBlendEffect* ptr);
+    Local<Object> getIDCompositionArithmeticCompositeEffectImpl(Isolate* isolate, IDCompositionArithmeticCompositeEffect* ptr);
+    Local<Object> getIDCompositionAffineTransform2DEffectImpl(Isolate* isolate, IDCompositionAffineTransform2DEffect* ptr);
+    Local<Object> getStrokeStyleImpl(Isolate* isolate, ID2D1StrokeStyle1* strokingStyle);
+    Local<Object> getGeometryImpl(Isolate* isolate, ID2D1Geometry* geo);
+    Local<Object> getSimplifiedGeometrySinkImpl(Isolate* isolate, ID2D1SimplifiedGeometrySink* simplifiedGeoSink);
+    Local<Object> getGeometrySinkImpl(Isolate* isolate, ID2D1GeometrySink* geoSink);
+    Local<Object> getPathGeometryImpl(Isolate* isolate, ID2D1PathGeometry1* path);
+    Local<Object> getDXGIDebug1Impl(Isolate* isolate, IDXGIDebug1* dbg);
 
-            RetIfFailed(effect->SetInput(IntegerFI(info[0]), (IUnknown*)IntegerFI(info[1].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()), IntegerFI(info[2])), "IDCompositionFIlterEffect* -> SetInput failed");
-        }));
-        return jsDCompEffect;
+    namespace Templates {
+
+        Local<ObjectTemplate> _IUnknown;
+        Local<ObjectTemplate> _TextFormat;
+        Local<ObjectTemplate> _TextLayout;
+        Local<ObjectTemplate> _WICBitmapSource;
+        Local<ObjectTemplate> _IWICBitmapDecoder;
+        Local<ObjectTemplate> _ID2D1Brush;
+        Local<ObjectTemplate> _ID2D1SolidColorBrush;
+        Local<ObjectTemplate> _ID2D1BitmapBrush;
+        Local<ObjectTemplate> _ID2D1LinearGradientBrush;
+        Local<ObjectTemplate> _ID2D1RadialGradientBrush;
+        Local<ObjectTemplate> _ID2D1ImageBrush;
+        Local<ObjectTemplate> _ID2D1Image;
+
+        Local<ObjectTemplate> _CompositionFilterEffect;
+        Local<ObjectTemplate> _IDCompositionGaussianBlurEffect;
+        Local<ObjectTemplate> _IDCompositionBrightnessEffect;
+        Local<ObjectTemplate> _IDCompositionColorMatrixEffect;
+        Local<ObjectTemplate> _IDCompositionShadowEffect;
+        Local<ObjectTemplate> _IDCompositionHueRotationEffect;
+        Local<ObjectTemplate> _IDCompositionSaturationEffect;
+        Local<ObjectTemplate> _IDCompositionTurbulenceEffect;
+        Local<ObjectTemplate> _IDCompositionLinearTransferEffect;
+        Local<ObjectTemplate> _IDCompositionTableTransferEffect; //not yet...
+        Local<ObjectTemplate> _IDCompositionCompositeEffect;
+        Local<ObjectTemplate> _IDCompositionBlendEffect;
+        Local<ObjectTemplate> _IDCompositionArithmeticCompositeEffect;
+        Local<ObjectTemplate> _IDCompositionAffineTransform2DEffect;
+
+        Local<ObjectTemplate> _ID2D1StrokeStyle1;
+        Local<ObjectTemplate> _ID2D1Geometry;
+        Local<ObjectTemplate> _ID2D1SimplifiedGeometrySink;
+        Local<ObjectTemplate> _ID2D1GeometrySink;
+        Local<ObjectTemplate> _ID2D1PathGeometry1;
+        Local<ObjectTemplate> _IDXGIDebug1;
+
+        Local<ObjectTemplate> createIUnknownImpl(Isolate* isolate) {
+            Local<ObjectTemplate> jsGenericIU = ObjectTemplate::New(isolate);
+
+            //jsGenericIU->Set(isolate, "internalPtr", Number::New(isolate, (LONG_PTR)ptr));
+            jsGenericIU->Set(isolate, "Release", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IUnknown* ptr = (IUnknown*)info.This()->Get(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                //print("IUnknownImpl Release -> " << ptr << " " << refCount);
+                //ptr->Release();
+                //ComPtr<IDXGIDebug> dbg;
+                //RetIfFailed(ptr->QueryInterface(dbg.GetAddressOf()), "QueryInterface");
+                //ComPtr<IDXGIDebug1> dbg2;
+                //RetIfFailed(DXGIGetDebugInterface1(NULL, __uuidof(IDXGIDebug1), (void**)dbg2.GetAddressOf()), "GetDebugInterface1");
+                //RetIfFailed(dbg2->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_DETAIL), "ReportLiveObjects");
+
+                ULONG refCount = ptr->Release();
+                info.GetReturnValue().Set(Number::New(isolate, refCount));
+            }));
+
+            return jsGenericIU;
+        }
+
+        Local<ObjectTemplate> createTextFormatImpl(Isolate* isolate, bool parent) {//, Direct2D* d2d, IDWriteTextFormat* font, bool parent) {
+            Local<ObjectTemplate> jsFont = createIUnknownImpl(isolate);
+            //        jsFont->Set(isolate, "internalPtr", Number::New(isolate, (LONG_PTR)font));
+            //jsFont->Set(isolate, "internalDXPtr", Number::New(isolate, (LONG_PTR)d2d));
+            //jsFont->Set(isolate, "family", String::NewFromUtf8(isolate, fontFamily).ToLocalChecked());
+            jsFont->Set(isolate, "GetFontSize", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                info.GetReturnValue().Set(font->GetFontSize());
+            }));
+            jsFont->Set(isolate, "GetFlowDirection", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                info.GetReturnValue().Set(font->GetFlowDirection());
+            }));
+            //jsFont->Set(isolate, "GetFontCollection", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            //    Isolate* isolate = info.GetIsolate();
+            //    IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            //
+            //    info.GetReturnValue().Set(font->GetFontCollection());
+            //}));
+            //font->GetFontCollection;
+            jsFont->Set(isolate, "GetFontFamilyName", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                UINT32 length = font->GetFontFamilyNameLength() + 1;
+                //oh shoot yeah i guess i could use a string instead of a new wchar_t[length]
+                std::wstring fontfamily(length, '\0');
+                RetIfFailed(font->GetFontFamilyName(&fontfamily[0], length), "GetFontFamilyName failed");
+                info.GetReturnValue().Set(String::NewFromTwoByte(isolate, (const uint16_t*)fontfamily.data()).ToLocalChecked());
+                ///*wchar_t* wfontfamily;*/std::wstring wfontfamily(length, '#'); font->GetFontFamilyName(&wfontfamily[0], length);
+                ////char fontfamily;
+                //std::string fontfamily(length, '#');
+                //wcstombs(&fontfamily[0], wfontfamily.c_str(), length); //FUCK THIS SHIT DAWG
+                //info.GetReturnValue().Set(String::NewFromUtf8(isolate, fontfamily.c_str()).ToLocalChecked());
+            }));
+            jsFont->Set(isolate, "GetFontFamilyNameLength", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                info.GetReturnValue().Set(font->GetFontFamilyNameLength());
+            }));
+            jsFont->Set(isolate, "GetFontStretch", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                info.GetReturnValue().Set(font->GetFontStretch());
+            }));
+            jsFont->Set(isolate, "GetFontStyle", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                info.GetReturnValue().Set(font->GetFontStyle());
+            }));
+            jsFont->Set(isolate, "GetFontWeight", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                info.GetReturnValue().Set(font->GetFontWeight());
+            }));
+            jsFont->Set(isolate, "GetIncrementalTabStop", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                info.GetReturnValue().Set(font->GetIncrementalTabStop());
+            }));
+            jsFont->Set(isolate, "GetLineSpacing", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                DWRITE_LINE_SPACING_METHOD lineSpacingMehtod; //keeping this mispelling LO!
+                FLOAT lineSpacing, baseline;
+
+                font->GetLineSpacing(&lineSpacingMehtod, &lineSpacing, &baseline);
+
+                Local<Object> jsLineSpacingInfo = Object::New(isolate);
+
+                jsLineSpacingInfo->Set(isolate->GetCurrentContext(), LITERAL("lineSpacingMethod"), Number::New(isolate, lineSpacingMehtod));
+                jsLineSpacingInfo->Set(isolate->GetCurrentContext(), LITERAL("lineSpacing"), Number::New(isolate, lineSpacing));
+                jsLineSpacingInfo->Set(isolate->GetCurrentContext(), LITERAL("baseline"), Number::New(isolate, baseline));
+
+                info.GetReturnValue().Set(jsLineSpacingInfo);
+            }));
+            jsFont->Set(isolate, "GetParagraphAlignment", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                info.GetReturnValue().Set(font->GetParagraphAlignment());
+            }));
+            jsFont->Set(isolate, "GetReadingDirection", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                info.GetReturnValue().Set(font->GetReadingDirection());
+            }));
+            jsFont->Set(isolate, "GetTextAlignment", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                info.GetReturnValue().Set(font->GetTextAlignment());
+            }));
+            jsFont->Set(isolate, "GetWordWrapping", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                info.GetReturnValue().Set(font->GetWordWrapping());
+            }));
+            //font->GetLocaleName;
+            //font->GetLocaleNameLength;
+            jsFont->Set(isolate, "GetTrimming", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                DWRITE_TRIMMING trimmingOptions;
+                font->GetTrimming(&trimmingOptions, NULL);
+
+                Local<Object> jsTrimmingOpt = Object::New(isolate);
+
+                jsTrimmingOpt->Set(isolate->GetCurrentContext(), LITERAL("granularity"), Number::New(isolate, trimmingOptions.granularity));
+                jsTrimmingOpt->Set(isolate->GetCurrentContext(), LITERAL("delimiter"), Number::New(isolate, trimmingOptions.delimiter));
+                jsTrimmingOpt->Set(isolate->GetCurrentContext(), LITERAL("delimiterCount"), Number::New(isolate, trimmingOptions.delimiterCount));
+
+                info.GetReturnValue().Set(jsTrimmingOpt);
+            }));
+
+            jsFont->Set(isolate, "SetFlowDirection", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                font->SetFlowDirection((DWRITE_FLOW_DIRECTION)IntegerFI(info[0]));
+            }));
+            jsFont->Set(isolate, "SetIncrementalTabStop", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                font->SetIncrementalTabStop(FloatFI(info[0]));
+            }));
+            jsFont->Set(isolate, "SetLineSpacing", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                font->SetLineSpacing((DWRITE_LINE_SPACING_METHOD)IntegerFI(info[0]), FloatFI(info[1]), FloatFI(info[2]));
+            }));
+            jsFont->Set(isolate, "SetParagraphAlignment", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                font->SetParagraphAlignment((DWRITE_PARAGRAPH_ALIGNMENT)IntegerFI(info[0]));
+            }));
+            jsFont->Set(isolate, "SetReadingDirection", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                font->SetReadingDirection((DWRITE_READING_DIRECTION)IntegerFI(info[0]));
+            }));
+            jsFont->Set(isolate, "SetTextAlignment", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                font->SetTextAlignment((DWRITE_TEXT_ALIGNMENT)IntegerFI(info[0]));
+            }));
+            jsFont->Set(isolate, "SetTrimming", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                DWRITE_TRIMMING trimmingOptions{ (DWRITE_TRIMMING_GRANULARITY)IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]) };
+
+                font->SetTrimming(&trimmingOptions, nullptr);
+                //WOAH JUST SAW THIS ON THE NET! https://stackoverflow.com/questions/51009082/display-text-in-a-specified-rectangle-with-directwrite
+                //font->SetTrimming(&DWRITE_TRIMMING{ (DWRITE_TRIMMING_GRANULARITY)IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]) }, nullptr);
+                //nvm it didn't work :sob:
+            }));
+            jsFont->Set(isolate, "SetWordWrapping", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                font->SetWordWrapping((DWRITE_WORD_WRAPPING)IntegerFI(info[0]));
+            }));
+            if (parent) {
+                jsFont->Set(isolate, "SetFontSize", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                    Isolate* isolate = info.GetIsolate();
+                    IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                    Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                    UINT32 length = font->GetFontFamilyNameLength() + 1;
+                    //oh shoot yeah i guess i could use a string instead of a new wchar_t[length]
+                    std::wstring fontfamily(length, '#');
+                    RetIfFailed(font->GetFontFamilyName(&fontfamily[0], length), "GetFontFamilyName failed (SetFontSize)");
+
+                    IDWriteTextFormat* font2;
+
+                    //wprint(fontfamily.data() << L" wfamily darta");
+
+                    if (FloatFI(info[0]) <= 0.0) {
+                        HANDLE console = GetStdHandle(STD_OUTPUT_HANDLE);
+                        SetConsoleTextAttribute(console, 4);
+                        print("you CANNOT use SetFontSize with a value smaller than or equal to 0 (it will explode)" << "\007");
+                        SetConsoleTextAttribute(console, 7);
+                        return;
+                    }
+
+                    RetIfFailed(d2d->textfactory->CreateTextFormat(
+                        fontfamily.data(),
+                        NULL,
+                        font->GetFontWeight(),
+                        font->GetFontStyle(),
+                        font->GetFontStretch(),
+                        FloatFI(info[0]),
+                        L"en-us", //locale
+                        &font2
+                    ), "CreateTextFormat failed (SetFontSize)");
+
+                    font->Release();
+                    info.This()->Set(isolate->GetCurrentContext(), LITERAL("internalPtr"), Number::New(isolate, (LONG_PTR)font2));
+                    //remakefontonbjecnts
+                    }));
+            }
+            //jsFont->Set(isolate, "Release", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            //    Isolate* isolate = info.GetIsolate();
+            //    IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            //
+            //    font->Release();
+            //}));
+            return jsFont;
+        }
+
+        Local<ObjectTemplate> createTextLayoutImpl(Isolate* isolate) {
+            Local<ObjectTemplate> jsLayout = createTextFormatImpl(isolate, false); //ObjectTemplate::New(isolate);
+            //
+            //jsFont->Set(isolate, )
+
+            jsLayout->Set(isolate, "DetermineMinWidth", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                float minWidth = 0;
+
+                RetIfFailed(layout->DetermineMinWidth(&minWidth), "DetermineMinWidth failed");
+                
+                info.GetReturnValue().Set(Number::New(isolate, minWidth));
+            }));
+
+            //jsLayout->Set(isolate, "Draw", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            //    Isolate* isolate = info.GetIsolate();
+            //    IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            //
+            //}));
+
+            //jsLayout->Set(isolate, "GetClusterMetrics", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            //    Isolate* isolate = info.GetIsolate();
+            //    IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            //
+            //    
+            //}));
+
+            jsLayout->Set(isolate, "GetDrawingEffect", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                IUnknown* drawingEffect;
+
+                DWRITE_TEXT_RANGE textRange = DIRECT2D::genTextRange(isolate, layout, IntegerFI(info[1]), info[2]);
+
+                RetIfFailed(layout->GetDrawingEffect(IntegerFI(info[0]), &drawingEffect, &textRange), "GetDrawingEffect failed");
+
+                info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)drawingEffect));
+            }));
+
+            //jsLayout->Set(isolate, "GetInlineObject", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            //    Isolate* isolate = info.GetIsolate();
+            //    IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            //
+            //    
+            //}));
+
+            jsLayout->Set(isolate, "GetLineMetrics", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                Local<Context> context = isolate->GetCurrentContext();
+                IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                //DWRITE_LINE_METRICS* lineMetrics = nullptr; //oh it wanted me to allocate space for that myself
+                std::vector<DWRITE_LINE_METRICS> lineMetrics(IntegerFI(info[0])); //is this actually valid because im gonna be mad (visual studio says there's no constructor that just takes a number)
+                unsigned int actualLineCount = 0;
+
+                RetIfFailed(layout->GetLineMetrics(&lineMetrics[0], IntegerFI(info[0]), &actualLineCount), "GetLineMetrics failed");
+                
+                Local<Array> metricss = Array::New(isolate, actualLineCount);
+
+                for (unsigned int i = 0; i < actualLineCount; i++) {
+                    Local<Object> jsMetrics = Object::New(isolate);
+
+                    jsMetrics->Set(context, LITERAL("length"), Number::New(isolate, lineMetrics[i].length));
+                    jsMetrics->Set(context, LITERAL("trailingWhitespaceLength"), Number::New(isolate, lineMetrics[i].trailingWhitespaceLength));
+                    jsMetrics->Set(context, LITERAL("newlineLength"), Number::New(isolate, lineMetrics[i].newlineLength));
+                    jsMetrics->Set(context, LITERAL("height"), Number::New(isolate, lineMetrics[i].height));
+                    jsMetrics->Set(context, LITERAL("baseline"), Number::New(isolate, lineMetrics[i].baseline));
+                    jsMetrics->Set(context, LITERAL("isTrimmed"), Number::New(isolate, lineMetrics[i].isTrimmed));
+
+                    metricss->Set(context, i, jsMetrics);
+                }
+
+                info.GetReturnValue().Set(metricss);
+            }));
+
+            //jsLayout->Set(isolate, "GetLocaleName", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            //    Isolate* isolate = info.GetIsolate();
+            //    IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            //
+            //}));
+            //
+            //jsLayout->Set(isolate, "GetLocaleNameLength", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            //    Isolate* isolate = info.GetIsolate();
+            //    IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            //
+            //}));
+
+            jsLayout->Set(isolate, "GetMaxHeight", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                info.GetReturnValue().Set(Number::New(isolate, layout->GetMaxHeight()));
+            }));
+
+            jsLayout->Set(isolate, "GetMaxWidth", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                info.GetReturnValue().Set(Number::New(isolate, layout->GetMaxWidth()));
+            }));
+
+            jsLayout->Set(isolate, "GetMetrics", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                Local<Context> context = isolate->GetCurrentContext();
+                IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            
+                DWRITE_TEXT_METRICS textMetrics{0};
+
+                RetIfFailed(layout->GetMetrics(&textMetrics), "GetMetrics failed");
+
+                Local<Object> jsMetrics = Object::New(isolate);
+
+                jsMetrics->Set(context, LITERAL("left"), Number::New(isolate, textMetrics.left));
+                jsMetrics->Set(context, LITERAL("top"), Number::New(isolate, textMetrics.top));
+                jsMetrics->Set(context, LITERAL("width"), Number::New(isolate, textMetrics.width));
+                jsMetrics->Set(context, LITERAL("widthIncludingTrailingWhitespace"), Number::New(isolate, textMetrics.widthIncludingTrailingWhitespace));
+                jsMetrics->Set(context, LITERAL("height"), Number::New(isolate, textMetrics.height));
+                jsMetrics->Set(context, LITERAL("layoutWidth"), Number::New(isolate, textMetrics.layoutWidth));
+                jsMetrics->Set(context, LITERAL("layoutHeight"), Number::New(isolate, textMetrics.layoutHeight));
+                jsMetrics->Set(context, LITERAL("maxBidiReorderingDepth"), Number::New(isolate, textMetrics.maxBidiReorderingDepth));
+                jsMetrics->Set(context, LITERAL("lineCount"), Number::New(isolate, textMetrics.lineCount));
+
+                info.GetReturnValue().Set(jsMetrics);
+            }));
+            
+            jsLayout->Set(isolate, "GetOverhangMetrics", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            
+                DWRITE_OVERHANG_METRICS overhangMetrics{0};
+
+                RetIfFailed(layout->GetOverhangMetrics(&overhangMetrics), "GetOverhangMetrics failed");
+
+                Local<Object> jsRect = Object::New(isolate);
+
+                jsRect->Set(isolate->GetCurrentContext(), LITERAL("left"), Number::New(isolate, overhangMetrics.left));
+                jsRect->Set(isolate->GetCurrentContext(), LITERAL("top"), Number::New(isolate, overhangMetrics.top));
+                jsRect->Set(isolate->GetCurrentContext(), LITERAL("right"), Number::New(isolate, overhangMetrics.right));
+                jsRect->Set(isolate->GetCurrentContext(), LITERAL("bottom"), Number::New(isolate, overhangMetrics.bottom));
+
+                info.GetReturnValue().Set(jsRect);
+            }));
+
+            jsLayout->Set(isolate, "GetStrikethrough", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                BOOL strikethroughed = false;
+
+                DWRITE_TEXT_RANGE textRange = DIRECT2D::genTextRange(isolate, layout, IntegerFI(info[1]), info[2]);
+
+                RetIfFailed(layout->GetStrikethrough(IntegerFI(info[0]), &strikethroughed, &textRange), "GetStrikethrough failed");
+
+                info.GetReturnValue().Set(Boolean::New(isolate, strikethroughed));
+            }));
+
+            //jsLayout->Set(isolate, "GetTypography", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            //    Isolate* isolate = info.GetIsolate();
+            //    IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            //
+            //    
+            //}));
+
+            jsLayout->Set(isolate, "GetUnderline", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                BOOL underlined = false;
+
+                DWRITE_TEXT_RANGE textRange = DIRECT2D::genTextRange(isolate, layout, IntegerFI(info[1]), info[2]);
+
+                RetIfFailed(layout->GetUnderline(IntegerFI(info[0]), &underlined, &textRange), "GetUnderlined failed");
+
+                info.GetReturnValue().Set(Boolean::New(isolate, underlined));
+            }));
+
+            jsLayout->Set(isolate, "HitTestPoint", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                Local<Context> context = isolate->GetCurrentContext();
+                IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                BOOL isTrailingHit = false;
+                BOOL isInside = false;
+
+                DWRITE_HIT_TEST_METRICS hitTestMetrics{ 0 };
+
+                RetIfFailed(layout->HitTestPoint(FloatFI(info[0]), FloatFI(info[1]), &isTrailingHit, &isInside, &hitTestMetrics), "HitTestPoint failed");
+
+                Local<Object> ykykyk = Object::New(isolate);
+
+                ykykyk->Set(context, LITERAL("isTrailingHit"), Number::New(isolate, isTrailingHit));
+                ykykyk->Set(context, LITERAL("isInside"), Number::New(isolate, isInside));
+                
+                Local<Object> jsMetrics = Object::New(isolate);
+
+                jsMetrics->Set(context, LITERAL("textPosition"), Number::New(isolate, hitTestMetrics.textPosition));
+                jsMetrics->Set(context, LITERAL("length"), Number::New(isolate, hitTestMetrics.length));
+                jsMetrics->Set(context, LITERAL("left"), Number::New(isolate, hitTestMetrics.left));
+                jsMetrics->Set(context, LITERAL("top"), Number::New(isolate, hitTestMetrics.top));
+                jsMetrics->Set(context, LITERAL("width"), Number::New(isolate, hitTestMetrics.width));
+                jsMetrics->Set(context, LITERAL("height"), Number::New(isolate, hitTestMetrics.height));
+                jsMetrics->Set(context, LITERAL("bidiLevel"), Number::New(isolate, hitTestMetrics.bidiLevel));
+                jsMetrics->Set(context, LITERAL("isText"), Number::New(isolate, hitTestMetrics.isText));
+                jsMetrics->Set(context, LITERAL("isTrimmed"), Number::New(isolate, hitTestMetrics.isTrimmed));
+
+                ykykyk->Set(context, LITERAL("hitTestMetrics"), jsMetrics);
+
+                info.GetReturnValue().Set(ykykyk);
+            }));
+
+            jsLayout->Set(isolate, "HitTestTextPosition", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                Local<Context> context = isolate->GetCurrentContext();
+                IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                float pointX = 0;
+                float pointY = 0;
+
+                DWRITE_HIT_TEST_METRICS hitTestMetrics{ 0 };
+
+                RetIfFailed(layout->HitTestTextPosition(IntegerFI(info[0]), IntegerFI(info[1]), &pointX, &pointY, &hitTestMetrics), "HitTestTextPosition failed");
+
+                Local<Object> ykykyk = Object::New(isolate);
+
+                ykykyk->Set(context, LITERAL("x"), Number::New(isolate, pointX));
+                ykykyk->Set(context, LITERAL("y"), Number::New(isolate, pointY));
+
+                Local<Object> jsMetrics = Object::New(isolate);
+
+                jsMetrics->Set(context, LITERAL("textPosition"), Number::New(isolate, hitTestMetrics.textPosition));
+                jsMetrics->Set(context, LITERAL("length"), Number::New(isolate, hitTestMetrics.length));
+                jsMetrics->Set(context, LITERAL("left"), Number::New(isolate, hitTestMetrics.left));
+                jsMetrics->Set(context, LITERAL("top"), Number::New(isolate, hitTestMetrics.top));
+                jsMetrics->Set(context, LITERAL("width"), Number::New(isolate, hitTestMetrics.width));
+                jsMetrics->Set(context, LITERAL("height"), Number::New(isolate, hitTestMetrics.height));
+                jsMetrics->Set(context, LITERAL("bidiLevel"), Number::New(isolate, hitTestMetrics.bidiLevel));
+                jsMetrics->Set(context, LITERAL("isText"), Number::New(isolate, hitTestMetrics.isText));
+                jsMetrics->Set(context, LITERAL("isTrimmed"), Number::New(isolate, hitTestMetrics.isTrimmed));
+
+                ykykyk->Set(context, LITERAL("hitTestMetrics"), jsMetrics);
+
+                info.GetReturnValue().Set(ykykyk);
+            }));
+
+            jsLayout->Set(isolate, "HitTestTextRange", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                Local<Context> context = isolate->GetCurrentContext();
+                IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                unsigned int actualHitTestMetricsCount = 0;
+
+                //DWRITE_HIT_TEST_METRICS* hitTestMetrics = nullptr;
+                std::vector<DWRITE_HIT_TEST_METRICS> hitTestMetrics(IntegerFI(info[4]));
+
+                RetIfFailed(layout->HitTestTextRange(IntegerFI(info[0]), IntegerFI(info[1]), FloatFI(info[2]), FloatFI(info[3]), hitTestMetrics.data(), IntegerFI(info[4]), &actualHitTestMetricsCount), "HitTestTextPosition failed");
+
+                Local<Object> ykykyk = Object::New(isolate);
+
+                ykykyk->Set(context, LITERAL("actualHitTestMetricsCount"), Number::New(isolate, actualHitTestMetricsCount));
+
+                Local<Array> metricss = Array::New(isolate, actualHitTestMetricsCount);
+
+                for (unsigned int i = 0; i < actualHitTestMetricsCount; i++) {
+                    Local<Object> jsMetrics = Object::New(isolate);
+
+                    jsMetrics->Set(context, LITERAL("textPosition"), Number::New(isolate, hitTestMetrics[i].textPosition));
+                    jsMetrics->Set(context, LITERAL("length"), Number::New(isolate, hitTestMetrics[i].length));
+                    jsMetrics->Set(context, LITERAL("left"), Number::New(isolate, hitTestMetrics[i].left));
+                    jsMetrics->Set(context, LITERAL("top"), Number::New(isolate, hitTestMetrics[i].top));
+                    jsMetrics->Set(context, LITERAL("width"), Number::New(isolate, hitTestMetrics[i].width));
+                    jsMetrics->Set(context, LITERAL("height"), Number::New(isolate, hitTestMetrics[i].height));
+                    jsMetrics->Set(context, LITERAL("bidiLevel"), Number::New(isolate, hitTestMetrics[i].bidiLevel));
+                    jsMetrics->Set(context, LITERAL("isText"), Number::New(isolate, hitTestMetrics[i].isText));
+                    jsMetrics->Set(context, LITERAL("isTrimmed"), Number::New(isolate, hitTestMetrics[i].isTrimmed));
+                    
+                    metricss->Set(context, i, jsMetrics);
+                }
+
+                ykykyk->Set(context, LITERAL("hitTestMetrics"), metricss);
+
+                info.GetReturnValue().Set(ykykyk);
+            }));
+
+            jsLayout->Set(isolate, "SetDrawingEffect", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                DWRITE_TEXT_RANGE textRange = DIRECT2D::genTextRange(isolate, layout, IntegerFI(info[1]), info[2]);
+
+                RetIfFailed(layout->SetDrawingEffect((IUnknown*)IntegerFI(info[0].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()), textRange), "SetDrawingEffect");
+            }));
+
+            //jsLayout->Set(isolate, "SetFontCollection", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            //    Isolate* isolate = info.GetIsolate();
+            //    IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            //
+            //}));
+
+            jsLayout->Set(isolate, "SetFontFamilyName", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                DWRITE_TEXT_RANGE textRange = DIRECT2D::genTextRange(isolate, layout, IntegerFI(info[1]), info[2]);
+
+                RetIfFailed(layout->SetFontFamilyName(WStringFI(info[0]), textRange), "SetFontFamilyName");
+            }));
+
+            jsLayout->Set(isolate, "SetFontSize", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                DWRITE_TEXT_RANGE textRange = DIRECT2D::genTextRange(isolate, layout, IntegerFI(info[1]), info[2]);
+
+                RetIfFailed(layout->SetFontSize(FloatFI(info[0]), textRange), "SetFontSize");
+            }));
+
+            jsLayout->Set(isolate, "SetFontStretch", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                DWRITE_FONT_STRETCH fontStretch = (DWRITE_FONT_STRETCH)IntegerFI(info[0]);
+
+                DWRITE_TEXT_RANGE textRange = DIRECT2D::genTextRange(isolate, layout, IntegerFI(info[1]), info[2]);
+
+                RetIfFailed(layout->SetFontStretch(fontStretch, textRange), "SetFontStretch failed");
+            }));
+
+            jsLayout->Set(isolate, "SetFontStyle", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                DWRITE_FONT_STYLE fontStyle = (DWRITE_FONT_STYLE)IntegerFI(info[0]);
+
+                DWRITE_TEXT_RANGE textRange = DIRECT2D::genTextRange(isolate, layout, IntegerFI(info[1]), info[2]);
+
+                RetIfFailed(layout->SetFontStyle(fontStyle, textRange), "SetFontStyle failed");
+            }));
+
+            jsLayout->Set(isolate, "SetFontWeight", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                DWRITE_FONT_WEIGHT fontWeight = (DWRITE_FONT_WEIGHT)IntegerFI(info[0]);
+
+                DWRITE_TEXT_RANGE textRange = DIRECT2D::genTextRange(isolate, layout, IntegerFI(info[1]), info[2]);
+
+                RetIfFailed(layout->SetFontWeight(fontWeight, textRange), "SetFontWeight failed");
+            }));
+
+            //jsLayout->Set(isolate, "SetInlineObject", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            //    Isolate* isolate = info.GetIsolate();
+            //    IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            //
+            //}));
+            //
+            //jsLayout->Set(isolate, "SetLocaleName", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            //    Isolate* isolate = info.GetIsolate();
+            //    IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            //
+            //}));
+
+            jsLayout->Set(isolate, "SetMaxHeight", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                RetIfFailed(layout->SetMaxHeight(FloatFI(info[0])), "SetMaxHeight failed?");
+            }));
+
+            jsLayout->Set(isolate, "SetMaxWidth", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                RetIfFailed(layout->SetMaxWidth(FloatFI(info[0])), "SetMaxWidth failed?");
+            }));
+
+            jsLayout->Set(isolate, "SetStrikethrough", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                DWRITE_TEXT_RANGE textRange = DIRECT2D::genTextRange(isolate, layout, IntegerFI(info[1]), info[2]);
+
+                RetIfFailed(layout->SetStrikethrough(IntegerFI(info[0]), textRange), "SetStrikethrough failed");
+            }));
+
+            //jsLayout->Set(isolate, "SetTypography", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            //    Isolate* isolate = info.GetIsolate();
+            //    IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            //
+            //}));
+
+            jsLayout->Set(isolate, "SetUnderline", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                DWRITE_TEXT_RANGE textRange = DIRECT2D::genTextRange(isolate, layout, IntegerFI(info[1]), info[2]);
+
+                RetIfFailed(layout->SetUnderline(IntegerFI(info[0]), textRange), "SetUnderline failed");
+            }));
+
+            return jsLayout;
+        }
+
+        Local<ObjectTemplate> createWICBitmapImpl(Isolate* isolate) {//, /*IWICBitmapSource*/IWICBitmapSource* wicBitmap, GUID format) {
+            Local<ObjectTemplate> jsConverter = createIUnknownImpl(isolate);
+
+            //{
+                //Local<Value> elem[] = { Number::New(isolate, format.Data1), Number::New(isolate, format.Data2), Number::New(isolate, format.Data3), Number::New(isolate, format.Data4[0]), Number::New(isolate, format.Data4[1]), Number::New(isolate, format.Data4[2]), Number::New(isolate, format.Data4[3]), Number::New(isolate, format.Data4[4]), Number::New(isolate, format.Data4[5]), Number::New(isolate, format.Data4[6]), Number::New(isolate, format.Data4[7]) };
+                //jsConverter->Set(isolate, "OKNIGGAWHAT", Array::New(isolate, elem, 11)); //for some reason can't pass jsGUID into getWICBitmapImpl or i get some vague ahh error (v8-template line 990)
+            //}
+            //HandleScope handle_scope(isolate); //aw shit chatgpt-4o just told me that handle_scopes are actually pretty important for memory management (and i haven't really been using any (BUT ALSO when i use jbs my memory doesn't go off the charts so im gonna act like it ain't no probrem)) 
+
+            //Local<Array> su = Array::New(isolate, 1);
+            //su->Set(isolate->GetCurrentContext(), 0, LITERAL("HELP"));
+            //jsConverter->Set(isolate, "FUCKE", su);
+
+            jsConverter->Set(isolate, "GetPixels", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                Local<Context> context = isolate->GetCurrentContext();
+                IWICBitmapSource* wicConverter = (IWICBitmapSource*)info.This()->GetRealNamedProperty(context, LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(context).FromJust();
+                //ok im not gonna lie everytime i use GetPixels i forget i need to pass wic
+                if (!info[0]->BooleanValue(isolate)) {
+                    MessageBoxA(NULL, "ay bro i think you forgot to pass wic as the first argument bro", "GetPixels", MB_OK | MB_ICONHAND);
+                }
+                WICHelper* wic = (WICHelper*)IntegerFI(info[0].As<Object>()->GetRealNamedProperty(context, LITERAL("internalPtr")).ToLocalChecked());
+
+                UINT width, height;
+
+                RetIfFailed(wicConverter->GetSize(&width, &height), "GetSize failed (i need to get the size of the bitmap to calculate the ArrayBuffer's length)");
+
+                //bruh you gotta do some GYMNASTICS to get the bitcount from a GUID (https://stackoverflow.com/questions/25797536/getting-a-bitmap-bitsperpixel-from-iwicbitmapsource-iwicbitmap-iwicbitmapdecod)
+                //lemme store the guid real quick
+                //        Local<Array> id = info.This()->GetRealNamedProperty(context, LITERAL("GUID")).ToLocalChecked().As<Array>();
+                //        GUID shit = { IntegerFI(id->Get(context, 0).ToLocalChecked()),
+                //IntegerFI(id->Get(context, 1).ToLocalChecked()),
+                //IntegerFI(id->Get(context, 2).ToLocalChecked()),
+                //IntegerFI(id->Get(context, 3).ToLocalChecked()),
+                //IntegerFI(id->Get(context, 4).ToLocalChecked()),
+                //IntegerFI(id->Get(context, 5).ToLocalChecked()),
+                //IntegerFI(id->Get(context, 6).ToLocalChecked()),
+                //IntegerFI(id->Get(context, 7).ToLocalChecked()),
+                //IntegerFI(id->Get(context, 8).ToLocalChecked()),
+                //IntegerFI(id->Get(context, 9).ToLocalChecked()),
+                //IntegerFI(id->Get(context, 10).ToLocalChecked()) };
+                GUID shit = jsImpl::fromJSGUID(isolate, info.This()->GetRealNamedProperty(context, LITERAL("GUID")).ToLocalChecked());
+
+                IWICComponentInfo* pIComponentInfo = NULL;
+                RetIfFailed(wic->wicFactory->CreateComponentInfo(shit, &pIComponentInfo), "CreateComponentInfo failed (use to get bitcount to calculate ArrayBuffer length)");
+
+                // Get IWICPixelFormatInfo from IWICComponentInfo
+                IWICPixelFormatInfo* pIPixelFormatInfo;
+
+                RetIfFailed(pIComponentInfo->QueryInterface(__uuidof(IWICPixelFormatInfo), reinterpret_cast<void**>(&pIPixelFormatInfo)), "QueryInterface failed");
+
+                // Now get the Bits Per Pixel
+                UINT bitCount;
+                RetIfFailed(pIPixelFormatInfo->GetBitsPerPixel(&bitCount), "GetBitsPerPixel failed (literally right there what happened)");
+
+                if (info[1]->BooleanValue(isolate)) {
+                    IWICBitmapFlipRotator* pIFlipRotator = NULL;
+                    RetIfFailed(wic->wicFactory->CreateBitmapFlipRotator(&pIFlipRotator), "CreateBitmapFlipRotator failed (GetPixels)");
+                    RetIfFailed(pIFlipRotator->Initialize(wicConverter, (WICBitmapTransformOptions)IntegerFI(info[1])), "pIFlipRotator->Initialize error");
+                    //pIFlipRotator->Release();
+                    wicConverter = pIFlipRotator; //luckily IWICBitmapFlipRotator is a child of IWICBitmapSource
+                }
+
+                auto stride = ((((width * bitCount) + 31) & ~31) >> 3);
+                DWORD* bits = new DWORD[width * height]; //bruh i just had to initialize it with a chunk of mem
+
+                RetIfFailed(wicConverter->CopyPixels(NULL, width * 4, width * height * 4, (BYTE*)bits), "CopyPixels failed bruh what happened"); //ok i know this sounds bad BUT IDC
+
+                //print(bits[0]);
+                Local<ArrayBuffer> ab = ArrayBuffer::New(isolate, height * stride); //honestly this math is a guess especially the sizeof part
+                memcpy(ab->Data(), bits, height * stride); //GULP
+                delete[] bits;
+                Local<Uint32Array> arr = Uint32Array::New(ab, 0, width * height); //weird if i multiply this one by sizeof(DWORD) v8 spits out garbage and crashes bad
+                info.GetReturnValue().Set(arr);
+                if (info[1]->BooleanValue(isolate)) {
+                    wicConverter->Release(); //release the internal pIFlipRotator
+                }
+            }));
+
+            jsConverter->Set(isolate, "GetResolution", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IWICBitmapSource* wicConverter = (IWICBitmapSource*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                double dpiX, dpiY;
+
+                RetIfFailed(wicConverter->GetResolution(&dpiX, &dpiY), "GetResolution failed?!");
+
+                Local<Object> jsPoint = Object::New(isolate);
+
+                jsPoint->Set(isolate->GetCurrentContext(), LITERAL("x"), Number::New(isolate, dpiX));
+                jsPoint->Set(isolate->GetCurrentContext(), LITERAL("y"), Number::New(isolate, dpiY));
+
+                info.GetReturnValue().Set(jsPoint);
+            }));
+
+            jsConverter->Set(isolate, "GetSize", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IWICBitmapSource* wicConverter = (IWICBitmapSource*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                UINT width, height;
+
+                RetIfFailed(wicConverter->GetSize(&width, &height), "GetSize failed?1");
+
+                Local<Object> jsSize = Object::New(isolate);
+
+                jsSize->Set(isolate->GetCurrentContext(), LITERAL("width"), Number::New(isolate, width));
+                jsSize->Set(isolate->GetCurrentContext(), LITERAL("height"), Number::New(isolate, height));
+
+                info.GetReturnValue().Set(jsSize);
+            }));
+
+            jsConverter->Set(isolate, "GetPixelFormat", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IWICBitmapSource* wicConverter = (IWICBitmapSource*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                GUID format{};
+                RetIfFailed(wicConverter->GetPixelFormat(&format), "GetPixelFormat failed LO!"); //bruh i don't even say LO! anymore i just put it around ironically now
+                Local<Value> elem[] = { Number::New(isolate, format.Data1), Number::New(isolate, format.Data2), Number::New(isolate, format.Data3), Number::New(isolate, format.Data4[0]), Number::New(isolate, format.Data4[1]), Number::New(isolate, format.Data4[2]), Number::New(isolate, format.Data4[3]), Number::New(isolate, format.Data4[4]), Number::New(isolate, format.Data4[5]), Number::New(isolate, format.Data4[6]), Number::New(isolate, format.Data4[7]) };
+                info.GetReturnValue().Set(Array::New(isolate, elem, 11));
+            }));
+
+            jsConverter->Set(isolate, "Resize", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                Local<Context> context = isolate->GetCurrentContext();
+                WICHelper* WICObj = (WICHelper*)IntegerFI(info[0].As<Object>()->GetRealNamedProperty(context, LITERAL("internalPtr")).ToLocalChecked());
+                IWICBitmapSource* wicConverter = (IWICBitmapSource*)info.This()->GetRealNamedProperty(context, LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(context).FromJust();
+                IWICBitmapScaler* pIScaler = NULL;
+
+                RetIfFailed(WICObj->wicFactory->CreateBitmapScaler(&pIScaler), "CreateBitmapScaler (ResizeBitmap)");
+                RetIfFailed(pIScaler->Initialize(
+                    wicConverter,                    // Bitmap source to scale.
+                    IntegerFI(info[1]),                         // Scale width to half of original.
+                    IntegerFI(info[2]),                        // Scale height to half of original.
+                    (WICBitmapInterpolationMode)IntegerFI(info[3])), "pIScaler Initialize");   // Use Fant mode interpolation.
+                wicConverter->Release();
+                info.This()->Set(context, LITERAL("internalPtr"), Number::New(isolate, (LONG_PTR)pIScaler)); //kinda crazy LO!
+            }));
+            //ok chatgpt said i should convert the objecttemplate to an object before setting an array?
+
+            //Local<Object> jsConverterObj = jsConverter->NewInstance(isolate->GetCurrentContext()).ToLocalChecked();
+            //Local<Value> elem[] = { Number::New(isolate, format.Data1), Number::New(isolate, format.Data2), Number::New(isolate, format.Data3), Number::New(isolate, format.Data4[0]), Number::New(isolate, format.Data4[1]), Number::New(isolate, format.Data4[2]), Number::New(isolate, format.Data4[3]), Number::New(isolate, format.Data4[4]), Number::New(isolate, format.Data4[5]), Number::New(isolate, format.Data4[6]), Number::New(isolate, format.Data4[7]) };
+            //jsConverterObj->Set(isolate->GetCurrentContext(), LITERAL("GUID"), Array::New(isolate, elem, 11)); //yeah ok v8 is just retarded bruh i can't do this (why tf did this work and why was the error so VAGEU)
+            //
+            //return jsConverterObj;
+            return jsConverter;
+        }
+
+        Local<ObjectTemplate> createIWICBitmapDecoderImpl(Isolate* isolate) {
+            Local<ObjectTemplate> jsDecoder = createIUnknownImpl(isolate);
+            jsDecoder->Set(isolate, "GetFrameCount", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                Local<Context> context = isolate->GetCurrentContext();
+                IWICBitmapDecoder* wicDecoder = (IWICBitmapDecoder*)info.This()->GetRealNamedProperty(context, LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                UINT pCount; wicDecoder->GetFrameCount(&pCount);
+
+                info.GetReturnValue().Set(pCount);
+            }));
+            jsDecoder->Set(isolate, "GetBitmapFrame", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                Local<Context> context = isolate->GetCurrentContext();
+                IWICBitmapDecoder* wicDecoder = (IWICBitmapDecoder*)info.This()->GetRealNamedProperty(context, LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                WICHelper* WICObj = (WICHelper*)info[0].As<Object>()->GetRealNamedProperty(context, LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                
+                IWICBitmapFrameDecode* wicFrame = NULL;
+                HRESULT err = wicDecoder->GetFrame(IntegerFI(info[1]), &wicFrame);
+                if (err != S_OK) {
+                    //MessageBoxA(NULL, "GetFirstFrameWiC", "yeah we failed the hoe (wicDecoder->GetFrame(0, &wicFrame))", MB_OK | MB_ICONERROR);
+                    ERRORMB(err, "yeah we failed the hoe (wicDecoder->GetFrame(frame, &wicFrame))");
+                    //wicDecoder->Release();
+                    return;// nullptr;
+                }
+
+                //Local<Array> id = info[2].As<Array>();
+                //GUID shit = { IntegerFI(id->Get(context, 0).ToLocalChecked()),
+                //    IntegerFI(id->Get(context, 1).ToLocalChecked()),
+                //    IntegerFI(id->Get(context, 2).ToLocalChecked()),
+                //    IntegerFI(id->Get(context, 3).ToLocalChecked()),
+                //    IntegerFI(id->Get(context, 4).ToLocalChecked()),
+                //    IntegerFI(id->Get(context, 5).ToLocalChecked()),
+                //    IntegerFI(id->Get(context, 6).ToLocalChecked()),
+                //    IntegerFI(id->Get(context, 7).ToLocalChecked()),
+                //    IntegerFI(id->Get(context, 8).ToLocalChecked()),
+                //    IntegerFI(id->Get(context, 9).ToLocalChecked()),
+                //    IntegerFI(id->Get(context, 10).ToLocalChecked()) };
+                GUID shit = jsImpl::fromJSGUID(isolate, info[2]);
+
+                IWICFormatConverter* wicConverter = WICObj->LoadBitmapFromFrame(wicDecoder, wicFrame, shit, false);
+                info.GetReturnValue().Set(DIRECT2D::getWICBitmapImpl(isolate, wicConverter, shit));//(Number::New(isolate, (LONG_PTR)wicConverter));
+            }));
+            jsDecoder->Set(isolate, "GetThumbnail", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                Local<Context> context = isolate->GetCurrentContext();
+                IWICBitmapDecoder* wicDecoder = (IWICBitmapDecoder*)info.This()->GetRealNamedProperty(context, LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                IWICBitmapSource* wicBitmap = nullptr;
+                GUID shit{};
+                RetIfFailed(wicDecoder->GetContainerFormat(&shit), "GetPixelFormat failed (GetThumbnail)");
+
+                RetIfFailed(wicDecoder->GetThumbnail(&wicBitmap), "GetThumbnail failed");
+
+                info.GetReturnValue().Set(DIRECT2D::getWICBitmapImpl(isolate, wicBitmap, shit));
+            }));
+            jsDecoder->Set(isolate, "GetPreview", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                Local<Context> context = isolate->GetCurrentContext();
+                IWICBitmapDecoder* wicDecoder = (IWICBitmapDecoder*)info.This()->GetRealNamedProperty(context, LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                IWICBitmapSource* wicBitmap = nullptr;
+                GUID shit{};
+                RetIfFailed(wicDecoder->GetContainerFormat(&shit), "GetPixelFormat failed (GetPreview)");
+
+                RetIfFailed(wicDecoder->GetPreview(&wicBitmap), "GetPreview failed");
+
+                info.GetReturnValue().Set(DIRECT2D::getWICBitmapImpl(isolate, wicBitmap, shit));
+            }));
+            jsDecoder->Set(isolate, "GetContainerFormat", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                Local<Context> context = isolate->GetCurrentContext();
+                IWICBitmapDecoder* wicDecoder = (IWICBitmapDecoder*)info.This()->GetRealNamedProperty(context, LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                GUID format{}; RetIfFailed(wicDecoder->GetContainerFormat(&format), "GetContainerFormat failed");
+
+                Local<Value> elem[] = { Number::New(isolate, format.Data1), Number::New(isolate, format.Data2), Number::New(isolate, format.Data3), Number::New(isolate, format.Data4[0]), Number::New(isolate, format.Data4[1]), Number::New(isolate, format.Data4[2]), Number::New(isolate, format.Data4[3]), Number::New(isolate, format.Data4[4]), Number::New(isolate, format.Data4[5]), Number::New(isolate, format.Data4[6]), Number::New(isolate, format.Data4[7]) };
+                info.GetReturnValue().Set(Array::New(isolate, elem, 11)); //yeah ok v8 is just retarded bruh i can't do this (why tf did this work and why was the error so VAGEU)
+
+            }));
+            //jsDecoder->Set(isolate, "GetFrame", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            //    Isolate* isolate = info.GetIsolate();
+            //    IWICBitmapDecoder* wicDecoder = (IWICBitmapDecoder*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            //    IWICBitmapFrameDecode* wicFrame = NULL;
+            //    HRESULT shit = wicDecoder->GetFrame(IntegerFI(info[0]), &wicFrame);
+            //
+            //    if (shit != S_OK) {
+            //        //MessageBoxA(NULL, "GetFirstFrameWiC", "yeah we failed the hoe (wicDecoder->GetFrame(0, &wicFrame))", MB_OK | MB_ICONERROR);
+            //        ERRORMB(shit, "yeah we failed the hoe (wicDecoder->GetFrame(frame, &wicFrame))");
+            //        //wicDecoder->Release();
+            //        return;// nullptr;
+            //    }
+            //
+            //    Local<ObjectTemplate> jsFrame = DIRECT2D::getIUnknownImpl(isolate, wicFrame);
+            //
+            //    jsFrame->Set(isolate, "CopyPixels", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            //        
+            //    }));
+            //
+            //    info.GetReturnValue().Set(jsFrame->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
+            //}));
+            return jsDecoder;
+        }
+
+        Local<ObjectTemplate> createDefaultBrushImpl(Isolate* isolate) {//, ID2D1Brush* newBrush, const char* type = "solid") {
+            Local<ObjectTemplate> jsBrush = createIUnknownImpl(isolate); //, newBrush);//ObjectTemplate::New(isolate);
+
+            //jsBrush->Set(isolate, "internalPtr", Number::New(isolate, (LONG_PTR)newBrush));
+
+            //jsBrush->Set(isolate, "brush", String::NewFromUtf8(isolate, type).ToLocalChecked());
+
+            jsBrush->Set(isolate, "SetOpacity", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1Brush* newBrush = (ID2D1Brush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                newBrush->SetOpacity(FloatFI(info[0]));
+            }));
+            jsBrush->Set(isolate, "GetOpacity", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1Brush* newBrush = (ID2D1Brush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                info.GetReturnValue().Set(newBrush->GetOpacity());
+            }));
+            jsBrush->Set(isolate, "GetTransform", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1Brush* newBrush = (ID2D1Brush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                D2D1::Matrix3x2F::D2D_MATRIX_3X2_F matrix;
+                newBrush->GetTransform(&matrix);
+                info.GetReturnValue().Set(DIRECT2D::getMatrix3x2FImpl(isolate, matrix));
+            }));
+            jsBrush->Set(isolate, "SetTransform", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1Brush* newBrush = (ID2D1Brush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                newBrush->SetTransform(DIRECT2D::fromJSMatrixF(isolate, info[0].As<Object>()));
+            }));
+
+            return jsBrush;
+        }
+
+        Local<ObjectTemplate> createID2D1SolidColorBrushImpl(Isolate* isolate) {
+            Local<ObjectTemplate> jsBrush = createDefaultBrushImpl(isolate);//ObjectTemplate::New(isolate);
+            //FUCKING GAME CHANGER
+            //jsBrush->Set(isolate, "internalPtr", Number::New(isolate, (LONG_PTR)newBrush));
+            jsBrush->Set(isolate, "SetColor", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1SolidColorBrush* newBrush = (ID2D1SolidColorBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                D2D1_COLOR_F color{};
+                if (info.Length() == 1) {
+                    color = D2D1::ColorF(IntegerFI(info[0]));
+                }
+                else {
+                    color = D2D1::ColorF(FloatFI(info[0]), FloatFI(info[1]), FloatFI(info[2]), info[3]->IsNumber() ? FloatFI(info[3]) : 1.0F);
+                }
+                newBrush->SetColor(color);
+            }));
+            jsBrush->Set(isolate, "GetColor", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1SolidColorBrush* newBrush = (ID2D1SolidColorBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                D2D1_COLOR_F color = newBrush->GetColor();
+
+                //double darr[4]{color.r,color.g,color.b,color.a};
+
+                Local<Object> jsColor = DIRECT2D::getColorFImpl(isolate, color);
+
+                info.GetReturnValue().Set(jsColor);//jsImpl::asNumberArray(isolate, darr, 4));
+            }));
+            //jsBrush->Set(isolate, "SetOpacity", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            //    Isolate* isolate = info.GetIsolate();
+            //    ID2D1SolidColorBrush* newBrush = (ID2D1SolidColorBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            //    
+            //    newBrush->SetOpacity(FloatFI(info[0]));
+            //}));
+            //jsBrush->Set(isolate, "GetOpacity", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            //    Isolate* isolate = info.GetIsolate();
+            //    ID2D1SolidColorBrush* newBrush = (ID2D1SolidColorBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            //    info.GetReturnValue().Set(newBrush->GetOpacity());
+            //}));
+            //jsBrush->Set(isolate, "Release", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            //    Isolate* isolate = info.GetIsolate();
+            //    ID2D1SolidColorBrush* newBrush = (ID2D1SolidColorBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            //    newBrush->Release();
+            //}));
+            return jsBrush;
+        }
+
+        Local<ObjectTemplate> createID2D1BitmapBrushImpl(Isolate* isolate) {
+            Local<ObjectTemplate> jsBrush = createDefaultBrushImpl(isolate);
+            //jsBrush->Set(isolate, "internalPtr", Number::New(isolate, (LONG_PTR)bmpBrush));
+            jsBrush->Set(isolate, "GetExtendModeX", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1BitmapBrush* bmpBrush = (ID2D1BitmapBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                //unsigned int extend = bmpBrush->GetExtendModeX();
+                info.GetReturnValue().Set(bmpBrush->GetExtendModeX());
+            }));
+            jsBrush->Set(isolate, "GetExtendModeY", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1BitmapBrush* bmpBrush = (ID2D1BitmapBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                //unsigned int extend = bmpBrush->GetExtendModeX();
+                info.GetReturnValue().Set(bmpBrush->GetExtendModeY());
+            }));
+            jsBrush->Set(isolate, "GetExtendMode", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1BitmapBrush* bmpBrush = (ID2D1BitmapBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                //unsigned int extend = bmpBrush->GetExtendModeX();
+                info.GetReturnValue().Set(DIRECT2D::getPoint2FImpl(isolate, D2D1::Point2F(bmpBrush->GetExtendModeX(), bmpBrush->GetExtendModeY())));
+            }));
+            jsBrush->Set(isolate, "GetInterpolationMode", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1BitmapBrush* bmpBrush = (ID2D1BitmapBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                info.GetReturnValue().Set(bmpBrush->GetInterpolationMode());
+            }));
+
+            jsBrush->Set(isolate, "SetExtendModeX", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1BitmapBrush* bmpBrush = (ID2D1BitmapBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                //unsigned int extend = bmpBrush->GetExtendModeX();
+                bmpBrush->SetExtendModeX((D2D1_EXTEND_MODE)IntegerFI(info[0]));
+            }));
+            jsBrush->Set(isolate, "SetExtendModeY", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1BitmapBrush* bmpBrush = (ID2D1BitmapBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                bmpBrush->SetExtendModeY((D2D1_EXTEND_MODE)IntegerFI(info[0]));
+            }));
+            jsBrush->Set(isolate, "SetExtendMode", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1BitmapBrush* bmpBrush = (ID2D1BitmapBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                bmpBrush->SetExtendModeX((D2D1_EXTEND_MODE)IntegerFI(info[0]));
+                bmpBrush->SetExtendModeY((D2D1_EXTEND_MODE)IntegerFI(info[0]));
+            }));
+            jsBrush->Set(isolate, "SetInterpolationMode", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1BitmapBrush* bmpBrush = (ID2D1BitmapBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                bmpBrush->SetInterpolationMode((D2D1_BITMAP_INTERPOLATION_MODE)IntegerFI(info[0]));
+            }));
+
+            jsBrush->Set(isolate, "SetBitmap", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1BitmapBrush* bmpBrush = (ID2D1BitmapBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                ID2D1Bitmap* bmp = (ID2D1Bitmap*)info[0].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                //print("bmpBrush->" << bmpBrush << " bmp->" << bmp);
+                bmpBrush->SetBitmap(bmp);
+            }));
+            jsBrush->Set(isolate, "GetBitmap", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1BitmapBrush* bmpBrush = (ID2D1BitmapBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                ID2D1Bitmap* bmp;
+                bmpBrush->GetBitmap(&bmp);
+
+                Local<Object> jsBitmap = DIRECT2D::getBitmapImpl(isolate, bmp);//DIRECT2D::getIUnknownImpl(isolate, bmp);//ObjectTemplate::New(isolate);
+
+                info.GetReturnValue().Set(jsBitmap);
+                //info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)bmp));
+            }));
+            //jsBrush->Set(isolate, "SetOpacity", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            //    Isolate* isolate = info.GetIsolate();
+            //    ID2D1BitmapBrush* bmpBrush = (ID2D1BitmapBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            //    bmpBrush->SetOpacity(FloatFI(info[0]));
+            //}));
+            //jsBrush->Set(isolate, "GetOpacity", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            //    Isolate* isolate = info.GetIsolate();
+            //    ID2D1BitmapBrush* bmpBrush = (ID2D1BitmapBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            //    info.GetReturnValue().Set(bmpBrush->GetOpacity());
+            //}));
+            //jsBrush->Set(isolate, "Release", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            //    Isolate* isolate = info.GetIsolate();
+            //    ID2D1BitmapBrush* bmpBrush = (ID2D1BitmapBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            //    bmpBrush->Release();
+            //}));
+            return jsBrush;
+        }
+
+        Local<ObjectTemplate> createID2D1LinearGradientBrushImpl(Isolate* isolate) {
+            Local<ObjectTemplate> jsBrush = createDefaultBrushImpl(isolate);//ObjectTemplate::New(isolate);
+            //jsBrush->Set(isolate, "internalPtr", Number::New(isolate, (LONG_PTR)newBrush));
+            //jsBrush->Set(isolate, "SetOpacity", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            //    Isolate* isolate = info.GetIsolate();
+            //    ID2D1LinearGradientBrush* newBrush = (ID2D1LinearGradientBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            //    
+            //    newBrush->SetOpacity(FloatFI(info[0]));
+            //}));
+            jsBrush->Set(isolate, "GetStartPoint", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1LinearGradientBrush* newBrush = (ID2D1LinearGradientBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                D2D1_POINT_2F sp = newBrush->GetStartPoint();
+            
+                info.GetReturnValue().Set(DIRECT2D::getPoint2FImpl(isolate, sp));
+            }));
+            jsBrush->Set(isolate, "GetEndPoint", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1LinearGradientBrush* newBrush = (ID2D1LinearGradientBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                
+                D2D1_POINT_2F ep = newBrush->GetEndPoint();
+
+                info.GetReturnValue().Set(DIRECT2D::getPoint2FImpl(isolate, ep));
+            }));
+
+            jsBrush->Set(isolate, "SetStartPoint", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1LinearGradientBrush* newBrush = (ID2D1LinearGradientBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                newBrush->SetStartPoint(D2D1::Point2F(FloatFI(info[0]), FloatFI(info[1])));
+            }));
+            jsBrush->Set(isolate, "SetEndPoint", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1LinearGradientBrush* newBrush = (ID2D1LinearGradientBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                
+                newBrush->SetEndPoint(D2D1::Point2F(FloatFI(info[0]), FloatFI(info[1])));
+            }));
+            jsBrush->Set(isolate, "SetPoints", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1LinearGradientBrush* newBrush = (ID2D1LinearGradientBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                
+                newBrush->SetStartPoint(D2D1::Point2F(FloatFI(info[0]), FloatFI(info[1])));
+                newBrush->SetEndPoint(D2D1::Point2F(FloatFI(info[2]), FloatFI(info[3])));
+            }));
+            //jsBrush->Set(isolate, "Release", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            //    Isolate* isolate = info.GetIsolate();
+            //    ID2D1LinearGradientBrush* newBrush = (ID2D1LinearGradientBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            //    newBrush->Release();
+            //}));
+            return jsBrush;
+        }
+
+        Local<ObjectTemplate> createID2D1RadialGradientBrushImpl(Isolate* isolate) {
+            Local<ObjectTemplate> jsBrush = createDefaultBrushImpl(isolate);
+
+            jsBrush->Set(isolate, "GetCenter", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1RadialGradientBrush* newBrush = (ID2D1RadialGradientBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                info.GetReturnValue().Set(DIRECT2D::getPoint2FImpl(isolate, newBrush->GetCenter()));
+            }));
+            jsBrush->Set(isolate, "GetGradientOriginOffset", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1RadialGradientBrush* newBrush = (ID2D1RadialGradientBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                info.GetReturnValue().Set(DIRECT2D::getPoint2FImpl(isolate, newBrush->GetGradientOriginOffset()));
+            }));
+            jsBrush->Set(isolate, "GetRadiusX", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1RadialGradientBrush* newBrush = (ID2D1RadialGradientBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                info.GetReturnValue().Set(newBrush->GetRadiusX());
+            }));
+            jsBrush->Set(isolate, "GetRadiusY", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1RadialGradientBrush* newBrush = (ID2D1RadialGradientBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                info.GetReturnValue().Set(newBrush->GetRadiusY());
+            }));
+            jsBrush->Set(isolate, "GetRadius", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1RadialGradientBrush* newBrush = (ID2D1RadialGradientBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                info.GetReturnValue().Set(DIRECT2D::getPoint2FImpl(isolate, D2D1::Point2F(newBrush->GetRadiusX(), newBrush->GetRadiusY())));
+            }));
+            
+            jsBrush->Set(isolate, "SetCenter", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1RadialGradientBrush* newBrush = (ID2D1RadialGradientBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                newBrush->SetCenter(D2D1::Point2F(FloatFI(info[0]), FloatFI(info[1])));
+            }));
+            jsBrush->Set(isolate, "SetGradientOriginOffset", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1RadialGradientBrush* newBrush = (ID2D1RadialGradientBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                newBrush->SetGradientOriginOffset(D2D1::Point2F(FloatFI(info[0]), FloatFI(info[1])));
+            }));
+            jsBrush->Set(isolate, "SetRadiusX", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1RadialGradientBrush* newBrush = (ID2D1RadialGradientBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                newBrush->SetRadiusX(FloatFI(info[0]));
+            }));
+            jsBrush->Set(isolate, "SetRadiusY", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1RadialGradientBrush* newBrush = (ID2D1RadialGradientBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                newBrush->SetRadiusY(FloatFI(info[0]));
+            }));
+            jsBrush->Set(isolate, "SetRadius", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1RadialGradientBrush* newBrush = (ID2D1RadialGradientBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                newBrush->SetRadiusX(FloatFI(info[0]));
+                newBrush->SetRadiusY(FloatFI(info[0]));
+            }));
+            return jsBrush;
+        }
+
+        Local<ObjectTemplate> createImageBrushImpl(Isolate* isolate) {
+            Local<ObjectTemplate> jsBrush = createDefaultBrushImpl(isolate);//ObjectTemplate::New(isolate);
+            //jsBrush->Set(isolate, "internalPtr", Number::New(isolate, (LONG_PTR)bmpBrush));
+            jsBrush->Set(isolate, "GetExtendModeX", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1ImageBrush* bmpBrush = (ID2D1ImageBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                
+                //unsigned int extend = bmpBrush->GetExtendModeX();
+                info.GetReturnValue().Set(bmpBrush->GetExtendModeX());
+            }));
+            jsBrush->Set(isolate, "GetExtendModeY", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1ImageBrush* bmpBrush = (ID2D1ImageBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                
+                //unsigned int extend = bmpBrush->GetExtendModeX();
+                info.GetReturnValue().Set(bmpBrush->GetExtendModeY());
+            }));
+            jsBrush->Set(isolate, "GetExtendMode", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1ImageBrush* bmpBrush = (ID2D1ImageBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                
+                //unsigned int extend = bmpBrush->GetExtendModeX();
+                info.GetReturnValue().Set(DIRECT2D::getPoint2FImpl(isolate, D2D1::Point2F(bmpBrush->GetExtendModeX(), bmpBrush->GetExtendModeY())));
+            }));
+            jsBrush->Set(isolate, "GetInterpolationMode", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1ImageBrush* bmpBrush = (ID2D1ImageBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                
+                info.GetReturnValue().Set(bmpBrush->GetInterpolationMode());
+            }));
+
+            jsBrush->Set(isolate, "SetExtendModeX", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1ImageBrush* bmpBrush = (ID2D1ImageBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                
+                //unsigned int extend = bmpBrush->GetExtendModeX();
+                bmpBrush->SetExtendModeX((D2D1_EXTEND_MODE)IntegerFI(info[0]));
+            }));
+            jsBrush->Set(isolate, "SetExtendModeY", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1ImageBrush* bmpBrush = (ID2D1ImageBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                
+                bmpBrush->SetExtendModeY((D2D1_EXTEND_MODE)IntegerFI(info[0]));
+            }));
+            jsBrush->Set(isolate, "SetExtendMode", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1ImageBrush* bmpBrush = (ID2D1ImageBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                
+                bmpBrush->SetExtendModeX((D2D1_EXTEND_MODE)IntegerFI(info[0]));
+                bmpBrush->SetExtendModeY((D2D1_EXTEND_MODE)IntegerFI(info[0]));
+            }));
+            jsBrush->Set(isolate, "SetInterpolationMode", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1ImageBrush* bmpBrush = (ID2D1ImageBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                
+                bmpBrush->SetInterpolationMode((D2D1_INTERPOLATION_MODE)IntegerFI(info[0]));
+            }));
+
+            jsBrush->Set(isolate, "SetImage", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1ImageBrush* bmpBrush = (ID2D1ImageBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                ID2D1Image* bmp = (ID2D1Image*)info[0].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                //print("bmpBrush->" << bmpBrush << " bmp->" << bmp);
+                bmpBrush->SetImage(bmp);
+            }));
+            jsBrush->Set(isolate, "GetImage", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1ImageBrush* bmpBrush = (ID2D1ImageBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                ID2D1Image* bmp;
+                bmpBrush->GetImage(&bmp);
+
+                Local<Object> jsBitmap = DIRECT2D::getBitmapImpl(isolate, bmp);//DIRECT2D::getIUnknownImpl(isolate, bmp);//ObjectTemplate::New(isolate);
+
+                info.GetReturnValue().Set(jsBitmap);
+                //info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)bmp));
+            }));
+            //jsBrush->Set(isolate, "SetOpacity", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            //    Isolate* isolate = info.GetIsolate();
+            //    ID2D1ImageBrush* bmpBrush = (ID2D1ImageBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            //    bmpBrush->SetOpacity(FloatFI(info[0]));
+            //}));
+            //jsBrush->Set(isolate, "GetOpacity", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            //    Isolate* isolate = info.GetIsolate();
+            //    ID2D1ImageBrush* bmpBrush = (ID2D1ImageBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            //    info.GetReturnValue().Set(bmpBrush->GetOpacity());
+            //}));
+            //jsBrush->Set(isolate, "Release", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            //    Isolate* isolate = info.GetIsolate();
+            //    ID2D1ImageBrush* bmpBrush = (ID2D1ImageBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            //    bmpBrush->Release();
+            //}));
+            return jsBrush;
+        }
+
+        Local<ObjectTemplate> createBitmapImpl(Isolate* isolate) {//, ID2D1Image* bmp) {
+            Local<ObjectTemplate> jsBitmap = createIUnknownImpl(isolate);
+
+            jsBitmap->Set(isolate, "GetDpi", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1Bitmap* bmp = (ID2D1Bitmap*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                float x, y;
+
+                bmp->GetDpi(&x, &y);
+
+                //Local<Array> jsArray = Array::New(isolate, 2);
+                //jsArray->Set(isolate->GetCurrentContext(), 0, Number::New(isolate,x));
+                //jsArray->Set(isolate->GetCurrentContext(), 1, Number::New(isolate,y));
+
+                info.GetReturnValue().Set(DIRECT2D::getPoint2FImpl(isolate, D2D1::Point2F(x, y)));//jsArray);
+            }));
+
+            jsBitmap->Set(isolate, "GetPixelFormat", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1Bitmap* bmp = (ID2D1Bitmap*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                D2D1_PIXEL_FORMAT pf = bmp->GetPixelFormat();
+
+
+                Local<Object> jsPixelFormat = Object::New(isolate);
+                jsPixelFormat->Set(isolate->GetCurrentContext(), LITERAL("format"), Number::New(isolate, pf.format));
+                jsPixelFormat->Set(isolate->GetCurrentContext(), LITERAL("alphaMode"), Number::New(isolate, pf.alphaMode));
+
+                info.GetReturnValue().Set(jsPixelFormat);
+            }));
+
+            jsBitmap->Set(isolate, "GetPixelSize", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1Bitmap* bmp = (ID2D1Bitmap*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                D2D1_SIZE_U size = bmp->GetPixelSize();
+
+                Local<Object> jsPixelSize = Object::New(isolate);
+                jsPixelSize->Set(isolate->GetCurrentContext(), LITERAL("width"), Number::New(isolate, size.width));
+                jsPixelSize->Set(isolate->GetCurrentContext(), LITERAL("height"), Number::New(isolate, size.height));
+
+                info.GetReturnValue().Set(jsPixelSize);
+            }));
+            //jsBitmap->Set(isolate, "internalPtr", Number::New(isolate, (LONG_PTR)bmp));
+            jsBitmap->Set(isolate, "GetSize", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1Bitmap* bmp = (ID2D1Bitmap*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                D2D1_SIZE_F bmpSize = bmp->GetSize();
+
+                Local<Object> sizeF = Object::New(isolate);
+                sizeF->Set(isolate->GetCurrentContext(), LITERAL("width"), Number::New(isolate, bmpSize.width));
+                sizeF->Set(isolate->GetCurrentContext(), LITERAL("height"), Number::New(isolate, bmpSize.height));
+                info.GetReturnValue().Set(sizeF);
+            }));
+            jsBitmap->Set(isolate, "CopyFromBitmap", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1Bitmap* bmp = (ID2D1Bitmap*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                D2D1_POINT_2U point = D2D1::Point2U(IntegerFI(info[0]), IntegerFI(info[1]));
+                D2D1_RECT_U rect = D2D1::RectU(IntegerFI(info[3]), IntegerFI(info[4]), IntegerFI(info[5]), IntegerFI(info[6]));
+
+                ID2D1Bitmap* copyFrom = (ID2D1Bitmap*)(IntegerFI(info[2].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()));
+
+                //print(bmp << " " << point.x << "<-x  y->" << point.y << " left->" << rect.left << " top->" << rect.top << " right->" << rect.right << " bottom->" << rect.bottom << " " << copyFrom);
+
+                //https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-erref/705fb797-2175-4a90-b5a3-3918024b10b8?redirectedfrom=MSDN
+                //getting -2147024809
+                //FFFF FFFF 8007 0057
+                //0x80070057 -> E_INVALIDARG
+                //it did NOT need all that effort to get the code
+                //ok i just found the solution
+            //https://stackoverflow.com/questions/22493524/decode-hresult-2147467259
+            https://stackoverflow.com/questions/7008047/is-there-a-way-to-get-the-string-representation-of-hresult-value-using-win-api
+                //IT THINKS MY UNCOMMENTED LINKS ARE LABELS FOR GOTO!
+                //info.GetReturnValue().Set(Number::New(isolate, bmp->CopyFromBitmap(&point, /*(ID2D1Bitmap*)IntegerFI(info[2])*/copyFrom, &rect)));
+                RetIfFailed(bmp->CopyFromBitmap(&point, copyFrom, &rect), "CopyFromBitmap failed!");
+            }));
+            jsBitmap->Set(isolate, "CopyFromRenderTarget", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1Bitmap* bmp = (ID2D1Bitmap*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                D2D1_POINT_2U point = D2D1::Point2U(IntegerFI(info[0]), IntegerFI(info[1]));
+                D2D1_RECT_U rect = D2D1::RectU(IntegerFI(info[3]), IntegerFI(info[4]), IntegerFI(info[5]), IntegerFI(info[6]));
+
+                ID2D1RenderTarget* rt = (ID2D1RenderTarget*)IntegerFI(info[2]);//info[2].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                RetIfFailed(bmp->CopyFromRenderTarget(&point, rt, &rect), "CopyFromRenderTarget failed!~");
+            }));
+            jsBitmap->Set(isolate, "CopyFromMemory", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) { //oops i made this because i wanted to convert HICON to ID2D1Bitmap BUT wic can already basically do that with CreateBitmapFromHICON
+                Isolate* isolate = info.GetIsolate();
+                ID2D1Bitmap* bmp = (ID2D1Bitmap*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                //D2D1_POINT_2U point = D2D1::Point2U(IntegerFI(info[0]), IntegerFI(info[1]));
+                D2D1_RECT_U rect = D2D1::RectU(IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]));
+
+                DWORD* data = nullptr;//new DWORD[jsBits->Length()];
+                Local<Uint32Array> jsBits = info[4].As<Uint32Array>();
+                data = new DWORD[jsBits->Length()]; //genius code stolen from my StretchDIBits func
+                jsBits->CopyContents(data, jsBits->ByteLength()); //hell yeah (i was using jsBits->Length() instead of ByteLength)
+
+
+                RetIfFailed(bmp->CopyFromMemory(&rect, data, sizeof(DWORD) * (rect.right - rect.left)), "CopyFromMemory failed!");
+            }));
+            jsBitmap->Set(isolate, "Map", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) { //oops i made this because i wanted to convert HICON to ID2D1Bitmap BUT wic can already basically do that with CreateBitmapFromHICON
+                Isolate* isolate = info.GetIsolate();
+                ID2D1Bitmap* bmp = (ID2D1Bitmap*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                ID2D1Bitmap1* gooder; RetIfFailed(bmp->QueryInterface(&gooder), "i don't REALLY know how QueryInterface works so im assuming it failed because this bitmap wasn't already a ID2D1Bitmap1");
+
+                D2D1_MAPPED_RECT mapped;
+
+                RetIfFailed(gooder->Map((D2D1_MAP_OPTIONS)IntegerFI(info[0]), &mapped), "ID2D1Bitmap1 Map failed (probably because you used something other than D2D1_MAP_OPTIONS_READ but don't worry you can still write to it with only D2D1_MAP_OPTIONS_READ (i think, check DIBitsToD2D.js))");
+
+                Local<Context> context = isolate->GetCurrentContext();
+                Local<Object> jsMapped = jsImpl::JSD2D1MappedRect->NewInstance(context).ToLocalChecked();//Object::New(isolate);
+                jsMapped->Set(context, LITERAL("pitch"), Number::New(isolate, mapped.pitch));
+                jsMapped->Set(context, LITERAL("_bits"), Number::New(isolate, (LONG_PTR)mapped.bits)); //i feel like i've done this before but i passed &mapped.bits instead of mapped.bits directly (it's those DAMN pointers)
+                jsMapped->Set(context, LITERAL("internalBmpPtr"), info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+
+                gooder->Release();
+                //D2D1_SIZE_U size = gooder->GetPixelSize();
+                //print("w " << size.width << " h " << size.height);
+                //D2D1_SIZE_F size2 = gooder->GetSize();
+                //print("w " << size2.width << " h " << size2.height);
+
+                info.GetReturnValue().Set(jsMapped);
+            }));
+            jsBitmap->Set(isolate, "Unmap", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) { //oops i made this because i wanted to convert HICON to ID2D1Bitmap BUT wic can already basically do that with CreateBitmapFromHICON
+                Isolate* isolate = info.GetIsolate();
+                ID2D1Bitmap* bmp = (ID2D1Bitmap*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                ID2D1Bitmap1* gooder; RetIfFailed(bmp->QueryInterface(&gooder), "i don't REALLY know how QueryInterface works so im assuming it failed because this bitmap wasn't already a ID2D1Bitmap1");
+
+                RetIfFailed(gooder->Unmap(), "Unmap failed for some reason but maybe because the bitmap wasn't already mapped idk");
+                gooder->Release();
+            }));
+            //jsBitmap->Set(isolate, "Release", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            //    Isolate* isolate = info.GetIsolate();
+            //    ID2D1Bitmap* bmp = (ID2D1Bitmap*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            //    bmp->Release();
+            //}));
+
+            return jsBitmap;
+        }
+
+        Local<ObjectTemplate> createCompositionEffectImpl(Isolate* isolate) {
+            Local<ObjectTemplate> jsDCompEffect = createIUnknownImpl(isolate);
+            jsDCompEffect->Set(isolate, "SetInput", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDCompositionFilterEffect* effect = (IDCompositionFilterEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                RetIfFailed(effect->SetInput(IntegerFI(info[0]), (IUnknown*)IntegerFI(info[1].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()), IntegerFI(info[2])), "IDCompositionFIlterEffect* -> SetInput failed");
+            }));
+            return jsDCompEffect;
+        }
+
+        Local<ObjectTemplate> createIDCompositionGaussianBlurEffectImpl(Isolate* isolate) {
+            Local<ObjectTemplate> jsDCompEffect = createCompositionEffectImpl(isolate);
+            jsDCompEffect->Set(isolate, "SetStandardDeviation", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDCompositionGaussianBlurEffect* effect = (IDCompositionGaussianBlurEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                RetIfFailed(effect->SetStandardDeviation(FloatFI(info[0])), "SetStandardDeviation failed (IDCompositionGaussianBlurEffect)");
+            }));
+            jsDCompEffect->Set(isolate, "SetBorderMode", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDCompositionGaussianBlurEffect* effect = (IDCompositionGaussianBlurEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                RetIfFailed(effect->SetBorderMode((D2D1_BORDER_MODE)IntegerFI(info[0])), "SetBorderMode failed (IDCompositionGaussianBlurEffect)");
+            }));
+            return jsDCompEffect;
+        }
+
+        Local<ObjectTemplate> createIDCompositionBrightnessEffectImpl(Isolate* isolate) {
+            Local<ObjectTemplate> jsDCompEffect = createCompositionEffectImpl(isolate);
+            jsDCompEffect->Set(isolate, "SetWhitePoint", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDCompositionBrightnessEffect* effect = (IDCompositionBrightnessEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                RetIfFailed(effect->SetWhitePoint(D2D1_VECTOR_2F{(FLOAT)FloatFI(info[0]), (FLOAT)FloatFI(info[1])}), "SetWhitePoint failed (IDCompositionBrightnessEffect)");
+            }));
+            jsDCompEffect->Set(isolate, "SetBlackPoint", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDCompositionBrightnessEffect* effect = (IDCompositionBrightnessEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                RetIfFailed(effect->SetBlackPoint(D2D1_VECTOR_2F{(FLOAT)FloatFI(info[0]), (FLOAT)FloatFI(info[1])}), "SetBlackPoint failed (IDCompositionBrightnessEffect)");
+            }));
+            return jsDCompEffect;
+        }
+
+        Local<ObjectTemplate> createIDCompositionColorMatrixEffectImpl(Isolate* isolate) {
+            Local<ObjectTemplate> jsDCompEffect = createCompositionEffectImpl(isolate);
+            jsDCompEffect->Set(isolate, "SetMatrix", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDCompositionColorMatrixEffect* effect = (IDCompositionColorMatrixEffect*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+                RetIfFailed(effect->SetMatrix(DIRECT2D::fromJSMatrix5x4(isolate, info[0].As<Object>())), "SetMatrix failed (IDCompositionColorMatrixEffect)");
+            }));
+            jsDCompEffect->Set(isolate, "SetMatrixElement", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDCompositionColorMatrixEffect* effect = (IDCompositionColorMatrixEffect*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+                RetIfFailed(effect->SetMatrixElement(IntegerFI(info[0]), IntegerFI(info[1]), FloatFI(info[2])), "SetMatrixElement failed (IDCompositionColorMatrixEffect)");
+            }));
+            jsDCompEffect->Set(isolate, "SetAlphaMode", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDCompositionColorMatrixEffect* effect = (IDCompositionColorMatrixEffect*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+                RetIfFailed(effect->SetAlphaMode((D2D1_COLORMATRIX_ALPHA_MODE)IntegerFI(info[0])), "SetAlphaMode failed (IDCompositionColorMatrixEffect)");
+            }));
+            jsDCompEffect->Set(isolate, "SetClampOutput", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDCompositionColorMatrixEffect* effect = (IDCompositionColorMatrixEffect*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+                RetIfFailed(effect->SetClampOutput(IntegerFI(info[0])), "SetClampOutput failed (IDCompositionColorMatrixEffect)");
+            }));
+            return jsDCompEffect;
+        }
+
+        Local<ObjectTemplate> createIDCompositionShadowEffectImpl(Isolate* isolate) {
+            Local<ObjectTemplate> jsDCompEffect = createCompositionEffectImpl(isolate);
+            jsDCompEffect->Set(isolate, "SetStandardDeviation", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDCompositionShadowEffect* effect = (IDCompositionShadowEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                RetIfFailed(effect->SetStandardDeviation(FloatFI(info[0])), "SetStandardDeviation failed (IDCompositionShadowEffect)");
+            }));
+            jsDCompEffect->Set(isolate, "SetColor", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDCompositionShadowEffect* effect = (IDCompositionShadowEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                RetIfFailed(effect->SetColor(D2D1_VECTOR_4F{ (FLOAT)FloatFI(info[0]) , (FLOAT)FloatFI(info[1]) , (FLOAT)FloatFI(info[2]) , (FLOAT)FloatFI(info[3]) }), "SetColor failed (IDCompositionShadowEffect)");
+            }));
+            return jsDCompEffect;
+        }
+
+        Local<ObjectTemplate> createIDCompositionHueRotationEffectImpl(Isolate* isolate) {
+            Local<ObjectTemplate> jsDCompEffect = createCompositionEffectImpl(isolate);
+            jsDCompEffect->Set(isolate, "SetAngle", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDCompositionHueRotationEffect* effect = (IDCompositionHueRotationEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                RetIfFailed(effect->SetAngle(FloatFI(info[0])), "SetAngle failed (IDCompositionHueRotationEffect)");
+            }));
+            return jsDCompEffect;
+        }
+
+        Local<ObjectTemplate> createIDCompositionSaturationEffectImpl(Isolate* isolate) {
+            Local<ObjectTemplate> jsDCompEffect = createCompositionEffectImpl(isolate);
+            jsDCompEffect->Set(isolate, "SetSaturation", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDCompositionSaturationEffect* effect = (IDCompositionSaturationEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                RetIfFailed(effect->SetSaturation(FloatFI(info[0])), "SetSaturation failed (IDCompositionSaturationEffect)");
+            }));
+            return jsDCompEffect;
+        }
+
+        Local<ObjectTemplate> createIDCompositionTurbulenceEffectImpl(Isolate* isolate) {
+            Local<ObjectTemplate> jsDCompEffect = createCompositionEffectImpl(isolate);
+            jsDCompEffect->Set(isolate, "SetOffset", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDCompositionTurbulenceEffect* effect = (IDCompositionTurbulenceEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                RetIfFailed(effect->SetOffset(D2D1_VECTOR_2F{ (FLOAT)FloatFI(info[0]), (FLOAT)FloatFI(info[1]) }), "SetOffset failed (IDCompositionTurbulenceEffect)");
+            }));
+            jsDCompEffect->Set(isolate, "SetBaseFrequency", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDCompositionTurbulenceEffect* effect = (IDCompositionTurbulenceEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                RetIfFailed(effect->SetBaseFrequency(D2D1_VECTOR_2F{ (FLOAT)FloatFI(info[0]), (FLOAT)FloatFI(info[1]) }), "SetBaseFrequency failed (IDCompositionTurbulenceEffect)");
+            }));
+            jsDCompEffect->Set(isolate, "SetSize", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDCompositionTurbulenceEffect* effect = (IDCompositionTurbulenceEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                RetIfFailed(effect->SetSize(D2D1_VECTOR_2F{ (FLOAT)FloatFI(info[0]), (FLOAT)FloatFI(info[1]) }), "SetSize failed (IDCompositionTurbulenceEffect)");
+            }));
+            jsDCompEffect->Set(isolate, "SetNumOctaves", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDCompositionTurbulenceEffect* effect = (IDCompositionTurbulenceEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                RetIfFailed(effect->SetNumOctaves(IntegerFI(info[0])), "SetNumOctaves failed (IDCompositionTurbulenceEffect)");
+            }));
+            jsDCompEffect->Set(isolate, "SetSeed", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDCompositionTurbulenceEffect* effect = (IDCompositionTurbulenceEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                RetIfFailed(effect->SetSeed(IntegerFI(info[0])), "SetSeed failed (IDCompositionTurbulenceEffect)");
+            }));
+            jsDCompEffect->Set(isolate, "SetNoise", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDCompositionTurbulenceEffect* effect = (IDCompositionTurbulenceEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                RetIfFailed(effect->SetNoise((D2D1_TURBULENCE_NOISE)IntegerFI(info[0])), "SetNoise failed (IDCompositionTurbulenceEffect)");
+            }));
+            jsDCompEffect->Set(isolate, "SetStitchable", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDCompositionTurbulenceEffect* effect = (IDCompositionTurbulenceEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                RetIfFailed(effect->SetStitchable(IntegerFI(info[0])), "SetStitchable failed (IDCompositionTurbulenceEffect)");
+            }));
+            return jsDCompEffect;
+        }
+
+        Local<ObjectTemplate> createIDCompositionLinearTransferEffectImpl(Isolate* isolate) {
+            Local<ObjectTemplate> jsDCompEffect = createCompositionEffectImpl(isolate);
+            jsDCompEffect->Set(isolate, "SetRedYIntercept", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDCompositionLinearTransferEffect* effect = (IDCompositionLinearTransferEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                RetIfFailed(effect->SetRedYIntercept(FloatFI(info[0])), "SetRedYIntercept failed (IDCompositionLinearTransferEffect)");
+            }));
+            jsDCompEffect->Set(isolate, "SetRedSlope", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDCompositionLinearTransferEffect* effect = (IDCompositionLinearTransferEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                RetIfFailed(effect->SetRedSlope(FloatFI(info[0])), "SetRedSlope failed (IDCompositionLinearTransferEffect)");
+            }));
+            jsDCompEffect->Set(isolate, "SetRedDisable", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDCompositionLinearTransferEffect* effect = (IDCompositionLinearTransferEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                RetIfFailed(effect->SetRedDisable(IntegerFI(info[0])), "SetRedDisable failed (IDCompositionLinearTransferEffect)");
+            }));
+            jsDCompEffect->Set(isolate, "SetGreenYIntercept", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDCompositionLinearTransferEffect* effect = (IDCompositionLinearTransferEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                RetIfFailed(effect->SetGreenYIntercept(FloatFI(info[0])), "SetGreenYIntercept failed (IDCompositionLinearTransferEffect)");
+            }));
+            jsDCompEffect->Set(isolate, "SetGreenSlope", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDCompositionLinearTransferEffect* effect = (IDCompositionLinearTransferEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                RetIfFailed(effect->SetGreenSlope(FloatFI(info[0])), "SetGreenSlope failed (IDCompositionLinearTransferEffect)");
+            }));
+            jsDCompEffect->Set(isolate, "SetGreenDisable", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDCompositionLinearTransferEffect* effect = (IDCompositionLinearTransferEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                RetIfFailed(effect->SetGreenDisable(IntegerFI(info[0])), "SetGreenDisable failed (IDCompositionLinearTransferEffect)");
+            }));
+            jsDCompEffect->Set(isolate, "SetBlueYIntercept", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDCompositionLinearTransferEffect* effect = (IDCompositionLinearTransferEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                RetIfFailed(effect->SetBlueYIntercept(FloatFI(info[0])), "SetBlueYIntercept failed (IDCompositionLinearTransferEffect)");
+            }));
+            jsDCompEffect->Set(isolate, "SetBlueSlope", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDCompositionLinearTransferEffect* effect = (IDCompositionLinearTransferEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                RetIfFailed(effect->SetBlueSlope(FloatFI(info[0])), "SetBlueSlope failed (IDCompositionLinearTransferEffect)");
+            }));
+            jsDCompEffect->Set(isolate, "SetBlueDisable", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDCompositionLinearTransferEffect* effect = (IDCompositionLinearTransferEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                RetIfFailed(effect->SetBlueDisable(IntegerFI(info[0])), "SetBlueDisable failed (IDCompositionLinearTransferEffect)");
+            }));
+            jsDCompEffect->Set(isolate, "SetAlphaYIntercept", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDCompositionLinearTransferEffect* effect = (IDCompositionLinearTransferEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                RetIfFailed(effect->SetAlphaYIntercept(FloatFI(info[0])), "SetAlphaYIntercept failed (IDCompositionLinearTransferEffect)");
+            }));
+            jsDCompEffect->Set(isolate, "SetAlphaSlope", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDCompositionLinearTransferEffect* effect = (IDCompositionLinearTransferEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                RetIfFailed(effect->SetAlphaSlope(FloatFI(info[0])), "SetAlphaSlope failed (IDCompositionLinearTransferEffect)");
+            }));
+            jsDCompEffect->Set(isolate, "SetAlphaDisable", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDCompositionLinearTransferEffect* effect = (IDCompositionLinearTransferEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                RetIfFailed(effect->SetAlphaDisable(IntegerFI(info[0])), "SetAlphaDisable failed (IDCompositionLinearTransferEffect)");
+            }));
+            jsDCompEffect->Set(isolate, "SetClampOutput", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDCompositionLinearTransferEffect* effect = (IDCompositionLinearTransferEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                RetIfFailed(effect->SetClampOutput(IntegerFI(info[0])), "SetClampOutput failed (IDCompositionLinearTransferEffect)");
+            }));
+            return jsDCompEffect;
+        }
+
+        Local<ObjectTemplate> createIDCompositionTableTransferEffectImpl(Isolate* isolate) {
+            Local<ObjectTemplate> jsDCompEffect = createCompositionEffectImpl(isolate);
+            jsDCompEffect->Set(isolate, "SetRedDisable", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDCompositionTableTransferEffect* effect = (IDCompositionTableTransferEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                RetIfFailed(effect->SetRedDisable(IntegerFI(info[0])), "SetRedDisable failed (IDCompositionTableTransferEffect)");
+            }));
+            jsDCompEffect->Set(isolate, "SetGreenDisable", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDCompositionTableTransferEffect* effect = (IDCompositionTableTransferEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                RetIfFailed(effect->SetGreenDisable(IntegerFI(info[0])), "SetGreenDisable failed (IDCompositionTableTransferEffect)");
+            }));
+            jsDCompEffect->Set(isolate, "SetBlueDisable", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDCompositionTableTransferEffect* effect = (IDCompositionTableTransferEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                RetIfFailed(effect->SetBlueDisable(IntegerFI(info[0])), "SetBlueDisable failed (IDCompositionTableTransferEffect)");
+            }));
+            jsDCompEffect->Set(isolate, "SetAlphaDisable", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDCompositionTableTransferEffect* effect = (IDCompositionTableTransferEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                RetIfFailed(effect->SetAlphaDisable(IntegerFI(info[0])), "SetAlphaDisable failed (IDCompositionTableTransferEffect)");
+            }));
+            jsDCompEffect->Set(isolate, "SetClampOutput", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDCompositionTableTransferEffect* effect = (IDCompositionTableTransferEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                RetIfFailed(effect->SetClampOutput(IntegerFI(info[0])), "SetClampOutput failed (IDCompositionTableTransferEffect)");
+            }));
+            return jsDCompEffect;
+        }
+
+        Local<ObjectTemplate> createIDCompositionCompositeEffectImpl(Isolate* isolate) {
+            Local<ObjectTemplate> jsDCompEffect = createCompositionEffectImpl(isolate);
+            jsDCompEffect->Set(isolate, "SetMode", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDCompositionCompositeEffect* effect = (IDCompositionCompositeEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                RetIfFailed(effect->SetMode((D2D1_COMPOSITE_MODE)IntegerFI(info[0])), "SetMode failed (IDCompositionCompositeEffect)");
+            }));
+            return jsDCompEffect;
+        }
+
+        Local<ObjectTemplate> createIDCompositionBlendEffectImpl(Isolate* isolate) {
+            Local<ObjectTemplate> jsDCompEffect = createCompositionEffectImpl(isolate);
+            jsDCompEffect->Set(isolate, "SetMode", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDCompositionBlendEffect* effect = (IDCompositionBlendEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                RetIfFailed(effect->SetMode((D2D1_BLEND_MODE)IntegerFI(info[0])), "SetMode failed (IDCompositionBlendEffect)");
+            }));
+            return jsDCompEffect;
+        }
+
+        Local<ObjectTemplate> createIDCompositionArithmeticCompositeEffectImpl(Isolate* isolate) {
+            Local<ObjectTemplate> jsDCompEffect = createCompositionEffectImpl(isolate);
+            jsDCompEffect->Set(isolate, "SetCoefficients", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDCompositionArithmeticCompositeEffect* effect = (IDCompositionArithmeticCompositeEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                RetIfFailed(effect->SetCoefficients(D2D1_VECTOR_4F{ (FLOAT)FloatFI(info[0]) , (FLOAT)FloatFI(info[1]) , (FLOAT)FloatFI(info[2]) , (FLOAT)FloatFI(info[3]) }), "SetCoefficients failed (IDCompositionArithmeticCompositeEffect)");
+            }));
+            jsDCompEffect->Set(isolate, "SetClampOutput", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDCompositionArithmeticCompositeEffect* effect = (IDCompositionArithmeticCompositeEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                RetIfFailed(effect->SetClampOutput(IntegerFI(info[0])), "SetClampOutput failed (IDCompositionArithmeticCompositeEffect)");
+            }));
+            return jsDCompEffect;
+        }
+
+        Local<ObjectTemplate> createIDCompositionAffineTransform2DEffectImpl(Isolate* isolate) {
+            Local<ObjectTemplate> jsDCompEffect = createCompositionEffectImpl(isolate);
+            jsDCompEffect->Set(isolate, "SetInterpolationMode", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDCompositionAffineTransform2DEffect* effect = (IDCompositionAffineTransform2DEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                RetIfFailed(effect->SetInterpolationMode((D2D1_2DAFFINETRANSFORM_INTERPOLATION_MODE)IntegerFI(info[0])), "SetInterpolationMode failed (IDCompositionAffineTransform2DEffect)");
+            }));
+            jsDCompEffect->Set(isolate, "SetBorderMode", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDCompositionAffineTransform2DEffect* effect = (IDCompositionAffineTransform2DEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                RetIfFailed(effect->SetBorderMode((D2D1_BORDER_MODE)IntegerFI(info[0])), "SetBorderMode failed (IDCompositionAffineTransform2DEffect)");
+            }));
+            jsDCompEffect->Set(isolate, "SetTransformMatrix", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDCompositionAffineTransform2DEffect* effect = (IDCompositionAffineTransform2DEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            
+                D2D1::Matrix3x2F matrix = DIRECT2D::fromJSMatrix3x2(isolate, info[0].As<Object>());
+                RetIfFailed(effect->SetTransformMatrix(matrix), "SetTransformMatrix failed (IDCompositionAffineTransform2DEffect)");
+            }));
+            jsDCompEffect->Set(isolate, "SetTransformMatrixElement", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDCompositionAffineTransform2DEffect* effect = (IDCompositionAffineTransform2DEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            
+                RetIfFailed(effect->SetTransformMatrixElement(IntegerFI(info[0]), IntegerFI(info[1]), FloatFI(info[2])), "SetTransformMatrixElement failed (IDCompositionAffineTransform2DEffect)");
+            }));
+            jsDCompEffect->Set(isolate, "SetSharpness", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDCompositionAffineTransform2DEffect* effect = (IDCompositionAffineTransform2DEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                RetIfFailed(effect->SetSharpness(FloatFI(info[0])), "SetSharpness failed (IDCompositionAffineTransform2DEffect)");
+            }));
+            return jsDCompEffect;
+        }
+
+        Local<ObjectTemplate> createStrokeStyleImpl(Isolate* isolate) {//, ID2D1StrokeStyle1* strokingStyle) {
+            Local<ObjectTemplate> jsSS = createIUnknownImpl(isolate);
+            jsSS->Set(isolate, "GetStrokeTransformType", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1StrokeStyle1* strokingStyle = (ID2D1StrokeStyle1*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+                info.GetReturnValue().Set(Number::New(isolate, strokingStyle->GetStrokeTransformType()));
+            }));
+            jsSS->Set(isolate, "GetEndCap", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1StrokeStyle1* strokingStyle = (ID2D1StrokeStyle1*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+                info.GetReturnValue().Set(Number::New(isolate, strokingStyle->GetEndCap()));
+            }));
+            jsSS->Set(isolate, "GetDashCap", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1StrokeStyle1* strokingStyle = (ID2D1StrokeStyle1*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+                info.GetReturnValue().Set(Number::New(isolate, strokingStyle->GetDashCap()));
+            }));
+            jsSS->Set(isolate, "GetMiterLimit", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1StrokeStyle1* strokingStyle = (ID2D1StrokeStyle1*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+                info.GetReturnValue().Set(Number::New(isolate, strokingStyle->GetMiterLimit()));
+            }));
+            jsSS->Set(isolate, "GetLineJoin", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1StrokeStyle1* strokingStyle = (ID2D1StrokeStyle1*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+                info.GetReturnValue().Set(Number::New(isolate, strokingStyle->GetLineJoin()));
+            }));
+            jsSS->Set(isolate, "GetDashOffset", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1StrokeStyle1* strokingStyle = (ID2D1StrokeStyle1*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+                info.GetReturnValue().Set(Number::New(isolate, strokingStyle->GetDashOffset()));
+            }));
+            jsSS->Set(isolate, "GetDashStyle", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1StrokeStyle1* strokingStyle = (ID2D1StrokeStyle1*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+                info.GetReturnValue().Set(Number::New(isolate, strokingStyle->GetDashStyle()));
+            }));
+            jsSS->Set(isolate, "GetDashesCount", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1StrokeStyle1* strokingStyle = (ID2D1StrokeStyle1*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+                info.GetReturnValue().Set(Number::New(isolate, strokingStyle->GetDashesCount()));
+            }));
+            jsSS->Set(isolate, "GetDashes", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                Local<Context> context = isolate->GetCurrentContext();
+                ID2D1StrokeStyle1* strokingStyle = (ID2D1StrokeStyle1*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+                UINT32 count = strokingStyle->GetDashesCount();
+                std::vector<float> dash(count, 0.0); //oh yeah i don't have to use new float[count]
+                strokingStyle->GetDashes(dash.data(), count);
+                Local<Array> jsDashes = Array::New(isolate);
+                for (int i = 0; i < count; i++) {
+                    jsDashes->Set(context, i, Number::New(isolate, dash[i]));
+                }
+                info.GetReturnValue().Set(jsDashes);
+            }));
+
+            return jsSS;//->NewInstance(isolate->GetCurrentContext()).ToLocalChecked();
+        }
+
+        Local<ObjectTemplate> createGeometryImpl(Isolate* isolate) {
+            Local<ObjectTemplate> jsG = createIUnknownImpl(isolate);
+            jsG->Set(isolate, "GetBounds", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                Local<Context> context = isolate->GetCurrentContext();
+                ID2D1Geometry* geo = (ID2D1Geometry*)IntegerFI(info.This()->GetRealNamedProperty(context, LITERAL("internalPtr")).ToLocalChecked());
+                D2D1_RECT_F rectf{};
+                D2D1_MATRIX_3X2_F* trans = nullptr;
+                //if (info[0]->IsNumber()) { //assuming it's 0 so null
+                //    //trans = (D2D1_MATRIX_3X2_F*)IntegerFI(info[0]);
+                //}
+                //else if (info[0]->IsObject()) {
+                if (!info[0]->IsNumber() && info[0]->IsObject()) {
+                    trans = new D2D1_MATRIX_3X2_F(DIRECT2D::fromJSMatrix3x2(isolate, info[0].As<Object>()));
+                }
+                RetIfFailed(geo->GetBounds(trans, &rectf), "ID2D1Geometry->GetBounds failed");
+                Local<Object> mango = Object::New(isolate);
+                mango->Set(context, LITERAL("left"), Number::New(isolate, rectf.left));
+                mango->Set(context, LITERAL("top"), Number::New(isolate, rectf.top));
+                mango->Set(context, LITERAL("right"), Number::New(isolate, rectf.right));
+                mango->Set(context, LITERAL("bottom"), Number::New(isolate, rectf.bottom));
+                info.GetReturnValue().Set(mango);
+                if (trans != nullptr) {
+                    delete trans;
+                }
+            }));
+            jsG->Set(isolate, "GetWidenedBounds", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                Local<Context> context = isolate->GetCurrentContext();
+                ID2D1Geometry* geo = (ID2D1Geometry*)IntegerFI(info.This()->GetRealNamedProperty(context, LITERAL("internalPtr")).ToLocalChecked());
+                D2D1_RECT_F rectf{};
+                D2D1_MATRIX_3X2_F* trans = nullptr;
+                //if (info[0]->IsNumber()) { //assuming it's 0 so null
+                    //trans = (D2D1_MATRIX_3X2_F*)IntegerFI(info[0]);
+                //}
+                //else if (info[0]->IsObject()) {
+                if (!info[0]->IsNumber() && info[0]->IsObject()) {
+                    trans = new D2D1_MATRIX_3X2_F(DIRECT2D::fromJSMatrix3x2(isolate, info[0].As<Object>()));
+                }
+                ID2D1StrokeStyle* strokeStyle = NULL;
+                if (!info[1]->IsNumber() && info[1]->IsObject()) {
+                    strokeStyle = (ID2D1StrokeStyle*)IntegerFI(info[1].As<Object>()->GetRealNamedProperty(context, LITERAL("internalPtr")).ToLocalChecked()); //(ID2D1StrokeStyle*)IntegerFI(info[6]);
+                }
+                ContIfFailed(geo->GetWidenedBounds(FloatFI(info[0]), strokeStyle, trans, &rectf), "ID2D1Geometry->GetWidenedBounds failed"); //this function lowkey made be realize that i need to actually add stroke styles
+                Local<Object> mango = Object::New(isolate);
+                mango->Set(context, LITERAL("left"), Number::New(isolate, rectf.left));
+                mango->Set(context, LITERAL("top"), Number::New(isolate, rectf.top));
+                mango->Set(context, LITERAL("right"), Number::New(isolate, rectf.right));
+                mango->Set(context, LITERAL("bottom"), Number::New(isolate, rectf.bottom));
+                info.GetReturnValue().Set(mango);
+                if (trans != nullptr) {
+                    delete trans;
+                }
+            }));
+            jsG->Set(isolate, "StrokeContainsPoint", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1Geometry* geo = (ID2D1Geometry*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+                ID2D1StrokeStyle* strokeStyle = NULL;
+                D2D1_MATRIX_3X2_F* trans = nullptr;
+                if (!info[3]->IsNumber() && info[3]->IsObject()) {
+                    strokeStyle = (ID2D1StrokeStyle*)IntegerFI(info[3].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()); //(ID2D1StrokeStyle*)IntegerFI(info[6]);
+                }
+                if (!info[4]->IsNumber() && info[4]->IsObject()) {
+                    trans = new D2D1_MATRIX_3X2_F(DIRECT2D::fromJSMatrix3x2(isolate, info[0].As<Object>()));
+                }
+                BOOL contains = 0;
+                ContIfFailed(geo->StrokeContainsPoint(D2D1::Point2F(FloatFI(info[0]), FloatFI(info[1])), FloatFI(info[2]), strokeStyle, trans, &contains), "StrokeContainsPoint failed..");
+                info.GetReturnValue().Set(Number::New(isolate, contains));
+                if (trans != nullptr) {
+                    delete trans;
+                }
+            }));
+            jsG->Set(isolate, "FillContainsPoint", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1Geometry* geo = (ID2D1Geometry*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+                D2D1_MATRIX_3X2_F* trans = nullptr;
+                if (!info[2]->IsNumber() && info[2]->IsObject()) {
+                    trans = new D2D1_MATRIX_3X2_F(DIRECT2D::fromJSMatrix3x2(isolate, info[2].As<Object>()));
+                }
+                BOOL contains = 0;
+                ContIfFailed(geo->FillContainsPoint(D2D1::Point2F(FloatFI(info[0]), FloatFI(info[1])), trans, &contains), "FillContainsPoint failed...");
+                info.GetReturnValue().Set(Number::New(isolate, contains));
+                if (trans != nullptr) {
+                    delete trans;
+                }
+            }));
+            jsG->Set(isolate, "CompareWithGeometry", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1Geometry* geo = (ID2D1Geometry*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+                ID2D1Geometry* otherGeo = (ID2D1Geometry*)IntegerFI(info[0].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+                D2D1_MATRIX_3X2_F* trans = nullptr;
+                if (!info[1]->IsNumber() && info[1]->IsObject()) {
+                    trans = new D2D1_MATRIX_3X2_F(DIRECT2D::fromJSMatrix3x2(isolate, info[2].As<Object>()));
+                }
+                D2D1_GEOMETRY_RELATION relation;
+                ContIfFailed(geo->CompareWithGeometry(otherGeo, trans, &relation), "CompareWithGeometry failed (amybe you forgot to pass a simplified geo sink object )");
+                info.GetReturnValue().Set(Number::New(isolate, relation));
+                if (trans != nullptr) {
+                    delete trans;
+                }
+            }));
+            jsG->Set(isolate, "Simplify", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1Geometry* geo = (ID2D1Geometry*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+                D2D1_MATRIX_3X2_F* trans = nullptr;
+                if (!info[1]->IsNumber() && info[1]->IsObject()) {
+                    trans = new D2D1_MATRIX_3X2_F(DIRECT2D::fromJSMatrix3x2(isolate, info[1].As<Object>()));
+                }
+                ID2D1SimplifiedGeometrySink* simplifiedGeoSink = (ID2D1SimplifiedGeometrySink*)IntegerFI(info[2].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+                //if (!info[2]->IsNumber() && info[2]->IsObject()) {
+                //    simplifiedGeoSink = (ID2D1SimplifiedGeometrySink*)IntegerFI(info[2].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+                //}
+                ContIfFailed(geo->Simplify((D2D1_GEOMETRY_SIMPLIFICATION_OPTION)IntegerFI(info[0]), trans, simplifiedGeoSink), "Simplify failed (perhaps you forgot to create and pass a simplified geometry sink object? lowk i idk)");
+                if (trans != nullptr) {
+                    delete trans;
+                }
+            }));
+            jsG->Set(isolate, "Tessellate", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1Geometry* geo = (ID2D1Geometry*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+                D2D1_MATRIX_3X2_F* trans = nullptr;
+                if (!info[0]->IsNumber() && info[0]->IsObject()) {
+                    trans = new D2D1_MATRIX_3X2_F(DIRECT2D::fromJSMatrix3x2(isolate, info[0].As<Object>()));
+                }
+                ID2D1TessellationSink* tesselationSink = (ID2D1TessellationSink*)IntegerFI(info[1].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+                ContIfFailed(geo->Tessellate(trans, tesselationSink), "Tessellate failed...");
+                if (trans != nullptr) {
+                    delete trans;
+                }
+            }));
+            jsG->Set(isolate, "CombineWithGeometry", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1Geometry* geo = (ID2D1Geometry*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+                ID2D1Geometry* otherGeo = (ID2D1Geometry*)IntegerFI(info[0].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+                D2D1_MATRIX_3X2_F* trans = nullptr;
+                if (!info[2]->IsNumber() && info[2]->IsObject()) {
+                    trans = new D2D1_MATRIX_3X2_F(DIRECT2D::fromJSMatrix3x2(isolate, info[2].As<Object>()));
+                }
+                ID2D1SimplifiedGeometrySink* simplifiedGeoSink = (ID2D1SimplifiedGeometrySink*)IntegerFI(info[3].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+                ContIfFailed(geo->CombineWithGeometry(otherGeo, (D2D1_COMBINE_MODE)IntegerFI(info[1]), trans, simplifiedGeoSink), "CombineWithGeometry failed (amybe you forgot to pass a simplified geo sink object )");
+                if (trans != nullptr) {
+                    delete trans;
+                }
+            }));
+            jsG->Set(isolate, "Outline", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1Geometry* geo = (ID2D1Geometry*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+                D2D1_MATRIX_3X2_F* trans = nullptr;
+                if (!info[0]->IsNumber() && info[0]->IsObject()) {
+                    trans = new D2D1_MATRIX_3X2_F(DIRECT2D::fromJSMatrix3x2(isolate, info[0].As<Object>()));
+                }
+                ID2D1SimplifiedGeometrySink* simplifiedGeoSink = (ID2D1SimplifiedGeometrySink*)IntegerFI(info[1].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+                ContIfFailed(geo->Outline(trans, simplifiedGeoSink), "Outline failed");
+                if (trans != nullptr) {
+                    delete trans;
+                }
+            }));
+            jsG->Set(isolate, "ComputeArea", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1Geometry* geo = (ID2D1Geometry*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+                D2D1_MATRIX_3X2_F* trans = nullptr;
+                if (!info[0]->IsNumber() && info[0]->IsObject()) {
+                    trans = new D2D1_MATRIX_3X2_F(DIRECT2D::fromJSMatrix3x2(isolate, info[0].As<Object>()));
+                }
+                FLOAT area = 0.0f;
+                ContIfFailed(geo->ComputeArea(trans, &area), "ComputeArea failedf");
+                info.GetReturnValue().Set(Number::New(isolate, area));
+                if (trans != nullptr) {
+                    delete trans;
+                }
+            }));
+            jsG->Set(isolate, "ComputeLength", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1Geometry* geo = (ID2D1Geometry*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+                D2D1_MATRIX_3X2_F* trans = nullptr;
+                if (!info[0]->IsNumber() && info[0]->IsObject()) {
+                    trans = new D2D1_MATRIX_3X2_F(DIRECT2D::fromJSMatrix3x2(isolate, info[0].As<Object>()));
+                }
+                FLOAT length = 0.0f;
+                ContIfFailed(geo->ComputeLength(trans, &length), "ComputeLength failedf");
+                info.GetReturnValue().Set(Number::New(isolate, length));
+                if (trans != nullptr) {
+                    delete trans;
+                }
+            }));
+            jsG->Set(isolate, "ComputePointAtLength", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                Local<Context> context = isolate->GetCurrentContext();
+                ID2D1Geometry* geo = (ID2D1Geometry*)IntegerFI(info.This()->GetRealNamedProperty(context, LITERAL("internalPtr")).ToLocalChecked());
+                D2D1_MATRIX_3X2_F* trans = nullptr;
+                if (!info[1]->IsNumber() && info[1]->IsObject()) {
+                    trans = new D2D1_MATRIX_3X2_F(DIRECT2D::fromJSMatrix3x2(isolate, info[1].As<Object>()));
+                }
+                D2D1_POINT_2F p2f{};
+                D2D1_POINT_2F tv{};
+                geo->ComputePointAtLength(FloatFI(info[0]), trans, &p2f, &tv);
+                Local<Object> jsInfo = Object::New(isolate);
+                jsInfo->Set(context, LITERAL("point"), DIRECT2D::getPoint2FImpl(isolate, p2f));
+                jsInfo->Set(context, LITERAL("unitTangentVector"), DIRECT2D::getPoint2FImpl(isolate, tv));
+                info.GetReturnValue().Set(jsInfo);
+                if (trans != nullptr) {
+                    delete trans;
+                }
+            }));
+            jsG->Set(isolate, "Widen", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1Geometry* geo = (ID2D1Geometry*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+                ID2D1StrokeStyle* strokeStyle = NULL;
+                D2D1_MATRIX_3X2_F* trans = nullptr;
+                if (!info[1]->IsNumber() && info[1]->IsObject()) {
+                    strokeStyle = (ID2D1StrokeStyle*)IntegerFI(info[1].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()); //(ID2D1StrokeStyle*)IntegerFI(info[6]);
+                }
+                if (!info[2]->IsNumber() && info[2]->IsObject()) {
+                    trans = new D2D1_MATRIX_3X2_F(DIRECT2D::fromJSMatrix3x2(isolate, info[2].As<Object>()));
+                }
+                ID2D1SimplifiedGeometrySink* simplifiedGeoSink = (ID2D1SimplifiedGeometrySink*)IntegerFI(info[3].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+                //if (!info[2]->IsNumber() && info[2]->IsObject()) {
+                //    simplifiedGeoSink = (ID2D1SimplifiedGeometrySink*)IntegerFI(info[2].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+                //}
+                ContIfFailed(geo->Widen(FloatFI(info[0]), strokeStyle, trans, simplifiedGeoSink), "Widen failed (perhaps you forgot to create and pass a simplified geometry sink object? lowk i idk)");
+                if (trans != nullptr) {
+                    delete trans;
+                }
+            }));
+            return jsG;
+        }
+
+        Local<ObjectTemplate> createSimplifiedGeometrySinkImpl(Isolate* isolate) {
+            Local<ObjectTemplate> jsSGS = createIUnknownImpl(isolate);
+            jsSGS->Set(isolate, "SetFillMode", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1SimplifiedGeometrySink* simplifiedGeoSink = (ID2D1SimplifiedGeometrySink*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+                simplifiedGeoSink->SetFillMode((D2D1_FILL_MODE)IntegerFI(info[0]));
+            }));
+            jsSGS->Set(isolate, "SetSegmentFlags", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1SimplifiedGeometrySink* simplifiedGeoSink = (ID2D1SimplifiedGeometrySink*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+                simplifiedGeoSink->SetSegmentFlags((D2D1_PATH_SEGMENT)IntegerFI(info[0]));
+            }));
+            jsSGS->Set(isolate, "BeginFigure", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1SimplifiedGeometrySink* simplifiedGeoSink = (ID2D1SimplifiedGeometrySink*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+                simplifiedGeoSink->BeginFigure(D2D1::Point2F(FloatFI(info[0]), FloatFI(info[1])), (D2D1_FIGURE_BEGIN)IntegerFI(info[2]));
+            }));
+            jsSGS->Set(isolate, "AddLines", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                Local<Context> context = isolate->GetCurrentContext();
+
+                ID2D1SimplifiedGeometrySink* simplifiedGeoSink = (ID2D1SimplifiedGeometrySink*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+
+                Local<Array> jsLines = info[0].As<Array>();
+                uint32_t len = jsLines->Length();
+
+                std::vector<D2D1_POINT_2F> points(len);
+
+                if (jsLines->Get(context, 0).ToLocalChecked()->IsArray()) { //this points array can be filled with more arrays -> [[10, 20], [20, 30]]
+                    for (int i = 0; i < len; i++) {
+                        Local<Array> innerArr = jsLines->Get(context, i).ToLocalChecked().As<Array>();
+                        points[i] = D2D1::Point2F(FloatFI(innerArr->Get(context, 0).ToLocalChecked()), FloatFI(innerArr->Get(context, 1).ToLocalChecked()));
+                    }
+                }
+                else { //or it can be filled with objects -> [{x: 10, y: 20}, {x: 20, y: 30}]
+                    for (int i = 0; i < len; i++) {
+                        Local<Object> innerObj = jsLines->Get(context, i).ToLocalChecked().As<Object>();
+                        points[i] = D2D1::Point2F(FloatFI(innerObj->Get(context, LITERAL("x")).ToLocalChecked()), FloatFI(innerObj->Get(context, LITERAL("y")).ToLocalChecked()));
+                    }
+                }
+
+                simplifiedGeoSink->AddLines(points.data(), len);
+            }));
+            jsSGS->Set(isolate, "AddBeziers", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                Local<Context> context = isolate->GetCurrentContext();
+
+                ID2D1SimplifiedGeometrySink* simplifiedGeoSink = (ID2D1SimplifiedGeometrySink*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+
+                Local<Array> jsLines = info[0].As<Array>();
+                uint32_t len = info.Length() > 1 ? info.Length() : jsLines->Length();
+
+                std::vector<D2D1_BEZIER_SEGMENT> beziers(len);
+
+                //if (jsLines->Get(context, 0).ToLocalChecked()->IsArray()) { //this points array can be filled with more arrays -> [[[10, 20], [20, 30], [30, 40]], [[40, 50], [50, 60], [60, 70]]]
+                if (info.Length() == 1) {
+                    //assuming you called this function like AddBeziers([[[x1, y1], [x2, y2], [x3, y3]], [[x4, y4], [x5, y5], [x6, y6]]])
+                    for (int i = 0; i < len; i++) {
+                        Local<Array> innerArr = jsLines->Get(context, i).ToLocalChecked().As<Array>();
+                        Local<Array> point1 = innerArr->Get(context, 0).ToLocalChecked().As<Array>();
+                        Local<Array> point2 = innerArr->Get(context, 1).ToLocalChecked().As<Array>();
+                        Local<Array> point3 = innerArr->Get(context, 2).ToLocalChecked().As<Array>();
+                        beziers[i] = D2D1::BezierSegment(
+                            D2D1::Point2F(FloatFI(point1->Get(context, 0).ToLocalChecked()), FloatFI(point1->Get(context, 1).ToLocalChecked())),
+                            D2D1::Point2F(FloatFI(point2->Get(context, 0).ToLocalChecked()), FloatFI(point2->Get(context, 1).ToLocalChecked())),
+                            D2D1::Point2F(FloatFI(point3->Get(context, 0).ToLocalChecked()), FloatFI(point3->Get(context, 1).ToLocalChecked()))//,
+                        );
+                    }
+                }
+                else {
+                    //assuming you called this function like AddBeziers([[x1, y1], [x2, y2], [x3, y3]], [[x4, y4], [x5, y5], [x6, y6]]);
+                    for (int i = 0; i < len; i++) {
+                        Local<Array> innerArr = info[i].As<Array>();
+                        Local<Array> point1 = innerArr->Get(context, 0).ToLocalChecked().As<Array>();
+                        Local<Array> point2 = innerArr->Get(context, 1).ToLocalChecked().As<Array>();
+                        Local<Array> point3 = innerArr->Get(context, 2).ToLocalChecked().As<Array>();
+                        beziers[i] = D2D1::BezierSegment(
+                            D2D1::Point2F(FloatFI(point1->Get(context, 0).ToLocalChecked()), FloatFI(point1->Get(context, 1).ToLocalChecked())),
+                            D2D1::Point2F(FloatFI(point2->Get(context, 0).ToLocalChecked()), FloatFI(point2->Get(context, 1).ToLocalChecked())),
+                            D2D1::Point2F(FloatFI(point3->Get(context, 0).ToLocalChecked()), FloatFI(point3->Get(context, 1).ToLocalChecked()))//,
+                        );
+                    }
+                }
+
+                simplifiedGeoSink->AddBeziers(beziers.data(), len);
+            }));
+            jsSGS->Set(isolate, "EndFigure", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1SimplifiedGeometrySink* simplifiedGeoSink = (ID2D1SimplifiedGeometrySink*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+                simplifiedGeoSink->EndFigure((D2D1_FIGURE_END)IntegerFI(info[0]));
+            }));
+            jsSGS->Set(isolate, "Close", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1SimplifiedGeometrySink* simplifiedGeoSink = (ID2D1SimplifiedGeometrySink*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+                RetIfFailed(simplifiedGeoSink->Close(), "ID2D1(Simplified?)GeometrySink->Close failed");
+            }));
+            return jsSGS;
+        }
+
+        Local<ObjectTemplate> createGeometrySinkImpl(Isolate* isolate) {
+            Local<ObjectTemplate> jsGS = createSimplifiedGeometrySinkImpl(isolate);
+            jsGS->Set(isolate, "AddLine", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                Local<Context> context = isolate->GetCurrentContext();
+                ID2D1GeometrySink* geoSink = (ID2D1GeometrySink*)IntegerFI(info.This()->GetRealNamedProperty(context, LITERAL("internalPtr")).ToLocalChecked());
+                D2D1_POINT_2F point{};
+                if (info[0]->IsArray()) {
+                    //assuming you called this function like AddLine([x,  y])
+                    Local<Array> arr = info[0].As<Array>();
+                    point = D2D1::Point2F(FloatFI(arr->Get(context, 0).ToLocalChecked()), FloatFI(arr->Get(context, 1).ToLocalChecked()));
+                }
+                else if (info[0]->IsNumber()) {
+                    //assuming you called this function like AddLine(x, y)
+                    point = D2D1::Point2F(FloatFI(info[0]), FloatFI(info[1]));
+                }
+                else if (info[0]->IsObject()) {
+                    //assuming you called this function like AddLine({x, y})
+                    Local<Object> obj = info[0].As<Object>();
+                    point = D2D1::Point2F(FloatFI(obj->Get(context, LITERAL("x")).ToLocalChecked()), FloatFI(obj->Get(context, LITERAL("y")).ToLocalChecked()));
+                }
+
+                geoSink->AddLine(point);
+            }));
+            jsGS->Set(isolate, "AddBezier", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                Local<Context> context = isolate->GetCurrentContext();
+                ID2D1GeometrySink* geoSink = (ID2D1GeometrySink*)IntegerFI(info.This()->GetRealNamedProperty(context, LITERAL("internalPtr")).ToLocalChecked());
+                D2D1_BEZIER_SEGMENT bezier{};
+
+                if (info.Length() == 1) {
+                    //assuming you called this function like AddBezier([[x, y], [x2, y2], [x3, y3]])
+                    Local<Array> arr = info[0].As<Array>();
+                    Local<Array> point1 = arr->Get(context, 0).ToLocalChecked().As<Array>();
+                    Local<Array> point2 = arr->Get(context, 1).ToLocalChecked().As<Array>();
+                    Local<Array> point3 = arr->Get(context, 2).ToLocalChecked().As<Array>();
+                    bezier.point1 = D2D1::Point2F(FloatFI(point1->Get(context, 0).ToLocalChecked()), FloatFI(point1->Get(context, 1).ToLocalChecked()));
+                    bezier.point2 = D2D1::Point2F(FloatFI(point2->Get(context, 0).ToLocalChecked()), FloatFI(point2->Get(context, 1).ToLocalChecked()));
+                    bezier.point3 = D2D1::Point2F(FloatFI(point3->Get(context, 0).ToLocalChecked()), FloatFI(point3->Get(context, 1).ToLocalChecked()));
+                }
+                else {
+                    //assuming you called this function like AddBezier([x, y], [x2, y2], [x3, y3]);
+                    bezier.point1 = D2D1::Point2F(FloatFI(info[0].As<Array>()->Get(context, 0).ToLocalChecked()), FloatFI(info[0].As<Array>()->Get(context, 1).ToLocalChecked()));
+                    bezier.point2 = D2D1::Point2F(FloatFI(info[1].As<Array>()->Get(context, 0).ToLocalChecked()), FloatFI(info[1].As<Array>()->Get(context, 1).ToLocalChecked()));
+                    bezier.point3 = D2D1::Point2F(FloatFI(info[2].As<Array>()->Get(context, 0).ToLocalChecked()), FloatFI(info[2].As<Array>()->Get(context, 1).ToLocalChecked()));
+                }
+
+                geoSink->AddBezier(bezier);
+            }));
+            jsGS->Set(isolate, "AddQuadraticBezier", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                Local<Context> context = isolate->GetCurrentContext();
+                ID2D1GeometrySink* geoSink = (ID2D1GeometrySink*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+
+                D2D1_QUADRATIC_BEZIER_SEGMENT bezier{};
+
+                if (info.Length() == 1) {
+                    //assuming you called this function like AddQuadraticBezier([[x, y], [x2, y2]])
+                    Local<Array> arr = info[0].As<Array>();
+                    Local<Array> point1 = arr->Get(context, 0).ToLocalChecked().As<Array>();
+                    Local<Array> point2 = arr->Get(context, 1).ToLocalChecked().As<Array>();
+                    bezier.point1 = D2D1::Point2F(FloatFI(point1->Get(context, 0).ToLocalChecked()), FloatFI(point1->Get(context, 1).ToLocalChecked()));
+                    bezier.point2 = D2D1::Point2F(FloatFI(point2->Get(context, 0).ToLocalChecked()), FloatFI(point2->Get(context, 1).ToLocalChecked()));
+                }
+                else {
+                    //assuming you called this function like AddQuadraticBezier([x, y], [x2, y2]);
+                    bezier.point1 = D2D1::Point2F(FloatFI(info[0].As<Array>()->Get(context, 0).ToLocalChecked()), FloatFI(info[0].As<Array>()->Get(context, 1).ToLocalChecked()));
+                    bezier.point2 = D2D1::Point2F(FloatFI(info[1].As<Array>()->Get(context, 0).ToLocalChecked()), FloatFI(info[1].As<Array>()->Get(context, 1).ToLocalChecked()));
+                }
+
+                geoSink->AddQuadraticBezier(bezier);
+            }));
+            jsGS->Set(isolate, "AddQuadraticBeziers", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                Local<Context> context = isolate->GetCurrentContext();
+                ID2D1GeometrySink* geoSink = (ID2D1GeometrySink*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+                Local<Array> jsLines = info[0].As<Array>();
+                uint32_t len = info.Length() > 1 ? info.Length() : jsLines->Length();
+
+                std::vector<D2D1_QUADRATIC_BEZIER_SEGMENT> beziers(len);
+
+                //if (jsLines->Get(context, 0).ToLocalChecked()->IsArray()) { //this points array can be filled with more arrays -> [[[10, 20], [20, 30], [30, 40]], [[40, 50], [50, 60], [60, 70]]]
+                if (info.Length() == 1) {
+                    for (int i = 0; i < len; i++) {
+                        //assuming you called this function like AddQuadraticBeziers([[[x, y], [x2, y2]], [[x3, y3], [x4, y4]]])
+                        Local<Array> innerArr = jsLines->Get(context, i).ToLocalChecked().As<Array>();
+                        Local<Array> point1 = innerArr->Get(context, 0).ToLocalChecked().As<Array>();
+                        Local<Array> point2 = innerArr->Get(context, 1).ToLocalChecked().As<Array>();
+                        //Local<Array> point3 = innerArr->Get(context, 2).ToLocalChecked().As<Array>();
+                        beziers[i] = D2D1::QuadraticBezierSegment(
+                            D2D1::Point2F(FloatFI(point1->Get(context, 0).ToLocalChecked()), FloatFI(point1->Get(context, 1).ToLocalChecked())),
+                            D2D1::Point2F(FloatFI(point2->Get(context, 0).ToLocalChecked()), FloatFI(point2->Get(context, 1).ToLocalChecked()))
+                            //D2D1::Point2F(FloatFI(point3->Get(context, 0).ToLocalChecked()), FloatFI(point3->Get(context, 1).ToLocalChecked()))//,
+                        );
+                    }
+                }
+                else {
+                    //assuming you called this function like AddQuadraticBeziers([[x, y], [x2, y2]], [[x3, y3], [x4, y4]])
+                    for (int i = 0; i < len; i++) {
+                        Local<Array> innerArr = info[0].As<Array>()->Get(context, i).ToLocalChecked().As<Array>();
+
+                        Local<Array> point1 = innerArr->Get(context, 0).ToLocalChecked().As<Array>();
+                        Local<Array> point2 = innerArr->Get(context, 1).ToLocalChecked().As<Array>();
+                        //Local<Array> point3 = innerArr->Get(context, 2).ToLocalChecked().As<Array>();
+                        beziers[i] = D2D1::QuadraticBezierSegment(
+                            D2D1::Point2F(FloatFI(point1->Get(context, 0).ToLocalChecked()), FloatFI(point1->Get(context, 1).ToLocalChecked())),
+                            D2D1::Point2F(FloatFI(point2->Get(context, 0).ToLocalChecked()), FloatFI(point2->Get(context, 1).ToLocalChecked()))
+                            //D2D1::Point2F(FloatFI(point3->Get(context, 0).ToLocalChecked()), FloatFI(point3->Get(context, 1).ToLocalChecked()))//,
+                        );
+                    }
+                }
+
+                geoSink->AddQuadraticBeziers(beziers.data(), len); //OOPS! i was calling AddQuadraticBezier instead and almost didn't realize
+            }));
+            jsGS->Set(isolate, "AddArc", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1GeometrySink* geoSink = (ID2D1GeometrySink*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+
+                //D2D1_ARC_SEGMENT arc[}; //BRUHHH i accidently put [} instead of {} and intellisense threw a huge fit and i even restarted visual studio because i thought it was a glitch! (there were errors everywhere past this line)
+
+                D2D1_ARC_SEGMENT arc = D2D1::ArcSegment(
+                    D2D1::Point2F(FloatFI(info[0]), FloatFI(info[1])),
+                    D2D1::SizeF(FloatFI(info[2]), FloatFI(info[3])),
+                    FloatFI(info[4]),
+                    D2D1_SWEEP_DIRECTION(IntegerFI(info[5])),
+                    D2D1_ARC_SIZE(IntegerFI(info[6]))
+                );
+
+                geoSink->AddArc(arc);
+            }));
+
+            return jsGS;//->NewInstance(isolate->GetCurrentContext()).ToLocalChecked();
+        }
+
+        Local<ObjectTemplate> createPathGeometryImpl(Isolate* isolate) {
+            Local<ObjectTemplate> jsPG = createGeometryImpl(isolate);
+            jsPG->Set(isolate, "Open", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1PathGeometry1* path = (ID2D1PathGeometry1*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+                ID2D1GeometrySink* geoSink = nullptr; RetIfFailed(path->Open(&geoSink), "Open failed...");
+                Local<Object> jsGS = DIRECT2D::getGeometrySinkImpl(isolate, geoSink);
+                info.GetReturnValue().Set(jsGS);
+            }));
+            jsPG->Set(isolate, "Stream", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1PathGeometry1* path = (ID2D1PathGeometry1*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+                ID2D1GeometrySink* geoSink = (ID2D1GeometrySink*)IntegerFI(info[0].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+                RetIfFailed(path->Stream(geoSink), "Stream faioled...");
+            }));
+            jsPG->Set(isolate, "GetSegmentCount", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1PathGeometry1* path = (ID2D1PathGeometry1*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+                UINT32 count = 0; RetIfFailed(path->GetSegmentCount(&count), "GetSegmentCount failed");
+                info.GetReturnValue().Set(Number::New(isolate, count));
+            }));
+            jsPG->Set(isolate, "GetFigureCount", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1PathGeometry1* path = (ID2D1PathGeometry1*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+                UINT32 count = 0; RetIfFailed(path->GetFigureCount(&count), "GetFigureCount failed");
+                info.GetReturnValue().Set(Number::New(isolate, count));
+            }));
+            return jsPG;//->NewInstance(isolate->GetCurrentContext()).ToLocalChecked();
+        }
+
+        Local<ObjectTemplate> createDXGIDebug1Impl(Isolate* isolate) {
+            Local<ObjectTemplate> jsDbg = createIUnknownImpl(isolate);
+
+            jsDbg->Set(isolate, "ReportLiveObjects", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                IDXGIDebug1* dbg = (IDXGIDebug1*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+
+                RetIfFailed(dbg->ReportLiveObjects(jsImpl::fromJSGUID(isolate, info[0]), (DXGI_DEBUG_RLO_FLAGS)IntegerFI(info[1])), "ReportLiveObjects failed...");
+            }));
+
+            return jsDbg;//->NewInstance(isolate->GetCurrentContext()).ToLocalChecked();
+        }
+
+        void Init(Isolate* isolate) {
+            _IUnknown = createIUnknownImpl(isolate);
+            _TextFormat = createTextFormatImpl(isolate, true);
+            _TextLayout = createTextLayoutImpl(isolate);
+            _WICBitmapSource = createWICBitmapImpl(isolate);
+            _IWICBitmapDecoder = createIWICBitmapDecoderImpl(isolate);
+            _ID2D1Brush = createDefaultBrushImpl(isolate);
+            _ID2D1SolidColorBrush = createID2D1SolidColorBrushImpl(isolate);
+            _ID2D1BitmapBrush = createID2D1BitmapBrushImpl(isolate);
+            _ID2D1LinearGradientBrush = createID2D1LinearGradientBrushImpl(isolate);
+            _ID2D1RadialGradientBrush = createID2D1RadialGradientBrushImpl(isolate);
+            _ID2D1ImageBrush = createImageBrushImpl(isolate);
+            _ID2D1Image = createBitmapImpl(isolate);
+
+            _CompositionFilterEffect = createCompositionEffectImpl(isolate);
+            _IDCompositionGaussianBlurEffect = createIDCompositionGaussianBlurEffectImpl(isolate);
+            _IDCompositionBrightnessEffect = createIDCompositionBrightnessEffectImpl(isolate);
+            _IDCompositionColorMatrixEffect = createIDCompositionColorMatrixEffectImpl(isolate);
+            _IDCompositionShadowEffect = createIDCompositionShadowEffectImpl(isolate);
+            _IDCompositionHueRotationEffect = createIDCompositionHueRotationEffectImpl(isolate);
+            _IDCompositionSaturationEffect = createIDCompositionSaturationEffectImpl(isolate);
+            _IDCompositionTurbulenceEffect = createIDCompositionTurbulenceEffectImpl(isolate);
+            _IDCompositionLinearTransferEffect = createIDCompositionLinearTransferEffectImpl(isolate);
+            _IDCompositionTableTransferEffect = createIDCompositionTableTransferEffectImpl(isolate);
+            _IDCompositionCompositeEffect = createIDCompositionCompositeEffectImpl(isolate);
+            _IDCompositionBlendEffect = createIDCompositionBlendEffectImpl(isolate);
+            _IDCompositionArithmeticCompositeEffect = createIDCompositionArithmeticCompositeEffectImpl(isolate);
+            _IDCompositionAffineTransform2DEffect = createIDCompositionAffineTransform2DEffectImpl(isolate);
+
+            _ID2D1StrokeStyle1 = createStrokeStyleImpl(isolate);
+            _ID2D1Geometry = createGeometryImpl(isolate);
+            _ID2D1SimplifiedGeometrySink = createSimplifiedGeometrySinkImpl(isolate);
+            _ID2D1GeometrySink = createGeometrySinkImpl(isolate);
+            _ID2D1PathGeometry1 = createPathGeometryImpl(isolate);
+            _IDXGIDebug1 = createDXGIDebug1Impl(isolate);
+        }
+    }
+
+    //regex goat
+    //Local<Object> get$1Impl(Isolate* isolate, $1* ptr) {\n        Local<Context> context = isolate->GetCurrentContext();\n        Local<Object> object = DIRECT2D::Templates::_$1->NewInstance(context).ToLocalChecked();\n        object->Set(context, LITERAL("internalPtr"), Number::New(isolate, (LONG_PTR)ptr));\n        return object;\n}\n\n
+    Local<Object> getIUnknownImpl(Isolate* isolate, void* ptr) {
+        Local<Context> context = isolate->GetCurrentContext();
+        Local<Object> jsUnknown = DIRECT2D::Templates::_IUnknown->NewInstance(context).ToLocalChecked();
+        jsUnknown->Set(context, LITERAL("internalPtr"), Number::New(isolate, (LONG_PTR)ptr)); //i guess i could use Integer::New instead idk
+        return jsUnknown;
+    }
+
+    Local<Object> getTextFormatImpl(Isolate* isolate, Direct2D* d2d, IDWriteTextFormat* ptr) {
+        Local<Context> context = isolate->GetCurrentContext();
+        Local<Object> object = DIRECT2D::Templates::_TextFormat->NewInstance(context).ToLocalChecked();
+        object->Set(context, LITERAL("internalPtr"), Number::New(isolate, (LONG_PTR)ptr));
+        object->Set(context, LITERAL("internalDXPtr"), Number::New(isolate, (LONG_PTR)d2d)); //almost forgot
+        return object;
+    }
+
+    Local<Object> getTextLayoutImpl(Isolate* isolate, const Local<Value>& text, IDWriteTextLayout* ptr) {
+        Local<Context> context = isolate->GetCurrentContext();
+        Local<Object> object = DIRECT2D::Templates::_TextLayout->NewInstance(context).ToLocalChecked();
+        object->Set(context, LITERAL("internalPtr"), Number::New(isolate, (LONG_PTR)ptr));
+        object->Set(context, LITERAL("text"), text);
+        return object;
+    }
+
+    Local<Object> getWICBitmapImpl(Isolate* isolate, IWICBitmapSource* ptr, GUID format) {
+        Local<Context> context = isolate->GetCurrentContext();
+        Local<Object> object = DIRECT2D::Templates::_WICBitmapSource->NewInstance(context).ToLocalChecked();
+        object->Set(context, LITERAL("internalPtr"), Number::New(isolate, (LONG_PTR)ptr));
+        Local<Value> elem[] = { Number::New(isolate, format.Data1), Number::New(isolate, format.Data2), Number::New(isolate, format.Data3), Number::New(isolate, format.Data4[0]), Number::New(isolate, format.Data4[1]), Number::New(isolate, format.Data4[2]), Number::New(isolate, format.Data4[3]), Number::New(isolate, format.Data4[4]), Number::New(isolate, format.Data4[5]), Number::New(isolate, format.Data4[6]), Number::New(isolate, format.Data4[7]) };
+        object->Set(context, LITERAL("GUID"), Array::New(isolate, elem, 11));
+        return object;
+    }
+
+    Local<Object> getIWICBitmapDecoderImpl(Isolate* isolate, IWICBitmapDecoder* ptr) {
+        Local<Context> context = isolate->GetCurrentContext();
+        Local<Object> object = DIRECT2D::Templates::_IWICBitmapDecoder->NewInstance(context).ToLocalChecked();
+        object->Set(context, LITERAL("internalPtr"), Number::New(isolate, (LONG_PTR)ptr));
+        return object;
+    }
+
+    //Local<Object> getDefaultBrushImpl(Isolate* isolate, ID2D1Brush* ptr) {
+    //    Local<Context> context = isolate->GetCurrentContext();
+    //    Local<Object> object = DIRECT2D::Templates::_ID2D1Brush->NewInstance(context).ToLocalChecked();
+    //    object->Set(context, LITERAL("internalPtr"), Number::New(isolate, (LONG_PTR)ptr));
+    //    object->Set(context, LITERAL("brush"), String::NewFromUtf8(isolate, type).ToLocalChecked());
+    //    return object;
+    //}
+
+    Local<Object> getID2D1SolidColorBrushImpl(Isolate* isolate, ID2D1SolidColorBrush* ptr) {
+        Local<Context> context = isolate->GetCurrentContext();
+        Local<Object> object = DIRECT2D::Templates::_ID2D1SolidColorBrush->NewInstance(context).ToLocalChecked();
+        object->Set(context, LITERAL("internalPtr"), Number::New(isolate, (LONG_PTR)ptr));
+        object->Set(context, LITERAL("brush"), LITERAL("solid")); //this brush property is only used with DIRECT2D::AdjustGradients (which you don't have to use anymore)
+        return object;
+    }
+
+    Local<Object> getBitmapBrushImpl(Isolate* isolate, ID2D1BitmapBrush* ptr) {
+        Local<Context> context = isolate->GetCurrentContext();
+        Local<Object> object = DIRECT2D::Templates::_ID2D1BitmapBrush->NewInstance(context).ToLocalChecked();
+        object->Set(context, LITERAL("internalPtr"), Number::New(isolate, (LONG_PTR)ptr));
+        object->Set(context, LITERAL("brush"), LITERAL("bitmap"));
+        return object;
+    }
+
+    Local<Object> getID2D1LinearGradientBrush(Isolate* isolate, ID2D1LinearGradientBrush* ptr) {
+        Local<Context> context = isolate->GetCurrentContext();
+        Local<Object> object = DIRECT2D::Templates::_ID2D1LinearGradientBrush->NewInstance(context).ToLocalChecked();
+        object->Set(context, LITERAL("internalPtr"), Number::New(isolate, (LONG_PTR)ptr));
+        object->Set(context, LITERAL("brush"), LITERAL("linear"));
+        return object;
+    }
+
+    Local<Object> getID2D1RadialGradientBrush(Isolate* isolate, ID2D1RadialGradientBrush* ptr) {
+        Local<Context> context = isolate->GetCurrentContext();
+        Local<Object> object = DIRECT2D::Templates::_ID2D1RadialGradientBrush->NewInstance(context).ToLocalChecked();
+        object->Set(context, LITERAL("internalPtr"), Number::New(isolate, (LONG_PTR)ptr));
+        object->Set(context, LITERAL("brush"), LITERAL("radial"));
+        return object;
+    }
+
+    Local<Object> getImageBrushImpl(Isolate* isolate, ID2D1ImageBrush* ptr) {
+        Local<Context> context = isolate->GetCurrentContext();
+        Local<Object> object = DIRECT2D::Templates::_ID2D1ImageBrush->NewInstance(context).ToLocalChecked();
+        object->Set(context, LITERAL("internalPtr"), Number::New(isolate, (LONG_PTR)ptr));
+        object->Set(context, LITERAL("brush"), LITERAL("bitmap"));
+        return object;
+    }
+
+    Local<Object> getBitmapImpl(Isolate* isolate, ID2D1Image* ptr) {
+        Local<Context> context = isolate->GetCurrentContext();
+        Local<Object> object = DIRECT2D::Templates::_ID2D1Image->NewInstance(context).ToLocalChecked();
+        object->Set(context, LITERAL("internalPtr"), Number::New(isolate, (LONG_PTR)ptr));
+        return object;
+    }
+
+    //
+    //Local<Object> getCompositionFilterEffectImpl(Isolate* isolate, IDCompositionFilterEffect* ptr) {
+    //    Local<Context> context = isolate->GetCurrentContext();
+    //    Local<Object> object = DIRECT2D::Templates::_CompositionFilterEffect->NewInstance(context).ToLocalChecked();
+    //    object->Set(context, LITERAL("internalPtr"), Number::New(isolate, (LONG_PTR)ptr));
+    //    return object;
+    //}
+
+    Local<Object> getIDCompositionGaussianBlurEffectImpl(Isolate* isolate, IDCompositionGaussianBlurEffect* ptr) {
+        Local<Context> context = isolate->GetCurrentContext();
+        Local<Object> object = DIRECT2D::Templates::_IDCompositionGaussianBlurEffect->NewInstance(context).ToLocalChecked();
+        object->Set(context, LITERAL("internalPtr"), Number::New(isolate, (LONG_PTR)ptr));
+        return object;
+    }
+
+    Local<Object> getIDCompositionBrightnessEffectImpl(Isolate* isolate, IDCompositionBrightnessEffect* ptr) {
+        Local<Context> context = isolate->GetCurrentContext();
+        Local<Object> object = DIRECT2D::Templates::_IDCompositionBrightnessEffect->NewInstance(context).ToLocalChecked();
+        object->Set(context, LITERAL("internalPtr"), Number::New(isolate, (LONG_PTR)ptr));
+        return object;
+    }
+
+    Local<Object> getIDCompositionColorMatrixEffectImpl(Isolate* isolate, IDCompositionColorMatrixEffect* ptr) {
+        Local<Context> context = isolate->GetCurrentContext();
+        Local<Object> object = DIRECT2D::Templates::_IDCompositionColorMatrixEffect->NewInstance(context).ToLocalChecked();
+        object->Set(context, LITERAL("internalPtr"), Number::New(isolate, (LONG_PTR)ptr));
+        return object;
+    }
+
+    Local<Object> getIDCompositionShadowEffectImpl(Isolate* isolate, IDCompositionShadowEffect* ptr) {
+        Local<Context> context = isolate->GetCurrentContext();
+        Local<Object> object = DIRECT2D::Templates::_IDCompositionShadowEffect->NewInstance(context).ToLocalChecked();
+        object->Set(context, LITERAL("internalPtr"), Number::New(isolate, (LONG_PTR)ptr));
+        return object;
+    }
+
+    Local<Object> getIDCompositionHueRotationEffectImpl(Isolate* isolate, IDCompositionHueRotationEffect* ptr) {
+        Local<Context> context = isolate->GetCurrentContext();
+        Local<Object> object = DIRECT2D::Templates::_IDCompositionHueRotationEffect->NewInstance(context).ToLocalChecked();
+        object->Set(context, LITERAL("internalPtr"), Number::New(isolate, (LONG_PTR)ptr));
+        return object;
+    }
+
+    Local<Object> getIDCompositionSaturationEffectImpl(Isolate* isolate, IDCompositionSaturationEffect* ptr) {
+        Local<Context> context = isolate->GetCurrentContext();
+        Local<Object> object = DIRECT2D::Templates::_IDCompositionSaturationEffect->NewInstance(context).ToLocalChecked();
+        object->Set(context, LITERAL("internalPtr"), Number::New(isolate, (LONG_PTR)ptr));
+        return object;
+    }
+
+    Local<Object> getIDCompositionTurbulenceEffectImpl(Isolate* isolate, IDCompositionTurbulenceEffect* ptr) {
+        Local<Context> context = isolate->GetCurrentContext();
+        Local<Object> object = DIRECT2D::Templates::_IDCompositionTurbulenceEffect->NewInstance(context).ToLocalChecked();
+        object->Set(context, LITERAL("internalPtr"), Number::New(isolate, (LONG_PTR)ptr));
+        return object;
+    }
+
+    Local<Object> getIDCompositionLinearTransferEffectImpl(Isolate* isolate, IDCompositionLinearTransferEffect* ptr) {
+        Local<Context> context = isolate->GetCurrentContext();
+        Local<Object> object = DIRECT2D::Templates::_IDCompositionLinearTransferEffect->NewInstance(context).ToLocalChecked();
+        object->Set(context, LITERAL("internalPtr"), Number::New(isolate, (LONG_PTR)ptr));
+        return object;
+    }
+
+    Local<Object> getIDCompositionTableTransferEffectImpl(Isolate* isolate, IDCompositionTableTransferEffect* ptr) {
+        Local<Context> context = isolate->GetCurrentContext();
+        Local<Object> object = DIRECT2D::Templates::_IDCompositionTableTransferEffect->NewInstance(context).ToLocalChecked();
+        object->Set(context, LITERAL("internalPtr"), Number::New(isolate, (LONG_PTR)ptr));
+        return object;
+    }
+
+    Local<Object> getIDCompositionCompositeEffectImpl(Isolate* isolate, IDCompositionCompositeEffect* ptr) {
+        Local<Context> context = isolate->GetCurrentContext();
+        Local<Object> object = DIRECT2D::Templates::_IDCompositionCompositeEffect->NewInstance(context).ToLocalChecked();
+        object->Set(context, LITERAL("internalPtr"), Number::New(isolate, (LONG_PTR)ptr));
+        return object;
+    }
+
+    Local<Object> getIDCompositionBlendEffectImpl(Isolate* isolate, IDCompositionBlendEffect* ptr) {
+        Local<Context> context = isolate->GetCurrentContext();
+        Local<Object> object = DIRECT2D::Templates::_IDCompositionBlendEffect->NewInstance(context).ToLocalChecked();
+        object->Set(context, LITERAL("internalPtr"), Number::New(isolate, (LONG_PTR)ptr));
+        return object;
+    }
+
+    Local<Object> getIDCompositionArithmeticCompositeEffectImpl(Isolate* isolate, IDCompositionArithmeticCompositeEffect* ptr) {
+        Local<Context> context = isolate->GetCurrentContext();
+        Local<Object> object = DIRECT2D::Templates::_IDCompositionArithmeticCompositeEffect->NewInstance(context).ToLocalChecked();
+        object->Set(context, LITERAL("internalPtr"), Number::New(isolate, (LONG_PTR)ptr));
+        return object;
+    }
+
+    Local<Object> getIDCompositionAffineTransform2DEffectImpl(Isolate* isolate, IDCompositionAffineTransform2DEffect* ptr) {
+        Local<Context> context = isolate->GetCurrentContext();
+        Local<Object> object = DIRECT2D::Templates::_IDCompositionAffineTransform2DEffect->NewInstance(context).ToLocalChecked();
+        object->Set(context, LITERAL("internalPtr"), Number::New(isolate, (LONG_PTR)ptr));
+        return object;
     }
 
     Local<Object> getStrokeStyleImpl(Isolate* isolate, ID2D1StrokeStyle1* strokingStyle) {
-        Local<ObjectTemplate> jsSS = DIRECT2D::getIUnknownImpl(isolate, strokingStyle);
-        jsSS->Set(isolate, "GetStrokeTransformType", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            ID2D1StrokeStyle1* strokingStyle = (ID2D1StrokeStyle1*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
-            info.GetReturnValue().Set(Number::New(isolate, strokingStyle->GetStrokeTransformType()));
-        }));
-        jsSS->Set(isolate, "GetEndCap", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            ID2D1StrokeStyle1* strokingStyle = (ID2D1StrokeStyle1*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
-            info.GetReturnValue().Set(Number::New(isolate, strokingStyle->GetEndCap()));
-        }));
-        jsSS->Set(isolate, "GetDashCap", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            ID2D1StrokeStyle1* strokingStyle = (ID2D1StrokeStyle1*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
-            info.GetReturnValue().Set(Number::New(isolate, strokingStyle->GetDashCap()));
-        }));
-        jsSS->Set(isolate, "GetMiterLimit", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            ID2D1StrokeStyle1* strokingStyle = (ID2D1StrokeStyle1*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
-            info.GetReturnValue().Set(Number::New(isolate, strokingStyle->GetMiterLimit()));
-        }));
-        jsSS->Set(isolate, "GetLineJoin", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            ID2D1StrokeStyle1* strokingStyle = (ID2D1StrokeStyle1*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
-            info.GetReturnValue().Set(Number::New(isolate, strokingStyle->GetLineJoin()));
-        }));
-        jsSS->Set(isolate, "GetDashOffset", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            ID2D1StrokeStyle1* strokingStyle = (ID2D1StrokeStyle1*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
-            info.GetReturnValue().Set(Number::New(isolate, strokingStyle->GetDashOffset()));
-        }));
-        jsSS->Set(isolate, "GetDashStyle", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            ID2D1StrokeStyle1* strokingStyle = (ID2D1StrokeStyle1*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
-            info.GetReturnValue().Set(Number::New(isolate, strokingStyle->GetDashStyle()));
-        }));
-        jsSS->Set(isolate, "GetDashesCount", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            ID2D1StrokeStyle1* strokingStyle = (ID2D1StrokeStyle1*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
-            info.GetReturnValue().Set(Number::New(isolate, strokingStyle->GetDashesCount()));
-        }));
-        jsSS->Set(isolate, "GetDashes", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            Local<Context> context = isolate->GetCurrentContext();
-            ID2D1StrokeStyle1* strokingStyle = (ID2D1StrokeStyle1*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
-            UINT32 count = strokingStyle->GetDashesCount();
-            std::vector<float> dash(count, 0.0); //oh yeah i don't have to use new float[count]
-            strokingStyle->GetDashes(dash.data(), count);
-            Local<Array> jsDashes = Array::New(isolate);
-            for (int i = 0; i < count; i++) {
-                jsDashes->Set(context, i, Number::New(isolate, dash[i]));
-            }
-            info.GetReturnValue().Set(jsDashes);
-        }));
-
-        return jsSS->NewInstance(isolate->GetCurrentContext()).ToLocalChecked();
+        Local<Context> context = isolate->GetCurrentContext();
+        Local<Object> jsStrokingStyle = DIRECT2D::Templates::_ID2D1StrokeStyle1->NewInstance(context).ToLocalChecked();
+        jsStrokingStyle->Set(context, LITERAL("internalPtr"), Number::New(isolate, (LONG_PTR)strokingStyle)); //i guess i could use Integer::New instead idk
+        return jsStrokingStyle;
     }
 
-    Local<ObjectTemplate> getGeometryImpl(Isolate* isolate, ID2D1Geometry* geo) {
-        Local<ObjectTemplate> jsG = DIRECT2D::getIUnknownImpl(isolate, geo);
-        jsG->Set(isolate, "GetBounds", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            Local<Context> context = isolate->GetCurrentContext();
-            ID2D1Geometry* geo = (ID2D1Geometry*)IntegerFI(info.This()->GetRealNamedProperty(context, LITERAL("internalPtr")).ToLocalChecked());
-            D2D1_RECT_F rectf{};
-            D2D1_MATRIX_3X2_F* trans = nullptr;
-            //if (info[0]->IsNumber()) { //assuming it's 0 so null
-            //    //trans = (D2D1_MATRIX_3X2_F*)IntegerFI(info[0]);
-            //}
-            //else if (info[0]->IsObject()) {
-            if (!info[0]->IsNumber() && info[0]->IsObject()) {
-                trans = new D2D1_MATRIX_3X2_F(DIRECT2D::fromJSMatrix3x2(isolate, info[0].As<Object>()));
-            }
-            RetIfFailed(geo->GetBounds(trans, &rectf), "ID2D1Geometry->GetBounds failed");
-            Local<Object> mango = Object::New(isolate);
-            mango->Set(context, LITERAL("left"), Number::New(isolate, rectf.left));
-            mango->Set(context, LITERAL("top"), Number::New(isolate, rectf.top));
-            mango->Set(context, LITERAL("right"), Number::New(isolate, rectf.right));
-            mango->Set(context, LITERAL("bottom"), Number::New(isolate, rectf.bottom));
-            info.GetReturnValue().Set(mango);
-            if (trans != nullptr) {
-                delete trans;
-            }
-        }));
-        jsG->Set(isolate, "GetWidenedBounds", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            Local<Context> context = isolate->GetCurrentContext();
-            ID2D1Geometry* geo = (ID2D1Geometry*)IntegerFI(info.This()->GetRealNamedProperty(context, LITERAL("internalPtr")).ToLocalChecked());
-            D2D1_RECT_F rectf{};
-            D2D1_MATRIX_3X2_F* trans = nullptr;
-            //if (info[0]->IsNumber()) { //assuming it's 0 so null
-                //trans = (D2D1_MATRIX_3X2_F*)IntegerFI(info[0]);
-            //}
-            //else if (info[0]->IsObject()) {
-            if(!info[0]->IsNumber() && info[0]->IsObject()) {
-                trans = new D2D1_MATRIX_3X2_F(DIRECT2D::fromJSMatrix3x2(isolate, info[0].As<Object>()));
-            }
-            ID2D1StrokeStyle* strokeStyle = NULL;
-            if (!info[1]->IsNumber() && info[1]->IsObject()) {
-                strokeStyle = (ID2D1StrokeStyle*)IntegerFI(info[1].As<Object>()->GetRealNamedProperty(context, LITERAL("internalPtr")).ToLocalChecked()); //(ID2D1StrokeStyle*)IntegerFI(info[6]);
-            }
-            ContIfFailed(geo->GetWidenedBounds(FloatFI(info[0]), strokeStyle, trans, &rectf), "ID2D1Geometry->GetWidenedBounds failed"); //this function lowkey made be realize that i need to actually add stroke styles
-            Local<Object> mango = Object::New(isolate);
-            mango->Set(context, LITERAL("left"), Number::New(isolate, rectf.left));
-            mango->Set(context, LITERAL("top"), Number::New(isolate, rectf.top));
-            mango->Set(context, LITERAL("right"), Number::New(isolate, rectf.right));
-            mango->Set(context, LITERAL("bottom"), Number::New(isolate, rectf.bottom));
-            info.GetReturnValue().Set(mango);
-            if (trans != nullptr) {
-                delete trans;
-            }
-        }));
-        jsG->Set(isolate, "StrokeContainsPoint", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            ID2D1Geometry* geo = (ID2D1Geometry*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
-            ID2D1StrokeStyle* strokeStyle = NULL;
-            D2D1_MATRIX_3X2_F* trans = nullptr;
-            if (!info[3]->IsNumber() && info[3]->IsObject()) {
-                strokeStyle = (ID2D1StrokeStyle*)IntegerFI(info[3].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()); //(ID2D1StrokeStyle*)IntegerFI(info[6]);
-            }
-            if (!info[4]->IsNumber() && info[4]->IsObject()) {
-                trans = new D2D1_MATRIX_3X2_F(DIRECT2D::fromJSMatrix3x2(isolate, info[0].As<Object>()));
-            }
-            BOOL contains = 0;
-            ContIfFailed(geo->StrokeContainsPoint(D2D1::Point2F(FloatFI(info[0]), FloatFI(info[1])), FloatFI(info[2]), strokeStyle, trans, &contains), "StrokeContainsPoint failed..");
-            info.GetReturnValue().Set(Number::New(isolate, contains));
-            if (trans != nullptr) {
-                delete trans;
-            }
-        }));
-        jsG->Set(isolate, "FillContainsPoint", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            ID2D1Geometry* geo = (ID2D1Geometry*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
-            D2D1_MATRIX_3X2_F* trans = nullptr;
-            if (!info[2]->IsNumber() && info[2]->IsObject()) {
-                trans = new D2D1_MATRIX_3X2_F(DIRECT2D::fromJSMatrix3x2(isolate, info[2].As<Object>()));
-            }
-            BOOL contains = 0;
-            ContIfFailed(geo->FillContainsPoint(D2D1::Point2F(FloatFI(info[0]), FloatFI(info[1])), trans, &contains), "FillContainsPoint failed...");
-            info.GetReturnValue().Set(Number::New(isolate, contains));
-            if (trans != nullptr) {
-                delete trans;
-            }
-        }));
-        jsG->Set(isolate, "CompareWithGeometry", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            ID2D1Geometry* geo = (ID2D1Geometry*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
-            ID2D1Geometry* otherGeo = (ID2D1Geometry*)IntegerFI(info[0].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
-            D2D1_MATRIX_3X2_F* trans = nullptr;
-            if (!info[1]->IsNumber() && info[1]->IsObject()) {
-                trans = new D2D1_MATRIX_3X2_F(DIRECT2D::fromJSMatrix3x2(isolate, info[2].As<Object>()));
-            }
-            D2D1_GEOMETRY_RELATION relation;
-            ContIfFailed(geo->CompareWithGeometry(otherGeo, trans, &relation), "CompareWithGeometry failed (amybe you forgot to pass a simplified geo sink object )");
-            info.GetReturnValue().Set(Number::New(isolate, relation));
-            if (trans != nullptr) {
-                delete trans;
-            }
-        }));
-        jsG->Set(isolate, "Simplify", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            ID2D1Geometry* geo = (ID2D1Geometry*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
-            D2D1_MATRIX_3X2_F* trans = nullptr;
-            if (!info[1]->IsNumber() && info[1]->IsObject()) {
-                trans = new D2D1_MATRIX_3X2_F(DIRECT2D::fromJSMatrix3x2(isolate, info[1].As<Object>()));
-            }
-            ID2D1SimplifiedGeometrySink* simplifiedGeoSink = (ID2D1SimplifiedGeometrySink*)IntegerFI(info[2].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
-            //if (!info[2]->IsNumber() && info[2]->IsObject()) {
-            //    simplifiedGeoSink = (ID2D1SimplifiedGeometrySink*)IntegerFI(info[2].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
-            //}
-            ContIfFailed(geo->Simplify((D2D1_GEOMETRY_SIMPLIFICATION_OPTION)IntegerFI(info[0]), trans, simplifiedGeoSink), "Simplify failed (perhaps you forgot to create and pass a simplified geometry sink object? lowk i idk)");
-            if (trans != nullptr) {
-                delete trans;
-            }
-        }));
-        jsG->Set(isolate, "Tessellate", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            ID2D1Geometry* geo = (ID2D1Geometry*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
-            D2D1_MATRIX_3X2_F* trans = nullptr;
-            if (!info[0]->IsNumber() && info[0]->IsObject()) {
-                trans = new D2D1_MATRIX_3X2_F(DIRECT2D::fromJSMatrix3x2(isolate, info[0].As<Object>()));
-            }
-            ID2D1TessellationSink* tesselationSink = (ID2D1TessellationSink*)IntegerFI(info[1].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
-            ContIfFailed(geo->Tessellate(trans, tesselationSink), "Tessellate failed...");
-            if (trans != nullptr) {
-                delete trans;
-            }
-        }));
-        jsG->Set(isolate, "CombineWithGeometry", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            ID2D1Geometry* geo = (ID2D1Geometry*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
-            ID2D1Geometry* otherGeo = (ID2D1Geometry*)IntegerFI(info[0].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
-            D2D1_MATRIX_3X2_F* trans = nullptr;
-            if (!info[2]->IsNumber() && info[2]->IsObject()) {
-                trans = new D2D1_MATRIX_3X2_F(DIRECT2D::fromJSMatrix3x2(isolate, info[2].As<Object>()));
-            }
-            ID2D1SimplifiedGeometrySink* simplifiedGeoSink = (ID2D1SimplifiedGeometrySink*)IntegerFI(info[3].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
-            ContIfFailed(geo->CombineWithGeometry(otherGeo, (D2D1_COMBINE_MODE)IntegerFI(info[1]), trans, simplifiedGeoSink), "CombineWithGeometry failed (amybe you forgot to pass a simplified geo sink object )");
-            if (trans != nullptr) {
-                delete trans;
-            }
-        }));
-        jsG->Set(isolate, "Outline", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            ID2D1Geometry* geo = (ID2D1Geometry*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
-            D2D1_MATRIX_3X2_F* trans = nullptr;
-            if (!info[0]->IsNumber() && info[0]->IsObject()) {
-                trans = new D2D1_MATRIX_3X2_F(DIRECT2D::fromJSMatrix3x2(isolate, info[0].As<Object>()));
-            }
-            ID2D1SimplifiedGeometrySink* simplifiedGeoSink = (ID2D1SimplifiedGeometrySink*)IntegerFI(info[1].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
-            ContIfFailed(geo->Outline(trans, simplifiedGeoSink), "Outline failed");
-            if (trans != nullptr) {
-                delete trans;
-            }
-        }));
-        jsG->Set(isolate, "ComputeArea", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            ID2D1Geometry* geo = (ID2D1Geometry*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
-            D2D1_MATRIX_3X2_F* trans = nullptr;
-            if (!info[0]->IsNumber() && info[0]->IsObject()) {
-                trans = new D2D1_MATRIX_3X2_F(DIRECT2D::fromJSMatrix3x2(isolate, info[0].As<Object>()));
-            }
-            FLOAT area = 0.0f;
-            ContIfFailed(geo->ComputeArea(trans, &area), "ComputeArea failedf");
-            info.GetReturnValue().Set(Number::New(isolate, area));
-            if (trans != nullptr) {
-                delete trans;
-            }
-        }));
-        jsG->Set(isolate, "ComputeLength", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            ID2D1Geometry* geo = (ID2D1Geometry*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
-            D2D1_MATRIX_3X2_F* trans = nullptr;
-            if (!info[0]->IsNumber() && info[0]->IsObject()) {
-                trans = new D2D1_MATRIX_3X2_F(DIRECT2D::fromJSMatrix3x2(isolate, info[0].As<Object>()));
-            }
-            FLOAT length = 0.0f;
-            ContIfFailed(geo->ComputeLength(trans, &length), "ComputeLength failedf");
-            info.GetReturnValue().Set(Number::New(isolate, length));
-            if (trans != nullptr) {
-                delete trans;
-            }
-        }));
-        jsG->Set(isolate, "ComputePointAtLength", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            Local<Context> context = isolate->GetCurrentContext();
-            ID2D1Geometry* geo = (ID2D1Geometry*)IntegerFI(info.This()->GetRealNamedProperty(context, LITERAL("internalPtr")).ToLocalChecked());
-            D2D1_MATRIX_3X2_F* trans = nullptr;
-            if (!info[1]->IsNumber() && info[1]->IsObject()) {
-                trans = new D2D1_MATRIX_3X2_F(DIRECT2D::fromJSMatrix3x2(isolate, info[1].As<Object>()));
-            }
-            D2D1_POINT_2F p2f{};
-            D2D1_POINT_2F tv{};
-            geo->ComputePointAtLength(FloatFI(info[0]), trans, &p2f, &tv);
-            Local<Object> jsInfo = Object::New(isolate);
-            jsInfo->Set(context, LITERAL("point"), DIRECT2D::getPoint2FImpl(isolate, p2f));
-            jsInfo->Set(context, LITERAL("unitTangentVector"), DIRECT2D::getPoint2FImpl(isolate, tv));
-            info.GetReturnValue().Set(jsInfo);
-            if (trans != nullptr) {
-                delete trans;
-            }
-        }));
-        jsG->Set(isolate, "Widen", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            ID2D1Geometry* geo = (ID2D1Geometry*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
-            ID2D1StrokeStyle* strokeStyle = NULL;
-            D2D1_MATRIX_3X2_F* trans = nullptr;
-            if (!info[1]->IsNumber() && info[1]->IsObject()) {
-                strokeStyle = (ID2D1StrokeStyle*)IntegerFI(info[1].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()); //(ID2D1StrokeStyle*)IntegerFI(info[6]);
-            }
-            if (!info[2]->IsNumber() && info[2]->IsObject()) {
-                trans = new D2D1_MATRIX_3X2_F(DIRECT2D::fromJSMatrix3x2(isolate, info[2].As<Object>()));
-            }
-            ID2D1SimplifiedGeometrySink* simplifiedGeoSink = (ID2D1SimplifiedGeometrySink*)IntegerFI(info[3].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
-            //if (!info[2]->IsNumber() && info[2]->IsObject()) {
-            //    simplifiedGeoSink = (ID2D1SimplifiedGeometrySink*)IntegerFI(info[2].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
-            //}
-            ContIfFailed(geo->Widen(FloatFI(info[0]), strokeStyle, trans, simplifiedGeoSink), "Widen failed (perhaps you forgot to create and pass a simplified geometry sink object? lowk i idk)");
-            if (trans != nullptr) {
-                delete trans;
-            }
-        }));
-        return jsG;
+    Local<Object> getGeometryImpl(Isolate* isolate, ID2D1Geometry* geo) {
+        Local<Context> context = isolate->GetCurrentContext();
+        Local<Object> jsGeometry = DIRECT2D::Templates::_ID2D1Geometry->NewInstance(context).ToLocalChecked();
+        jsGeometry->Set(context, LITERAL("internalPtr"), Number::New(isolate, (LONG_PTR)geo)); //i guess i could use Integer::New instead idk
+        return jsGeometry;
     }
 
-    Local<ObjectTemplate> getSimplifiedGeometrySinkImpl(Isolate* isolate, ID2D1SimplifiedGeometrySink* simplifiedGeoSink) {
-        Local<ObjectTemplate> jsSGS = DIRECT2D::getIUnknownImpl(isolate, simplifiedGeoSink);
-        jsSGS->Set(isolate, "SetFillMode", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            ID2D1SimplifiedGeometrySink* simplifiedGeoSink = (ID2D1SimplifiedGeometrySink*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
-            simplifiedGeoSink->SetFillMode((D2D1_FILL_MODE)IntegerFI(info[0]));
-        }));
-        jsSGS->Set(isolate, "SetSegmentFlags", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            ID2D1SimplifiedGeometrySink* simplifiedGeoSink = (ID2D1SimplifiedGeometrySink*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
-            simplifiedGeoSink->SetSegmentFlags((D2D1_PATH_SEGMENT)IntegerFI(info[0]));
-        }));
-        jsSGS->Set(isolate, "BeginFigure", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            ID2D1SimplifiedGeometrySink* simplifiedGeoSink = (ID2D1SimplifiedGeometrySink*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
-            simplifiedGeoSink->BeginFigure(D2D1::Point2F(FloatFI(info[0]), FloatFI(info[1])), (D2D1_FIGURE_BEGIN)IntegerFI(info[2]));
-        }));
-        jsSGS->Set(isolate, "AddLines", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            Local<Context> context = isolate->GetCurrentContext();
-            
-            ID2D1SimplifiedGeometrySink* simplifiedGeoSink = (ID2D1SimplifiedGeometrySink*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
-            
-            Local<Array> jsLines = info[0].As<Array>();
-            uint32_t len = jsLines->Length();
-            
-            std::vector<D2D1_POINT_2F> points(len);
-            
-            if (jsLines->Get(context, 0).ToLocalChecked()->IsArray()) { //this points array can be filled with more arrays -> [[10, 20], [20, 30]]
-                for (int i = 0; i < len; i++) {
-                    Local<Array> innerArr = jsLines->Get(context, i).ToLocalChecked().As<Array>();
-                    points[i] = D2D1::Point2F(FloatFI(innerArr->Get(context, 0).ToLocalChecked()), FloatFI(innerArr->Get(context, 1).ToLocalChecked()));
-                }
-            }
-            else { //or it can be filled with objects -> [{x: 10, y: 20}, {x: 20, y: 30}]
-                for (int i = 0; i < len; i++) {
-                    Local<Object> innerObj = jsLines->Get(context, i).ToLocalChecked().As<Object>();
-                    points[i] = D2D1::Point2F(FloatFI(innerObj->Get(context, LITERAL("x")).ToLocalChecked()), FloatFI(innerObj->Get(context, LITERAL("y")).ToLocalChecked()));
-                }
-            }
-
-            simplifiedGeoSink->AddLines(points.data(), len);
-        }));
-        jsSGS->Set(isolate, "AddBeziers", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            Local<Context> context = isolate->GetCurrentContext();
-
-            ID2D1SimplifiedGeometrySink* simplifiedGeoSink = (ID2D1SimplifiedGeometrySink*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
-
-            Local<Array> jsLines = info[0].As<Array>();
-            uint32_t len = info.Length() > 1 ? info.Length() : jsLines->Length();
-
-            std::vector<D2D1_BEZIER_SEGMENT> beziers(len);
-
-            //if (jsLines->Get(context, 0).ToLocalChecked()->IsArray()) { //this points array can be filled with more arrays -> [[[10, 20], [20, 30], [30, 40]], [[40, 50], [50, 60], [60, 70]]]
-            if (info.Length() == 1) {
-                //assuming you called this function like AddBeziers([[[x1, y1], [x2, y2], [x3, y3]], [[x4, y4], [x5, y5], [x6, y6]]])
-                for (int i = 0; i < len; i++) {
-                    Local<Array> innerArr = jsLines->Get(context, i).ToLocalChecked().As<Array>();
-                    Local<Array> point1 = innerArr->Get(context, 0).ToLocalChecked().As<Array>();
-                    Local<Array> point2 = innerArr->Get(context, 1).ToLocalChecked().As<Array>();
-                    Local<Array> point3 = innerArr->Get(context, 2).ToLocalChecked().As<Array>();
-                    beziers[i] = D2D1::BezierSegment(
-                        D2D1::Point2F(FloatFI(point1->Get(context, 0).ToLocalChecked()), FloatFI(point1->Get(context, 1).ToLocalChecked())),
-                        D2D1::Point2F(FloatFI(point2->Get(context, 0).ToLocalChecked()), FloatFI(point2->Get(context, 1).ToLocalChecked())),
-                        D2D1::Point2F(FloatFI(point3->Get(context, 0).ToLocalChecked()), FloatFI(point3->Get(context, 1).ToLocalChecked()))//,
-                    );
-                }
-            }
-            else {
-                //assuming you called this function like AddBeziers([[x1, y1], [x2, y2], [x3, y3]], [[x4, y4], [x5, y5], [x6, y6]]);
-                for (int i = 0; i < len; i++) {
-                    Local<Array> innerArr = info[i].As<Array>();
-                    Local<Array> point1 = innerArr->Get(context, 0).ToLocalChecked().As<Array>();
-                    Local<Array> point2 = innerArr->Get(context, 1).ToLocalChecked().As<Array>();
-                    Local<Array> point3 = innerArr->Get(context, 2).ToLocalChecked().As<Array>();
-                    beziers[i] = D2D1::BezierSegment(
-                        D2D1::Point2F(FloatFI(point1->Get(context, 0).ToLocalChecked()), FloatFI(point1->Get(context, 1).ToLocalChecked())),
-                        D2D1::Point2F(FloatFI(point2->Get(context, 0).ToLocalChecked()), FloatFI(point2->Get(context, 1).ToLocalChecked())),
-                        D2D1::Point2F(FloatFI(point3->Get(context, 0).ToLocalChecked()), FloatFI(point3->Get(context, 1).ToLocalChecked()))//,
-                    );
-                }
-            }
-
-            simplifiedGeoSink->AddBeziers(beziers.data(), len);
-        }));
-        jsSGS->Set(isolate, "EndFigure", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            ID2D1SimplifiedGeometrySink* simplifiedGeoSink = (ID2D1SimplifiedGeometrySink*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
-            simplifiedGeoSink->EndFigure((D2D1_FIGURE_END)IntegerFI(info[0]));
-        }));
-        jsSGS->Set(isolate, "Close", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            ID2D1SimplifiedGeometrySink* simplifiedGeoSink = (ID2D1SimplifiedGeometrySink*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
-            RetIfFailed(simplifiedGeoSink->Close(), "ID2D1(Simplified?)GeometrySink->Close failed");
-        }));
-        return jsSGS;
+    Local<Object> getSimplifiedGeometrySinkImpl(Isolate* isolate, ID2D1SimplifiedGeometrySink* simplifiedGeoSink) {
+        Local<Context> context = isolate->GetCurrentContext();
+        Local<Object> jsSimplifiedGeoSink = DIRECT2D::Templates::_ID2D1SimplifiedGeometrySink->NewInstance(context).ToLocalChecked();
+        jsSimplifiedGeoSink->Set(context, LITERAL("internalPtr"), Number::New(isolate, (LONG_PTR)simplifiedGeoSink)); //i guess i could use Integer::New instead idk
+        return jsSimplifiedGeoSink;
     }
 
     Local<Object> getGeometrySinkImpl(Isolate* isolate, ID2D1GeometrySink* geoSink) {
-        Local<ObjectTemplate> jsGS = DIRECT2D::getSimplifiedGeometrySinkImpl(isolate, geoSink);
-        jsGS->Set(isolate, "AddLine", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            Local<Context> context = isolate->GetCurrentContext();
-            ID2D1GeometrySink* geoSink = (ID2D1GeometrySink*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
-            D2D1_POINT_2F point{};
-            if (info[0]->IsArray()) {
-                //assuming you called this function like AddLine([x,  y])
-                Local<Array> arr = info[0].As<Array>();
-                point = D2D1::Point2F(FloatFI(arr->Get(context, 0).ToLocalChecked()), FloatFI(arr->Get(context, 1).ToLocalChecked()));
-            }
-            else if (info[0]->IsNumber()) {
-                //assuming you called this function like AddLine(x, y)
-                point = D2D1::Point2F(FloatFI(info[0]), FloatFI(info[1]));
-            }
-            else if (info[0]->IsObject()) {
-                //assuming you called this function like AddLine({x, y})
-                Local<Object> obj = info[0].As<Object>();
-                point = D2D1::Point2F(FloatFI(obj->Get(context, LITERAL("x")).ToLocalChecked()), FloatFI(obj->Get(context, LITERAL("y")).ToLocalChecked()));
-            }
-
-            geoSink->AddLine(point);
-        }));
-        jsGS->Set(isolate, "AddBezier", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            Local<Context> context = isolate->GetCurrentContext();
-            ID2D1GeometrySink* geoSink = (ID2D1GeometrySink*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
-            D2D1_BEZIER_SEGMENT bezier{};
-            
-            if (info.Length() == 1) {
-                //assuming you called this function like AddBezier([[x, y], [x2, y2], [x3, y3]])
-                Local<Array> arr = info[0].As<Array>();
-                Local<Array> point1 = arr->Get(context, 0).ToLocalChecked().As<Array>();
-                Local<Array> point2 = arr->Get(context, 1).ToLocalChecked().As<Array>();
-                Local<Array> point3 = arr->Get(context, 2).ToLocalChecked().As<Array>();
-                bezier.point1 = D2D1::Point2F(FloatFI(point1->Get(context, 0).ToLocalChecked()), FloatFI(point1->Get(context, 1).ToLocalChecked()));
-                bezier.point2 = D2D1::Point2F(FloatFI(point2->Get(context, 0).ToLocalChecked()), FloatFI(point2->Get(context, 1).ToLocalChecked()));
-                bezier.point3 = D2D1::Point2F(FloatFI(point3->Get(context, 0).ToLocalChecked()), FloatFI(point3->Get(context, 1).ToLocalChecked()));
-            }
-            else {
-                //assuming you called this function like AddBezier([x, y], [x2, y2], [x3, y3]);
-                bezier.point1 = D2D1::Point2F(FloatFI(info[0].As<Array>()->Get(context, 0).ToLocalChecked()), FloatFI(info[0].As<Array>()->Get(context, 1).ToLocalChecked()));
-                bezier.point2 = D2D1::Point2F(FloatFI(info[1].As<Array>()->Get(context, 0).ToLocalChecked()), FloatFI(info[1].As<Array>()->Get(context, 1).ToLocalChecked()));
-                bezier.point3 = D2D1::Point2F(FloatFI(info[2].As<Array>()->Get(context, 0).ToLocalChecked()), FloatFI(info[2].As<Array>()->Get(context, 1).ToLocalChecked()));
-            }
-
-            geoSink->AddBezier(bezier);
-        }));
-        jsGS->Set(isolate, "AddQuadraticBezier", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            Local<Context> context = isolate->GetCurrentContext();
-            ID2D1GeometrySink* geoSink = (ID2D1GeometrySink*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
-            
-            D2D1_QUADRATIC_BEZIER_SEGMENT bezier{};
-
-            if (info.Length() == 1) {
-                //assuming you called this function like AddQuadraticBezier([[x, y], [x2, y2]])
-                Local<Array> arr = info[0].As<Array>();
-                Local<Array> point1 = arr->Get(context, 0).ToLocalChecked().As<Array>();
-                Local<Array> point2 = arr->Get(context, 1).ToLocalChecked().As<Array>();
-                bezier.point1 = D2D1::Point2F(FloatFI(point1->Get(context, 0).ToLocalChecked()), FloatFI(point1->Get(context, 1).ToLocalChecked()));
-                bezier.point2 = D2D1::Point2F(FloatFI(point2->Get(context, 0).ToLocalChecked()), FloatFI(point2->Get(context, 1).ToLocalChecked()));
-            }
-            else {
-                //assuming you called this function like AddQuadraticBezier([x, y], [x2, y2]);
-                bezier.point1 = D2D1::Point2F(FloatFI(info[0].As<Array>()->Get(context, 0).ToLocalChecked()), FloatFI(info[0].As<Array>()->Get(context, 1).ToLocalChecked()));
-                bezier.point2 = D2D1::Point2F(FloatFI(info[1].As<Array>()->Get(context, 0).ToLocalChecked()), FloatFI(info[1].As<Array>()->Get(context, 1).ToLocalChecked()));
-            }
-
-            geoSink->AddQuadraticBezier(bezier);
-        }));
-        jsGS->Set(isolate, "AddQuadraticBeziers", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            Local<Context> context = isolate->GetCurrentContext();
-            ID2D1GeometrySink* geoSink = (ID2D1GeometrySink*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
-            Local<Array> jsLines = info[0].As<Array>();
-            uint32_t len = info.Length() > 1 ? info.Length() : jsLines->Length();
-
-            std::vector<D2D1_QUADRATIC_BEZIER_SEGMENT> beziers(len);
-
-            //if (jsLines->Get(context, 0).ToLocalChecked()->IsArray()) { //this points array can be filled with more arrays -> [[[10, 20], [20, 30], [30, 40]], [[40, 50], [50, 60], [60, 70]]]
-            if (info.Length() == 1) {
-                for (int i = 0; i < len; i++) {
-                    //assuming you called this function like AddQuadraticBeziers([[[x, y], [x2, y2]], [[x3, y3], [x4, y4]]])
-                    Local<Array> innerArr = jsLines->Get(context, i).ToLocalChecked().As<Array>();
-                    Local<Array> point1 = innerArr->Get(context, 0).ToLocalChecked().As<Array>();
-                    Local<Array> point2 = innerArr->Get(context, 1).ToLocalChecked().As<Array>();
-                    //Local<Array> point3 = innerArr->Get(context, 2).ToLocalChecked().As<Array>();
-                    beziers[i] = D2D1::QuadraticBezierSegment(
-                        D2D1::Point2F(FloatFI(point1->Get(context, 0).ToLocalChecked()), FloatFI(point1->Get(context, 1).ToLocalChecked())),
-                        D2D1::Point2F(FloatFI(point2->Get(context, 0).ToLocalChecked()), FloatFI(point2->Get(context, 1).ToLocalChecked()))
-                        //D2D1::Point2F(FloatFI(point3->Get(context, 0).ToLocalChecked()), FloatFI(point3->Get(context, 1).ToLocalChecked()))//,
-                    );
-                }
-            }
-            else {
-                //assuming you called this function like AddQuadraticBeziers([[x, y], [x2, y2]], [[x3, y3], [x4, y4]])
-                for (int i = 0; i < len; i++) {
-                    Local<Array> innerArr = info[0].As<Array>()->Get(context, i).ToLocalChecked().As<Array>();
-
-                    Local<Array> point1 = innerArr->Get(context, 0).ToLocalChecked().As<Array>();
-                    Local<Array> point2 = innerArr->Get(context, 1).ToLocalChecked().As<Array>();
-                    //Local<Array> point3 = innerArr->Get(context, 2).ToLocalChecked().As<Array>();
-                    beziers[i] = D2D1::QuadraticBezierSegment(
-                        D2D1::Point2F(FloatFI(point1->Get(context, 0).ToLocalChecked()), FloatFI(point1->Get(context, 1).ToLocalChecked())),
-                        D2D1::Point2F(FloatFI(point2->Get(context, 0).ToLocalChecked()), FloatFI(point2->Get(context, 1).ToLocalChecked()))
-                        //D2D1::Point2F(FloatFI(point3->Get(context, 0).ToLocalChecked()), FloatFI(point3->Get(context, 1).ToLocalChecked()))//,
-                    );
-                }
-            }
-
-            geoSink->AddQuadraticBeziers(beziers.data(), len); //OOPS! i was calling AddQuadraticBezier instead and almost didn't realize
-        }));
-        jsGS->Set(isolate, "AddArc", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            ID2D1GeometrySink* geoSink = (ID2D1GeometrySink*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
-
-            //D2D1_ARC_SEGMENT arc[}; //BRUHHH i accidently put [} instead of {} and intellisense threw a huge fit and i even restarted visual studio because i thought it was a glitch! (there were errors everywhere past this line)
-
-            D2D1_ARC_SEGMENT arc = D2D1::ArcSegment(
-                D2D1::Point2F(FloatFI(info[0]), FloatFI(info[1])),
-                D2D1::SizeF(FloatFI(info[2]), FloatFI(info[3])),
-                FloatFI(info[4]),
-                D2D1_SWEEP_DIRECTION(IntegerFI(info[5])),
-                D2D1_ARC_SIZE(IntegerFI(info[6]))
-            );
-
-            geoSink->AddArc(arc);
-        }));
-
-        return jsGS->NewInstance(isolate->GetCurrentContext()).ToLocalChecked();
+        Local<Context> context = isolate->GetCurrentContext();
+        Local<Object> jsGeoSink = DIRECT2D::Templates::_ID2D1GeometrySink->NewInstance(context).ToLocalChecked();
+        jsGeoSink->Set(context, LITERAL("internalPtr"), Number::New(isolate, (LONG_PTR)geoSink)); //i guess i could use Integer::New instead idk
+        return jsGeoSink;
     }
 
     Local<Object> getPathGeometryImpl(Isolate* isolate, ID2D1PathGeometry1* path) {
-        Local<ObjectTemplate> jsPG = DIRECT2D::getGeometryImpl(isolate, path);
-        jsPG->Set(isolate, "Open", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            ID2D1PathGeometry1* path = (ID2D1PathGeometry1*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
-            ID2D1GeometrySink* geoSink = nullptr; RetIfFailed(path->Open(&geoSink), "Open failed...");
-            Local<Object> jsGS = DIRECT2D::getGeometrySinkImpl(isolate, geoSink);
-            info.GetReturnValue().Set(jsGS);
-        }));
-        jsPG->Set(isolate, "Stream", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            ID2D1PathGeometry1* path = (ID2D1PathGeometry1*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
-            ID2D1GeometrySink* geoSink = (ID2D1GeometrySink*)IntegerFI(info[0].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
-            RetIfFailed(path->Stream(geoSink), "Stream faioled...");
-        }));
-        jsPG->Set(isolate, "GetSegmentCount", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            ID2D1PathGeometry1* path = (ID2D1PathGeometry1*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
-            UINT32 count = 0; RetIfFailed(path->GetSegmentCount(&count), "GetSegmentCount failed");
-            info.GetReturnValue().Set(Number::New(isolate, count));
-        }));
-        jsPG->Set(isolate, "GetFigureCount", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            ID2D1PathGeometry1* path = (ID2D1PathGeometry1*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
-            UINT32 count = 0; RetIfFailed(path->GetFigureCount(&count), "GetFigureCount failed");
-            info.GetReturnValue().Set(Number::New(isolate, count));
-        }));
-        return jsPG->NewInstance(isolate->GetCurrentContext()).ToLocalChecked();
+        Local<Context> context = isolate->GetCurrentContext();
+        Local<Object> jsGeometry = DIRECT2D::Templates::_ID2D1PathGeometry1->NewInstance(context).ToLocalChecked();
+        jsGeometry->Set(context, LITERAL("internalPtr"), Number::New(isolate, (LONG_PTR)path)); //i guess i could use Integer::New instead idk
+        return jsGeometry;
     }
 
     Local<Object> getDXGIDebug1Impl(Isolate* isolate, IDXGIDebug1* dbg) {
-        Local<ObjectTemplate> jsDbg = DIRECT2D::getIUnknownImpl(isolate, dbg);
-
-        jsDbg->Set(isolate, "ReportLiveObjects", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            Isolate* isolate = info.GetIsolate();
-            IDXGIDebug1* dbg = (IDXGIDebug1*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
-            
-            RetIfFailed(dbg->ReportLiveObjects(jsImpl::fromJSGUID(isolate, info[0]), (DXGI_DEBUG_RLO_FLAGS)IntegerFI(info[1])), "ReportLiveObjects failed...");
-        }));
-
-        return jsDbg->NewInstance(isolate->GetCurrentContext()).ToLocalChecked();
+        Local<Context> context = isolate->GetCurrentContext();
+        Local<Object> jsDebug = DIRECT2D::Templates::_IDXGIDebug1->NewInstance(context).ToLocalChecked();
+        jsDebug->Set(context, LITERAL("internalPtr"), Number::New(isolate, (LONG_PTR)dbg)); //i guess i could use Integer::New instead idk
+        return jsDebug;
     }
 
     float f(float x) {
         if (x < .875) {
-            return min((max(abs(6*x-1.5)-.75, 0))/1.5, 1);
+            return min((max(abs(6 * x - 1.5) - .75, 0)) / 1.5, 1);
         }
         else {
-            return min((max(abs(6*x-7.5)-.75, 0))/1.5, 1);
+            return min((max(abs(6 * x - 7.5) - .75, 0)) / 1.5, 1);
         }
     }
 
     float f3(float x) {
-        return max(min(-(abs(6*x-3)-2.25)/1.5, 1), 0);
+        return max(min(-(abs(6 * x - 3) - 2.25) / 1.5, 1), 0);
     }
 
     ID2D1Brush* AdjustGradients(Isolate* isolate, Local<Object> jsBrush, D2D1_POINT_2F point0, D2D1_POINT_2F point1, float angle = 0.0F) { //unfortunately deprecated due to me finally added SetTransform (because i thought it would be too hard)
@@ -3786,7 +5295,7 @@ namespace DIRECT2D {
         ID2D1Brush* bruh = (ID2D1Brush*)jsBrush->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()->IntegerValue(isolate->GetCurrentContext()).FromJust();
         if (strcmp(brushType, "radial") == 0) {
             ID2D1RadialGradientBrush* brush = (ID2D1RadialGradientBrush*)bruh;
-            brush->SetCenter(D2D1::Point2F(point0.x+(point1.x - point0.x) / 2, point0.y+(point1.y - point0.y) / 2));
+            brush->SetCenter(D2D1::Point2F(point0.x + (point1.x - point0.x) / 2, point0.y + (point1.y - point0.y) / 2));
             //print(((point1.x - point0.x) / 2) << ((point1.y - point0.y) / 2));
             //printf("point0: (%f,%f); point1: (%f,%f); p1-p2: (%f,%f);\n", point0.x, point0.y, point1.x, point1.y, point1.x - point0.x, point1.y - point0.y);
             //brush->SetGradientOriginOffset(D2D1::Point2F((point1.x - point0.x) / 2, (point1.y - point0.y) / 2));
@@ -3798,7 +5307,7 @@ namespace DIRECT2D {
                         //damn it i lose precision (lol it donesn't reall y mater)
             angle = fmod(angle, 360.f);
             ID2D1LinearGradientBrush* brush = (ID2D1LinearGradientBrush*)bruh;
-            D2D1_POINT_2F zeroRotP0 = D2D1::Point2F(point0.x+(point1.x-point0.x)*f3(angle/360), point1.y - (point1.y - point0.y) * f(angle / 360));
+            D2D1_POINT_2F zeroRotP0 = D2D1::Point2F(point0.x + (point1.x - point0.x) * f3(angle / 360), point1.y - (point1.y - point0.y) * f(angle / 360));
             D2D1_POINT_2F zeroRotP1 = D2D1::Point2F(point1.x + (point0.x - point1.x) * f3(angle / 360), point0.y - (point0.y - point1.y) * f(angle / 360));
             //https://www.desmos.com/calculator/erqmojpc7j   //absolutely insane math
             //desmos just saved my life
@@ -3851,12 +5360,12 @@ namespace DIRECT2D {
 
                 Isolate* isolate = info.GetIsolate();
                 ID2D1Effect* effect = (ID2D1Effect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                
+
                 const char* mode = CStringFI(info[0]);
                 //oh no bruh SetValue works super weird and idk if i can do it MAN FUCK
                 //RetIfFailed(effect->SetValue(IntegerFI(info[0]), IntegerFI(info[1])), "SetValue failed!");
                 //effect->SetValue(D2D1_GAUSSIANBLUR_PROP_BORDER_MODE, D2D1_BORDER_MODE_HARD);
-                
+
                 //i had to use a little regex AND js to construct this function for me
                 //const deez = {"FLOAT": "(FLOAT)FloatFI(info[1])", "D2D1_VECTOR_2F": "D2D1_VECTOR_2F{(FLOAT)FloatFI(info[1]), (FLOAT)FloatFI(info[2])}", "D2D1_VECTOR_3F": "D2D1_VECTOR_3F{(FLOAT)FloatFI(info[1]), (FLOAT)FloatFI(info[2]), (FLOAT)FloatFI(info[3])}", "D2D1_VECTOR_4F": "D2D1_VECTOR_4F{(FLOAT)FloatFI(info[1]), (FLOAT)FloatFI(info[2]), (FLOAT)FloatFI(info[3]), (FLOAT)FloatFI(info[4])}", "IUnknown": "(IUnknown*)IntegerFI(info[1])", "ID2D1ColorContext": "(ID2D1ColorContext*)IntegerFI(info[1])"};
                 //lines = "";
@@ -4791,7 +6300,7 @@ namespace DIRECT2D {
                     effect->SetValue(D2D1_HDRTONEMAP_PROP_DISPLAY_MODE, (D2D1_HDRTONEMAP_DISPLAY_MODE)IntegerFI(info[1]));
                     return;
                 }
-            }));
+                }));
 
             jsEffect->Set(isolate, "SetInput", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
                 Isolate* isolate = info.GetIsolate();
@@ -4804,7 +6313,7 @@ namespace DIRECT2D {
                 //}
 
                 effect->SetInput(IntegerFI(info[0]), copyFrom);
-            }));
+                }));
 
             jsEffect->Set(isolate, "SetInputEffect", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
                 Isolate* isolate = info.GetIsolate();
@@ -4818,7 +6327,7 @@ namespace DIRECT2D {
                 //}
 
                 effect->SetInputEffect(IntegerFI(info[0]), inputEffect);
-            }));
+                }));
 
             jsEffect->Set(isolate, "effect", Boolean::New(isolate, true));
         }
@@ -4921,8 +6430,8 @@ V8FUNC(createCanvas) {
             }
             else if (d2d->type >= 2) { //OOPS when you resize you erase the backbitmap and targetbitmaps to resize them
                 Direct2D11* locald2d11 = (Direct2D11*)d2d;
-                info.This()->Set(context, LITERAL("backBitmap"), DIRECT2D::getBitmapImpl(isolate, locald2d11->d2dBackBitmap.Get())->NewInstance(context).ToLocalChecked());
-                info.This()->Set(context, LITERAL("targetBitmap"), DIRECT2D::getBitmapImpl(isolate, locald2d11->d2dTargetBitmap.Get())->NewInstance(context).ToLocalChecked());
+                info.This()->Set(context, LITERAL("backBitmap"), DIRECT2D::getBitmapImpl(isolate, locald2d11->d2dBackBitmap.Get()));
+                info.This()->Set(context, LITERAL("targetBitmap"), DIRECT2D::getBitmapImpl(isolate, locald2d11->d2dTargetBitmap.Get()));
             }
             //if (d2d->type == 0) {
             //    ID2D1HwndRenderTarget* renderTarget = (ID2D1HwndRenderTarget*)d2d->renderTarget;
@@ -4961,52 +6470,11 @@ V8FUNC(createCanvas) {
 
             ID2D1SolidColorBrush* newBrush;
 
-            d2d->renderTarget->CreateSolidColorBrush(D2D1::ColorF(FloatFI(info[0]), FloatFI(info[1]), FloatFI(info[2]), info[3]->IsNumber() ? FloatFI(info[3]) : 1.0F), & newBrush);//FloatFI(info[3])), &newBrush);
+            RetPrintIfFailed(d2d->renderTarget->CreateSolidColorBrush(D2D1::ColorF(FloatFI(info[0]), FloatFI(info[1]), FloatFI(info[2]), info[3]->IsNumber() ? FloatFI(info[3]) : 1.0F), & newBrush), "CreateSolidColorBrush failed some how bruh idk.");//FloatFI(info[3])), &newBrush);
 
-            Local<ObjectTemplate> jsBrush = DIRECT2D::getDefaultBrushImpl(isolate, newBrush);//ObjectTemplate::New(isolate);
-            //FUCKING GAME CHANGER
-            //jsBrush->Set(isolate, "internalPtr", Number::New(isolate, (LONG_PTR)newBrush));
-            jsBrush->Set(isolate, "SetColor", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                ID2D1SolidColorBrush* newBrush = (ID2D1SolidColorBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                D2D1_COLOR_F color{};
-                if (info.Length() == 1) {
-                    color = D2D1::ColorF(IntegerFI(info[0]));
-                }
-                else {
-                    color = D2D1::ColorF(FloatFI(info[0]), FloatFI(info[1]), FloatFI(info[2]), info[3]->IsNumber() ? FloatFI(info[3]) : 1.0F);
-                }
-                newBrush->SetColor(color);
-            }));
-            jsBrush->Set(isolate, "GetColor", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                ID2D1SolidColorBrush* newBrush = (ID2D1SolidColorBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                D2D1_COLOR_F color = newBrush->GetColor();
+            Local<Object> jsBrush = DIRECT2D::getID2D1SolidColorBrushImpl(isolate, newBrush);
 
-                //double darr[4]{color.r,color.g,color.b,color.a};
-
-                Local<Object> jsColor = DIRECT2D::getColorFImpl(isolate, color);
-
-                info.GetReturnValue().Set(jsColor);//jsImpl::asNumberArray(isolate, darr, 4));
-            }));
-            //jsBrush->Set(isolate, "SetOpacity", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            //    Isolate* isolate = info.GetIsolate();
-            //    ID2D1SolidColorBrush* newBrush = (ID2D1SolidColorBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-            //    
-            //    newBrush->SetOpacity(FloatFI(info[0]));
-            //}));
-            //jsBrush->Set(isolate, "GetOpacity", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            //    Isolate* isolate = info.GetIsolate();
-            //    ID2D1SolidColorBrush* newBrush = (ID2D1SolidColorBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-            //    info.GetReturnValue().Set(newBrush->GetOpacity());
-            //}));
-            //jsBrush->Set(isolate, "Release", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            //    Isolate* isolate = info.GetIsolate();
-            //    ID2D1SolidColorBrush* newBrush = (ID2D1SolidColorBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-            //    newBrush->Release();
-            //}));
-
-            info.GetReturnValue().Set(jsBrush->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
+            info.GetReturnValue().Set(jsBrush); //->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
         }));
         context->Set(isolate, "DXGIGetDebugInterface1", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
             Isolate* isolate = info.GetIsolate();
@@ -5203,7 +6671,7 @@ V8FUNC(createCanvas) {
 
             //font->SetWordWrapping(DWRITE_WORD_WRAPPING_NO_WRAP);
 
-            Local<ObjectTemplate> jsFont = DIRECT2D::getTextFormatImpl(isolate, d2d, font, true); //ObjectTemplate::New(isolate);
+            Local<Object/*Template*/> jsFont = DIRECT2D::getTextFormatImpl(isolate, d2d, font); //, d2d, font, true); //ObjectTemplate::New(isolate);
 
             //jsFont->Set(isolate, "GetWidth", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
             //    Isolate* isolate = info.GetIsolate();
@@ -5214,7 +6682,7 @@ V8FUNC(createCanvas) {
             //    pST->m_pTextLayout->GetOverhangMetrics(&overhangMetrics); //https://github.com/castorix/Direct2D_CScrollingText/blob/master/CScrollingText.cpp
             //}));
             
-            info.GetReturnValue().Set(jsFont->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
+            info.GetReturnValue().Set(jsFont);//->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
 
         }));
         context->Set(isolate, "CreateTextLayout", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
@@ -5226,409 +6694,9 @@ V8FUNC(createCanvas) {
 
             RetIfFailed(d2d->textfactory->CreateTextLayout(WStringFI(info[0]), wcslen(WStringFI(info[0])), textFormat, FloatFI(info[2]), FloatFI(info[3]), &layout), "CreateTextLayout failed");
 
-            Local<ObjectTemplate> jsLayout = DIRECT2D::getTextFormatImpl(isolate, d2d, (IDWriteTextFormat*)layout, false); //ObjectTemplate::New(isolate);
-            //
-            //jsFont->Set(isolate, )
-            jsLayout->Set(isolate, "text", info[0]);
+            Local<Object> jsLayout = DIRECT2D::getTextLayoutImpl(isolate, info[0], layout); //lowkey idk why i wrote the object template in here instead of in DIRECT2D
 
-            jsLayout->Set(isolate, "DetermineMinWidth", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-                float minWidth = 0;
-
-                RetIfFailed(layout->DetermineMinWidth(&minWidth), "DetermineMinWidth failed");
-                
-                info.GetReturnValue().Set(Number::New(isolate, minWidth));
-            }));
-
-            //jsLayout->Set(isolate, "Draw", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            //    Isolate* isolate = info.GetIsolate();
-            //    IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-            //
-            //}));
-
-            //jsLayout->Set(isolate, "GetClusterMetrics", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            //    Isolate* isolate = info.GetIsolate();
-            //    IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-            //
-            //    
-            //}));
-
-            jsLayout->Set(isolate, "GetDrawingEffect", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-                IUnknown* drawingEffect;
-
-                DWRITE_TEXT_RANGE textRange = DIRECT2D::genTextRange(isolate, layout, IntegerFI(info[1]), info[2]);
-
-                RetIfFailed(layout->GetDrawingEffect(IntegerFI(info[0]), &drawingEffect, &textRange), "GetDrawingEffect failed");
-
-                info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)drawingEffect));
-            }));
-
-            //jsLayout->Set(isolate, "GetInlineObject", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            //    Isolate* isolate = info.GetIsolate();
-            //    IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-            //
-            //    
-            //}));
-
-            jsLayout->Set(isolate, "GetLineMetrics", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                Local<Context> context = isolate->GetCurrentContext();
-                IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-                //DWRITE_LINE_METRICS* lineMetrics = nullptr; //oh it wanted me to allocate space for that myself
-                std::vector<DWRITE_LINE_METRICS> lineMetrics(IntegerFI(info[0])); //is this actually valid because im gonna be mad (visual studio says there's no constructor that just takes a number)
-                unsigned int actualLineCount = 0;
-
-                RetIfFailed(layout->GetLineMetrics(&lineMetrics[0], IntegerFI(info[0]), &actualLineCount), "GetLineMetrics failed");
-                
-                Local<Array> metricss = Array::New(isolate, actualLineCount);
-
-                for (unsigned int i = 0; i < actualLineCount; i++) {
-                    Local<Object> jsMetrics = Object::New(isolate);
-
-                    jsMetrics->Set(context, LITERAL("length"), Number::New(isolate, lineMetrics[i].length));
-                    jsMetrics->Set(context, LITERAL("trailingWhitespaceLength"), Number::New(isolate, lineMetrics[i].trailingWhitespaceLength));
-                    jsMetrics->Set(context, LITERAL("newlineLength"), Number::New(isolate, lineMetrics[i].newlineLength));
-                    jsMetrics->Set(context, LITERAL("height"), Number::New(isolate, lineMetrics[i].height));
-                    jsMetrics->Set(context, LITERAL("baseline"), Number::New(isolate, lineMetrics[i].baseline));
-                    jsMetrics->Set(context, LITERAL("isTrimmed"), Number::New(isolate, lineMetrics[i].isTrimmed));
-
-                    metricss->Set(context, i, jsMetrics);
-                }
-
-                info.GetReturnValue().Set(metricss);
-            }));
-
-            //jsLayout->Set(isolate, "GetLocaleName", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            //    Isolate* isolate = info.GetIsolate();
-            //    IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-            //
-            //}));
-            //
-            //jsLayout->Set(isolate, "GetLocaleNameLength", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            //    Isolate* isolate = info.GetIsolate();
-            //    IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-            //
-            //}));
-
-            jsLayout->Set(isolate, "GetMaxHeight", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-                info.GetReturnValue().Set(Number::New(isolate, layout->GetMaxHeight()));
-            }));
-
-            jsLayout->Set(isolate, "GetMaxWidth", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-                info.GetReturnValue().Set(Number::New(isolate, layout->GetMaxWidth()));
-            }));
-
-            jsLayout->Set(isolate, "GetMetrics", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                Local<Context> context = isolate->GetCurrentContext();
-                IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-            
-                DWRITE_TEXT_METRICS textMetrics{0};
-
-                RetIfFailed(layout->GetMetrics(&textMetrics), "GetMetrics failed");
-
-                Local<Object> jsMetrics = Object::New(isolate);
-
-                jsMetrics->Set(context, LITERAL("left"), Number::New(isolate, textMetrics.left));
-                jsMetrics->Set(context, LITERAL("top"), Number::New(isolate, textMetrics.top));
-                jsMetrics->Set(context, LITERAL("width"), Number::New(isolate, textMetrics.width));
-                jsMetrics->Set(context, LITERAL("widthIncludingTrailingWhitespace"), Number::New(isolate, textMetrics.widthIncludingTrailingWhitespace));
-                jsMetrics->Set(context, LITERAL("height"), Number::New(isolate, textMetrics.height));
-                jsMetrics->Set(context, LITERAL("layoutWidth"), Number::New(isolate, textMetrics.layoutWidth));
-                jsMetrics->Set(context, LITERAL("layoutHeight"), Number::New(isolate, textMetrics.layoutHeight));
-                jsMetrics->Set(context, LITERAL("maxBidiReorderingDepth"), Number::New(isolate, textMetrics.maxBidiReorderingDepth));
-                jsMetrics->Set(context, LITERAL("lineCount"), Number::New(isolate, textMetrics.lineCount));
-
-                info.GetReturnValue().Set(jsMetrics);
-            }));
-            
-            jsLayout->Set(isolate, "GetOverhangMetrics", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-            
-                DWRITE_OVERHANG_METRICS overhangMetrics{0};
-
-                RetIfFailed(layout->GetOverhangMetrics(&overhangMetrics), "GetOverhangMetrics failed");
-
-                Local<Object> jsRect = Object::New(isolate);
-
-                jsRect->Set(isolate->GetCurrentContext(), LITERAL("left"), Number::New(isolate, overhangMetrics.left));
-                jsRect->Set(isolate->GetCurrentContext(), LITERAL("top"), Number::New(isolate, overhangMetrics.top));
-                jsRect->Set(isolate->GetCurrentContext(), LITERAL("right"), Number::New(isolate, overhangMetrics.right));
-                jsRect->Set(isolate->GetCurrentContext(), LITERAL("bottom"), Number::New(isolate, overhangMetrics.bottom));
-
-                info.GetReturnValue().Set(jsRect);
-            }));
-
-            jsLayout->Set(isolate, "GetStrikethrough", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-                BOOL strikethroughed = false;
-
-                DWRITE_TEXT_RANGE textRange = DIRECT2D::genTextRange(isolate, layout, IntegerFI(info[1]), info[2]);
-
-                RetIfFailed(layout->GetStrikethrough(IntegerFI(info[0]), &strikethroughed, &textRange), "GetStrikethrough failed");
-
-                info.GetReturnValue().Set(Boolean::New(isolate, strikethroughed));
-            }));
-
-            //jsLayout->Set(isolate, "GetTypography", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            //    Isolate* isolate = info.GetIsolate();
-            //    IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-            //
-            //    
-            //}));
-
-            jsLayout->Set(isolate, "GetUnderline", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-                BOOL underlined = false;
-
-                DWRITE_TEXT_RANGE textRange = DIRECT2D::genTextRange(isolate, layout, IntegerFI(info[1]), info[2]);
-
-                RetIfFailed(layout->GetUnderline(IntegerFI(info[0]), &underlined, &textRange), "GetUnderlined failed");
-
-                info.GetReturnValue().Set(Boolean::New(isolate, underlined));
-            }));
-
-            jsLayout->Set(isolate, "HitTestPoint", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                Local<Context> context = isolate->GetCurrentContext();
-                IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-                BOOL isTrailingHit = false;
-                BOOL isInside = false;
-
-                DWRITE_HIT_TEST_METRICS hitTestMetrics{ 0 };
-
-                RetIfFailed(layout->HitTestPoint(FloatFI(info[0]), FloatFI(info[1]), &isTrailingHit, &isInside, &hitTestMetrics), "HitTestPoint failed");
-
-                Local<Object> ykykyk = Object::New(isolate);
-
-                ykykyk->Set(context, LITERAL("isTrailingHit"), Number::New(isolate, isTrailingHit));
-                ykykyk->Set(context, LITERAL("isInside"), Number::New(isolate, isInside));
-                
-                Local<Object> jsMetrics = Object::New(isolate);
-
-                jsMetrics->Set(context, LITERAL("textPosition"), Number::New(isolate, hitTestMetrics.textPosition));
-                jsMetrics->Set(context, LITERAL("length"), Number::New(isolate, hitTestMetrics.length));
-                jsMetrics->Set(context, LITERAL("left"), Number::New(isolate, hitTestMetrics.left));
-                jsMetrics->Set(context, LITERAL("top"), Number::New(isolate, hitTestMetrics.top));
-                jsMetrics->Set(context, LITERAL("width"), Number::New(isolate, hitTestMetrics.width));
-                jsMetrics->Set(context, LITERAL("height"), Number::New(isolate, hitTestMetrics.height));
-                jsMetrics->Set(context, LITERAL("bidiLevel"), Number::New(isolate, hitTestMetrics.bidiLevel));
-                jsMetrics->Set(context, LITERAL("isText"), Number::New(isolate, hitTestMetrics.isText));
-                jsMetrics->Set(context, LITERAL("isTrimmed"), Number::New(isolate, hitTestMetrics.isTrimmed));
-
-                ykykyk->Set(context, LITERAL("hitTestMetrics"), jsMetrics);
-
-                info.GetReturnValue().Set(ykykyk);
-            }));
-
-            jsLayout->Set(isolate, "HitTestTextPosition", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                Local<Context> context = isolate->GetCurrentContext();
-                IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-                float pointX = 0;
-                float pointY = 0;
-
-                DWRITE_HIT_TEST_METRICS hitTestMetrics{ 0 };
-
-                RetIfFailed(layout->HitTestTextPosition(IntegerFI(info[0]), IntegerFI(info[1]), &pointX, &pointY, &hitTestMetrics), "HitTestTextPosition failed");
-
-                Local<Object> ykykyk = Object::New(isolate);
-
-                ykykyk->Set(context, LITERAL("x"), Number::New(isolate, pointX));
-                ykykyk->Set(context, LITERAL("y"), Number::New(isolate, pointY));
-
-                Local<Object> jsMetrics = Object::New(isolate);
-
-                jsMetrics->Set(context, LITERAL("textPosition"), Number::New(isolate, hitTestMetrics.textPosition));
-                jsMetrics->Set(context, LITERAL("length"), Number::New(isolate, hitTestMetrics.length));
-                jsMetrics->Set(context, LITERAL("left"), Number::New(isolate, hitTestMetrics.left));
-                jsMetrics->Set(context, LITERAL("top"), Number::New(isolate, hitTestMetrics.top));
-                jsMetrics->Set(context, LITERAL("width"), Number::New(isolate, hitTestMetrics.width));
-                jsMetrics->Set(context, LITERAL("height"), Number::New(isolate, hitTestMetrics.height));
-                jsMetrics->Set(context, LITERAL("bidiLevel"), Number::New(isolate, hitTestMetrics.bidiLevel));
-                jsMetrics->Set(context, LITERAL("isText"), Number::New(isolate, hitTestMetrics.isText));
-                jsMetrics->Set(context, LITERAL("isTrimmed"), Number::New(isolate, hitTestMetrics.isTrimmed));
-
-                ykykyk->Set(context, LITERAL("hitTestMetrics"), jsMetrics);
-
-                info.GetReturnValue().Set(ykykyk);
-            }));
-
-            jsLayout->Set(isolate, "HitTestTextRange", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                Local<Context> context = isolate->GetCurrentContext();
-                IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-                unsigned int actualHitTestMetricsCount = 0;
-
-                //DWRITE_HIT_TEST_METRICS* hitTestMetrics = nullptr;
-                std::vector<DWRITE_HIT_TEST_METRICS> hitTestMetrics(IntegerFI(info[4]));
-
-                RetIfFailed(layout->HitTestTextRange(IntegerFI(info[0]), IntegerFI(info[1]), FloatFI(info[2]), FloatFI(info[3]), hitTestMetrics.data(), IntegerFI(info[4]), &actualHitTestMetricsCount), "HitTestTextPosition failed");
-
-                Local<Object> ykykyk = Object::New(isolate);
-
-                ykykyk->Set(context, LITERAL("actualHitTestMetricsCount"), Number::New(isolate, actualHitTestMetricsCount));
-
-                Local<Array> metricss = Array::New(isolate, actualHitTestMetricsCount);
-
-                for (unsigned int i = 0; i < actualHitTestMetricsCount; i++) {
-                    Local<Object> jsMetrics = Object::New(isolate);
-
-                    jsMetrics->Set(context, LITERAL("textPosition"), Number::New(isolate, hitTestMetrics[i].textPosition));
-                    jsMetrics->Set(context, LITERAL("length"), Number::New(isolate, hitTestMetrics[i].length));
-                    jsMetrics->Set(context, LITERAL("left"), Number::New(isolate, hitTestMetrics[i].left));
-                    jsMetrics->Set(context, LITERAL("top"), Number::New(isolate, hitTestMetrics[i].top));
-                    jsMetrics->Set(context, LITERAL("width"), Number::New(isolate, hitTestMetrics[i].width));
-                    jsMetrics->Set(context, LITERAL("height"), Number::New(isolate, hitTestMetrics[i].height));
-                    jsMetrics->Set(context, LITERAL("bidiLevel"), Number::New(isolate, hitTestMetrics[i].bidiLevel));
-                    jsMetrics->Set(context, LITERAL("isText"), Number::New(isolate, hitTestMetrics[i].isText));
-                    jsMetrics->Set(context, LITERAL("isTrimmed"), Number::New(isolate, hitTestMetrics[i].isTrimmed));
-                    
-                    metricss->Set(context, i, jsMetrics);
-                }
-
-                ykykyk->Set(context, LITERAL("hitTestMetrics"), metricss);
-
-                info.GetReturnValue().Set(ykykyk);
-            }));
-
-            jsLayout->Set(isolate, "SetDrawingEffect", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-                DWRITE_TEXT_RANGE textRange = DIRECT2D::genTextRange(isolate, layout, IntegerFI(info[1]), info[2]);
-
-                RetIfFailed(layout->SetDrawingEffect((IUnknown*)IntegerFI(info[0].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()), textRange), "SetDrawingEffect");
-            }));
-
-            //jsLayout->Set(isolate, "SetFontCollection", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            //    Isolate* isolate = info.GetIsolate();
-            //    IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-            //
-            //}));
-
-            jsLayout->Set(isolate, "SetFontFamilyName", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-                DWRITE_TEXT_RANGE textRange = DIRECT2D::genTextRange(isolate, layout, IntegerFI(info[1]), info[2]);
-
-                RetIfFailed(layout->SetFontFamilyName(WStringFI(info[0]), textRange), "SetFontFamilyName");
-            }));
-
-            jsLayout->Set(isolate, "SetFontSize", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-                DWRITE_TEXT_RANGE textRange = DIRECT2D::genTextRange(isolate, layout, IntegerFI(info[1]), info[2]);
-
-                RetIfFailed(layout->SetFontSize(FloatFI(info[0]), textRange), "SetFontSize");
-            }));
-
-            jsLayout->Set(isolate, "SetFontStretch", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-                DWRITE_FONT_STRETCH fontStretch = (DWRITE_FONT_STRETCH)IntegerFI(info[0]);
-
-                DWRITE_TEXT_RANGE textRange = DIRECT2D::genTextRange(isolate, layout, IntegerFI(info[1]), info[2]);
-
-                RetIfFailed(layout->SetFontStretch(fontStretch, textRange), "SetFontStretch failed");
-            }));
-
-            jsLayout->Set(isolate, "SetFontStyle", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-                DWRITE_FONT_STYLE fontStyle = (DWRITE_FONT_STYLE)IntegerFI(info[0]);
-
-                DWRITE_TEXT_RANGE textRange = DIRECT2D::genTextRange(isolate, layout, IntegerFI(info[1]), info[2]);
-
-                RetIfFailed(layout->SetFontStyle(fontStyle, textRange), "SetFontStyle failed");
-            }));
-
-            jsLayout->Set(isolate, "SetFontWeight", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-                DWRITE_FONT_WEIGHT fontWeight = (DWRITE_FONT_WEIGHT)IntegerFI(info[0]);
-
-                DWRITE_TEXT_RANGE textRange = DIRECT2D::genTextRange(isolate, layout, IntegerFI(info[1]), info[2]);
-
-                RetIfFailed(layout->SetFontWeight(fontWeight, textRange), "SetFontWeight failed");
-            }));
-
-            //jsLayout->Set(isolate, "SetInlineObject", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            //    Isolate* isolate = info.GetIsolate();
-            //    IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-            //
-            //}));
-            //
-            //jsLayout->Set(isolate, "SetLocaleName", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            //    Isolate* isolate = info.GetIsolate();
-            //    IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-            //
-            //}));
-
-            jsLayout->Set(isolate, "SetMaxHeight", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-                RetIfFailed(layout->SetMaxHeight(FloatFI(info[0])), "SetMaxHeight failed?");
-            }));
-
-            jsLayout->Set(isolate, "SetMaxWidth", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-                RetIfFailed(layout->SetMaxWidth(FloatFI(info[0])), "SetMaxWidth failed?");
-            }));
-
-            jsLayout->Set(isolate, "SetStrikethrough", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-                DWRITE_TEXT_RANGE textRange = DIRECT2D::genTextRange(isolate, layout, IntegerFI(info[1]), info[2]);
-
-                RetIfFailed(layout->SetStrikethrough(IntegerFI(info[0]), textRange), "SetStrikethrough failed");
-            }));
-
-            //jsLayout->Set(isolate, "SetTypography", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            //    Isolate* isolate = info.GetIsolate();
-            //    IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-            //
-            //}));
-
-            jsLayout->Set(isolate, "SetUnderline", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-                DWRITE_TEXT_RANGE textRange = DIRECT2D::genTextRange(isolate, layout, IntegerFI(info[1]), info[2]);
-
-                RetIfFailed(layout->SetUnderline(IntegerFI(info[0]), textRange), "SetUnderline failed");
-            }));
-
-            info.GetReturnValue().Set(jsLayout->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
+            info.GetReturnValue().Set(jsLayout);
         }));
         context->Set(isolate, "EnumFonts", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
             Isolate* isolate = info.GetIsolate();
@@ -5733,9 +6801,9 @@ V8FUNC(createCanvas) {
                 }
             }
 
-            Local<ObjectTemplate> jsBitmap = DIRECT2D::getBitmapImpl(isolate, bmp);//DIRECT2D::getIUnknownImpl(isolate, bmp);//ObjectTemplate::New(isolate);
+            Local<Object> jsBitmap = DIRECT2D::getBitmapImpl(isolate, bmp);//DIRECT2D::getIUnknownImpl(isolate, bmp);//ObjectTemplate::New(isolate);
         
-            info.GetReturnValue().Set(jsBitmap->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
+            info.GetReturnValue().Set(jsBitmap);
         }));
         context->Set(isolate, "CreateBitmapFromWicBitmap", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
             Isolate* isolate = info.GetIsolate();
@@ -5753,9 +6821,9 @@ V8FUNC(createCanvas) {
                 wicConverter->Release();
             }
         
-            Local<ObjectTemplate> jsBitmap = DIRECT2D::getBitmapImpl(isolate, bmp);//DIRECT2D::getIUnknownImpl(isolate, bmp);//ObjectTemplate::New(isolate);
+            Local<Object> jsBitmap = DIRECT2D::getBitmapImpl(isolate, bmp);//DIRECT2D::getIUnknownImpl(isolate, bmp);//ObjectTemplate::New(isolate);
         
-            info.GetReturnValue().Set(jsBitmap->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
+            info.GetReturnValue().Set(jsBitmap);
         }));
         context->Set(isolate, "CreateBitmapFromFilename", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
             Isolate* isolate = info.GetIsolate();
@@ -5830,9 +6898,9 @@ V8FUNC(createCanvas) {
             wicConverter->Release();
             wicFrame->Release();
         
-            Local<ObjectTemplate> jsBitmap = DIRECT2D::getBitmapImpl(isolate, bmp);//DIRECT2D::getIUnknownImpl(isolate, bmp);//ObjectTemplate::New(isolate);
+            Local<Object> jsBitmap = DIRECT2D::getBitmapImpl(isolate, bmp);//DIRECT2D::getIUnknownImpl(isolate, bmp);//ObjectTemplate::New(isolate);
         
-            info.GetReturnValue().Set(jsBitmap->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
+            info.GetReturnValue().Set(jsBitmap);
         }));
         //lowkey impatientmaxxing right now but good god i can't be bothered to comb through sparse documents to understand how loading a font works with DirectWrite
         //https://learn.microsoft.com/en-us/windows/win32/directwrite/custom-font-collections?redirectedfrom=MSDN
@@ -5866,98 +6934,11 @@ V8FUNC(createCanvas) {
 
             d2d->renderTarget->CreateBitmapBrush(bmp, &bmpBrush);
 
-            Local<ObjectTemplate> jsBrush = DIRECT2D::getDefaultBrushImpl(isolate, bmpBrush, "bitmap");//ObjectTemplate::New(isolate);
-            //jsBrush->Set(isolate, "internalPtr", Number::New(isolate, (LONG_PTR)bmpBrush));
-            jsBrush->Set(isolate, "GetExtendModeX", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                ID2D1BitmapBrush* bmpBrush = (ID2D1BitmapBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                
-                //unsigned int extend = bmpBrush->GetExtendModeX();
-                info.GetReturnValue().Set(bmpBrush->GetExtendModeX());
-            }));
-            jsBrush->Set(isolate, "GetExtendModeY", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                ID2D1BitmapBrush* bmpBrush = (ID2D1BitmapBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                
-                //unsigned int extend = bmpBrush->GetExtendModeX();
-                info.GetReturnValue().Set(bmpBrush->GetExtendModeY());
-            }));
-            jsBrush->Set(isolate, "GetExtendMode", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                ID2D1BitmapBrush* bmpBrush = (ID2D1BitmapBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                
-                //unsigned int extend = bmpBrush->GetExtendModeX();
-                info.GetReturnValue().Set(DIRECT2D::getPoint2FImpl(isolate, D2D1::Point2F(bmpBrush->GetExtendModeX(), bmpBrush->GetExtendModeY())));
-            }));
-            jsBrush->Set(isolate, "GetInterpolationMode", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                ID2D1BitmapBrush* bmpBrush = (ID2D1BitmapBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                
-                info.GetReturnValue().Set(bmpBrush->GetInterpolationMode());
-            }));
+            //Local<ObjectTemplate> jsBrush = DIRECT2D::getDefaultBrushImpl(isolate, bmpBrush, "bitmap");//ObjectTemplate::New(isolate);
+            
+            Local<Object> jsBrush = DIRECT2D::getBitmapBrushImpl(isolate, bmpBrush);
 
-            jsBrush->Set(isolate, "SetExtendModeX", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                ID2D1BitmapBrush* bmpBrush = (ID2D1BitmapBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                
-                //unsigned int extend = bmpBrush->GetExtendModeX();
-                bmpBrush->SetExtendModeX((D2D1_EXTEND_MODE)IntegerFI(info[0]));
-            }));
-            jsBrush->Set(isolate, "SetExtendModeY", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                ID2D1BitmapBrush* bmpBrush = (ID2D1BitmapBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                
-                bmpBrush->SetExtendModeY((D2D1_EXTEND_MODE)IntegerFI(info[0]));
-            }));
-            jsBrush->Set(isolate, "SetExtendMode", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                ID2D1BitmapBrush* bmpBrush = (ID2D1BitmapBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                
-                bmpBrush->SetExtendModeX((D2D1_EXTEND_MODE)IntegerFI(info[0]));
-                bmpBrush->SetExtendModeY((D2D1_EXTEND_MODE)IntegerFI(info[0]));
-            }));
-            jsBrush->Set(isolate, "SetInterpolationMode", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                ID2D1BitmapBrush* bmpBrush = (ID2D1BitmapBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                
-                bmpBrush->SetInterpolationMode((D2D1_BITMAP_INTERPOLATION_MODE)IntegerFI(info[0]));
-            }));
-
-            jsBrush->Set(isolate, "SetBitmap", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                ID2D1BitmapBrush* bmpBrush = (ID2D1BitmapBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                ID2D1Bitmap* bmp = (ID2D1Bitmap*)info[0].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                //print("bmpBrush->" << bmpBrush << " bmp->" << bmp);
-                bmpBrush->SetBitmap(bmp);
-            }));
-            jsBrush->Set(isolate, "GetBitmap", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                ID2D1BitmapBrush* bmpBrush = (ID2D1BitmapBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                ID2D1Bitmap* bmp;
-                bmpBrush->GetBitmap(&bmp);
-
-                Local<ObjectTemplate> jsBitmap = DIRECT2D::getBitmapImpl(isolate, bmp);//DIRECT2D::getIUnknownImpl(isolate, bmp);//ObjectTemplate::New(isolate);
-
-                info.GetReturnValue().Set(jsBitmap->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
-                //info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)bmp));
-            }));
-            //jsBrush->Set(isolate, "SetOpacity", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            //    Isolate* isolate = info.GetIsolate();
-            //    ID2D1BitmapBrush* bmpBrush = (ID2D1BitmapBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-            //    bmpBrush->SetOpacity(FloatFI(info[0]));
-            //}));
-            //jsBrush->Set(isolate, "GetOpacity", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            //    Isolate* isolate = info.GetIsolate();
-            //    ID2D1BitmapBrush* bmpBrush = (ID2D1BitmapBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-            //    info.GetReturnValue().Set(bmpBrush->GetOpacity());
-            //}));
-            //jsBrush->Set(isolate, "Release", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            //    Isolate* isolate = info.GetIsolate();
-            //    ID2D1BitmapBrush* bmpBrush = (ID2D1BitmapBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-            //    bmpBrush->Release();
-            //}));
-
-            info.GetReturnValue().Set(jsBrush->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
+            info.GetReturnValue().Set(jsBrush); //->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
 
         }));
         //d2d->renderTarget->SetTransform;
@@ -5987,7 +6968,7 @@ V8FUNC(createCanvas) {
 
             print("lengtrgh >> " << info.Length());//IntegerFI(info[info.Length() - 1]));
 
-            Local<ObjectTemplate> jsGSC;
+            Local<Object> jsGSC;
 
             //if (d2d->type >= 2) { https://learn.microsoft.com/en-us/windows/win32/api/d2d1_1/nf-d2d1_1-id2d1devicecontext-creategradientstopcollection
             //    Direct2D11* d2d11 = (Direct2D11*)d2d;
@@ -6011,7 +6992,7 @@ V8FUNC(createCanvas) {
             //    gSC->Release();
             //}));
 
-            info.GetReturnValue().Set(jsGSC->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
+            info.GetReturnValue().Set(jsGSC);
         }));
         context->Set(isolate, "CreateLinearGradientBrush", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
             //MessageBoxA(NULL, "if i can be bothered i might have to implement the transform methods", "buddy i ain't do that yet ok", MB_OK | MB_ICONASTERISK);
@@ -6023,59 +7004,11 @@ V8FUNC(createCanvas) {
             //D2D1_GRADIENT_STOP stops[2]; gSC->GetGradientStops(stops, 2);
             //print("stops -> " << stops << " " << stops[0].color.r << " " << stops[0].color.g);
                                                                                                                                                                 //HOW LONG HAS THAT BEEN LIKE THAT????
-            d2d->renderTarget->CreateLinearGradientBrush(D2D1::LinearGradientBrushProperties(D2D1::Point2F(FloatFI(info[0]), FloatFI(info[1])), D2D1::Point2F(FloatFI(info[2]), FloatFI(info[3]))), gSC, &newBrush);//D2D1::ColorF(FloatFI(info[0]), FloatFI(info[1]), FloatFI(info[2]), info[3]->IsNumber() ? FloatFI(info[3]) : 1.0F), & newBrush);//FloatFI(info[3])), &newBrush);
+            RetPrintIfFailed(d2d->renderTarget->CreateLinearGradientBrush(D2D1::LinearGradientBrushProperties(D2D1::Point2F(FloatFI(info[0]), FloatFI(info[1])), D2D1::Point2F(FloatFI(info[2]), FloatFI(info[3]))), gSC, &newBrush), "CreateLinearGradientBrush failed...");//D2D1::ColorF(FloatFI(info[0]), FloatFI(info[1]), FloatFI(info[2]), info[3]->IsNumber() ? FloatFI(info[3]) : 1.0F), & newBrush);//FloatFI(info[3])), &newBrush);
         
-            Local<ObjectTemplate> jsBrush = DIRECT2D::getDefaultBrushImpl(isolate, newBrush, "linear");//ObjectTemplate::New(isolate);
-            //jsBrush->Set(isolate, "internalPtr", Number::New(isolate, (LONG_PTR)newBrush));
-            //jsBrush->Set(isolate, "SetOpacity", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            //    Isolate* isolate = info.GetIsolate();
-            //    ID2D1LinearGradientBrush* newBrush = (ID2D1LinearGradientBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-            //    
-            //    newBrush->SetOpacity(FloatFI(info[0]));
-            //}));
-            jsBrush->Set(isolate, "GetStartPoint", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                ID2D1LinearGradientBrush* newBrush = (ID2D1LinearGradientBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-                D2D1_POINT_2F sp = newBrush->GetStartPoint();
-            
-                info.GetReturnValue().Set(DIRECT2D::getPoint2FImpl(isolate, sp));
-            }));
-            jsBrush->Set(isolate, "GetEndPoint", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                ID2D1LinearGradientBrush* newBrush = (ID2D1LinearGradientBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                
-                D2D1_POINT_2F ep = newBrush->GetEndPoint();
-
-                info.GetReturnValue().Set(DIRECT2D::getPoint2FImpl(isolate, ep));
-            }));
-
-            jsBrush->Set(isolate, "SetStartPoint", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                ID2D1LinearGradientBrush* newBrush = (ID2D1LinearGradientBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-                newBrush->SetStartPoint(D2D1::Point2F(FloatFI(info[0]), FloatFI(info[1])));
-            }));
-            jsBrush->Set(isolate, "SetEndPoint", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                ID2D1LinearGradientBrush* newBrush = (ID2D1LinearGradientBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                
-                newBrush->SetEndPoint(D2D1::Point2F(FloatFI(info[0]), FloatFI(info[1])));
-            }));
-            jsBrush->Set(isolate, "SetPoints", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                ID2D1LinearGradientBrush* newBrush = (ID2D1LinearGradientBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                
-                newBrush->SetStartPoint(D2D1::Point2F(FloatFI(info[0]), FloatFI(info[1])));
-                newBrush->SetEndPoint(D2D1::Point2F(FloatFI(info[2]), FloatFI(info[3])));
-            }));
-            //jsBrush->Set(isolate, "Release", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            //    Isolate* isolate = info.GetIsolate();
-            //    ID2D1LinearGradientBrush* newBrush = (ID2D1LinearGradientBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-            //    newBrush->Release();
-            //}));
+            Local<Object> jsBrush = DIRECT2D::getID2D1LinearGradientBrush(isolate, newBrush);
         
-            info.GetReturnValue().Set(jsBrush->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
+            info.GetReturnValue().Set(jsBrush);
         }));
         context->Set(isolate, "CreateRadialGradientBrush", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
             Isolate* isolate = info.GetIsolate();
@@ -6085,72 +7018,9 @@ V8FUNC(createCanvas) {
 
             d2d->renderTarget->CreateRadialGradientBrush(D2D1::RadialGradientBrushProperties(D2D1::Point2F(FloatFI(info[0]), FloatFI(info[1])), D2D1::Point2F(FloatFI(info[2]), FloatFI(info[3])), FloatFI(info[4]), FloatFI(info[5])), gSC, &newBrush);
 
-            Local<ObjectTemplate> jsBrush = DIRECT2D::getDefaultBrushImpl(isolate, newBrush, "radial");
+            Local<Object> jsBrush = DIRECT2D::getID2D1RadialGradientBrush(isolate, newBrush);
 
-            jsBrush->Set(isolate, "GetCenter", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                ID2D1RadialGradientBrush* newBrush = (ID2D1RadialGradientBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-                info.GetReturnValue().Set(DIRECT2D::getPoint2FImpl(isolate, newBrush->GetCenter()));
-            }));
-            jsBrush->Set(isolate, "GetGradientOriginOffset", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                ID2D1RadialGradientBrush* newBrush = (ID2D1RadialGradientBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-                info.GetReturnValue().Set(DIRECT2D::getPoint2FImpl(isolate, newBrush->GetGradientOriginOffset()));
-            }));
-            jsBrush->Set(isolate, "GetRadiusX", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                ID2D1RadialGradientBrush* newBrush = (ID2D1RadialGradientBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-                info.GetReturnValue().Set(newBrush->GetRadiusX());
-            }));
-            jsBrush->Set(isolate, "GetRadiusY", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                ID2D1RadialGradientBrush* newBrush = (ID2D1RadialGradientBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-                info.GetReturnValue().Set(newBrush->GetRadiusY());
-            }));
-            jsBrush->Set(isolate, "GetRadius", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                ID2D1RadialGradientBrush* newBrush = (ID2D1RadialGradientBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-                info.GetReturnValue().Set(DIRECT2D::getPoint2FImpl(isolate, D2D1::Point2F(newBrush->GetRadiusX(), newBrush->GetRadiusY())));
-            }));
-            
-            jsBrush->Set(isolate, "SetCenter", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                ID2D1RadialGradientBrush* newBrush = (ID2D1RadialGradientBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-                newBrush->SetCenter(D2D1::Point2F(FloatFI(info[0]), FloatFI(info[1])));
-            }));
-            jsBrush->Set(isolate, "SetGradientOriginOffset", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                ID2D1RadialGradientBrush* newBrush = (ID2D1RadialGradientBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-                newBrush->SetGradientOriginOffset(D2D1::Point2F(FloatFI(info[0]), FloatFI(info[1])));
-            }));
-            jsBrush->Set(isolate, "SetRadiusX", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                ID2D1RadialGradientBrush* newBrush = (ID2D1RadialGradientBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-                newBrush->SetRadiusX(FloatFI(info[0]));
-            }));
-            jsBrush->Set(isolate, "SetRadiusY", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                ID2D1RadialGradientBrush* newBrush = (ID2D1RadialGradientBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-                newBrush->SetRadiusY(FloatFI(info[0]));
-            }));
-            jsBrush->Set(isolate, "SetRadius", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                ID2D1RadialGradientBrush* newBrush = (ID2D1RadialGradientBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-                newBrush->SetRadiusX(FloatFI(info[0]));
-                newBrush->SetRadiusY(FloatFI(info[0]));
-            }));
-
-            info.GetReturnValue().Set(jsBrush->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
+            info.GetReturnValue().Set(jsBrush);
         }));
         context->Set(isolate, "RestoreDrawingState", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
             Isolate* isolate = info.GetIsolate();
@@ -6583,7 +7453,7 @@ V8FUNC(createCanvas) {
                 ), "CreateBitmapFromDxgiSurface failed");
                 //  );
                 
-                info.GetReturnValue().Set(DIRECT2D::getBitmapImpl(isolate, target)->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
+                info.GetReturnValue().Set(DIRECT2D::getBitmapImpl(isolate, target));
             }
             else {
                 MessageBox(NULL, L"To use CreateBitmapFromDxgiSurface you must create this canvas with ID2D1DeviceContext or ID2D1DeviceContextDComposition (lol regular d2d doesn't even have a dxgi surface so that's why)", L"Sorry", MB_OK | MB_SYSTEMMODAL);
@@ -6599,98 +7469,9 @@ V8FUNC(createCanvas) {
                 ID2D1ImageBrush* brush;
                 RetIfFailed(d2d11->d2dcontext->CreateImageBrush(image, nullptr, nullptr, &brush), "CreateImageBrush failed");
 
-                Local<ObjectTemplate> jsBrush = DIRECT2D::getDefaultBrushImpl(isolate, brush, "bitmap");//ObjectTemplate::New(isolate);
-                //jsBrush->Set(isolate, "internalPtr", Number::New(isolate, (LONG_PTR)bmpBrush));
-                jsBrush->Set(isolate, "GetExtendModeX", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                    Isolate* isolate = info.GetIsolate();
-                    ID2D1ImageBrush* bmpBrush = (ID2D1ImageBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                    
-                    //unsigned int extend = bmpBrush->GetExtendModeX();
-                    info.GetReturnValue().Set(bmpBrush->GetExtendModeX());
-                }));
-                jsBrush->Set(isolate, "GetExtendModeY", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                    Isolate* isolate = info.GetIsolate();
-                    ID2D1ImageBrush* bmpBrush = (ID2D1ImageBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                    
-                    //unsigned int extend = bmpBrush->GetExtendModeX();
-                    info.GetReturnValue().Set(bmpBrush->GetExtendModeY());
-                }));
-                jsBrush->Set(isolate, "GetExtendMode", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                    Isolate* isolate = info.GetIsolate();
-                    ID2D1ImageBrush* bmpBrush = (ID2D1ImageBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                    
-                    //unsigned int extend = bmpBrush->GetExtendModeX();
-                    info.GetReturnValue().Set(DIRECT2D::getPoint2FImpl(isolate, D2D1::Point2F(bmpBrush->GetExtendModeX(), bmpBrush->GetExtendModeY())));
-                }));
-                jsBrush->Set(isolate, "GetInterpolationMode", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                    Isolate* isolate = info.GetIsolate();
-                    ID2D1ImageBrush* bmpBrush = (ID2D1ImageBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                    
-                    info.GetReturnValue().Set(bmpBrush->GetInterpolationMode());
-                }));
+                Local<Object> jsBrush = DIRECT2D::getImageBrushImpl(isolate, brush);
 
-                jsBrush->Set(isolate, "SetExtendModeX", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                    Isolate* isolate = info.GetIsolate();
-                    ID2D1ImageBrush* bmpBrush = (ID2D1ImageBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                    
-                    //unsigned int extend = bmpBrush->GetExtendModeX();
-                    bmpBrush->SetExtendModeX((D2D1_EXTEND_MODE)IntegerFI(info[0]));
-                }));
-                jsBrush->Set(isolate, "SetExtendModeY", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                    Isolate* isolate = info.GetIsolate();
-                    ID2D1ImageBrush* bmpBrush = (ID2D1ImageBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                    
-                    bmpBrush->SetExtendModeY((D2D1_EXTEND_MODE)IntegerFI(info[0]));
-                }));
-                jsBrush->Set(isolate, "SetExtendMode", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                    Isolate* isolate = info.GetIsolate();
-                    ID2D1ImageBrush* bmpBrush = (ID2D1ImageBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                    
-                    bmpBrush->SetExtendModeX((D2D1_EXTEND_MODE)IntegerFI(info[0]));
-                    bmpBrush->SetExtendModeY((D2D1_EXTEND_MODE)IntegerFI(info[0]));
-                }));
-                jsBrush->Set(isolate, "SetInterpolationMode", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                    Isolate* isolate = info.GetIsolate();
-                    ID2D1ImageBrush* bmpBrush = (ID2D1ImageBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                    
-                    bmpBrush->SetInterpolationMode((D2D1_INTERPOLATION_MODE)IntegerFI(info[0]));
-                }));
-
-                jsBrush->Set(isolate, "SetImage", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                    Isolate* isolate = info.GetIsolate();
-                    ID2D1ImageBrush* bmpBrush = (ID2D1ImageBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                    ID2D1Image* bmp = (ID2D1Image*)info[0].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                    //print("bmpBrush->" << bmpBrush << " bmp->" << bmp);
-                    bmpBrush->SetImage(bmp);
-                }));
-                jsBrush->Set(isolate, "GetImage", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                    Isolate* isolate = info.GetIsolate();
-                    ID2D1ImageBrush* bmpBrush = (ID2D1ImageBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                    ID2D1Image* bmp;
-                    bmpBrush->GetImage(&bmp);
-
-                    Local<ObjectTemplate> jsBitmap = DIRECT2D::getBitmapImpl(isolate, bmp);//DIRECT2D::getIUnknownImpl(isolate, bmp);//ObjectTemplate::New(isolate);
-
-                    info.GetReturnValue().Set(jsBitmap->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
-                    //info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)bmp));
-                }));
-                //jsBrush->Set(isolate, "SetOpacity", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                //    Isolate* isolate = info.GetIsolate();
-                //    ID2D1ImageBrush* bmpBrush = (ID2D1ImageBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                //    bmpBrush->SetOpacity(FloatFI(info[0]));
-                //}));
-                //jsBrush->Set(isolate, "GetOpacity", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                //    Isolate* isolate = info.GetIsolate();
-                //    ID2D1ImageBrush* bmpBrush = (ID2D1ImageBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                //    info.GetReturnValue().Set(bmpBrush->GetOpacity());
-                //}));
-                //jsBrush->Set(isolate, "Release", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                //    Isolate* isolate = info.GetIsolate();
-                //    ID2D1ImageBrush* bmpBrush = (ID2D1ImageBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                //    bmpBrush->Release();
-                //}));
-
-                info.GetReturnValue().Set(jsBrush->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
+                info.GetReturnValue().Set(jsBrush);
             }
             else {
                 MessageBox(NULL, L"To use CreateImageBrush you must create this canvas with ID2D1DeviceContext or ID2D1DeviceContextDComposition", L"Sorry", MB_OK | MB_SYSTEMMODAL);
@@ -6731,9 +7512,9 @@ V8FUNC(createCanvas) {
         
                 /*HRESULT shit = */RetIfFailed(d2d11->d2dcontext->CreateBitmap(D2D1::SizeU(IntegerFI(info[0]), IntegerFI(info[1])), src, IntegerFI(info[6]), &bitmapProperties, &target), "CreateBitmap1 (ID2D1DeviceContext->CreateBitmap) failed big dawg");
         
-                Local<ObjectTemplate> jsBitmap = DIRECT2D::getBitmapImpl(isolate, target);//DIRECT2D::getIUnknownImpl(isolate, bmp);//ObjectTemplate::New(isolate);
+                Local<Object> jsBitmap = DIRECT2D::getBitmapImpl(isolate, target);//DIRECT2D::getIUnknownImpl(isolate, bmp);//ObjectTemplate::New(isolate);
         
-                info.GetReturnValue().Set(jsBitmap->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
+                info.GetReturnValue().Set(jsBitmap);
             }
             else {
                 MessageBox(NULL, L"you can only use CreateBitmap1 with ID2D1DeviceContext or ID2D1DeviceContextDComposition", L"CreateBitmap1 failed (nah buddy)", MB_OK | MB_SYSTEMMODAL);
@@ -6797,19 +7578,9 @@ V8FUNC(createCanvas) {
             
                 RetIfFailed(d2d11->m_dcompD1->CreateGaussianBlurEffect(&effect), "DComposition CreateGaussianBlurEffect");
             
-                Local<ObjectTemplate> jsDCompEffect = DIRECT2D::getCompositionEffectImpl(isolate, effect);
-                jsDCompEffect->Set(isolate, "SetStandardDeviation", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                    Isolate* isolate = info.GetIsolate();
-                    IDCompositionGaussianBlurEffect* effect = (IDCompositionGaussianBlurEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                    RetIfFailed(effect->SetStandardDeviation(FloatFI(info[0])), "SetStandardDeviation failed (IDCompositionGaussianBlurEffect)");
-                }));
-                jsDCompEffect->Set(isolate, "SetBorderMode", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                    Isolate* isolate = info.GetIsolate();
-                    IDCompositionGaussianBlurEffect* effect = (IDCompositionGaussianBlurEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                    RetIfFailed(effect->SetBorderMode((D2D1_BORDER_MODE)IntegerFI(info[0])), "SetBorderMode failed (IDCompositionGaussianBlurEffect)");
-                }));
+                Local<Object> jsDCompEffect = DIRECT2D::getIDCompositionGaussianBlurEffectImpl(isolate, effect);
 
-                info.GetReturnValue().Set(jsDCompEffect->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
+                info.GetReturnValue().Set(jsDCompEffect);
             }));
             context->Set(isolate, "CreateBrightnessEffect", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
                 Isolate* isolate = info.GetIsolate();
@@ -6818,18 +7589,9 @@ V8FUNC(createCanvas) {
             
                 RetIfFailed(d2d11->m_dcompD1->CreateBrightnessEffect(&effect), "DComposition CreateBrightnessEffect");
             
-                Local<ObjectTemplate> jsDCompEffect = DIRECT2D::getCompositionEffectImpl(isolate, effect);
-                jsDCompEffect->Set(isolate, "SetWhitePoint", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                    Isolate* isolate = info.GetIsolate();
-                    IDCompositionBrightnessEffect* effect = (IDCompositionBrightnessEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                    RetIfFailed(effect->SetWhitePoint(D2D1_VECTOR_2F{(FLOAT)FloatFI(info[0]), (FLOAT)FloatFI(info[1])}), "SetWhitePoint failed (IDCompositionBrightnessEffect)");
-                }));
-                jsDCompEffect->Set(isolate, "SetBlackPoint", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                    Isolate* isolate = info.GetIsolate();
-                    IDCompositionBrightnessEffect* effect = (IDCompositionBrightnessEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                    RetIfFailed(effect->SetBlackPoint(D2D1_VECTOR_2F{(FLOAT)FloatFI(info[0]), (FLOAT)FloatFI(info[1])}), "SetBlackPoint failed (IDCompositionBrightnessEffect)");
-                }));
-                info.GetReturnValue().Set(jsDCompEffect->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
+                Local<Object> jsDCompEffect = DIRECT2D::getIDCompositionBrightnessEffectImpl(isolate, effect);
+
+                info.GetReturnValue().Set(jsDCompEffect);
             }));
             context->Set(isolate, "CreateColorMatrixEffect", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
                 Isolate* isolate = info.GetIsolate();
@@ -6839,28 +7601,9 @@ V8FUNC(createCanvas) {
                 
                 RetIfFailed(d2d11->m_dcompD1->CreateColorMatrixEffect(&effect), "DComposition CreateColorMatrixEffect");
                 
-                Local<ObjectTemplate> jsDCompEffect = DIRECT2D::getCompositionEffectImpl(isolate, effect);
-                jsDCompEffect->Set(isolate, "SetMatrix", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                    Isolate* isolate = info.GetIsolate();
-                    IDCompositionColorMatrixEffect* effect = (IDCompositionColorMatrixEffect*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
-                    RetIfFailed(effect->SetMatrix(DIRECT2D::fromJSMatrix5x4(isolate, info[0].As<Object>())), "SetMatrix failed (IDCompositionColorMatrixEffect)");
-                }));
-                jsDCompEffect->Set(isolate, "SetMatrixElement", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                    Isolate* isolate = info.GetIsolate();
-                    IDCompositionColorMatrixEffect* effect = (IDCompositionColorMatrixEffect*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
-                    RetIfFailed(effect->SetMatrixElement(IntegerFI(info[0]), IntegerFI(info[1]), FloatFI(info[2])), "SetMatrixElement failed (IDCompositionColorMatrixEffect)");
-                }));
-                jsDCompEffect->Set(isolate, "SetAlphaMode", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                    Isolate* isolate = info.GetIsolate();
-                    IDCompositionColorMatrixEffect* effect = (IDCompositionColorMatrixEffect*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
-                    RetIfFailed(effect->SetAlphaMode((D2D1_COLORMATRIX_ALPHA_MODE)IntegerFI(info[0])), "SetAlphaMode failed (IDCompositionColorMatrixEffect)");
-                }));
-                jsDCompEffect->Set(isolate, "SetClampOutput", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                    Isolate* isolate = info.GetIsolate();
-                    IDCompositionColorMatrixEffect* effect = (IDCompositionColorMatrixEffect*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
-                    RetIfFailed(effect->SetClampOutput(IntegerFI(info[0])), "SetClampOutput failed (IDCompositionColorMatrixEffect)");
-                }));
-                info.GetReturnValue().Set(jsDCompEffect->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
+                Local<Object> jsDCompEffect = DIRECT2D::getIDCompositionColorMatrixEffectImpl(isolate, effect);
+
+                info.GetReturnValue().Set(jsDCompEffect);
             }));
             context->Set(isolate, "CreateShadowEffect", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
                 Isolate* isolate = info.GetIsolate();
@@ -6869,18 +7612,9 @@ V8FUNC(createCanvas) {
             
                 RetIfFailed(d2d11->m_dcompD1->CreateShadowEffect(&effect), "DComposition CreateShadowEffect");
             
-                Local<ObjectTemplate> jsDCompEffect = DIRECT2D::getCompositionEffectImpl(isolate, effect);
-                jsDCompEffect->Set(isolate, "SetStandardDeviation", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                    Isolate* isolate = info.GetIsolate();
-                    IDCompositionShadowEffect* effect = (IDCompositionShadowEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                    RetIfFailed(effect->SetStandardDeviation(FloatFI(info[0])), "SetStandardDeviation failed (IDCompositionShadowEffect)");
-                }));
-                jsDCompEffect->Set(isolate, "SetColor", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                    Isolate* isolate = info.GetIsolate();
-                    IDCompositionShadowEffect* effect = (IDCompositionShadowEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                    RetIfFailed(effect->SetColor(D2D1_VECTOR_4F{ (FLOAT)FloatFI(info[0]) , (FLOAT)FloatFI(info[1]) , (FLOAT)FloatFI(info[2]) , (FLOAT)FloatFI(info[3]) }), "SetColor failed (IDCompositionShadowEffect)");
-                }));
-                info.GetReturnValue().Set(jsDCompEffect->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
+                Local<Object> jsDCompEffect = DIRECT2D::getIDCompositionShadowEffectImpl(isolate, effect);
+
+                info.GetReturnValue().Set(jsDCompEffect);
             }));
             context->Set(isolate, "CreateHueRotationEffect", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
                 Isolate* isolate = info.GetIsolate();
@@ -6889,14 +7623,9 @@ V8FUNC(createCanvas) {
             
                 RetIfFailed(d2d11->m_dcompD1->CreateHueRotationEffect(&effect), "DComposition CreateHueRotationEffect");
             
-                Local<ObjectTemplate> jsDCompEffect = DIRECT2D::getCompositionEffectImpl(isolate, effect);
-                jsDCompEffect->Set(isolate, "SetAngle", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                    Isolate* isolate = info.GetIsolate();
-                    IDCompositionHueRotationEffect* effect = (IDCompositionHueRotationEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                    RetIfFailed(effect->SetAngle(FloatFI(info[0])), "SetAngle failed (IDCompositionHueRotationEffect)");
-                }));
+                Local<Object> jsDCompEffect = DIRECT2D::getIDCompositionHueRotationEffectImpl(isolate, effect);
 
-                info.GetReturnValue().Set(jsDCompEffect->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
+                info.GetReturnValue().Set(jsDCompEffect);
             }));
             context->Set(isolate, "CreateSaturationEffect", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
                 Isolate* isolate = info.GetIsolate();
@@ -6905,13 +7634,9 @@ V8FUNC(createCanvas) {
             
                 RetIfFailed(d2d11->m_dcompD1->CreateSaturationEffect(&effect), "DComposition CreateSaturationEffect");
             
-                Local<ObjectTemplate> jsDCompEffect = DIRECT2D::getCompositionEffectImpl(isolate, effect);
-                jsDCompEffect->Set(isolate, "SetSaturation", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                    Isolate* isolate = info.GetIsolate();
-                    IDCompositionSaturationEffect* effect = (IDCompositionSaturationEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                    RetIfFailed(effect->SetSaturation(FloatFI(info[0])), "SetSaturation failed (IDCompositionSaturationEffect)");
-                }));
-                info.GetReturnValue().Set(jsDCompEffect->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
+                Local<Object> jsDCompEffect = DIRECT2D::getIDCompositionSaturationEffectImpl(isolate, effect);
+
+                info.GetReturnValue().Set(jsDCompEffect);
             }));
             context->Set(isolate, "CreateTurbulenceEffect", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
                 Isolate* isolate = info.GetIsolate();
@@ -6920,43 +7645,9 @@ V8FUNC(createCanvas) {
             
                 RetIfFailed(d2d11->m_dcompD1->CreateTurbulenceEffect(&effect), "DComposition CreateTurbulenceEffect");
             
-                Local<ObjectTemplate> jsDCompEffect = DIRECT2D::getCompositionEffectImpl(isolate, effect);
-                jsDCompEffect->Set(isolate, "SetOffset", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                    Isolate* isolate = info.GetIsolate();
-                    IDCompositionTurbulenceEffect* effect = (IDCompositionTurbulenceEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                    RetIfFailed(effect->SetOffset(D2D1_VECTOR_2F{ (FLOAT)FloatFI(info[0]), (FLOAT)FloatFI(info[1]) }), "SetOffset failed (IDCompositionTurbulenceEffect)");
-                }));
-                jsDCompEffect->Set(isolate, "SetBaseFrequency", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                    Isolate* isolate = info.GetIsolate();
-                    IDCompositionTurbulenceEffect* effect = (IDCompositionTurbulenceEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                    RetIfFailed(effect->SetBaseFrequency(D2D1_VECTOR_2F{ (FLOAT)FloatFI(info[0]), (FLOAT)FloatFI(info[1]) }), "SetBaseFrequency failed (IDCompositionTurbulenceEffect)");
-                }));
-                jsDCompEffect->Set(isolate, "SetSize", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                    Isolate* isolate = info.GetIsolate();
-                    IDCompositionTurbulenceEffect* effect = (IDCompositionTurbulenceEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                    RetIfFailed(effect->SetSize(D2D1_VECTOR_2F{ (FLOAT)FloatFI(info[0]), (FLOAT)FloatFI(info[1]) }), "SetSize failed (IDCompositionTurbulenceEffect)");
-                }));
-                jsDCompEffect->Set(isolate, "SetNumOctaves", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                    Isolate* isolate = info.GetIsolate();
-                    IDCompositionTurbulenceEffect* effect = (IDCompositionTurbulenceEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                    RetIfFailed(effect->SetNumOctaves(IntegerFI(info[0])), "SetNumOctaves failed (IDCompositionTurbulenceEffect)");
-                }));
-                jsDCompEffect->Set(isolate, "SetSeed", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                    Isolate* isolate = info.GetIsolate();
-                    IDCompositionTurbulenceEffect* effect = (IDCompositionTurbulenceEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                    RetIfFailed(effect->SetSeed(IntegerFI(info[0])), "SetSeed failed (IDCompositionTurbulenceEffect)");
-                }));
-                jsDCompEffect->Set(isolate, "SetNoise", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                    Isolate* isolate = info.GetIsolate();
-                    IDCompositionTurbulenceEffect* effect = (IDCompositionTurbulenceEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                    RetIfFailed(effect->SetNoise((D2D1_TURBULENCE_NOISE)IntegerFI(info[0])), "SetNoise failed (IDCompositionTurbulenceEffect)");
-                }));
-                jsDCompEffect->Set(isolate, "SetStitchable", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                    Isolate* isolate = info.GetIsolate();
-                    IDCompositionTurbulenceEffect* effect = (IDCompositionTurbulenceEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                    RetIfFailed(effect->SetStitchable(IntegerFI(info[0])), "SetStitchable failed (IDCompositionTurbulenceEffect)");
-                }));
-                info.GetReturnValue().Set(jsDCompEffect->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
+                Local<Object> jsDCompEffect = DIRECT2D::getIDCompositionTurbulenceEffectImpl(isolate, effect);
+
+                info.GetReturnValue().Set(jsDCompEffect);
             }));
             context->Set(isolate, "CreateLinearTransferEffect", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
                 Isolate* isolate = info.GetIsolate();
@@ -6965,110 +7656,22 @@ V8FUNC(createCanvas) {
             
                 RetIfFailed(d2d11->m_dcompD1->CreateLinearTransferEffect(&effect), "DComposition CreateLinearTransferEffect");
             
-                Local<ObjectTemplate> jsDCompEffect = DIRECT2D::getCompositionEffectImpl(isolate, effect);
-                jsDCompEffect->Set(isolate, "SetRedYIntercept", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                    Isolate* isolate = info.GetIsolate();
-                    IDCompositionLinearTransferEffect* effect = (IDCompositionLinearTransferEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                    RetIfFailed(effect->SetRedYIntercept(FloatFI(info[0])), "SetRedYIntercept failed (IDCompositionLinearTransferEffect)");
-                }));
-                jsDCompEffect->Set(isolate, "SetRedSlope", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                    Isolate* isolate = info.GetIsolate();
-                    IDCompositionLinearTransferEffect* effect = (IDCompositionLinearTransferEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                    RetIfFailed(effect->SetRedSlope(FloatFI(info[0])), "SetRedSlope failed (IDCompositionLinearTransferEffect)");
-                }));
-                jsDCompEffect->Set(isolate, "SetRedDisable", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                    Isolate* isolate = info.GetIsolate();
-                    IDCompositionLinearTransferEffect* effect = (IDCompositionLinearTransferEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                    RetIfFailed(effect->SetRedDisable(IntegerFI(info[0])), "SetRedDisable failed (IDCompositionLinearTransferEffect)");
-                }));
-                jsDCompEffect->Set(isolate, "SetGreenYIntercept", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                    Isolate* isolate = info.GetIsolate();
-                    IDCompositionLinearTransferEffect* effect = (IDCompositionLinearTransferEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                    RetIfFailed(effect->SetGreenYIntercept(FloatFI(info[0])), "SetGreenYIntercept failed (IDCompositionLinearTransferEffect)");
-                }));
-                jsDCompEffect->Set(isolate, "SetGreenSlope", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                    Isolate* isolate = info.GetIsolate();
-                    IDCompositionLinearTransferEffect* effect = (IDCompositionLinearTransferEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                    RetIfFailed(effect->SetGreenSlope(FloatFI(info[0])), "SetGreenSlope failed (IDCompositionLinearTransferEffect)");
-                }));
-                jsDCompEffect->Set(isolate, "SetGreenDisable", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                    Isolate* isolate = info.GetIsolate();
-                    IDCompositionLinearTransferEffect* effect = (IDCompositionLinearTransferEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                    RetIfFailed(effect->SetGreenDisable(IntegerFI(info[0])), "SetGreenDisable failed (IDCompositionLinearTransferEffect)");
-                }));
-                jsDCompEffect->Set(isolate, "SetBlueYIntercept", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                    Isolate* isolate = info.GetIsolate();
-                    IDCompositionLinearTransferEffect* effect = (IDCompositionLinearTransferEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                    RetIfFailed(effect->SetBlueYIntercept(FloatFI(info[0])), "SetBlueYIntercept failed (IDCompositionLinearTransferEffect)");
-                }));
-                jsDCompEffect->Set(isolate, "SetBlueSlope", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                    Isolate* isolate = info.GetIsolate();
-                    IDCompositionLinearTransferEffect* effect = (IDCompositionLinearTransferEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                    RetIfFailed(effect->SetBlueSlope(FloatFI(info[0])), "SetBlueSlope failed (IDCompositionLinearTransferEffect)");
-                }));
-                jsDCompEffect->Set(isolate, "SetBlueDisable", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                    Isolate* isolate = info.GetIsolate();
-                    IDCompositionLinearTransferEffect* effect = (IDCompositionLinearTransferEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                    RetIfFailed(effect->SetBlueDisable(IntegerFI(info[0])), "SetBlueDisable failed (IDCompositionLinearTransferEffect)");
-                }));
-                jsDCompEffect->Set(isolate, "SetAlphaYIntercept", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                    Isolate* isolate = info.GetIsolate();
-                    IDCompositionLinearTransferEffect* effect = (IDCompositionLinearTransferEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                    RetIfFailed(effect->SetAlphaYIntercept(FloatFI(info[0])), "SetAlphaYIntercept failed (IDCompositionLinearTransferEffect)");
-                }));
-                jsDCompEffect->Set(isolate, "SetAlphaSlope", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                    Isolate* isolate = info.GetIsolate();
-                    IDCompositionLinearTransferEffect* effect = (IDCompositionLinearTransferEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                    RetIfFailed(effect->SetAlphaSlope(FloatFI(info[0])), "SetAlphaSlope failed (IDCompositionLinearTransferEffect)");
-                }));
-                jsDCompEffect->Set(isolate, "SetAlphaDisable", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                    Isolate* isolate = info.GetIsolate();
-                    IDCompositionLinearTransferEffect* effect = (IDCompositionLinearTransferEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                    RetIfFailed(effect->SetAlphaDisable(IntegerFI(info[0])), "SetAlphaDisable failed (IDCompositionLinearTransferEffect)");
-                }));
-                jsDCompEffect->Set(isolate, "SetClampOutput", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                    Isolate* isolate = info.GetIsolate();
-                    IDCompositionLinearTransferEffect* effect = (IDCompositionLinearTransferEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                    RetIfFailed(effect->SetClampOutput(IntegerFI(info[0])), "SetClampOutput failed (IDCompositionLinearTransferEffect)");
-                }));
-                info.GetReturnValue().Set(jsDCompEffect->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
+                Local<Object> jsDCompEffect = DIRECT2D::getIDCompositionLinearTransferEffectImpl(isolate, effect);
+
+                info.GetReturnValue().Set(jsDCompEffect);
             }));
             //idk how this one works (well the real problem is i gotta allocate space for the tables and i don't feel like it)
-            //context->Set(isolate, "CreateTableTransferEffect", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            //    Isolate* isolate = info.GetIsolate();
-            //    Direct2D11* d2d11 = (Direct2D11*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-            //    IDCompositionTableTransferEffect* effect;
-            //    
-            //    RetIfFailed(d2d11->m_dcompD1->CreateTableTransferEffect(&effect), "DComposition CreateTableTransferEffect");
-            //    
-            //    Local<ObjectTemplate> jsDCompEffect = DIRECT2D::getCompositionEffectImpl(isolate, effect);
-            //    jsDCompEffect->Set(isolate, "SetRedDisable", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            //        Isolate* isolate = info.GetIsolate();
-            //        IDCompositionTableTransferEffect* effect = (IDCompositionTableTransferEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-            //        RetIfFailed(effect->SetRedDisable(IntegerFI(info[0])), "SetRedDisable failed (IDCompositionTableTransferEffect)");
-            //    }));
-            //    jsDCompEffect->Set(isolate, "SetGreenDisable", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            //        Isolate* isolate = info.GetIsolate();
-            //        IDCompositionTableTransferEffect* effect = (IDCompositionTableTransferEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-            //        RetIfFailed(effect->SetGreenDisable(IntegerFI(info[0])), "SetGreenDisable failed (IDCompositionTableTransferEffect)");
-            //    }));
-            //    jsDCompEffect->Set(isolate, "SetBlueDisable", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            //        Isolate* isolate = info.GetIsolate();
-            //        IDCompositionTableTransferEffect* effect = (IDCompositionTableTransferEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-            //        RetIfFailed(effect->SetBlueDisable(IntegerFI(info[0])), "SetBlueDisable failed (IDCompositionTableTransferEffect)");
-            //    }));
-            //    jsDCompEffect->Set(isolate, "SetAlphaDisable", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            //        Isolate* isolate = info.GetIsolate();
-            //        IDCompositionTableTransferEffect* effect = (IDCompositionTableTransferEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-            //        RetIfFailed(effect->SetAlphaDisable(IntegerFI(info[0])), "SetAlphaDisable failed (IDCompositionTableTransferEffect)");
-            //    }));
-            //    jsDCompEffect->Set(isolate, "SetClampOutput", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            //        Isolate* isolate = info.GetIsolate();
-            //        IDCompositionTableTransferEffect* effect = (IDCompositionTableTransferEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-            //        RetIfFailed(effect->SetClampOutput(IntegerFI(info[0])), "SetClampOutput failed (IDCompositionTableTransferEffect)");
-            //    }));
-            //    info.GetReturnValue().Set(jsDCompEffect->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
-            //}));
+            context->Set(isolate, "CreateTableTransferEffect", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                Direct2D11* d2d11 = (Direct2D11*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                IDCompositionTableTransferEffect* effect;
+                
+                RetIfFailed(d2d11->m_dcompD1->CreateTableTransferEffect(&effect), "DComposition CreateTableTransferEffect");
+                
+                Local<Object> jsDCompEffect = DIRECT2D::getIDCompositionTableTransferEffectImpl(isolate, effect);
+            
+                info.GetReturnValue().Set(jsDCompEffect);
+            }));
             context->Set(isolate, "CreateCompositeEffect", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
                 Isolate* isolate = info.GetIsolate();
                 Direct2D11* d2d11 = (Direct2D11*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
@@ -7076,13 +7679,9 @@ V8FUNC(createCanvas) {
             
                 RetIfFailed(d2d11->m_dcompD1->CreateCompositeEffect(&effect), "DComposition CreateCompositeEffect");
             
-                Local<ObjectTemplate> jsDCompEffect = DIRECT2D::getCompositionEffectImpl(isolate, effect);
-                jsDCompEffect->Set(isolate, "SetMode", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                    Isolate* isolate = info.GetIsolate();
-                    IDCompositionCompositeEffect* effect = (IDCompositionCompositeEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                    RetIfFailed(effect->SetMode((D2D1_COMPOSITE_MODE)IntegerFI(info[0])), "SetMode failed (IDCompositionCompositeEffect)");
-                }));
-                info.GetReturnValue().Set(jsDCompEffect->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
+                Local<Object> jsDCompEffect = DIRECT2D::getIDCompositionCompositeEffectImpl(isolate, effect);
+
+                info.GetReturnValue().Set(jsDCompEffect);
             }));
             context->Set(isolate, "CreateBlendEffect", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
                 Isolate* isolate = info.GetIsolate();
@@ -7091,13 +7690,9 @@ V8FUNC(createCanvas) {
             
                 RetIfFailed(d2d11->m_dcompD1->CreateBlendEffect(&effect), "DComposition CreateBlendEffect");
             
-                Local<ObjectTemplate> jsDCompEffect = DIRECT2D::getCompositionEffectImpl(isolate, effect);
-                jsDCompEffect->Set(isolate, "SetMode", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                    Isolate* isolate = info.GetIsolate();
-                    IDCompositionBlendEffect* effect = (IDCompositionBlendEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                    RetIfFailed(effect->SetMode((D2D1_BLEND_MODE)IntegerFI(info[0])), "SetMode failed (IDCompositionBlendEffect)");
-                }));
-                info.GetReturnValue().Set(jsDCompEffect->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
+                Local<Object> jsDCompEffect = DIRECT2D::getIDCompositionBlendEffectImpl(isolate, effect);
+
+                info.GetReturnValue().Set(jsDCompEffect);
             }));
             context->Set(isolate, "CreateArithmeticCompositeEffect", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
                 Isolate* isolate = info.GetIsolate();
@@ -7106,18 +7701,9 @@ V8FUNC(createCanvas) {
             
                 RetIfFailed(d2d11->m_dcompD1->CreateArithmeticCompositeEffect(&effect), "DComposition CreateArithmeticCompositeEffect");
             
-                Local<ObjectTemplate> jsDCompEffect = DIRECT2D::getCompositionEffectImpl(isolate, effect);
-                jsDCompEffect->Set(isolate, "SetCoefficients", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                    Isolate* isolate = info.GetIsolate();
-                    IDCompositionArithmeticCompositeEffect* effect = (IDCompositionArithmeticCompositeEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                    RetIfFailed(effect->SetCoefficients(D2D1_VECTOR_4F{ (FLOAT)FloatFI(info[0]) , (FLOAT)FloatFI(info[1]) , (FLOAT)FloatFI(info[2]) , (FLOAT)FloatFI(info[3]) }), "SetCoefficients failed (IDCompositionArithmeticCompositeEffect)");
-                }));
-                jsDCompEffect->Set(isolate, "SetClampOutput", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                    Isolate* isolate = info.GetIsolate();
-                    IDCompositionArithmeticCompositeEffect* effect = (IDCompositionArithmeticCompositeEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                    RetIfFailed(effect->SetClampOutput(IntegerFI(info[0])), "SetClampOutput failed (IDCompositionArithmeticCompositeEffect)");
-                }));
-                info.GetReturnValue().Set(jsDCompEffect->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
+                Local<Object> jsDCompEffect = DIRECT2D::getIDCompositionArithmeticCompositeEffectImpl(isolate, effect);
+
+                info.GetReturnValue().Set(jsDCompEffect);
             }));
             context->Set(isolate, "CreateAffineTransform2DEffect", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
                 Isolate* isolate = info.GetIsolate();
@@ -7126,36 +7712,9 @@ V8FUNC(createCanvas) {
             
                 RetIfFailed(d2d11->m_dcompD1->CreateAffineTransform2DEffect(&effect), "DComposition CreateAffineTransform2DEffect");
             
-                Local<ObjectTemplate> jsDCompEffect = DIRECT2D::getCompositionEffectImpl(isolate, effect);
-                jsDCompEffect->Set(isolate, "SetInterpolationMode", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                    Isolate* isolate = info.GetIsolate();
-                    IDCompositionAffineTransform2DEffect* effect = (IDCompositionAffineTransform2DEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                    RetIfFailed(effect->SetInterpolationMode((D2D1_2DAFFINETRANSFORM_INTERPOLATION_MODE)IntegerFI(info[0])), "SetInterpolationMode failed (IDCompositionAffineTransform2DEffect)");
-                }));
-                jsDCompEffect->Set(isolate, "SetBorderMode", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                    Isolate* isolate = info.GetIsolate();
-                    IDCompositionAffineTransform2DEffect* effect = (IDCompositionAffineTransform2DEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                    RetIfFailed(effect->SetBorderMode((D2D1_BORDER_MODE)IntegerFI(info[0])), "SetBorderMode failed (IDCompositionAffineTransform2DEffect)");
-                }));
-                jsDCompEffect->Set(isolate, "SetTransformMatrix", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                    Isolate* isolate = info.GetIsolate();
-                    IDCompositionAffineTransform2DEffect* effect = (IDCompositionAffineTransform2DEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                
-                    D2D1::Matrix3x2F matrix = DIRECT2D::fromJSMatrix3x2(isolate, info[0].As<Object>());
-                    RetIfFailed(effect->SetTransformMatrix(matrix), "SetTransformMatrix failed (IDCompositionAffineTransform2DEffect)");
-                }));
-                jsDCompEffect->Set(isolate, "SetTransformMatrixElement", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                    Isolate* isolate = info.GetIsolate();
-                    IDCompositionAffineTransform2DEffect* effect = (IDCompositionAffineTransform2DEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                
-                    RetIfFailed(effect->SetTransformMatrixElement(IntegerFI(info[0]), IntegerFI(info[1]), FloatFI(info[2])), "SetTransformMatrixElement failed (IDCompositionAffineTransform2DEffect)");
-                }));
-                jsDCompEffect->Set(isolate, "SetSharpness", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                    Isolate* isolate = info.GetIsolate();
-                    IDCompositionAffineTransform2DEffect* effect = (IDCompositionAffineTransform2DEffect*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                    RetIfFailed(effect->SetSharpness(FloatFI(info[0])), "SetSharpness failed (IDCompositionAffineTransform2DEffect)");
-                }));
-                info.GetReturnValue().Set(jsDCompEffect->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
+                Local<Object> jsDCompEffect = DIRECT2D::getIDCompositionAffineTransform2DEffectImpl(isolate, effect);
+
+                info.GetReturnValue().Set(jsDCompEffect);
             }));
         }
 
@@ -7181,8 +7740,8 @@ V8FUNC(createCanvas) {
         //context->Set(isolate, "type", info[1]);
         print("TRENDERTARF< " << d2d->renderTarget);
         
-        renderingContext->Set(c, LITERAL("backBitmap"), DIRECT2D::getBitmapImpl(isolate, d2d->d2dBackBitmap.Get())->NewInstance(c).ToLocalChecked());
-        renderingContext->Set(c, LITERAL("targetBitmap"), DIRECT2D::getBitmapImpl(isolate, d2d->d2dTargetBitmap.Get())->NewInstance(c).ToLocalChecked());
+        renderingContext->Set(c, LITERAL("backBitmap"), DIRECT2D::getBitmapImpl(isolate, d2d->d2dBackBitmap.Get()));
+        renderingContext->Set(c, LITERAL("targetBitmap"), DIRECT2D::getBitmapImpl(isolate, d2d->d2dTargetBitmap.Get()));
 
         renderingContext->Set(c, LITERAL("fillStyle"), LITERAL("black"));
         renderingContext->Set(c, LITERAL("strokeStyle"), LITERAL("black"));
@@ -11856,108 +12415,9 @@ V8FUNC(InitializeWIC) {
             IWICBitmapDecoder* wicDecoder = NULL;
 
             RetIfFailed(WICObj->wicFactory->CreateDecoderFromFilename(WStringFI(info[0]), NULL, GENERIC_READ, WICDecodeMetadataCacheOnLoad, &wicDecoder), "yeah we failed that hoe (CreateDecoderFromFilename)");
-            Local<ObjectTemplate> jsDecoder = DIRECT2D::getIUnknownImpl(isolate, wicDecoder);//ObjectTemplate::New(isolate);
-            
-            jsDecoder->Set(isolate, "GetFrameCount", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                Local<Context> context = isolate->GetCurrentContext();
-                IWICBitmapDecoder* wicDecoder = (IWICBitmapDecoder*)info.This()->GetRealNamedProperty(context, LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            Local<Object> jsDecoder = DIRECT2D::getIWICBitmapDecoderImpl(isolate, wicDecoder);//ObjectTemplate::New(isolate);
 
-                UINT pCount; wicDecoder->GetFrameCount(&pCount);
-
-                info.GetReturnValue().Set(pCount);
-            }));
-            jsDecoder->Set(isolate, "GetBitmapFrame", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                Local<Context> context = isolate->GetCurrentContext();
-                IWICBitmapDecoder* wicDecoder = (IWICBitmapDecoder*)info.This()->GetRealNamedProperty(context, LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                WICHelper* WICObj = (WICHelper*)info[0].As<Object>()->GetRealNamedProperty(context, LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                
-                IWICBitmapFrameDecode* wicFrame = NULL;
-                HRESULT err = wicDecoder->GetFrame(IntegerFI(info[1]), &wicFrame);
-                if (err != S_OK) {
-                    //MessageBoxA(NULL, "GetFirstFrameWiC", "yeah we failed the hoe (wicDecoder->GetFrame(0, &wicFrame))", MB_OK | MB_ICONERROR);
-                    ERRORMB(err, "yeah we failed the hoe (wicDecoder->GetFrame(frame, &wicFrame))");
-                    //wicDecoder->Release();
-                    return;// nullptr;
-                }
-
-                //Local<Array> id = info[2].As<Array>();
-                //GUID shit = { IntegerFI(id->Get(context, 0).ToLocalChecked()),
-                //    IntegerFI(id->Get(context, 1).ToLocalChecked()),
-                //    IntegerFI(id->Get(context, 2).ToLocalChecked()),
-                //    IntegerFI(id->Get(context, 3).ToLocalChecked()),
-                //    IntegerFI(id->Get(context, 4).ToLocalChecked()),
-                //    IntegerFI(id->Get(context, 5).ToLocalChecked()),
-                //    IntegerFI(id->Get(context, 6).ToLocalChecked()),
-                //    IntegerFI(id->Get(context, 7).ToLocalChecked()),
-                //    IntegerFI(id->Get(context, 8).ToLocalChecked()),
-                //    IntegerFI(id->Get(context, 9).ToLocalChecked()),
-                //    IntegerFI(id->Get(context, 10).ToLocalChecked()) };
-                GUID shit = jsImpl::fromJSGUID(isolate, info[2]);
-
-                IWICFormatConverter* wicConverter = WICObj->LoadBitmapFromFrame(wicDecoder, wicFrame, shit, false);
-                info.GetReturnValue().Set(DIRECT2D::getWICBitmapImpl(isolate, wicConverter, shit));//(Number::New(isolate, (LONG_PTR)wicConverter));
-            }));
-            jsDecoder->Set(isolate, "GetThumbnail", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                Local<Context> context = isolate->GetCurrentContext();
-                IWICBitmapDecoder* wicDecoder = (IWICBitmapDecoder*)info.This()->GetRealNamedProperty(context, LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-                IWICBitmapSource* wicBitmap = nullptr;
-                GUID shit{};
-                RetIfFailed(wicDecoder->GetContainerFormat(&shit), "GetPixelFormat failed (GetThumbnail)");
-
-                RetIfFailed(wicDecoder->GetThumbnail(&wicBitmap), "GetThumbnail failed");
-
-                info.GetReturnValue().Set(DIRECT2D::getWICBitmapImpl(isolate, wicBitmap, shit));
-            }));
-            jsDecoder->Set(isolate, "GetPreview", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                Local<Context> context = isolate->GetCurrentContext();
-                IWICBitmapDecoder* wicDecoder = (IWICBitmapDecoder*)info.This()->GetRealNamedProperty(context, LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-
-                IWICBitmapSource* wicBitmap = nullptr;
-                GUID shit{};
-                RetIfFailed(wicDecoder->GetContainerFormat(&shit), "GetPixelFormat failed (GetPreview)");
-
-                RetIfFailed(wicDecoder->GetPreview(&wicBitmap), "GetPreview failed");
-
-                info.GetReturnValue().Set(DIRECT2D::getWICBitmapImpl(isolate, wicBitmap, shit));
-            }));
-            jsDecoder->Set(isolate, "GetContainerFormat", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-                Isolate* isolate = info.GetIsolate();
-                Local<Context> context = isolate->GetCurrentContext();
-                IWICBitmapDecoder* wicDecoder = (IWICBitmapDecoder*)info.This()->GetRealNamedProperty(context, LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                GUID format{}; RetIfFailed(wicDecoder->GetContainerFormat(&format), "GetContainerFormat failed");
-
-                Local<Value> elem[] = { Number::New(isolate, format.Data1), Number::New(isolate, format.Data2), Number::New(isolate, format.Data3), Number::New(isolate, format.Data4[0]), Number::New(isolate, format.Data4[1]), Number::New(isolate, format.Data4[2]), Number::New(isolate, format.Data4[3]), Number::New(isolate, format.Data4[4]), Number::New(isolate, format.Data4[5]), Number::New(isolate, format.Data4[6]), Number::New(isolate, format.Data4[7]) };
-                info.GetReturnValue().Set(Array::New(isolate, elem, 11)); //yeah ok v8 is just retarded bruh i can't do this (why tf did this work and why was the error so VAGEU)
-
-            }));
-            //jsDecoder->Set(isolate, "GetFrame", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            //    Isolate* isolate = info.GetIsolate();
-            //    IWICBitmapDecoder* wicDecoder = (IWICBitmapDecoder*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-            //    IWICBitmapFrameDecode* wicFrame = NULL;
-            //    HRESULT shit = wicDecoder->GetFrame(IntegerFI(info[0]), &wicFrame);
-            //
-            //    if (shit != S_OK) {
-            //        //MessageBoxA(NULL, "GetFirstFrameWiC", "yeah we failed the hoe (wicDecoder->GetFrame(0, &wicFrame))", MB_OK | MB_ICONERROR);
-            //        ERRORMB(shit, "yeah we failed the hoe (wicDecoder->GetFrame(frame, &wicFrame))");
-            //        //wicDecoder->Release();
-            //        return;// nullptr;
-            //    }
-            //
-            //    Local<ObjectTemplate> jsFrame = DIRECT2D::getIUnknownImpl(isolate, wicFrame);
-            //
-            //    jsFrame->Set(isolate, "CopyPixels", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-            //        
-            //    }));
-            //
-            //    info.GetReturnValue().Set(jsFrame->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
-            //}));
-
-            info.GetReturnValue().Set(jsDecoder->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
+            info.GetReturnValue().Set(jsDecoder);
             //info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)wicDecoder));
         }));
         wic->Set(isolate, "LoadBitmapFromFilename", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
@@ -12145,7 +12605,7 @@ V8FUNC(InitializeWIC) {
 
             IWICStream* fileStream = nullptr;
             hr = WICObj->wicFactory->CreateStream(&fileStream);
-            if (FAILED(hr)) {
+            if (FAILED(hr)) { //bruh i just realized i could've just use a ComPtr around here so i didn't have to manually release these shitns
                 encoder->Release();
                 RetPrintIfFailed(hr, "CreateStream failed... (SaveBitmapToFilename)");
             }
@@ -13810,8 +14270,8 @@ V8FUNC(CreateFileWrapper) {
 //}
 
 V8FUNC(__debugbreakWrapper) {
-    using namespace v8;
-    Isolate* isolate = info.GetIsolate();
+    //using namespace v8;
+    //Isolate* isolate = info.GetIsolate();
 
     __debugbreak(); //intrinsic (0xCC) int 3 opcode
     //print("dwvu");
@@ -14598,6 +15058,46 @@ V8FUNC(fetch) {
 
 }
 
+V8FUNC(mt_incremento) { //so far so good...
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    Local<Context> context = isolate->GetCurrentContext();
+
+    Local<Object> p1 = info[0].As<Object>();
+    long long n = IntegerFI(p1->Get(context, LITERAL("n")).ToLocalChecked());
+    p1->Set(context, LITERAL("n"), Number::New(isolate, ++n));
+
+    //info.GetReturnValue().Set(Number::New(isolate, n));
+}
+
+V8FUNC(mt_makeobject) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    Local<Context> context = isolate->GetCurrentContext();
+    EscapableHandleScope handle_scope(isolate);
+
+    Local<Object> object;
+    UINT x = 0; _rdrand32_step(&x);
+    UINT y = 0; _rdrand32_step(&y); //lol i knew this would be the fastest way (as in 1 function) to get a random value
+    if (!info[0]->BooleanValue(isolate)) {
+        object = Object::New(isolate);
+        object->Set(context, LITERAL("x"), Number::New(isolate, x)); //lowkey i just learned yesterday that there is actually an Integer type for v8
+        object->Set(context, LITERAL("y"), Number::New(isolate, y)); //lowkey i just learned yesterday that there is actually an Integer type for v8
+    }
+    else { //yeah i was right this is just bad
+        //Local<ObjectTemplate> ot = ObjectTemplate::New(isolate);
+        //static Local<ObjectTemplate> ot = ObjectTemplate::New(isolate); //using static here is like me defining and initializing it in jsImpl (ok apparently it is NOT lmao i just got an access violation probably because isolate was different or sumn)
+        Local<ObjectTemplate> ot = jsImpl::mt_testot;
+        object = ot->NewInstance(context).ToLocalChecked();
+        object->Set(context, LITERAL("x"), Number::New(isolate, x));
+        object->Set(context, LITERAL("y"), Number::New(isolate, y));
+        //ot->Set(isolate, "x", Number::New(isolate, x));
+        //ot->Set(isolate, "y", Number::New(isolate, y));
+        //object = ot->NewInstance(context).ToLocalChecked(); //i feel like making an object template EVERY time and returning the object is bad (but i LOWKEY do it A LOT)
+    }
+    info.GetReturnValue().Set(handle_scope.Escape(object));
+}
+
 //i think im allowed to use a snapshot thing to load these quicker
 //https://github.com/danbev/learning-v8/blob/master/notes/snapshots.md
 v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const wchar_t* filename, int nCmdShow) {
@@ -14677,6 +15177,9 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const wchar_t* filename
     setGlobal(NewWCharStrPtr);
     setGlobal(DeletePtr);
     setGlobal(DeleteArrayPtr);
+
+    setGlobal(mt_incremento);
+    setGlobal(mt_makeobject);
 
     //setGlobalWrapper(SystemParametersInfo);
     
@@ -17196,6 +17699,7 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
 
     //jsEffectOT = DIRECT2D::getIUnknownImpl(isolate, nullptr);
     jsImpl::initObjectTemplates(isolate);
+    DIRECT2D::Templates::Init(isolate);
 
     jsEffectOT = ObjectTemplate::New(isolate);
 
@@ -17922,7 +18426,8 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrevInstance, PWSTR nCmdList, in
     //1.5.74 because i added SetWinEventHook lol
     //1.5.76 idk bruh i added a lot of random stuff for gdi
     //1.5.77 i changed the return value of GetDpi
-    print("JBS3 -> Version 1.5.77"); //so idk how normal version things work so the first number will probably stay one --- i will increment the second number if i change an existing function like when i remade the CreateWindowClass and CreateWindow functions --- i might random increment the third number if i feel like it
+    //1.5.90 fixed every DIRECT2D get#Impl function from returning a NEW object template every time (JBSBLUEPRINTS NOW STAYS AT LESS THAN 100MB!!!!)
+    print("JBS3 -> Version 1.5.90"); //so idk how normal version things work so the first number will probably stay one --- i will increment the second number if i change an existing function like when i remade the CreateWindowClass and CreateWindow functions --- i might random increment the third number if i feel like it
     print(screenWidth << "x" << screenHeight);
     
 

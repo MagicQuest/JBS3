@@ -549,8 +549,14 @@ class Blueprint {
         this.y = y;
         this.width = width;
         this.height = height;
-        this.parameters = parameters; //parameters and out come in as arrays of strings but are stored as arrays of objects
-        this.out = out;
+
+        //OOPS this is a REFERENCE!
+        //this.parameters = parameters; //parameters and out come in as arrays of strings but are stored as arrays of objects
+        //this.out = out;
+        
+        this.parameters = Array.from(parameters); //COPY!  (wait why does structuredClone not work bruh)
+        this.out = Array.from(out);
+
         this.type = type;
         this.desc = desc; ///hover and show it
         this._special = false;
@@ -693,6 +699,7 @@ class Blueprint {
         if(param.type == "exec") {
             //draw traingel 
             //(why doesn't d2d have an easy triangle primitive function type hsit)
+            
             const path = d2d.CreatePathGeometry();
             const sink = path.Open();
             sink.BeginFigure(ex-2.5, y-5, D2D1_FIGURE_BEGIN_FILLED);
@@ -700,7 +707,7 @@ class Blueprint {
             sink.AddLine(ex-2.5, y+5);
             sink.EndFigure(D2D1_FIGURE_END_CLOSED);
             sink.Close();
-            print(sink.Release() == 0, "sink true hawk two");
+            sink.Release();
             const args = [path, colorBrush];
             
             if(connection) {
@@ -711,6 +718,7 @@ class Blueprint {
             //d2d[`${connection ? "Fill" : "Draw"}Geometry`](path, colorBrush, connection ? undefined : 2);
             //path.Release(); //ok this is a HUGE leak bruh this shit isn't getting released!!!
             throwawayObjects.push(path);
+            
         }else {
             //check if param type is any and then make rainbowe graident
             d2d[`${connection ? "Fill" : "Draw"}Ellipse`](ex, y, Blueprint.radius, Blueprint.radius, colorBrush, 2, roundStrokeStyle); //passing 2 as the 6th parameter for FillEllipse will not do anything because it doesn't have a 6th parameter (it is for DrawEllipse's strokeWidth)
@@ -802,6 +810,7 @@ class Blueprint {
                     const halfX = this.width-8 + this.getXAlong(connection, .5);
                     const halfY = y + this.getYAlong(connection, y, .5);
 
+                    
                     const path = d2d.CreatePathGeometry();
                     const sink = path.Open();
 
@@ -821,8 +830,8 @@ class Blueprint {
                     sink.EndFigure(D2D1_FIGURE_END_OPEN);
 
                     sink.Close();
-                    //sink.Release();
-                    print(sink.Release() == 0, "hawk one sink down");
+                    sink.Release();
+                    //print(sink.Release() == 0, "hawk one sink down");
                     //print(sink.Release(), "sink release?");
                     d2d.DrawGeometry(path, colorBrush, 4, roundStrokeStyle);
 
@@ -830,6 +839,7 @@ class Blueprint {
                     //r&&d2d.DrawText(`${r.id}`, font, halfX+16, halfY+16, halfX+80, halfY+80, colorBrush);
                     //print(path.Release(), "path release?}"); //lowkey idk if this is getting released but idk how to check
                     throwawayObjects.push(path);
+                    
                 }
             }
         }
@@ -1137,6 +1147,7 @@ class BlueprintMenu {
             const j = Math.floor(this.scrollY) + i;
             //print(i, j);
             const {name, desc, parameters, out} = BlueprintMenu.commandList[j];
+            //print(typeof(parameters), typeof(out));
             print(name, desc, parameters, out);
             Blueprint.create(undefined, name, this.x, this.y, parameters, out, BPTYPE_NOTPURE, desc); //ok putting undefined here is a real sign that i really don't need to hold on to the hwnd in Blueprint lmao
             BlueprintMenu.close();
