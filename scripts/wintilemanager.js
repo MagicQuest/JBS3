@@ -41,7 +41,7 @@ function findspaceforapp(path, id = undefined) {
         //\033[0m
         //tried using printNoHighlight but it lowkey also didn't work
         //for some reason when i added printNoHighlight like the other day i didn't think to add the actual functions i used to color the text
-        let console = GetStdHandle(STD_OUTPUT_HANDLE);
+        let console = GetStdHandle(STD_OUTPUT_HANDLE); //you don't have to release the HANDLE returned from this function :)
         SetConsoleTextAttribute(console, 4);
         printNoHighlight(/*"\x1b[31;1m*/`failed to ${!id ? "make space" : "recenter"} for `+apps[path].name);//+"\x1b[0m");
         printNoHighlight(/*"\x1b[96m*/"trying again...");//\x1b[0m");

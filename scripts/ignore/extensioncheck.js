@@ -9,8 +9,9 @@ for(const key in globalThis) {
     }
 }
 
-delete functions["registerFunc"];
+delete functions["registerFunc"]; //lol these are functions defined in extension.ts not jbs
 delete functions["registerGlobalObject"];
+delete functions["registerGlobalObjectSignature"];
 
 function registerFunc(name, signature, desc) {
     if(functions[name] != undefined) {

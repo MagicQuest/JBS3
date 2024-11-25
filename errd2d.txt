@@ -1,0 +1,6 @@
+-2003238911 
+https://stackoverflow.com/questions/9510822/what-is-the-design-rationale-behind-handlescope
+https://stackoverflow.com/questions/16701275/correct-use-of-handlescope-in-asynchronous-addon
+https://github.com/PanosPetras/The_Great_War
+https://github.com/PanosPetras/The_Great_War/pull/2
+https://github.com/Nevermore1994/http-request/

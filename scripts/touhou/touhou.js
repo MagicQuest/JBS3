@@ -783,7 +783,8 @@ function windowProc(hwnd, msg, wp, lp) {
         //ACTUALLY i have no idea what to believe because i used https://web.archive.org/web/20180621043849/https://jsperf.com/fast-array-foreach and somehow forEach was faster? idk
         for(let ent of del) { //using for of because it's literally the same as for each (BASICALLY) no index count tho
             //print(entities.findIndex(element => element.x == ent.x && element.y == ent.y));
-            let i = entities.findIndex(element => element.x == ent.x && element.y == ent.y && element.constructor.name == ent.constructor.name); //simply ahh check because it prolly doesn't need to be that specific ykykyk also you cannot use indexOf on an array of objects (shit = [{...}, {...}]) because all objects are unique so {x: 21} != {x: 21}
+            //let i = entities.findIndex(element => element.x == ent.x && element.y == ent.y && element.constructor.name == ent.constructor.name); //simply ahh check because it prolly doesn't need to be that specific ykykyk also you cannot use indexOf on an array of objects (shit = [{...}, {...}]) because all objects are unique so {x: 21} != {x: 21} (my reasoning is a bit off here...)
+            let i = entities.indexOf(ent); //i think what made me think that indexOf wouldn't work with objects is the fact that while it's true identical objects aren't equal to each other, objects are passed by reference and so instead of the objects being identical, the objects are actually each other and js can tell that both of these variables reference the same underlying object
             if(i != -1) {
                 entities.splice(i, 1);
             }else {

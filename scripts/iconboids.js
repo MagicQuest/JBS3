@@ -22,6 +22,27 @@ function getMagnitude(x, y) {
     return Math.sqrt(x**2 + y**2);
 }
 
+function enumProcessesForIcons(pid) {//PrintProcessNameAndID(pid) { //https://learn.microsoft.com/en-us/windows/win32/psapi/enumerating-all-processes
+    let handle = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, false, pid);
+
+    if(handle) {
+        let [hMod, cbNeeded, success] = EnumProcessModules(handle);
+
+        if(success) {
+            //let name = GetModuleBaseName(handle, hMod);
+
+            let path = GetModuleFileNameEx(handle, hMod);
+            let {icon, id} = ExtractAssociatedIcon(hInstance, path);
+            print(icon, id);
+            iconIcons.push(icon);
+        }
+    }
+    //OOPS I FORGOT CLOSE HANDLE
+    CloseHandle(handle);
+}
+
+EnumProcesses(enumProcessesForIcons);
+
 class Vector2 {
     constructor(x, y) {
         this.x = x;

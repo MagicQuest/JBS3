@@ -11,6 +11,9 @@ let activePin;
 let draws = 0;
 let throwawayObjects = [];
 
+let next; //next blueprint to fire (global so i can change it in the meta functions like branch/IF)
+let loopStack = [];
+
 const typeRegex = /(.+) *: *(.+)/;
 
 const arrow = LoadCursor(NULL, IDC_ARROW);
@@ -303,12 +306,12 @@ const PRIMITIVE_TOGGLE = 0;
 const PRIMITIVE_INPUT = 1;
 const PRIMITIVE_DROPDOWN = 2; //maybe...
 
-class PrimitiveControl { //hell yeah brother (this object isn't meant to be on its own and is used in Blueprint)
+class PrimitiveControl { //hell yeah brother (this object isn't meant to be on its own and is for Blueprint but i also use it in BlueprintMenu too)
     static validPrimitives = {string: [PRIMITIVE_INPUT], number: [PRIMITIVE_INPUT, "number"], boolean: [PRIMITIVE_TOGGLE], BOOL: [PRIMITIVE_TOGGLE], float: [PRIMITIVE_INPUT, "float"]};
 
     type = PRIMITIVE_TOGGLE;
     value = undefined;
-    data = undefined; //data for PRIMITIVE_DROPDOWN
+    data = undefined; //data for PRIMITIVE_DROPDOWN or the type of number for PRIMITIVE_INPUT
     geometry = undefined; //random additional d2d stuff like a path geometry (for toggle) or a text layout (for input)
     width = 16;
     height = 16;
@@ -464,6 +467,8 @@ class Blueprint {
 
     static padding = 16;
     static radius = 4;
+
+    static meta_functions = {};
 
     static getColorByTitle(title, type) {
         let color;
@@ -965,6 +970,41 @@ for(const key in baseTypes) {
     PrimitiveControl.validPrimitives[key] = PrimitiveControl.validPrimitives[baseTypes[key]];
 }
 
+Blueprint.meta_functions["IF"] = function(bool) {
+    //if(bool) {
+                                   //!lol!
+        //next = this.connections.out[+!bool][0]?.receiver?.source
+        //print(+!bool, Object.keys(this.connections.out), Object.keys(this.connections.out[+!bool]));
+    //}
+    if(bool) {
+        next = this.connections.out[0]?.[0]?.receiver?.source;
+    }else {
+        next = this.connections.out[1]?.[0]?.receiver?.source;
+    }
+}
+
+Blueprint.meta_functions["WHILE"] = function(bool) {
+    if(bool) {
+        if(!loopStack.indexOf(this)) {
+            loopStack.push(this);
+        }
+        next = this.connections.out[0]?.[0]?.receiver?.source;
+    }else {
+        loopStack.splice(loopStack.indexOf(this), 1);
+        next = this.connections.out[1]?.[0]?.receiver?.source;
+    }
+}
+
+Blueprint.meta_functions[""]
+//meta blueprint functions
+//function IF(bool) { //lemme define these in Blueprint
+//    print("bool", bool);
+//    //print(next, current);
+//    if(bool) {
+//        next = ;
+//    }
+//}
+
 class BlueprintMenu {
     x = 0;
     y = 0;
@@ -984,7 +1024,9 @@ class BlueprintMenu {
     static singleton = undefined;
 
     static commandList = [ //haha not the d2d one
-        //{name, desc, parameters, out}
+        //{name, desc, parameters, out, type?}
+        {name: "IF", desc: "branch", parameters: [" : exec", "Condition : boolean"], out: ["True : exec", "False : exec"], type: BPTYPE_PURE},
+        {name: "WHILE", desc: "while loop", parameters: [" : exec", "Condition: boolean"], out: ["Loop Body : exec", "Completed : exec"], type : BPTYPE_PURE},
         //i was gonna use this regex but i realized i could eval it instead -> /registerFunc *\( *(["'`])(\w+)\1 *, *(["'`])function \2\(([A-z0-9:_, ]+)\) *: *(\w+)\3/
         //damn well i already wanted to add some networking functions for a custom discord client burt wwteverf
     ];
@@ -1104,6 +1146,7 @@ class BlueprintMenu {
             this.scrollY = Math.min(BlueprintMenu.commandList.length, Math.max(0, this.scrollY+this.scrollVelocity));
             this.scrollVelocity *= .95;
             //dirty = true; //lol! (aw damn wait it's already true)
+            
         }
 
         for(let i = 0; i < (400-92)/12; i++) {
@@ -1146,10 +1189,10 @@ class BlueprintMenu {
             const i = Math.floor((mouse.y-checkY)/12);    //(mouse.y-92)/12; //i think?
             const j = Math.floor(this.scrollY) + i;
             //print(i, j);
-            const {name, desc, parameters, out} = BlueprintMenu.commandList[j];
+            const {name, desc, parameters, out, type} = BlueprintMenu.commandList[j];
             //print(typeof(parameters), typeof(out));
-            print(name, desc, parameters, out);
-            Blueprint.create(undefined, name, this.x, this.y, parameters, out, BPTYPE_NOTPURE, desc); //ok putting undefined here is a real sign that i really don't need to hold on to the hwnd in Blueprint lmao
+            print(name, desc, parameters, out, type);
+            Blueprint.create(undefined, name, this.x, this.y, parameters, out, type ?? BPTYPE_NOTPURE, desc); //ok putting undefined here is a real sign that i really don't need to hold on to the hwnd in Blueprint lmao
             BlueprintMenu.close();
         }
     }
@@ -1228,6 +1271,9 @@ function executeBlueprints() {
     //assuming panes[0] is the event start blueprint because it's the first one i make
     const start = panes[0];                                                         //the first 'i' is the index of the out pin (why?)
     let current = start.connections.out[0]?.[0]?.receiver?.source; //connections.out : Array<{i : number, receiver : {i : number, source : Blueprint}}>
+
+    next = undefined;
+    loopStack = []; //hell yeah a stack!
     //print(start.connections.out[0]);
     //start.connections.out[0] //we can assume that for every object connected from event start has an exec pin as the first out pin
     //print(recur(start.connections));
@@ -1246,7 +1292,7 @@ function executeBlueprints() {
         //source._special = false;
         const args = [];
         const notpure = source.type == BPTYPE_NOTPURE;
-        const j = notpure ? 1 : 0;
+        const j = (notpure || source.parameters[0]?.type == "exec") ? 1 : 0;
         const paneIndex = panes.indexOf(source);
         let result;
         if(!cache[paneIndex]?.value) {
@@ -1292,7 +1338,11 @@ function executeBlueprints() {
             //if this is a datatype blueprint then don't do this lmao
             print("exec", source.title);
             print("args", args);
-            result = globalThis[source.title](...args);
+            if(Blueprint.meta_functions[source.title]) {
+                result = Blueprint.meta_functions[source.title].call(source, ...args);
+            }else {
+                result = globalThis[source.title](...args); //lowkey im just gonna name the branch function like IF or something so i can just define it earlier
+            }
             if(notpure) {
                 if(!cache[paneIndex]) {
                     cache[paneIndex] = {};
@@ -1314,8 +1364,16 @@ function executeBlueprints() {
         //args = loopthroughparameters(current);
         //print("args", args);
         //globalThis[current.title](...args); //store results in cache somehow and make primitive input boxes type shit
+        next = current.connections.out[0]?.[0]?.receiver?.source; //defining it like this so i can modify next in the interpret function (for blueprints like )
+        print(current.title);
         interpretParametersAndExecute(current);
-        current = current.connections.out[0]?.[0]?.receiver?.source; //traverse to the next blueprint connected
+
+        if(!next && loopStack.length != 0) {
+            next = loopStack.at(-1);
+        }
+        
+        //damn i am not ready for these meta blueprints how am i gonna make the branch work...
+        current = next; //traverse to the next blueprint connected
     }
 }
 
