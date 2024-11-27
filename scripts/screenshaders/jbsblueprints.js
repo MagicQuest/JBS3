@@ -87,7 +87,7 @@ const hittestarr = [
 const BPTYPE_PURE = 0;
 const BPTYPE_NOTPURE = 1;
 const BPTYPE_EVENT = 2;
-const BPTYPE_DATATYPE = 3;
+const BPTYPE_BARE = 3;
 
 class Draggable { //not to be confused with Draggable from jbstudio3 (this shit is elegant as fuck)
     static lockX = false;
@@ -497,6 +497,9 @@ class Blueprint {
         const reservedheight = Blueprint.captionHeight+Blueprint.padding; //titlebar + padding
         //const outheight = reservedheight+(Blueprint.captionHeight*(out.length+execpins))+5;
         let height = reservedheight;
+        //if(type == BPTYPE_BARE) {
+        //    height -= Blueprint.captionHeight;
+        //}
         if(parameters.length+execpins > out.length+execpins) {
             height += (Blueprint.captionHeight*(parameters.length+execpins))+5
         }else {
@@ -581,24 +584,37 @@ class Blueprint {
         //    d2d.CreateLinearGradientBrush(2, 2, 2, Blueprint.captionHeight-2, this.gradientStops[3]), //pointing down
         //);
 
-        this.gradients.push(
-            Gradient.LinearGradientBrush(
-                d2d.CreateGradientStopCollection([0.0, ...color], [0.85, 32/255, 32/255, 32/255]),
-                0,0,this.width,/*this.height*/ Blueprint.captionHeight, //CreateLinearGradientBrush args (don't include the gradientStop because Gradient.LinearGradientBrush does it for you)
-            ),
-            Gradient.RadialGradientBrush(
-                d2d.CreateGradientStopCollection([0.0, 32/255, 32/255, 32/255], [0.4, 0.0, 0.0, 0.0, 0.0]),
-                this.width/3, Blueprint.captionHeight/2, 0, 0, this.width, Blueprint.captionHeight,
-            ),
-            Gradient.LinearGradientBrush(
-                d2d.CreateGradientStopCollection([0.0, 27/255, 28/255, 27/255], [0.4, 19/255, 21/255, 19/255], [.8, 15/255, 17/255, 15/255]),
-                0, Blueprint.captionHeight, this.width, this.height,
-            ),
-            Gradient.LinearGradientBrush(
-                d2d.CreateGradientStopCollection([0.0, ...color], [0.2, 0.0, 0.0, 0.0, 0.0]),
-                2, 2, 2, Blueprint.captionHeight-2, //pointing down
-            ),
-        )
+        if(this.type != BPTYPE_BARE) {
+            this.gradients.push(
+                Gradient.LinearGradientBrush(
+                    d2d.CreateGradientStopCollection([0.0, ...color], [0.85, 32/255, 32/255, 32/255]),
+                    0,0,this.width,/*this.height*/ Blueprint.captionHeight, //CreateLinearGradientBrush args (don't include the gradientStop because Gradient.LinearGradientBrush does it for you)
+                ),
+                Gradient.RadialGradientBrush(
+                    d2d.CreateGradientStopCollection([0.0, 32/255, 32/255, 32/255], [0.4, 0.0, 0.0, 0.0, 0.0]),
+                    this.width/3, Blueprint.captionHeight/2, 0, 0, this.width, Blueprint.captionHeight,
+                ),
+                Gradient.LinearGradientBrush(
+                    d2d.CreateGradientStopCollection([0.0, 27/255, 28/255, 27/255], [0.4, 19/255, 21/255, 19/255], [.8, 15/255, 17/255, 15/255]),
+                    0, Blueprint.captionHeight, this.width, this.height,
+                ),
+                Gradient.LinearGradientBrush(
+                    d2d.CreateGradientStopCollection([0.0, ...color], [0.2, 0.0, 0.0, 0.0, 0.0]),
+                    2, 2, 2, Blueprint.captionHeight-2, //pointing down
+                ),
+            )
+        }else {
+            this.gradients.push(undefined, undefined, 
+                Gradient.LinearGradientBrush(
+                    d2d.CreateGradientStopCollection([0.0, 168/255, 168/255, 168/255, .7], [0.4, 100/255, 100/255, 100/255, .5], [1.0, 32/255, 32/255, 32/255, .1]),
+                    0, 0, 0, this.height,
+                ),
+                Gradient.LinearGradientBrush(
+                    d2d.CreateGradientStopCollection([0.0, 1.0, 1.0, 1.0], [0.2, 0.0, 0.0, 0.0, 0.0]),
+                    2, Blueprint.captionHeight-2, 2, (Blueprint.captionHeight*2)-6, //pointing down
+                ),
+            );
+        }
 
         if(this.type == BPTYPE_NOTPURE || this.type == BPTYPE_EVENT) { //lowkey still no delegate pin
             if(this.type == BPTYPE_NOTPURE) {
@@ -743,15 +759,21 @@ class Blueprint {
         //https://learn.microsoft.com/en-us/windows/win32/direct2d/printing-and-command-lists
         //https://github.com/MicrosoftDocs/win32/blob/docs/desktop-src/direct3d12/d2d-using-d3d11on12.md
         d2d.FillRoundedRectangle(0, Blueprint.captionHeight-4, this.width, this.height, 4, 4, this.gradients[2]);
-
-        d2d.FillRoundedRectangle(0, 0, this.width, Blueprint.captionHeight, 4, 4, this.gradients[0]);
-        d2d.FillRoundedRectangle(0, 0, this.width, Blueprint.captionHeight, 4, 4, this.gradients[1]);
-        //d2d.FillRectangle(0, 0, this.width, Blueprint.captionHeight, this.gradients[0]);
-        //d2d.FillRectangle(0, 0, this.width, Blueprint.captionHeight, this.gradients[1]);
+        
+        if(this.type != BPTYPE_BARE) {
+            d2d.FillRoundedRectangle(0, 0, this.width, Blueprint.captionHeight, 4, 4, this.gradients[0]);
+            d2d.FillRoundedRectangle(0, 0, this.width, Blueprint.captionHeight, 4, 4, this.gradients[1]);
+            //d2d.FillRectangle(0, 0, this.width, Blueprint.captionHeight, this.gradients[0]);
+            //d2d.FillRectangle(0, 0, this.width, Blueprint.captionHeight, this.gradients[1]);
+        }
         colorBrush.SetColor(1.0, 1.0, 1.0);
         d2d.DrawText(this.title, font, 21, 0, this.width, Blueprint.captionHeight, colorBrush);
 
-        d2d.DrawRoundedRectangle(2, 2, this.width-2, Blueprint.captionHeight-2, 2, 2, this.gradients[3], 1);
+        if(this.type == BPTYPE_BARE) {
+            d2d.DrawRoundedRectangle(2, Blueprint.captionHeight-2, this.width-2, (Blueprint.captionHeight*2)-6, 2, 2, this.gradients[3], 1);
+        }else {
+            d2d.DrawRoundedRectangle(2, 2, this.width-2, Blueprint.captionHeight-2, 2, 2, this.gradients[3], 1);
+        }
 
         if(this._special) {
             d2d.DrawBitmap(specialBitmap, this.width-16-2, 2.5, this.width-2, 16+2.5);
@@ -984,18 +1006,78 @@ Blueprint.meta_functions["IF"] = function(bool) {
 }
 
 Blueprint.meta_functions["WHILE"] = function(bool) {
-    if(bool) {
-        if(!loopStack.indexOf(this)) {
+    if(bool && !GetKey(VK_ESCAPE)) { //break out of infinite loop with escape!
+        if(loopStack.indexOf(this) == -1) { //haha oops
             loopStack.push(this);
         }
-        next = this.connections.out[0]?.[0]?.receiver?.source;
+        next = this.connections.out[0]?.[0]?.receiver?.source; //the loop body exec pin
     }else {
-        loopStack.splice(loopStack.indexOf(this), 1);
-        next = this.connections.out[1]?.[0]?.receiver?.source;
+        let i = loopStack.indexOf(this);
+        if(i != -1) { //haha oops
+            loopStack.splice(i, 1);
+        }
+        next = this.connections.out[1]?.[0]?.receiver?.source; //the second pin (the completed exec)
     }
 }
 
-Blueprint.meta_functions[""]
+Blueprint.meta_functions["FOR_LOOP"] = function(firstIndex, lastIndex) {
+    //wait where am i going to store the index?!
+    //ok i actually might do it in _special haha
+    let index = 0;
+    if(loopStack.indexOf(this) == -1) { //haha oops
+        loopStack.push(this);
+        index = firstIndex;
+    }else {
+        index = this._special+1; //oops i forgot the plus 1 and started an infinite loop
+    }
+    if(index > lastIndex || GetKey(VK_ESCAPE)) {
+        loopStack.splice(loopStack.indexOf(this), 1);
+        next = this.connections.out[2]?.[0]?.receiver?.source; //the third pin (the completed exec)
+    }else {
+        next = this.connections.out[0]?.[0]?.receiver?.source;
+    }
+    //print("i:",index, this._special);
+    this._special = index;
+    return index;
+}
+
+//oh boy for loop with break is kinda weird because i don't check which exec pin im plugged into
+
+Blueprint.meta_functions["NOT_EQUAL"] = function(left, right) {
+    return left != right;
+}
+
+Blueprint.meta_functions["EQUAL"] = function(left, right) {
+    return left == right;
+}
+
+Blueprint.meta_functions["AND"] = function(left, right) {
+    return left && right;
+}
+
+Blueprint.meta_functions["OR"] = function(left, right) {
+    return left || right;
+}
+
+Blueprint.meta_functions["NOT"] = function(left) {
+    return !left;
+}
+
+Blueprint.meta_functions["RUSSIAN_ROULETTE"] = function(...args) { //variable length? (lowkey idk if it's gonna look that good if i really do it)
+    const keys = Object.keys(globalThis);
+    while(true) {
+        let i = Math.floor(Math.random()*keys.length);
+        const func = globalThis[keys[i]];
+        if(typeof(func) != "function") continue;
+        print("calling", keys[i]);
+        return func(...args);
+    }
+}
+
+/*Blueprint.meta_functions["__TATTLETAIL__"] = function(window) { //https://www.youtube.com/watch?v=nI26a2pDxGk
+
+}*/
+
 //meta blueprint functions
 //function IF(bool) { //lemme define these in Blueprint
 //    print("bool", bool);
@@ -1025,8 +1107,15 @@ class BlueprintMenu {
 
     static commandList = [ //haha not the d2d one
         //{name, desc, parameters, out, type?}
-        {name: "IF", desc: "branch", parameters: [" : exec", "Condition : boolean"], out: ["True : exec", "False : exec"], type: BPTYPE_PURE},
-        {name: "WHILE", desc: "while loop", parameters: [" : exec", "Condition: boolean"], out: ["Loop Body : exec", "Completed : exec"], type : BPTYPE_PURE},
+        {name: "IF", desc: "branch", parameters: ["exec : exec", "Condition : boolean"], out: ["True : exec", "False : exec"], type: BPTYPE_PURE},
+        {name: "WHILE", desc: "while loop (break infinite loop by holding escape!)", parameters: ["exec : exec", "Condition: boolean"], out: ["Loop Body : exec", "Completed : exec"], type : BPTYPE_PURE},
+        {name: "FOR_LOOP", desc: "for loop", parameters: ["exec : exec", "First Index : number", "Last Index : number"], out: ["Loop Body : exec", "Index : number", "Completed : exec"], type : BPTYPE_PURE},
+        {name: "NOT_EQUAL", desc: "!=", parameters: [" : number", " : number"], out: [" : boolean"], type: BPTYPE_BARE},
+        {name: "EQUAL", desc: "==", parameters: [" : number", " : number"], out: [" : boolean"], type: BPTYPE_BARE},
+        {name: "AND", desc: "&&", parameters: [" : boolean", " : boolean"], out: [" : boolean"], type: BPTYPE_BARE},
+        {name: "OR", desc: "||", parameters: [" : boolean", " : boolean"], out: [" : boolean"], type: BPTYPE_BARE},
+        {name: "NOT", desc: "!", parameters: [" : boolean"], out: [" : boolean"], type: BPTYPE_BARE},
+        {name: "RUSSIAN_ROULETTE", desc: "calls a totally random function with the specified parameters", parameters: ["any : any"], out: ["any : any"]},
         //i was gonna use this regex but i realized i could eval it instead -> /registerFunc *\( *(["'`])(\w+)\1 *, *(["'`])function \2\(([A-z0-9:_, ]+)\) *: *(\w+)\3/
         //damn well i already wanted to add some networking functions for a custom discord client burt wwteverf
     ];
@@ -1283,6 +1372,7 @@ function executeBlueprints() {
     const cache = {};
     
     for(const pane of panes) {
+        //if(pane instanceof Blueprint) pane._special = false;
         (pane instanceof Blueprint) && (pane._special = false);
     }
 
@@ -1341,7 +1431,7 @@ function executeBlueprints() {
             if(Blueprint.meta_functions[source.title]) {
                 result = Blueprint.meta_functions[source.title].call(source, ...args);
             }else {
-                result = globalThis[source.title](...args); //lowkey im just gonna name the branch function like IF or something so i can just define it earlier
+                result = globalThis[source.title](...args); //lowkey im just gonna name the branch function like IF or something so i can just define it earlier (ok i did it differently than that)
             }
             if(notpure) {
                 if(!cache[paneIndex]) {
@@ -1368,8 +1458,10 @@ function executeBlueprints() {
         print(current.title);
         interpretParametersAndExecute(current);
 
+        print(!!next, loopStack.length);
         if(!next && loopStack.length != 0) {
             next = loopStack.at(-1);
+            print("loop");
         }
         
         //damn i am not ready for these meta blueprints how am i gonna make the branch work...

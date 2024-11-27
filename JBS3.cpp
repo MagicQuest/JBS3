@@ -18700,7 +18700,8 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrevInstance, PWSTR nCmdList, in
     //1.5.76 idk bruh i added a lot of random stuff for gdi
     //1.5.77 i changed the return value of GetDpi
     //1.5.90 fixed every DIRECT2D get#Impl function from returning a NEW object template every time (JBSBLUEPRINTS NOW STAYS AT LESS THAN 100MB!!!!)
-    print("JBS3 -> Version 1.5.90"); //so idk how normal version things work so the first number will probably stay one --- i will increment the second number if i change an existing function like when i remade the CreateWindowClass and CreateWindow functions --- i might random increment the third number if i feel like it
+    //1.6.0 fixed EVERY object template that was created in a FunctionTemplate!!
+    print("JBS3 -> Version 1.6.0"); //so idk how normal version things work so the first number will probably stay one --- i will increment the second number if i change an existing function like when i remade the CreateWindowClass and CreateWindow functions --- i might random increment the third number if i feel like it
     print(screenWidth << "x" << screenHeight);
     
 
