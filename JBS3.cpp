@@ -6459,9 +6459,10 @@ namespace DIRECT2D {
             }));
             context->Set(isolate, "DrawTextLayout", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
                 Isolate* isolate = info.GetIsolate();
-                Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                IDWriteTextLayout* layout = (IDWriteTextLayout*)info[2].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                ID2D1Brush* brush = (ID2D1Brush*)info[3].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                Local<Context> context = isolate->GetCurrentContext();
+                Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(context, LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(context).FromJust();
+                IDWriteTextLayout* layout = (IDWriteTextLayout*)info[2].As<Object>()->GetRealNamedProperty(context, LITERAL("internalPtr")).ToLocalChecked()->IntegerValue(context).FromJust();
+                ID2D1Brush* brush = (ID2D1Brush*)info[3].As<Object>()->GetRealNamedProperty(context, LITERAL("internalPtr")).ToLocalChecked()->IntegerValue(context).FromJust();
 
                 d2d->renderTarget->DrawTextLayout(D2D1::Point2F(FloatFI(info[0]), FloatFI(info[1])), layout, brush);
             }));
@@ -10217,10 +10218,12 @@ V8FUNC(CreateWindowWrapper) {
                 return lres;
             }
             else {
-                LRESULT ret = IntegerFI(returnedValue.ToLocalChecked()); //oh wait i could just check if this value is undefined i think right
-                if (ret != 0) {
-                    print(ret << " ret");
-                    return ret;
+                if (!returnedValue.IsEmpty()) { //returnedValue is usually empty when an error happens earlier!
+                    LRESULT ret = IntegerFI(returnedValue.ToLocalChecked()); //oh wait i could just check if this value is undefined i think right
+                    if (ret != 0) {
+                        print(ret << " ret");
+                        return ret;
+                    }
                 }
                 return DefWindowProcW(hwnd, msg, wp, lp);
                 //return SKIBIDI_CHECK;

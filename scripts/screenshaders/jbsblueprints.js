@@ -1,3 +1,6 @@
+//imma be honest the code that goes into drawing and managing the blueprints might not be good BUT IT WORKS
+//i might try to clean this shit up at some point so it's not a tangled mess of classes
+
 //const rp = print;
 //print = function(...args) {};
 
@@ -8,6 +11,7 @@ let hit = {}; // {result, pane, data}
 //let hitpane;
 let activeButton;
 let activePin;
+let activePane;
 let draws = 0;
 let throwawayObjects = [];
 
@@ -104,6 +108,7 @@ class Draggable { //not to be confused with Draggable from jbstudio3 (this shit 
         Draggable.lockX = lx;
         Draggable.lockY = ly;
         Draggable.defaultRelease = releaseonmouseup;
+        activePane = object;
     }
 
     static update(mouse) {
@@ -138,7 +143,8 @@ class Editable { //for text :smirk: (unfortunately you must draw the text and ca
     static ctrlDelimiters = [".", " "]; //points where using ctrl+backspace/delete will stop
     //static ctrlDelimiters = /[."]/;
 
-    static beginInput(caret = 0, tobeedited, returntoquit = true) {
+    static beginInput(caret = 0, tobeedited, returntoquit = true) { //named like roblox's UserInputService (oh i just googled it and it's actually inputBegan im a FRAUD)
+        if(Editable.editing && tobeedited != Editable.edited) Editable.endInput();
         Editable.caret = caret;
         Editable.edited = tobeedited;
         Editable.edited.value = Editable.edited.value?.toString() ?? "undefined"; //just in case lol
@@ -257,9 +263,10 @@ class Editable { //for text :smirk: (unfortunately you must draw the text and ca
     }
 
     static writechar(char) {
-        if(GetKey(VK_CONTROL) && char == "a") {
-            //lowkey idk about highlighting like that so im just moving the caret
-        }
+        //if(GetKey(VK_CONTROL) && char == "a") { //why is char String.fromCharCode(1) when you hit control a
+        //    //lowkey idk about highlighting like that so im just moving the caret
+        //    return;
+        //}
         //Editable.edited.value = Editable.edited.value.split("").splice(Editable.caret, 0, char).join();
         const arr = Editable.edited.value.split("");
         arr.splice(Editable.caret, 0, char);
@@ -316,16 +323,16 @@ class PrimitiveControl { //hell yeah brother (this object isn't meant to be on i
     width = 16;
     height = 16;
 
-    constructor(type, data) {
+    constructor(x, y, type, data) {
         this.type = type;
         this.data = data;
 
         if(this.type == PRIMITIVE_TOGGLE) {
             this.geometry = d2d.CreatePathGeometry();
             const sink = this.geometry.Open();
-            sink.BeginFigure(4, 9, D2D1_FIGURE_BEGIN_HOLLOW); //lowkey just looked a picture of a checked boolean parameter
-            sink.AddLine(7, 11);
-            sink.AddLine(13, 5);
+            sink.BeginFigure(x+4, y+9, D2D1_FIGURE_BEGIN_HOLLOW); //lowkey just looked a picture of a checked boolean parameter
+            sink.AddLine(x+7, y+11);
+            sink.AddLine(x+13, y+5);
             sink.EndFigure(D2D1_FIGURE_END_OPEN);
             sink.Close();
             sink.Release();
@@ -341,19 +348,19 @@ class PrimitiveControl { //hell yeah brother (this object isn't meant to be on i
         }
     }
 
-    redraw() {
+    redraw(x, y) {
         if(this.type == PRIMITIVE_TOGGLE) {
             colorBrush.SetColor(.3, .3, .3);
-            d2d.FillRoundedRectangle(0, 0, 16, 16, 2, 2, colorBrush);
+            d2d.FillRoundedRectangle(x, y, x+16, y+16, 2, 2, colorBrush);
             colorBrush.SetColor(1.0, 1.0, 1.0);
             if(this.value) {
                 d2d.DrawGeometry(this.geometry, colorBrush, 2); //no round stroke style for htis one
             }
-            d2d.DrawRoundedRectangle(0, 0, 16, 16, 2, 2, colorBrush, 2, roundStrokeStyle);
+            d2d.DrawRoundedRectangle(x, y, x+16, y+16, 2, 2, colorBrush, 2, roundStrokeStyle);
         }else if(this.type == PRIMITIVE_INPUT) {
             //damn i might have to draw the caret myself in here
             if(this.geometry.text != this.value) { //haha just now added this property
-                const {widthIncludingTrailingWhitespace} = this.geometry.GetMetrics();
+                const {widthIncludingTrailingWhitespace} = this.geometry.GetMetrics(); //wait why the hell did i get the width BEFORE i changed the value? (there's either a valid reason or i was TWEAKING)
                 this.geometry.Release();
                 this.geometry = d2d.CreateTextLayout(this.value, font, 100, 16);
                 this.width = Math.max(16, 16+widthIncludingTrailingWhitespace);
@@ -366,16 +373,16 @@ class PrimitiveControl { //hell yeah brother (this object isn't meant to be on i
                 
                 const hit = this.geometry.HitTestTextPosition(Editable.caret, false); //who knew this function's main purpose was this use case
                 //print(hit.x, hit.hitTestMetrics.width);
-                const caretX = hit.x+2; //plus 2 because im drawing the text 2 pixels away from 0
-                const caretY = hit.y;
+                const caretX = hit.x+2+x; //plus 2 because im drawing the text 2 pixels away from 0
+                const caretY = hit.y+y;
 
                 
                 //const pos = ; //lowkey might have to make a text layout to see how wide each character is
                 d2d.DrawLine(caretX, caretY, caretX, caretY+16, colorBrush, 1, roundStrokeStyle);
                 //t.Release();
             }
-            d2d.DrawRoundedRectangle(0, 0, this.width, 16, 2, 2, colorBrush, 1, roundStrokeStyle);
-            d2d.DrawTextLayout(2, 0, this.geometry, colorBrush);
+            d2d.DrawRoundedRectangle(x, y, x+this.width, y+16, 2, 2, colorBrush, 1, roundStrokeStyle);
+            d2d.DrawTextLayout(2+x, y, this.geometry, colorBrush); //lowkey i bet i could totally make the text scroll if you type too much but i ain't doing that rn
         }
     }
 
@@ -412,6 +419,309 @@ class PrimitiveControl { //hell yeah brother (this object isn't meant to be on i
 
     destroy() {
         this.geometry?.Release();
+    }
+}
+
+class CheckboxControl {
+    width = 16;
+    height = 16;
+    value = false;
+    callback = undefined;
+    geometry = undefined;
+
+    constructor(width = 16, height = 16, value = false, callback) {
+        this.width = width;
+        this.height = height;
+        this.value = value;
+        this.callback = callback?.bind(this);
+
+        this.geometry = d2d.CreatePathGeometry();
+        const sink = this.geometry.Open();
+        sink.BeginFigure(4, 9, D2D1_FIGURE_BEGIN_HOLLOW); //lowkey just looked a picture of a checked boolean parameter in unreal
+        sink.AddLine(7, 11);
+        sink.AddLine(13, 5);
+        sink.EndFigure(D2D1_FIGURE_END_OPEN);
+        sink.Close();
+        sink.Release();
+    }
+
+    buttonDown(mouse) {
+        this.value = !this.value;
+        this.callback?.();
+    }
+
+    redraw(x, y) {
+        colorBrush.SetColor(.3, .3, .3);
+        d2d.FillRoundedRectangle(x, y, x+this.width, y+this.height, 2, 2, colorBrush);
+        colorBrush.SetColor(1.0, 1.0, 1.0);
+        if(this.value) {
+            //oof
+            const prev = d2d.GetTransform(); //i should be able to just do prev.Translation() or something so i can add it so i might have to add that
+            const copy = Object.assign({}, prev); //hell yeah brother next best thing to structuredClone
+            //print(copy);
+            //copy.dx += x; //i mean probably dawg unfortunately matrices are outta my league currently
+            //copy.dy += y;
+            ////oops wrong properties
+            //copy.m[2][0] += x;
+            //copy.m[2][1] += y;
+            copy._31 += x; //ok idk why Matrix3x2F has so many useless properties since this is the only one i had to change
+            copy._32 += y;
+            //print(copy, "POST COPY");
+            d2d.SetTransform(copy);
+            d2d.DrawGeometry(this.geometry, colorBrush, 2); //no round stroke style for htis one
+            d2d.SetTransform(prev);
+        }
+        d2d.DrawRoundedRectangle(x, y, x+this.width, y+this.height, 2, 2, colorBrush, 2, roundStrokeStyle);
+    }
+
+    hittest(mouse, x, y) {
+        if(withinBounds({x, y, width:this.width, height:this.height}, mouse)) {
+            return [BUTTON, this];
+        }
+    }
+
+    destroy() {
+        this.geometry.Release();
+    }
+}
+
+class DropdownControlMenu { //a singleton for controls that need a dropdown (dropdown as in the way i use it in shadereditor2.js)
+    //the reason i need a whole new class/pane for this is because if i drew the entire dropdown in an individual dropdown control (like i was doing in shadereditor2.js) and i had another control **right below** the dropdown then the hittest would (probably) go off of (oh fuck! right as i was writing this part i just realized that my assumptions were wrong and techincally i didn't have to make this class (im gonna keep it though because it'll probably help me))
+    x = 0;
+    y = 0;
+    width = 0;
+    height = 0;
+    rowHeight = 16;
+    options = [];
+    static instance = undefined;
+
+    static open(x, y, options, callback, width = 0) {
+        if(this.instance) {
+            this.close();
+        }
+        //this.instance.x = x; //this as in DropdownControlMenu (static)
+        //this.instance.y = y;
+        //this.instance.options = options;
+        if(!width) {
+            //we calculating it manually
+            const longeststr = options.toSorted((a, b) => b.length-a.length)[0];
+            const temp = d2d.CreateTextLayout(longeststr, font, w, h);
+            width = temp.GetMetrics().width+4; //i might have to make a d2d.GetMetricsForText(text, font, maxwidth, maxheight)
+            temp.Release();
+        }
+        if(x+width > w) {
+            x -= (x+width)-w;
+        }
+        //this.instance.width = width;
+        this.instance = new DropdownControlMenu(x, y, options, callback, width);
+        this.instance.height = options.length*this.instance.rowHeight; //just in case i decide to change rowHeight
+        //this.instance.width = ;//calc is short for calculator im just using slang
+        panes.push(this.instance);
+        //this.instance.height = 16; //propbbaly
+    }
+
+    constructor(x, y, options, callback, width) {
+        this.x = x;
+        this.y = y;
+        for(const option of options) {
+            this.options.push(d2d.CreateTextLayout(option, font, w, h)); //this.options is by default an empty array []
+        }
+        //this.options = options;
+        this.width = width;
+        //this.height = height;
+        this.callback = callback;
+    }
+
+    redraw() {
+        //const dropdownheight = control.height/(control.args.length+1); //lol
+        // /mangomangomango/gymuisd
+        colorBrush.SetColor(0xffffff); //nice :)
+        d2d.FillRectangle(0, 0, this.width, this.height, colorBrush);
+        for(let i = 0; i < this.options.length; i++) {
+            const y = i*this.rowHeight;
+            colorBrush.SetColor(0.0, 0.0, 0.0);
+            d2d.DrawRectangle(0, y, this.width, y+this.rowHeight, colorBrush, 1, roundStrokeStyle);
+            //colorBrush.SetColor(1.0, 1.0, 1.0);
+            //d2d.FillRectangle(control.x+textwidth, control.y+(i+1)*dropdownheight, control.x+control.width, (control.y+(i+1)*dropdownheight)+dropdownheight, colorBrush);
+            //colorBrush.SetColor(0.0, 0.0, 0.0);
+            d2d.DrawTextLayout(0, y, this.options[i], colorBrush);
+            //d2d.DrawText(this.options[i], font, 0, y, w, h, colorBrush);
+        }
+    }
+
+    hittest(mouse) {
+        for(let i = 0; i < this.options.length; i++) {
+            if(withinBounds({x: 0, y: i*this.rowHeight, width: this.width, height: this.rowHeight}, mouse)) {
+                const tempobjectthatmakesmecringe = { //this is weird but valid i guess lol
+                    buttonDown: function(mouse) {
+                        //using DropdownControlMenu.instance because i can't bothered to bind(this)
+                        DropdownControlMenu.instance.callback(DropdownControlMenu.instance.options[i].text); //.text because they are now TextLayouts
+                        DropdownControlMenu.close();
+                    },
+                };
+                return [BUTTON, tempobjectthatmakesmecringe]; //should probably make a callback version but i did it like this because yk
+            }
+        }
+        return [NULL];
+    }
+
+    static close() {
+        this.instance.destroy();
+        panes.splice(panes.indexOf(this.instance), 1);
+        this.instance = undefined;
+    }
+
+    destroy() {
+        //idk yet hold on.
+    }
+}
+
+class EditControl {
+    width = 24;
+    height = 16;
+    value = "";
+    data = undefined;
+    layout = undefined;
+    endInput = undefined;
+    autoresize = false;
+    maxwidth = 100;
+
+    verifyInput() {
+        if(this.value == "NULL" || this.value == "null" || this.value == "undefined"){
+            this.value = undefined;
+        }else if(this.data == "number") {
+            this.value = Number(this.value) || 0; //NaN is falsy but not nullish (no nullish coalescing today)
+        }else if(this.data == "float") {
+            this.value = parseFloat(this.value) || 0.0;
+        }
+    }
+
+    constructor(width, height, data, value, endInput) {
+        this.layout = d2d.CreateTextLayout(value, font, w, h); //OOHHHH
+        this.endInput = endInput?.bind(this) ?? this.verifyInput;
+        this.width = width;
+        this.height = height;
+        this.data = data;
+        //if(!value) {
+        //    if(data) {
+        //        this.verifyInput();
+        //    }else {
+        //        this.value = "";
+        //    }
+        //}else {
+        //    this.value = value; //CHANGING VALUE DOWN HERE CAUSES REDRAW TO UPDATE THE SIZE SINCE IT'S DIFFERENT!
+        //}
+        this.value = value ?? "";
+        this.verifyInput();
+    }
+    
+    redraw(x, y) {
+        //const halfwidth = PropertyMenu.instance.width/2;
+        colorBrush.SetColor(0xcccccc);
+        d2d.FillRoundedRectangle(x, y, x+this.width-4, y+this.height, 2, 2, colorBrush);
+        colorBrush.SetColor(229/255, 229/255, 229/255);
+        d2d.DrawRoundedRectangle(x, y, x+this.width-4, y+this.height, 2, 2, colorBrush, 2, roundStrokeStyle); //gotta subtract 4 because of the 2 strokewidth
+
+        if(this.layout.text != this.value) {
+            this.layout.Release();
+            this.layout = d2d.CreateTextLayout(this.value, font, this.maxwidth, 16); //100, 16);
+            if(this.autoresize) {
+                const {widthIncludingTrailingWhitespace} = this.layout.GetMetrics();
+                this.width = Math.max(24, 16+widthIncludingTrailingWhitespace);
+            }
+        }
+
+        colorBrush.SetColor(0.0, 0.0, 0.0);
+        
+        if(Editable.edited == this) {
+            //const t = d2d.CreateTextLayout(this.value.slice(0, Editable.caret), font, 100, 16);
+            //const {widthIncludingTrailingWhitespace} = t.GetMetrics(); //if there are trailing spaces it doesn't show that and it's weird
+
+            
+            const hit = this.layout.HitTestTextPosition(Editable.caret, false); //who knew this function's main purpose was this use case
+            //print(hit.x, hit.hitTestMetrics.width);
+            const caretX = hit.x+x; //plus 4 because im drawing the text 4 pixels away from 0
+            const caretY = hit.y+y;
+
+            
+            //const pos = ; //lowkey might have to make a text layout to see how wide each character is
+            d2d.DrawLine(caretX, caretY, caretX, caretY+16, colorBrush, 1, roundStrokeStyle);
+            //t.Release();
+        }
+        d2d.DrawTextLayout(x, y, this.layout, colorBrush);    
+    }
+
+    hittest(mouse, x, y) {
+        //const halfwidth = PropertyMenu.instance.width/2;
+        if(withinBounds({x, y, width: this.width, height: this.height}, mouse)) {
+            const i = this.layout.HitTestPoint(mouse.x-x, mouse.y).hitTestMetrics.textPosition;
+            return [TEXT, [i, this]];
+        }
+        //no return NULL here because im doing it specially (which is weird)
+        //(i mean that i use return [NULL] at the end of PropertyMenu's hittest if nothing was hit)
+    }
+
+    destroy() {
+        //this.name.Release();
+        this.layout.Release();
+    }
+}
+
+class DropdownButtonControl {
+    options = [];
+    callback = undefined; 
+    value = undefined;
+    width = 0;
+    height = 0;
+
+    constructor(width, height, options, value, callback) {
+        this.options = options;
+        this.callback = callback;
+        this.value = value ?? options[0];
+        this.width = width;
+        this.height = height;
+    }
+
+    onEdit(newvalue) {
+        //print("binf this idk?", this.options); //apparently i didn't have to bind rthis (ok no i lied without bind(this), this function is bound to DropdownControlMenu!)
+        print(this instanceof DropdownButtonControl, newvalue);
+        this.value = newvalue;
+        this.callback?.(newvalue);
+    }
+
+    buttonDown(mouse) {
+        //i wasn't originally planning on using mouse.x and mouse.y but it works good enough lmao
+        DropdownControlMenu.open(mouse.x, mouse.y, this.options, this.onEdit.bind(this));
+    }
+    
+    redraw(x, y) {
+        colorBrush.SetColor(0.0, 0.0, 0.0);
+        d2d.DrawRoundedRectangle(x, y, x+this.width-4, y+this.height, 1, 1, colorBrush, 2, roundStrokeStyle);
+        colorBrush.SetColor(229/255, 229/255, 229/255);
+        d2d.FillRoundedRectangle(x, y, x+this.width-4, y+this.height, 1, 1, colorBrush);
+        colorBrush.SetColor(0.0, 0.0, 0.0);
+        d2d.DrawText(this.value, font, x, y, w, h, colorBrush);
+    }
+
+    hittest(mouse, x, y) {
+        if(withinBounds({x, y, width: this.width, height: this.height}, mouse)) {
+            return [BUTTON, this];
+        }
+    }
+
+    destroy() {
+        
+    }
+}
+
+function createControlBasedOnType(type, width, height, ...args) {
+    const [primitivetype, additional] = PrimitiveControl.validPrimitives[type];
+    if(primitivetype == PRIMITIVE_TOGGLE) {
+        return new CheckboxControl(width, height, ...args);
+    }else if(primitivetype == PRIMITIVE_INPUT) {
+        return new EditControl(width, height, additional, ...args); //[specil]
+    }else if(primitivetype == PRIMITIVE_DROPDOWN) {
+        return new DropdownButtonControl(width, height, ...args);
     }
 }
 
@@ -469,6 +779,9 @@ class Blueprint {
     static radius = 4;
 
     static meta_functions = {};
+    static variables = {};
+
+    /*static*/selectionGradient = undefined;
 
     static getColorByTitle(title, type) {
         let color;
@@ -521,7 +834,7 @@ class Blueprint {
             let pwidth = temp.GetMetrics().width;
             temp.Release();
             if(controlArgs) {
-                let tempcontrol = new PrimitiveControl(...controlArgs);
+                let tempcontrol = new PrimitiveControl(0, 0, ...controlArgs);
                 pwidth += tempcontrol.width;
                 tempcontrol.destroy();
             }
@@ -569,6 +882,11 @@ class Blueprint {
         this.desc = desc; ///hover and show it
         this._special = false;
 
+        this.selectionGradient = Gradient.LinearGradientBrush(
+            d2d.CreateGradientStopCollection([0.0, 241/255, 176/255, 0.0], [1.0, 205/255, 104/255, 0.0]),
+            0, 0, 0, this.height,
+        )
+
         //this.gradientStops.push(
         //    //d2d.CreateGradientStopCollection([0.0, 0.0, 67/255, 255/255], [0.8, 32/255, 32/255, 32/255]),
         //    d2d.CreateGradientStopCollection([0.0, ...color], [0.85, 32/255, 32/255, 32/255]),
@@ -615,8 +933,9 @@ class Blueprint {
                 ),
             );
         }
-
+        
         if(this.type == BPTYPE_NOTPURE || this.type == BPTYPE_EVENT) { //lowkey still no delegate pin
+            this.out.splice(0, 0, " : exec"); //inserting  : exec as the first out pin
             if(this.type == BPTYPE_NOTPURE) {
                 //this.parameters[i] = "exec"; //i don't need the variable name anymore because i store it in the text layout paramText[i]
                 //const gsc = d2d.CreateGradientStopCollection([0.0, ...Blueprint.paramColors[param]], [0.5, 0.0, 0.0, 0.0, 0.0]);
@@ -630,8 +949,9 @@ class Blueprint {
                 //    )
                 //);
                 this.parameters.splice(0, 0, "exec : exec"); //inserting exec : exec as the first parameter
+            }else {
+                this.out.splice(0, 0, " : delegate");
             }
-            this.out.splice(0, 0, " : exec"); //inserting  : exec as the first out pin
         }
 
         for(let i = 0; i < this.parameters.length; i++) {
@@ -675,7 +995,11 @@ class Blueprint {
         if(!out) {
             const controlArgs = PrimitiveControl.validPrimitives[param];
             if(controlArgs != undefined) { //oops
-                pobj.control = new PrimitiveControl(...controlArgs);
+                const tl = pobj.text.GetMetrics();
+                //pobj.control = new PrimitiveControl(Blueprint.padding+tl.width+8, (i+1)*Blueprint.captionHeight + Blueprint.padding, ...controlArgs);
+                //oh boy PrimitiveControl overhaul (demolition)
+                pobj.control = createControlBasedOnType(param, 16, 16);
+                if(pobj.control instanceof EditControl) pobj.control.autoresize = true;
             }
             this.parameters[i] = pobj; //i don't need the variable name anymore because i store it in the text layout paramText[i]
             //this.paramText.push(d2d.CreateTextLayout(name, font, w, h));
@@ -711,6 +1035,8 @@ class Blueprint {
             const tl = param.text; //this.outText[i];
             //print(tl.GetMetrics());
             const {width} = tl.GetMetrics();
+            //oops now i changed the controls and the text is black i gotta actually add set color here
+            colorBrush.SetColor(229/255, 229/255, 229/255);
             d2d.DrawTextLayout(this.width-10-width, y, tl, colorBrush);
             colorBrush.SetColor(...color); //oh i do this after DrawTextLayout so the text is white and the ellipse is the actual color
             ex = this.width-8;
@@ -758,6 +1084,10 @@ class Blueprint {
     redraw() { //wait i could lowkey draw basically all of these into a bitmap and draw that instead (efficiency) i was thinking about using a CommandList too //https://learn.microsoft.com/en-us/windows/win32/direct2d/improving-direct2d-performance
         //https://learn.microsoft.com/en-us/windows/win32/direct2d/printing-and-command-lists
         //https://github.com/MicrosoftDocs/win32/blob/docs/desktop-src/direct3d12/d2d-using-d3d11on12.md
+        if(activePane == this) {
+            d2d.DrawRoundedRectangle(0, 0, this.width, this.height, 2, 2, this.selectionGradient, 4, roundStrokeStyle);
+        }
+
         d2d.FillRoundedRectangle(0, Blueprint.captionHeight-4, this.width, this.height, 4, 4, this.gradients[2]);
         
         if(this.type != BPTYPE_BARE) {
@@ -788,9 +1118,11 @@ class Blueprint {
             if(connection) {
                 d2d.DrawLine(Blueprint.padding, (i+1)*Blueprint.captionHeight + Blueprint.padding+tl.height, Blueprint.padding+tl.width, (i+1)*Blueprint.captionHeight + Blueprint.padding+tl.height, colorBrush);
             }else if(param.control) {
-                d2d.SetTransform(Matrix3x2F.Translation(this.x+camera.x+Blueprint.padding+tl.width+8, this.y+camera.y+(i+1)*Blueprint.captionHeight + Blueprint.padding));
-                param.control.redraw();
-                d2d.SetTransform(Matrix3x2F.Translation(this.x+camera.x, this.y+camera.y));
+                //d2d.SetTransform(Matrix3x2F.Translation(this.x+camera.x+Blueprint.padding+tl.width+8, this.y+camera.y+(i+1)*Blueprint.captionHeight + Blueprint.padding));
+                //param.control.redraw();
+                //d2d.SetTransform(Matrix3x2F.Translation(this.x+camera.x, this.y+camera.y));
+                //the reason i made PrimitiveControl's redraw like this was because i wanted it to be like a pane's redraw function but it's kinda clunky setting the transform manually
+                param.control.redraw(Blueprint.padding+tl.width+8, (i+1)*Blueprint.captionHeight + Blueprint.padding);
             }
         }
         for(let i = 0; i < this.out.length; i++) {
@@ -894,7 +1226,8 @@ class Blueprint {
                     //this.x+camera.x+Blueprint.padding+tl.width+8
                     //this.y+camera.y+(i+1)*Blueprint.captionHeight + Blueprint.padding
                                                             //oops i didn't use parethesis here and it was not doing what i expected
-                    const ht = control.hittest({x: mouse.x-(Blueprint.padding+tl.width+8), y: mouse.y-((i+1)*Blueprint.captionHeight + Blueprint.padding)});
+                    //const ht = control.hittest({x: mouse.x-(Blueprint.padding+tl.width+8), y: mouse.y-((i+1)*Blueprint.captionHeight + Blueprint.padding)});
+                    const ht = control.hittest(mouse, (Blueprint.padding+tl.width+8), ((i+1)*Blueprint.captionHeight + Blueprint.padding));
                     if(ht) {
                         return ht;
                     }
@@ -910,13 +1243,21 @@ class Blueprint {
         }
     }
 
+    keyDown(wp) {
+        if(wp == VK_DELETE || wp == VK_BACK) {
+            dirty = true;
+            this.destroy();
+        }
+    }
+
     destroy() {
         //for(let i = 0; i < this.gradientStops.length; i++) {
         //    this.gradientStops[i].Release();
         //    this.gradients[i].Release();
         //}
+        this.selectionGradient.Release();
         for(let i = 0; i < this.gradients.length; i++) {
-            this.gradients[i].Release();
+            this.gradients[i]?.Release(); //lol if it's a BPTYPE_BARE blueprint then the first 2 gradients are undefined!
         }
         //for(let i = 0; i < this.paramText.length; i++) {
         //    this.paramText[i].Release();
@@ -986,6 +1327,7 @@ Blueprint.paramColors["number"] = [27/255, 191/255, 147/255];
 //Blueprint.paramColors["HWND"] = Blueprint.paramColors.number;
 Blueprint.paramColors["boolean"] = [146/255, 0.0, 0.0];
 Blueprint.paramColors["float"] = [161/255, 1.0, 69/255];
+Blueprint.paramColors["delegate"] = [1.0, 56/255, 56/255];
 
 for(const key in baseTypes) {
     Blueprint.paramColors[key] = Blueprint.paramColors[baseTypes[key]];
@@ -1063,7 +1405,7 @@ Blueprint.meta_functions["NOT"] = function(left) {
     return !left;
 }
 
-Blueprint.meta_functions["RUSSIAN_ROULETTE"] = function(...args) { //variable length? (lowkey idk if it's gonna look that good if i really do it)
+Blueprint.meta_functions["RUSSIAN_ROULETTE"] = function(...args) { //variable length? (lowkey idk if it's gonna look that good if i really do it) (ok wait i just realized it wouldn't be hard at all to make them resizable and add pins (probably))
     const keys = Object.keys(globalThis);
     while(true) {
         let i = Math.floor(Math.random()*keys.length);
@@ -1072,6 +1414,11 @@ Blueprint.meta_functions["RUSSIAN_ROULETTE"] = function(...args) { //variable le
         print("calling", keys[i]);
         return func(...args);
     }
+}
+
+Blueprint.meta_functions["SET"] = function(newvalue) { //i gotta check if set is cached or not lol
+    this.variable.value = newvalue;
+    return newvalue;
 }
 
 /*Blueprint.meta_functions["__TATTLETAIL__"] = function(window) { //https://www.youtube.com/watch?v=nI26a2pDxGk
@@ -1132,7 +1479,7 @@ class BlueprintMenu {
         return bv - av;    
     }
 
-    static open(hwnd) {
+    static open(hwnd) { //hwnd is actually important this time
         const mouse = GetCursorPos();
         ScreenToClient(hwnd, mouse);
         mouse.x -= camera.x;
@@ -1159,16 +1506,17 @@ class BlueprintMenu {
         this.x = mouse.x;
         this.y = mouse.y;
         BlueprintMenu.singleton = this;
-        this.contextSensitive = new PrimitiveControl(PRIMITIVE_TOGGLE);
-        this.contextSensitive.value = true;
+        this.contextSensitive = new CheckboxControl(16, 16, true); //new PrimitiveControl(280, 10, PRIMITIVE_TOGGLE);
+        //this.contextSensitive.value = true;
         this.gradients.push(
             Gradient.LinearGradientBrush(
                 d2d.CreateGradientStopCollection([0.0, 41/255, 41/255, 41/255], [4/this.height, 38/255, 38/255, 38/255], [8/this.height, 33/255, 33/255, 33/255], [31/this.height, 32/255, 32/255, 32/255], [34/this.height, 31/255, 31/255, 31/255], [56/this.height, 30/255, 30/255, 30/255], [80/this.height, 29/255, 29/255, 29/255], [154/this.height, 28/255, 28/255, 28/255], [179/this.height, 27/255, 27/255, 27/255], [236/this.height, 26/255, 26/255, 26/255], [369/this.height, 25/255, 25/255, 25/255], [393/this.height, 26/255, 26/255, 26/255], [401/this.height, 27/255, 27/255, 27/255], [405/this.height, 29/255, 29/255, 29/255], [410/this.height, 32/255, 32/255, 32/255]),
                 0, 0, 0, this.height,
             ),
             Gradient.LinearGradientBrush(
-                d2d.CreateGradientStopCollection([0.0, 26/255, 26/255, 26/255], [1.0, 13/255, 13/255, 13/255]),
-                0, 398, 0, 404,
+                d2d.CreateGradientStopCollection([0.0, 26/255, 26/255, 26/255, 0.0], [1.0, 13/255, 13/255, 13/255, 1.0]),
+                //0, 398, 0, 404,
+                0, this.height-16, 0, this.height-4,
             ),
         );
         this.text.push(
@@ -1182,9 +1530,9 @@ class BlueprintMenu {
         d2d.FillRectangle(0, 0, this.width, this.height, this.gradients[0]);
         d2d.DrawRectangle(0, 0, this.width, this.height, colorBrush, 1);
 
-        d2d.SetTransform(Matrix3x2F.Translation(this.x+camera.x+280, this.y+camera.y+10));
-        this.contextSensitive.redraw();
-        d2d.SetTransform(Matrix3x2F.Translation(this.x+camera.x, this.y+camera.y));
+        //d2d.SetTransform(Matrix3x2F.Translation(this.x+camera.x+280, this.y+camera.y+10));
+        this.contextSensitive.redraw(280, 10);
+        //d2d.SetTransform(Matrix3x2F.Translation(this.x+camera.x, this.y+camera.y));
         
         colorBrush.SetColor(229/255, 229/255, 229/255);
         d2d.DrawTextLayout(280+16+4, 10, this.text[0], colorBrush); //Context Sensitive
@@ -1244,6 +1592,8 @@ class BlueprintMenu {
                 d2d.DrawText(BlueprintMenu.commandList[j].name/* + " " + i + " " + j*/, font, 14, 92+((i-(this.scrollY%1))*12), w, h, colorBrush);
             }
         }
+
+        d2d.FillRectangle(4, this.height-16, this.width-4, this.height-4, this.gradients[1]); //lol for some reason i never added this one
     }
 
     hittest(mouse) {
@@ -1254,11 +1604,11 @@ class BlueprintMenu {
             return [MOVE];
         }else {
             //print({x: mouse.x-(280), y: mouse.y-(10)});
-            const ht = this.contextSensitive.hittest({x: mouse.x-280, y: mouse.y-10}); //ermmm this is kinda weird lowkey (nah but PrimitiveControl was really made for Blueprint so i'm still a genius)
+            const ht = this.contextSensitive.hittest(mouse, 280, 10); //({x: mouse.x-280, y: mouse.y-10}); //ermmm this is kinda weird lowkey (nah but PrimitiveControl was really made for Blueprint so i'm still a genius)
             if(ht) {
                 return ht;
             }else if(mouse.y > 92) {
-                return [WHEEL]
+                return [WHEEL];
             }
             return [NULL];
         }
@@ -1278,10 +1628,14 @@ class BlueprintMenu {
             const i = Math.floor((mouse.y-checkY)/12);    //(mouse.y-92)/12; //i think?
             const j = Math.floor(this.scrollY) + i;
             //print(i, j);
-            const {name, desc, parameters, out, type} = BlueprintMenu.commandList[j];
+            const {name, desc, parameters, out, type, parent} = BlueprintMenu.commandList[j];
             //print(typeof(parameters), typeof(out));
-            print(name, desc, parameters, out, type);
-            Blueprint.create(undefined, name, this.x, this.y, parameters, out, type ?? BPTYPE_NOTPURE, desc); //ok putting undefined here is a real sign that i really don't need to hold on to the hwnd in Blueprint lmao
+            print(name, desc, parameters, out, type, parent);
+            const bp = Blueprint.create(undefined, name, this.x, this.y, parameters, out, type ?? BPTYPE_NOTPURE, desc); //ok putting undefined here is a real sign that i really don't need to hold on to the hwnd in Blueprint lmao
+            if(parent && parent == "variable") {
+                print("parent valid!", bp.title, bp.title.substring(4));
+                bp.variable = Blueprint.variables[bp.title.substring(4)];
+            }
             BlueprintMenu.close();
         }
     }
@@ -1296,7 +1650,555 @@ class BlueprintMenu {
     }
 }
 
+class PropertyDropdownMenu { //written for PropertyMenu!
+    name = undefined;
+    button = undefined;
+    height = 300;
+    open = true;
+
+    constructor(name, height) {
+        this.name = d2d.CreateTextLayout(name, font, w, 24);
+        this.height = height;
+    }
+
+    buttonDown(mouse) {
+        this.open = !this.open;
+    }
+
+    getHeight() {
+        if(this.open) {
+            return this.height;
+        }else {
+            return 24+2; //24 because of the height of the titlebar. +2 for padding
+        }
+    }
+}
+
+//https://creators.spotify.com/pod/show/moveabledo/episodes/Wayne-Lytle-Animusic-e16466p/a-a6cgkf2
+
+/*class DetailDropdownMenu extends PropertyDropdownMenu {
+    constructor(height) {
+        super("Details", height, undefined);
+    }
+
+    drawcontents(x, y) {
+        const aib = activePane instanceof Blueprint;
+        //do it
+        if((aib && Blueprint.variables[activePane.title]) || VariableDropdownMenu.selected) {
+            
+        }else if(aib) { //just in case...
+            
+        }
+    }
+
+    hittest(mouse, x, y) {
+        return [NULL];
+    }
+}*/
+
+/*class EditLabelControl {
+    constructor(name, value, endInput) {
+        this.name = d2d.CreateTextLayout(name, font, w, h);
+        this.value = value;
+        this.layout = d2d.CreateTextLayout(value, font, w, h);
+        this.endInput = endInput.bind(this);
+    }
+    
+    redraw(x, y) {
+        const halfwidth = PropertyMenu.instance.width/2;
+        colorBrush.SetColor(0xcccccc);
+        d2d.FillRoundedRectangle(x+halfwidth, y, x+(halfwidth*2)-4, y+16, 2, 2, colorBrush);
+        colorBrush.SetColor(229/255, 229/255, 229/255);
+        d2d.DrawRoundedRectangle(x+halfwidth, y, x+(halfwidth*2)-4, y+16, 2, 2, colorBrush, 2, roundStrokeStyle); //gotta subtract 4 because of the 2 strokewidth
+        d2d.DrawTextLayout(x, y, this.name, colorBrush);
+
+        if(this.layout.text != this.value) {
+            this.layout.Release();
+            this.layout = d2d.CreateTextLayout(this.value, font, w, h);
+        }
+
+        colorBrush.SetColor(0.0, 0.0, 0.0);
+        
+        if(Editable.edited == this) {
+            //const t = d2d.CreateTextLayout(this.value.slice(0, Editable.caret), font, 100, 16);
+            //const {widthIncludingTrailingWhitespace} = t.GetMetrics(); //if there are trailing spaces it doesn't show that and it's weird
+
+            
+            const hit = this.layout.HitTestTextPosition(Editable.caret, false); //who knew this function's main purpose was this use case
+            //print(hit.x, hit.hitTestMetrics.width);
+            const caretX = hit.x+x+halfwidth; //plus 4 because im drawing the text 4 pixels away from 0
+            const caretY = hit.y+y;
+
+            
+            //const pos = ; //lowkey might have to make a text layout to see how wide each character is
+            d2d.DrawLine(caretX, caretY, caretX, caretY+16, colorBrush, 1, roundStrokeStyle);
+            //t.Release();
+        }
+        d2d.DrawTextLayout(x+halfwidth, y, this.layout, colorBrush);    
+    }
+
+    hittest(mouse, y) {
+        const halfwidth = PropertyMenu.instance.width/2;
+        if(withinBounds({x: halfwidth, y, width: halfwidth, height: 16}, mouse)) {
+            const i = this.layout.HitTestPoint(mouse.x-halfwidth, mouse.y).hitTestMetrics.textPosition;
+            return [TEXT, [i, this]];
+        }
+        //no return NULL here because im doing it specially (which is weird)
+    }
+
+    destroy() {
+        this.name.Release();
+        this.layout.Release();
+    }
+}*/
+
+class VariableDetailDropdownMenu extends PropertyDropdownMenu {
+    kvcontrols = []; //key value controls
+
+    constructor(height) {//, name, type, desc, defaultvalue) {
+        super("Variable", height, undefined);
+        print("JUST DON'T FALL OUT THE SKY YK", VariableDropdownMenu.selected.type);
+        //pcontorl.name = "Default Value";
+        this.kvcontrols.push(
+            [
+                d2d.CreateTextLayout("Variable Name", font, w, h),
+                new EditControl(PropertyMenu.instance.width/2, 16, undefined, VariableDropdownMenu.selected.textlayout.text, function() { //end input
+                    const lastname = VariableDropdownMenu.selected.textlayout.text;
+                    if(lastname == this.value) {
+                        return; //OOPS!
+                    }
+                    VariableDropdownMenu.selected.textlayout.Release();
+                    VariableDropdownMenu.selected.textlayout = d2d.CreateTextLayout(this.value, font, w, h);
+                    Blueprint.variables[this.value] = VariableDropdownMenu.selected; //this as in the EditLabelControl
+                    delete Blueprint.variables[lastname];
+                    VariableDetailDropdownMenu.updateCommandListAndBlueprints(lastname, undefined, undefined, true, this.value);
+                }),
+            ],
+            [
+                d2d.CreateTextLayout("Variable Type", font, w, h),
+                new DropdownButtonControl(PropertyMenu.instance.width/2, 16, Object.keys(Blueprint.paramColors), VariableDropdownMenu.selected.type, function(newtype) {
+                    VariableDropdownMenu.selected.type = newtype;
+                    VariableDropdownMenu.selected = VariableDropdownMenu.selected; //LOL! (i gotta reload this menu since i've changed the variable's type)
+                    print(VariableDropdownMenu.selected.type, newtype, "BEEN SEARCHING HIGH AND LOW");
+                    //VariableDetailDropdownMenu.updateCommandListAndBlueprints(VariableDropdownMenu.selected.textlayout.text, "type", VariableDropdownMenu.selected.type);
+                    //ok don't get weirded out but instead of calling updateCommandListAndBlueprints with "type" as the key
+                    //im gonna set rename to true and pass in the original name
+                    //the reason im doing it like this is because if you actually set the commandList object's type property it messes up the actual type of the blueprint when it's created (which i wasn't realizing)
+                    VariableDetailDropdownMenu.updateCommandListAndBlueprints(VariableDropdownMenu.selected.textlayout.text, undefined, undefined, true, VariableDropdownMenu.selected.textlayout.text);
+                }),
+            ],
+            [
+                d2d.CreateTextLayout("Tooltip", font, w, h),
+                new EditControl(PropertyMenu.instance.width/2, 16, undefined, VariableDropdownMenu.selected.desc, function() {
+                    VariableDropdownMenu.selected.desc = this.value;
+                    /*const i = BlueprintMenu.commandList.findIndex(({name}) => name == `Get ${VariableDropdownMenu.selected.textlayout.text}`);
+                    //const j = BlueprintMenu.commandList.findIndex(({name}) => name == VariableDropdownMenu.selected.textlayout.text);
+                    if(i != -1) {
+                        BlueprintMenu.commandList[i].desc = VariableDropdownMenu.selected.desc; //get
+                        BlueprintMenu.commandList[i+1].desc = VariableDropdownMenu.selected.desc; //set
+                    }else {
+                        printNoHighlight("uh oh...");
+                    }*/
+                   VariableDetailDropdownMenu.updateCommandListAndBlueprints(VariableDropdownMenu.selected.textlayout.text, "desc", VariableDropdownMenu.selected.desc);
+                }),
+            ],
+            //new EditLabelControl("Variable Name", VariableDropdownMenu.selected.textlayout.text, function() { //end input
+            //    const lastname = VariableDropdownMenu.selected.textlayout.text;
+            //    VariableDropdownMenu.selected.textlayout.Release();
+            //    VariableDropdownMenu.selected.textlayout = d2d.CreateTextLayout(this.value, font, w, h);
+            //    Blueprint.variables[this.value] = VariableDropdownMenu.selected; //this as in the EditLabelControl
+            //    delete Blueprint.variables[lastname];
+            //}),
+            //
+            //new EditLabelControl("Tooltip", VariableDropdownMenu.selected.desc, function() {
+            //    VariableDropdownMenu.selected.desc = this.value;
+            //}),
+            //{name: d2d.CreateTextLayout("Variable Name", font, w, h), value: name, vtextlayout: d2d.CreateTextLayout(name)}, //name is the key name, value is the value's value
+            //{name: d2d.CreateTextLayout("Variable Type", font, w, h), }, //primitive dropdown or something im not sure
+            //{name: d2d.CreateTextLayout("Tooltip", font, w, h), value: desc, vtextlayout: d2d.CreateTextLayout(desc)},
+            //{name: d2d.CreateTextLayout("Default Value", font, w, h), control: new PrimitiveControl(PrimitiveControl.validPrimitives[type]), },
+            //ok this whole system is lowkey kinda bad and RIGHT NOW im trying to get this entire thing WORKING (not saying this code is gonna be good but it's just gonna work and maybe at some point i'll come and actually try to make this fully thought out with no weird things like PrimitiveControl because i never expected to use it outside of Blueprint)
+            //with that being said im doing this part SUPER weird
+            //pcontorl,
+        );
+                        //i need to make a better generic version of primitive control so it's not so clanky with other classes (i mean cut me some slack i wrote PrimitiveControl ONLY for blueprint (which was obviously a mistake and i think im starting to see why people prototype and write their ideas first because they start writing the code))
+        /*const pcontorl = new PrimitiveControl(PropertyMenu.instance.width/2+2, (this.kvcontrols.length)*24+4+24, ...PrimitiveControl.validPrimitives[VariableDropdownMenu.selected.type]); //hopefully i will fix this weirdness
+        pcontorl.value = VariableDropdownMenu.selected.defaultvalue;
+        //gotta create this later because i need to know the y
+        //lowkey this wouldn't be a problem if it was easier to modify the Matrix3x2F object that d2d.GetTransform returns
+        this.kvcontrols.push(
+            [
+                d2d.CreateTextLayout("Default Value", font, w, h),
+                pcontorl,
+            ],
+        );*/
+
+        //yeah lowkey im probably finna extirpate PrimitiveControl because it's SUPER weird for no reason idk why i just didn't make different classes for it
+        this.kvcontrols.push(
+            [
+                d2d.CreateTextLayout("Default Value", font, w, h),
+                createControlBasedOnType(VariableDropdownMenu.selected.type, PropertyMenu.instance.width/2, 16, VariableDropdownMenu.selected.defaultvalue, function() {
+                    this.verifyInput?.(); //i gotta verifyinput first (using ?. just in case it's not an input control)
+                    //d2d.DrawInput(?mango); //just typing shit
+                    VariableDropdownMenu.selected.defaultvalue = this.value;
+                }),
+            ],
+        );
+    }
+
+    static updateCommandListAndBlueprints(clname, key, value, rename, newname) {
+        let i = BlueprintMenu.commandList.findIndex(({name}) => name == `Get ${clname}`);
+        let j = BlueprintMenu.commandList.findIndex(({name}) => name == `Set ${clname}`);
+        if(i != -1 && j != -1) {
+            print(`Get ${clname}`, i);
+            const getlast = BlueprintMenu.commandList[i];
+            const setlast = BlueprintMenu.commandList[j];
+            if(key) {
+                getlast[key] = value;
+                setlast[key] = value;
+            }
+            if(rename) {
+                print(i, BlueprintMenu.commandList.length, getlast, setlast);
+                getlast.name = `Get ${newname}`;
+                setlast.name = `Set ${newname}`;
+                //BlueprintMenu.commandList.splice(i, 2); //wait why am i even getting rid of them instead of modifying them out right????? (damn it bruh why am i just realizing this) i think it's because i had to do the same thing in the Variable Name callback (this.kvcontrols[0])
+                //delete BlueprintMenu.commandList[i];
+                //delete BlueprintMenu.commandList[j];
+                //i = BlueprintMenu.commandList.push(getlast); //:smirk:
+                //j = BlueprintMenu.commandList.push(setlast);
+            }
+            if(key == "type" || rename) {
+                const actualname = rename ? newname : clname;
+                getlast.out = [`${actualname} : ${VariableDropdownMenu.selected.type}`];
+                setlast.parameters = [`${actualname} : ${VariableDropdownMenu.selected.type}`];
+                //[`${VariableDropdownMenu.selected.value} : ${VariableDropdownMenu.selected.type}`], out: [` : ${VariableDropdownMenu.selected.type}`]
+            }
+            setlast.out = [` : ${VariableDropdownMenu.selected.type}`];
+        }else {
+            printNoHighlight("oh uh finmd luigi");
+        }
+
+        let panelen = panes.length;
+        //wait i thought this was cached??
+        for(let k = 0; k < panelen; k++) { //oops i had a for of loop here and was accidently decrementing i down there lol
+            const pane = panes[k];
+            const wasget = pane.title == "Get "+clname;
+            if(pane instanceof Blueprint && pane._special != 100 && (wasget || pane.title == "Set "+clname)) {
+                const old = pane;
+                //const k = +pane.title.includes("Set");
+                //pane.title.replace(newname, this.value);
+                //pane._special = 100; //using _special 100 as a debounce so i don't recheck this one again! (nevermind i can just decrement the length too since i push the new blueprint in Blueprint.create)
+                print(i, j, wasget, wasget ? i : j);
+                const {name, desc, parameters, out, type} = BlueprintMenu.commandList[wasget ? i : j];
+                //print(typeof(parameters), typeof(out));
+                print(name, desc, parameters, out, type);
+                const newbp = Blueprint.create(undefined, name, old.x, old.y, parameters, out, type ?? BPTYPE_NOTPURE, desc); //ok putting undefined here is a real sign that i really don't need to hold on to the hwnd in Blueprint lmao                
+                newbp.variable = VariableDropdownMenu.selected;
+                newbp.connections = Object.assign({}, old.connections); //doudou oye
+                for(let l = 0; l < newbp.connections.in.length; l++) {
+                    const pin = newbp.connections.in[l]; //{i, source, id}
+                    pin.source.connections.out[pin.i][pin.id].receiver.source = newbp; //bruh...
+                }
+                for(let l = 0; l < newbp.connections.out.length; l++) {
+                    //const pin = newbp.connections.out[i];
+                    for(const key in newbp.connections.out[l]) {
+                        const pin = newbp.connections.out[l][key]; //receiver : {i, source}
+                        pin.receiver.source.connections.in[pin.receiver.i].source = newbp; //bruh...
+                    }
+                }
+                pane.destroy(); //oh shit bruh for some reason when i was testing this part it would "skip" the pane that got delete and i realized that i destroy the pane which splices it which fuckls up the shit nigga
+                //since in pane.destroy() i splice i must decrement k because the array has changed!
+                k--; //for some reason i've never thought to fix a concurrent modification exception type issue like this
+                panelen--;
+            }
+        }
+    }
+
+    drawcontents(x, y) {
+        for(let i = 0; i < this.kvcontrols.length; i++) {
+            const [label, control] = this.kvcontrols[i];
+            colorBrush.SetColor(229/255, 229/255, 229/255);
+            d2d.DrawTextLayout(x, y+(i*24)+4, label, colorBrush);
+            //if(control instanceof PrimitiveControl) {
+                //d2d.SetTransform(Matrix3x2F.Translation(PropertyMenu.instance.x+x+(PropertyMenu.instance.width/2),PropertyMenu.instance.y+y+(i*24)+4));
+                //control.redraw();
+                //d2d.SetTransform(Matrix3x2F.Translation(PropertyMenu.instance.x, PropertyMenu.instance.y)); //x+camera.x, y+camera.y));
+                control.redraw(x+PropertyMenu.instance.width/2, y+(i*24)+4);
+            //}else {
+            //    control.redraw(x, y+(i*24)+4);
+            //}
+        }
+    }
+
+    hittest(mouse, y) {
+        for(let i = 0; i < this.kvcontrols.length; i++) {
+            const control = this.kvcontrols[i][1];
+            //let ht;
+            //if(control instanceof PrimitiveControl) {
+            //    const localmouse = {x: mouse.x-PropertyMenu.instance.width/2, y: mouse.y-y-24-((i)*24)-4}; //OHHH i had to use i+1 because the 24 titlebar
+            //    //print(localmouse);
+            //    ht = control.hittest(localmouse);
+            //}else {
+            const    ht = control.hittest(mouse, PropertyMenu.instance.width/2, y+24+(i*24)+4); //hittest?.
+            //}
+            if(ht) {
+                return ht;
+            }
+        }
+        //no return [NULL] here because i do that at the end in PropertyMenu
+    }
+
+    resize() {
+        for(let i = 0; i < this.kvcontrols.length; i++) {
+            const control = this.kvcontrols[i][1];
+            control.width = PropertyMenu.instance.width/2;
+        }
+    }
+
+    destroy() {
+        for(let i = 0; i < this.kvcontrols.length; i++) {
+            const [label, control] = this.kvcontrols[i];
+            label.Release();
+            control.destroy();
+        }
+    }
+
+    //name
+    //type
+    //tooltip
+    //default value
+}
+
+class VariableDropdownMenu extends PropertyDropdownMenu { //no release methods because PropertyMenu isn't meant to be closed
+    vCBE = undefined; //variableCurrentlyBeingEdited (i lowkey had this one written out but damn it was too long LMOA
+    //static selected = undefined; //staic
+    static #selectedVariable = undefined; //private for selected
+    static get selected() {
+        return VariableDropdownMenu.#selectedVariable; //surprisingly valid
+    }
+    static set selected(newvalue) {
+        VariableDropdownMenu.#selectedVariable = newvalue;
+        //using a setter so i can add the variable dropdown menu
+        if(!(PropertyMenu.instance.dropdownMenus[0] instanceof VariableDropdownMenu)) {
+            PropertyMenu.instance.dropdownMenus[0].destroy();
+            PropertyMenu.instance.dropdownMenus.splice(0, 1);
+        }
+        PropertyMenu.instance.dropdownMenus.splice(0, 0, new VariableDetailDropdownMenu(300));
+        //PropertyMenu.instance.dropdownMenus[0] = new VariableDetailDropdownMenu(300);
+    }
+
+    constructor(height) {
+        super("Variables", height);
+        this.button = {
+            buttonDown: this.makeNewVariable.bind(this),
+        };
+    }
+
+    makeNewVariable(mouse) {
+        print("this?", this.name.text);
+        print("Variable Dropdown menu drawa shit");
+        this.vCBE = {i: Object.keys(Blueprint.variables).length, value: "", textlayout: d2d.CreateTextLayout("", font, w, h), endInput: this.endInput.bind(this)};
+        if(!this.open) this.open = true;
+        if(Editable.editing) Editable.endInput();
+        Editable.beginInput(0, this.vCBE);
+    }
+
+    endInput() {
+        const i = BlueprintMenu.commandList.findIndex(({name}) => name == this.vCBE.value);
+        if(i != -1) {
+            Editable.beginInput(0, this.vCBE);
+            return;
+        }
+        Blueprint.variables[this.vCBE.value] = {type: "boolean", textlayout: this.vCBE.textlayout, desc: "My new variable :)", defaultvalue: false}; //default type
+        VariableDropdownMenu.selected = Blueprint.variables[this.vCBE.value];
+        BlueprintMenu.commandList.push({name: `Get ${this.vCBE.value}`, desc: VariableDropdownMenu.selected.desc, parameters: [], out: [`${this.vCBE.value} : ${VariableDropdownMenu.selected.type}`], type: BPTYPE_BARE, parent: "variable"});
+        BlueprintMenu.commandList.push({name: `Set ${this.vCBE.value}`, desc: VariableDropdownMenu.selected.desc, parameters: [`${this.vCBE.value} : ${VariableDropdownMenu.selected.type}`], out: [` : ${VariableDropdownMenu.selected.type}`], type: BPTYPE_NOTPURE, parent: "variable"});
+        this.vCBE = undefined;
+    }
+
+    drawcontents(x, y) {
+        //for(let i = 0; i < Blueprint.variables.length; i++) {
+        let i = 0;
+        for(const key in Blueprint.variables) {
+            const bpv = Blueprint.variables[key];
+            if(bpv.editing) continue; //we draw the edited one later
+            //draw it
+            if(VariableDropdownMenu.selected == bpv) {
+                colorBrush.SetColor(241/255, 176/255, 0.0);
+                d2d.FillRectangle(x, y+16*i, x+PropertyMenu.instance.width-2, y+16*(i+1), colorBrush);
+            }
+            const color = Blueprint.paramColors[bpv.type] ?? [.8, .8, .8];
+            colorBrush.SetColor(...color);
+            d2d.FillRoundedRectangle(x, y+16*(i), x+16, y+16*(i+1), 2, 2, colorBrush);
+            colorBrush.SetColor(1.0, 1.0, 1.0);
+            d2d.DrawTextLayout(x+24, y+16*(i), bpv.textlayout, colorBrush);
+            i++;
+        }
+        if(this.vCBE) {
+            const i = this.vCBE.i;
+            colorBrush.SetColor(0xcccccc);
+            d2d.FillRoundedRectangle(x, y+(16*i), x+PropertyMenu.instance.width-2, y+16*(i+1), 2, 2, colorBrush);
+            colorBrush.SetColor(229/255, 229/255, 229/255);
+            d2d.DrawRoundedRectangle(x, y+(16*i), x+PropertyMenu.instance.width-2, y+16*(i+1), 2, 2, colorBrush, 2, roundStrokeStyle);
+
+            if(this.vCBE.textlayout.text != this.vCBE.value) {
+                this.vCBE.textlayout.Release();
+                this.vCBE.textlayout = d2d.CreateTextLayout(this.vCBE.value, font, w, h);
+            }
+    
+            colorBrush.SetColor(0.0, 0.0, 0.0);
+            
+            if(Editable.edited == this.vCBE) {
+                //const t = d2d.CreateTextLayout(this.value.slice(0, Editable.caret), font, 100, 16);
+                //const {widthIncludingTrailingWhitespace} = t.GetMetrics(); //if there are trailing spaces it doesn't show that and it's weird
+    
+                
+                const hit = this.vCBE.textlayout.HitTestTextPosition(Editable.caret, false); //who knew this function's main purpose was this use case
+                //print(hit.x, hit.hitTestMetrics.width);
+                const caretX = hit.x+x; //plus 4 because im drawing the text 4 pixels away from 0
+                const caretY = hit.y+y+(16*i);
+    
+                
+                //const pos = ; //lowkey might have to make a text layout to see how wide each character is
+                d2d.DrawLine(caretX, caretY, caretX, caretY+16, colorBrush, 1, roundStrokeStyle);
+                //t.Release();
+            }
+            d2d.DrawTextLayout(x, y+(16*i), this.vCBE.textlayout, colorBrush);    
+        }
+    }
+
+    hittest(mouse, y) {
+        let i = 0;
+        for(const key in Blueprint.variables) {
+            const bpv = Blueprint.variables[key];
+            if(bpv.editing) continue; //we draw the edited one later
+            //draw it
+            if(withinBounds({x: 2, y: y+24+(i*16), width: PropertyMenu.instance.width-2, height: 16}, mouse)) {
+                const tempobjectthatmakesmecringe = { //this is weird but valid i guess lol
+                    buttonDown: function(mouse) {
+                        VariableDropdownMenu.selected = bpv;
+                    }
+                }
+                return [BUTTON, tempobjectthatmakesmecringe];
+            }
+            i++;
+        }
+        if(this.vCBE) {
+            const ty = y+24+(this.vCBE.i*16); //this y (*16 is padding)
+            //print(mouse, 2, ty);
+            if(withinBounds({x: 2, y: ty, width: PropertyMenu.instance.width-2, height: 16}, mouse)) {
+                const i = this.vCBE.textlayout.HitTestPoint(mouse.x, mouse.y).hitTestMetrics.textPosition;
+                return [TEXT, [i, this.vCBE]]; //we'll calculate that later :)
+            }
+        }
+    }
+}
+
+class PropertyMenu { //lowkey this might be a singleton too because im only going to make one of these
+    x = 800
+    y = 0
+    width = 200
+    height = h;
+    sticky = true;
+
+    static instance = undefined;
+
+    dropdownMenus = [];
+
+    static create() {
+        PropertyMenu.instance = new PropertyMenu();
+        panes.push(PropertyMenu.instance);
+    }
+
+    constructor() {
+        this.dropdownMenus.push(
+            //new VariableDetailDropdownMenu(300),
+            //new DetailDropdownMenu(300),
+            new VariableDropdownMenu(300),
+            //new PropertyDropdownMenu("Details", 300),
+            //new PropertyDropdownMenu("Variables", 300, {buttonDown: function(mouse) {
+            //    print("make new variable bruh");
+            //}}),
+        )
+    }
+
+    redraw() {
+        colorBrush.SetColor(0x606060); //#606060 (96, 96, 96)
+        d2d.FillRectangle(0, 0, this.width, this.height, colorBrush); //oops i forgot it was local and put this.x, this.y, this.x+this.width, this.y+this.height
+        
+        let y = 0;
+        for(const dropdown of this.dropdownMenus) {
+            colorBrush.SetColor(48/255, 48/255, 48/255);
+            d2d.FillRoundedRectangle(2, y, this.width-2, y+24, 2, 2, colorBrush); //title bar
+            colorBrush.SetColor(62/255, 62/255, 62/255);
+            if(dropdown.open) {
+                d2d.FillRoundedRectangle(2, y+24, this.width-2, y+dropdown.height-2, 1, 1, colorBrush); //contents
+                //draw contents
+                dropdown.drawcontents(2, y+24);
+            }
+            colorBrush.SetColor(62/255, 62/255, 62/255);
+            if(dropdown.button) {
+                //dropdown.button.redraw();
+                d2d.FillRoundedRectangle(this.width-4-20, y+3, this.width-4, y+18+3, 1, 1, colorBrush); //button
+            }
+            colorBrush.SetColor(229/255, 229/255, 229/255);
+            d2d.DrawTextLayout(2, y, dropdown.name, colorBrush);
+            //d2d.DrawText(dropdown.name, font, 2, y, this.width, y+24, colorBrush);    
+            y += dropdown.getHeight();
+        }
+    }
+
+    hittest(mouse) {
+        if(mouse.x < 10) {
+            return [LEFT];
+        }else {
+            let y = 0;
+            for(const dropdown of this.dropdownMenus) {
+                //dropdown.mango.!:?
+                //const {width} = dropdown.name.GetMetrics(); //nevermind lol
+                const dropdownheight = dropdown.getHeight();
+                if(withinBounds({x: 2, y, width: this.width-2, height: dropdownheight}, mouse)) {
+                    if(dropdown.button && withinBounds({x: this.width-4-20, y, width: 20, height: 18}, mouse)) {
+                        return [BUTTON, dropdown.button];
+                    }else if(withinBounds({x: 2, y, width: this.width-2, height: 24}, mouse)) {
+                        return [BUTTON, dropdown];
+                    }else {
+                        const ht = dropdown.hittest(mouse, y);
+                        if(ht) {
+                            return ht;
+                        }
+                        //yk...
+                    }
+                }
+                y += dropdownheight;
+            }
+        }
+        return [NULL];
+    }
+
+    onDrag() {
+        this.windowResized(w, h);
+    }
+
+    windowResized(oldw, oldh) {
+        this.x *= w/oldw;
+        this.width = w-this.x;
+        this.height *= h/oldh;
+        for(const dropdown of this.dropdownMenus) {
+            dropdown.height = this.height/this.dropdownMenus.length;
+            dropdown.resize?.();
+        }
+    }
+
+    destroy() {
+        for(const dropdown of this.dropdownMenus) {
+            dropdown.name.Release();
+        }
+    }
+}
+
 function parseCommandList() {
+    //lowkey GetForegroundWindow and FindWindow should be pure
     function registerFunc(name, signature, desc) {
         let startI = signature.indexOf("(")+1;
         let endI = signature.indexOf(")");
@@ -1319,7 +2221,13 @@ function parseCommandList() {
 
         for(let i = 0; i < parameters.length; i++) {
             //oops some parameters are like HWND | number so im stripping the ' |'
-            parameters[i] = parameters[i].split(" |")[0].trimEnd(); //just in case
+            //and also some are just (void)
+            if(parameters[i] == "void") {
+                parameters.splice(i, 1);
+                i--; //i literally just had this thought that maybe if i decrement i after removing an element we'd be good...
+            }else {
+                parameters[i] = parameters[i].split(" |")[0].trimEnd(); //just in case
+            }
         }
 
         BlueprintMenu.commandList.push({name, desc, parameters, out: [`${out} : ${out}`]});
@@ -1336,7 +2244,7 @@ function parseCommandList() {
     }
 }
 
-let w = 800;
+let w = 800+200; //200 for right menu
 let h = 600;
 
 const camera = {x: 0, y: 0, zoom: 1}; //idk if im gonna do zoom lowkey but just in case like a reserved parameter...
@@ -1358,8 +2266,9 @@ function recur(obj, name="") {
 
 function executeBlueprints() {
     //assuming panes[0] is the event start blueprint because it's the first one i make
-    const start = panes[0];                                                         //the first 'i' is the index of the out pin (why?)
-    let current = start.connections.out[0]?.[0]?.receiver?.source; //connections.out : Array<{i : number, receiver : {i : number, source : Blueprint}}>
+    const start = panes[0];
+    //                         it's out[1] now because of the delegate pin             the first 'i' is the index of the out pin (why?)
+    let current = start.connections.out[1]?.[0]?.receiver?.source; //connections.out : Array<{i : number, receiver : {i : number, source : Blueprint}}>
 
     next = undefined;
     loopStack = []; //hell yeah a stack!
@@ -1368,12 +2277,16 @@ function executeBlueprints() {
     //print(recur(start.connections));
     print("spacebar exec");
     
-
     const cache = {};
     
     for(const pane of panes) {
         //if(pane instanceof Blueprint) pane._special = false;
         (pane instanceof Blueprint) && (pane._special = false);
+    }
+
+    for(const key in Blueprint.variables) {
+        //const var of
+        Blueprint.variables[key].value = Blueprint.variables[key].defaultvalue;
     }
 
     //recur(start.connections);
@@ -1404,8 +2317,13 @@ function executeBlueprints() {
                             //}else {
                             //    val = cache[inPaneIndex];
                             //}
+                        //if(inpin.source.type == BPTYPE_BARE && Blueprint.variables[inpin.source.title]) {
+                        if(inpin.source.variable) { //lowkey just gonna put this on here
+                            val = inpin.source.variable.value;
+                        }else {
                             val = interpretParametersAndExecute(inpin.source);
-                        //}
+                        }
+                            //}
                     }else if(param.control) {
                         val = param.control.value;
                     }
@@ -1428,7 +2346,9 @@ function executeBlueprints() {
             //if this is a datatype blueprint then don't do this lmao
             print("exec", source.title);
             print("args", args);
-            if(Blueprint.meta_functions[source.title]) {
+            if(source.variable) {
+                result = Blueprint.meta_functions["SET"].call(source, ...args); //had to do it special bruh
+            }else if(Blueprint.meta_functions[source.title]) {
                 result = Blueprint.meta_functions[source.title].call(source, ...args);
             }else {
                 result = globalThis[source.title](...args); //lowkey im just gonna name the branch function like IF or something so i can just define it earlier (ok i did it differently than that)
@@ -1476,8 +2396,14 @@ function d2dpaint() {
     //d2d.DrawBitmap(drawing, 0, 0, w, h);
     for(const pane of panes) {
         d2d.SaveDrawingState();
-        //oh wait you can't do this d2d.GetTransform().Translation as it returns the straight up D2D1_MATRIX_3X2_F 
-        d2d.SetTransform(Matrix3x2F.Translation(pane.x+camera.x, pane.y+camera.y));
+        //oh wait you can't do this d2d.GetTransform().Translation as it returns the straight up D2D1_MATRIX_3X2_F
+        let x = pane.x;
+        let y = pane.y;
+        if(!pane.sticky) {
+            x+=camera.x;
+            y+=camera.y;
+        }
+        d2d.SetTransform(Matrix3x2F.Translation(x, y));
         //defaultBGG.SetTransform(Matrix3x2F.Multiply(Matrix3x2F.Translation(pane.x, pane.y), Matrix3x2F.Scale(pane.width/100, pane.height/100, pane.x, pane.y)));
         //defaultBGG.SetTransform(Matrix3x2F.Scale(pane.width, pane.height, 0, 0));
         //d2d.FillRectangle(0, 0, pane.width, pane.height, defaultBGG);
@@ -1507,8 +2433,9 @@ function windowProc(hwnd, msg, wp, lp) {
         roundStrokeStyle = d2d.CreateStrokeStyle(D2D1_CAP_STYLE_ROUND, D2D1_CAP_STYLE_ROUND, D2D1_CAP_STYLE_ROUND, D2D1_LINE_JOIN_ROUND, NULL, D2D1_DASH_STYLE_SOLID, 0, D2D1_STROKE_TRANSFORM_TYPE_NORMAL);
         //font.SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
         specialBitmap = d2d.CreateBitmapFromWicBitmap(wic.LoadBitmapFromFilename(__dirname+"/../imagine.bmp", wic.GUID_WICPixelFormat32bppPBGRA), true);
-        
+
         parseCommandList();
+
         //gl = createCanvas("gl", NULL, hwnd);
         
         //DragAcceptFiles(hwnd, true); //you can just use WS_EX_ACCEPTFILES
@@ -1538,6 +2465,7 @@ function windowProc(hwnd, msg, wp, lp) {
         panes.push(new Blueprint(hwnd, "Shader", [120/255, 168/255, 115/255], 0, 100, 221, 90, ["filename : string", "type : number"], ["shader : SHADER"], BPTYPE_PURE));
         panes.push(new Blueprint(hwnd, "print", [95/255, 150/255, 187/255], 500, 500, 150, 90, ["In String : string"], [], BPTYPE_NOTPURE));
         panes.push(new Blueprint(hwnd, "Beep", [120/255, 168/255, 115/255], 100, 500, 200, 130, ["frequency : number", "durationMs : number", "nonblocking? : boolean"], ["success : BOOL"], BPTYPE_NOTPURE));
+        PropertyMenu.create();
         d2dpaint();
         SetTimer(hwnd, 0, 16); //lowkey this is only for BlueprintMenu smooth scrolling lmao
     }else if(msg == WM_PAINT) {
@@ -1584,16 +2512,21 @@ function windowProc(hwnd, msg, wp, lp) {
         //print("setcursornigga");
         const mouse = GetCursorPos();//{x: GET_X_LPARAM(lp), y: GET_Y_LPARAM(lp)}; //i was originally using WM_MOUSEMOVE which passed the mouse position in the lp
         ScreenToClient(hwnd, mouse); //fun (returns nothing and modifies the object)
-        mouse.x -= camera.x;
-        mouse.y -= camera.y;
+        //mouse.x -= camera.x;
+        //mouse.y -= camera.y;
         //let result = 0;
         hit = {};
         //hitpane = undefined;
         for(const pane of panes) {
-            if(withinBounds(pane, mouse)) {
+            const mca = {x: mouse.x, y: mouse.y}; //mouse camera adjusted
+            if(!pane.sticky) {
+                mca.x -= camera.x;
+                mca.y -= camera.y;
+            }
+            if(withinBounds(pane, mca)) {
                 //hitpane = undefined;
 
-                const clientmouse = {x: mouse.x-pane.x, y: mouse.y-pane.y};
+                const clientmouse = {x: mca.x-pane.x, y: mca.y-pane.y};
                 //mouse.x -= pane.x;
                 //mouse.y -= pane.y; //to client (oops i was directly modifying mouse)
                 const [legit, data] = pane.hittest(clientmouse);
@@ -1625,6 +2558,9 @@ function windowProc(hwnd, msg, wp, lp) {
         
         if(BlueprintMenu.singleton && hit.pane != BlueprintMenu.singleton) {
             BlueprintMenu.close();
+        }
+        if(activePane != hit.pane) {
+            activePane = undefined;
         }
 
         if(hit.result) {
@@ -1684,7 +2620,7 @@ function windowProc(hwnd, msg, wp, lp) {
             }
         }
 
-        if(hit.result != TEXT && Editable.editing) {
+        if((hit.result != TEXT && hit.result != BUTTON) && Editable.editing) { //BUTTON is an exception here because there's only one time i use one and it's when you hit the new variable button in PropertyMenu
             Editable.endInput();
         }
     }else if(msg == WM_RBUTTONDOWN) {
@@ -1760,6 +2696,9 @@ function windowProc(hwnd, msg, wp, lp) {
                 //    print(activePin.i, "prev", receiver.i);
                 //}
                 delete activePin.source.connections.out[activePin.i][activePin.id];// = undefined;
+                if(activePin.source.out[activePin.i].type == "exec") {
+                    BlueprintMenu.open(hwnd);
+                }
             }
         }
         activePin = undefined;
@@ -1811,9 +2750,13 @@ function windowProc(hwnd, msg, wp, lp) {
         if(Editable.editing && (wp > VK_SPACE || wp <= VK_DELETE)) {
             Editable.modify(wp);
         }
+
+        if(activePane && !Editable.editing) {
+            activePane.keyDown?.(wp);
+        }
     }else if(msg == WM_CHAR) { //WM_CHAR will send the keycode of actual characters (like abc or !@#) but WM_KEYDOWN will send the keycode for every character BUT it won't send characters modified by shift (so if you hit shift+1 it will only send 1 instead of ! like WM_CHAR) also not to mention WM_KEYDOWN sends the capitalized keycode for letters (idk why)
         //so clearly i should've used WM_CHAR in jbstudio3.js
-        if(Editable.editing && (wp != VK_RETURN && wp != VK_BACK && wp != 127)) { //for some reason ctrl+backspace puts this random character down (and windows controls always put it instead of backspacing words and it makes me mad)
+        if(Editable.editing && (wp != VK_RETURN && wp != VK_BACK && wp != 127) && wp > 31) { //for some reason ctrl+backspace puts this random character down (and windows controls always put it instead of backspacing words and it makes me mad)
             print("char", wp, String.fromCharCode(wp));
             Editable.writechar(String.fromCharCode(wp));
         }
