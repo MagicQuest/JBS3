@@ -1,6 +1,12 @@
 //imma be honest the code that goes into drawing and managing the blueprints might not be good BUT IT WORKS
 //i might try to clean this shit up at some point so it's not a tangled mess of classes
 
+//add labels for the parameters and outs of this blueprint
+//oops i might have forgot, make sure you';re not connecting an exec pin to anmything lese
+//stop Sleep and SET from being cached !!!
+//probably should make a modal class or something like that for BlueprintMenu and DropdownControlMenu
+//then test changing variable types again
+
 //const rp = print;
 //print = function(...args) {};
 
@@ -11,7 +17,7 @@ let hit = {}; // {result, pane, data}
 //let hitpane;
 let activeButton;
 let activePin;
-let activePane;
+//let activePane;
 let draws = 0;
 let throwawayObjects = [];
 
@@ -108,7 +114,12 @@ class Draggable { //not to be confused with Draggable from jbstudio3 (this shit 
         Draggable.lockX = lx;
         Draggable.lockY = ly;
         Draggable.defaultRelease = releaseonmouseup;
-        activePane = object;
+        if(object != camera && object instanceof Blueprint) { //lol i want blueprints to still be selected when dragging the camera
+            Blueprint.active = object; //apparently this is the ONLY time i set Blueprint.active which is kinda weird but i guess not that weird
+            //if(activePane instanceof Blueprint) {
+                PropertyMenu.addFunctionDetails(); //hell yeah borhter
+            //}
+        }
     }
 
     static update(mouse) {
@@ -151,6 +162,7 @@ class Editable { //for text :smirk: (unfortunately you must draw the text and ca
         Editable.editing = true;
         Editable.returntoquit = returntoquit;
         print("HELL YEAH BEGIN INPUT");
+        print("value:", tobeedited.value);
     }
 
     static ctrlMoveBack() {
@@ -313,10 +325,11 @@ const PRIMITIVE_TOGGLE = 0;
 const PRIMITIVE_INPUT = 1;
 const PRIMITIVE_DROPDOWN = 2; //maybe...
 
+//yeah PrimitiveControl is totally deprecated and im only using it for validPrimitives now
 class PrimitiveControl { //hell yeah brother (this object isn't meant to be on its own and is for Blueprint but i also use it in BlueprintMenu too)
-    static validPrimitives = {string: [PRIMITIVE_INPUT], number: [PRIMITIVE_INPUT, "number"], boolean: [PRIMITIVE_TOGGLE], BOOL: [PRIMITIVE_TOGGLE], float: [PRIMITIVE_INPUT, "float"]};
+    static validPrimitives = {string: [PRIMITIVE_INPUT], number: [PRIMITIVE_INPUT, "number"], bigint: [PRIMITIVE_INPUT, "bigint"], boolean: [PRIMITIVE_TOGGLE], BOOL: [PRIMITIVE_TOGGLE], float: [PRIMITIVE_INPUT, "float"]};
 
-    type = PRIMITIVE_TOGGLE;
+    /*type = PRIMITIVE_TOGGLE;
     value = undefined;
     data = undefined; //data for PRIMITIVE_DROPDOWN or the type of number for PRIMITIVE_INPUT
     geometry = undefined; //random additional d2d stuff like a path geometry (for toggle) or a text layout (for input)
@@ -419,7 +432,7 @@ class PrimitiveControl { //hell yeah brother (this object isn't meant to be on i
 
     destroy() {
         this.geometry?.Release();
-    }
+    }*/
 }
 
 class CheckboxControl {
@@ -493,6 +506,7 @@ class DropdownControlMenu { //a singleton for controls that need a dropdown (dro
     height = 0;
     rowHeight = 16;
     options = [];
+    sticky = true; //OHHHH ("it's getting sticky in this bitch")
     static instance = undefined;
 
     static open(x, y, options, callback, width = 0) {
@@ -566,13 +580,17 @@ class DropdownControlMenu { //a singleton for controls that need a dropdown (dro
     }
 
     static close() {
+        //print("Close DropdownControlMenu");
         this.instance.destroy();
-        panes.splice(panes.indexOf(this.instance), 1);
         this.instance = undefined;
     }
 
     destroy() {
         //idk yet hold on.
+        for(const option of this.options) {
+            option.Release(); //oops forgot that
+        }
+        panes.splice(panes.indexOf(this), 1);
     }
 }
 
@@ -593,7 +611,10 @@ class EditControl {
             this.value = Number(this.value) || 0; //NaN is falsy but not nullish (no nullish coalescing today)
         }else if(this.data == "float") {
             this.value = parseFloat(this.value) || 0.0;
+        }else if(this.data == "bigint") {
+            this.value = BigInt(this.value) || 0n;
         }
+        this.updateText();
     }
 
     constructor(width, height, data, value, endInput) {
@@ -614,6 +635,19 @@ class EditControl {
         this.value = value ?? "";
         this.verifyInput();
     }
+
+    updateText() {
+        //print(this.layout.text, this.value); //wait what the fuck why does this.layout.text give me the actual boolean value instead of a string (yeah oops i was trolling on the v8 side)
+        //if(this.layout.text !== this.value) { //OH MY GOD THIS IS THE FIRST TIME I'VE EVER NEEDED TO USE A STRICT OPERATOR BECAUSE I NEED TO TELL THE DIFFERENCE BETWEEN false AND 0!!!!!!
+        if(this.layout.text !== this.value) { //NEVERMIND I STILL HAVE TO USE IT ANYWAYS BECAUSE THE STRING "0x14" IS BEING COALESCED INTO A NUMBER (20) SO THE COMPARISON "0x14" != 20 IS FALSE!
+            this.layout.Release();
+            this.layout = d2d.CreateTextLayout(this.value, font, this.maxwidth, 16); //100, 16);
+            if(this.autoresize) {
+                const {widthIncludingTrailingWhitespace} = this.layout.GetMetrics();
+                this.width = Math.max(24, 16+widthIncludingTrailingWhitespace);
+            }
+        }
+    }
     
     redraw(x, y) {
         //const halfwidth = PropertyMenu.instance.width/2;
@@ -622,14 +656,7 @@ class EditControl {
         colorBrush.SetColor(229/255, 229/255, 229/255);
         d2d.DrawRoundedRectangle(x, y, x+this.width-4, y+this.height, 2, 2, colorBrush, 2, roundStrokeStyle); //gotta subtract 4 because of the 2 strokewidth
 
-        if(this.layout.text != this.value) {
-            this.layout.Release();
-            this.layout = d2d.CreateTextLayout(this.value, font, this.maxwidth, 16); //100, 16);
-            if(this.autoresize) {
-                const {widthIncludingTrailingWhitespace} = this.layout.GetMetrics();
-                this.width = Math.max(24, 16+widthIncludingTrailingWhitespace);
-            }
-        }
+        this.updateText();
 
         colorBrush.SetColor(0.0, 0.0, 0.0);
         
@@ -684,14 +711,15 @@ class DropdownButtonControl {
 
     onEdit(newvalue) {
         //print("binf this idk?", this.options); //apparently i didn't have to bind rthis (ok no i lied without bind(this), this function is bound to DropdownControlMenu!)
-        print(this instanceof DropdownButtonControl, newvalue);
+        //print(this instanceof DropdownButtonControl, newvalue);
         this.value = newvalue;
         this.callback?.(newvalue);
     }
 
     buttonDown(mouse) {
         //i wasn't originally planning on using mouse.x and mouse.y but it works good enough lmao
-        DropdownControlMenu.open(mouse.x, mouse.y, this.options, this.onEdit.bind(this));
+        //oh shoot mouse isn't screenspace lemme fix that
+        DropdownControlMenu.open(mouse.x+camera.x, mouse.y+camera.y, this.options, this.onEdit.bind(this));
     }
     
     redraw(x, y) {
@@ -755,6 +783,7 @@ const baseTypes = {
 
 class Blueprint {
     static paramColors = {};
+    static defaultColor = [.8, .8, .8];
     //static captionHeight = GetSystemMetrics(SM_CYCAPTION) + GetSystemMetrics(SM_CYEDGE)*2; //27
     static captionHeight = 21;
 
@@ -781,24 +810,111 @@ class Blueprint {
     static meta_functions = {};
     static variables = {};
 
+    static active = undefined; //the currently selected blueprint
+
     /*static*/selectionGradient = undefined;
 
-    static getColorByTitle(title, type) {
+    static recreate(old, cl) {
+        old.destroy();
+
+        const {name, desc, parameters, out, type, cacheable} = cl;
+        //print(typeof(parameters), typeof(out));
+        print("RECREATING", name, desc, parameters, out, type, cacheable);
+        const newbp = Blueprint.create(undefined, name, old.x, old.y, parameters, out, type ?? BPTYPE_NOTPURE, desc, cacheable); //ok putting undefined here is a real sign that i really don't need to hold on to the hwnd in Blueprint lmao                
+        //newbp.connections = Object.assign({}, old.connections); //doudou oye
+        let m = 0;
+        if(old.type != type) {
+            if(type == BPTYPE_PURE) {
+                m = 1;
+            }else {
+                m = -1;
+            }
+        }
+        for(let l = 0; l < newbp.parameters.length; l++) {
+            const {control} = newbp.parameters[l];
+            if(control) {
+                //print(l, old.parameters[l]);
+                control.value = old.parameters[l+m].control.value;
+            }
+        }
+        //for(let l of Object.keys(newbp.connections.in)) { //lowkey for some reason the regular for wasn't working so i used this instead and now im tryna figure out why it wasn't working in the first place
+        //looping through old connections because this new blueprint could have more or less connections
+        //let maxinlength = newbp.connections.in.length;
+        //if(maxinlength > old.connections.in.length) {
+        //    maxinlength = old.connections.in.length;
+        //}
+        //let n = 0;
+        //basically if type == BPTYPE_PURE then let l = 0 else let l = 1
+        for(let l = 0; l < old.connections.in.length; l++) { //i think i accidently put i++ the first time or something!
+            //print("l",l);
+            if(old.type != type) {
+                //using the old blueprint here so i can get rid of the thingy yk
+                if(type == BPTYPE_PURE && l == 0) {
+                    const pin = old.connections.in[l]; //{i, source, id}
+                    if(pin) delete pin.source.connections.out[pin.i][pin.id];
+                    //n = 1;
+                    continue;
+                }
+            }
+            const oldpin = old.connections.in[l];
+            newbp.connections.in[l-m] = oldpin;
+            const pin = newbp.connections.in[l-m];
+            pin.source.connections.out[pin.i][pin.id].receiver.i = l-m; //bruh...
+            pin.source.connections.out[pin.i][pin.id].receiver.source = newbp; //bruh...
+        }
+        //let maxoutlength = newbp.connections.out.length;
+        //if(maxoutlength > old.connections.out.length) {
+        //    maxoutlength = old.connections.out.length;
+        //}
+        //n = 0;
+        //basically if type == BPTYPE_PURE then let l = 0 else let l = 1
+        for(let l = 0; l < old.connections.out.length; l++) {
+            //const pin = newbp.connections.out[i];
+            for(const key in old.connections.out[l]) {
+                if(old.type != type) {
+                    if(type == BPTYPE_PURE && l == 0) {
+                        const pin = old.connections.out[l][key]; //receiver : {i, source}
+                        if(pin) pin.receiver.source.connections.in[pin.receiver.i] = undefined;
+                        //n = 1;
+                        continue;
+                    }
+                }
+                const oldpin = old.connections.out[l][key];
+                if(!newbp.connections.out[l-m]) {
+                    newbp.connections.out[l-m] = {};
+                }
+                newbp.connections.out[l-m][key] = oldpin;
+                const pin = newbp.connections.out[l-m][key];
+                pin.receiver.source.connections.in[pin.receiver.i].i = l-m; //bruh...
+                pin.receiver.source.connections.in[pin.receiver.i].source = newbp; //bruh...
+            }
+        }
+        return newbp;
+    }
+
+    static getColorByInfo(title, type, out) {
         let color;
-        let lower = title.toLowerCase();
-        if(lower.includes("set") || type == BPTYPE_NOTPURE) {
-            color = [95/255, 150/255, 187/255];
-        }else if(lower.includes("get") || type == BPTYPE_PURE) {
-            color = [120/255, 168/255, 115/255];
+        if(type != BPTYPE_BARE) {
+            let lower = title.toLowerCase();
+            if(lower.includes("set") || type == BPTYPE_NOTPURE) {
+                color = [95/255, 150/255, 187/255];
+            }else if(lower.includes("get") || type == BPTYPE_PURE) {
+                color = [120/255, 168/255, 115/255];
+            }
+        }else {
+            //const [] = out[0]; //lol this doesn't do anything
+            const [_, name, op] = out[0].match(typeRegex);
+            print(out[0], op);
+            color = Blueprint.paramColors[op] ?? [1.0, 1.0, 1.0];
         }
         return color;
     }
 
     //static create(parent, title, color, x, y, width, height, parameters, out, type) {
-    static create(parent, title, x, y, parameters, out, type, desc) {
-        const color = Blueprint.getColorByTitle(title, type);
+    static create(parent, title, x, y, parameters, out, type, desc, cacheable) {
+        const color = Blueprint.getColorByInfo(title, type, out);
         const {width, height} = Blueprint.getAppropriateSize(title, parameters, out, type);
-        const b = new Blueprint(parent, title, color, x, y, width, height, parameters, out, type, desc);
+        const b = new Blueprint(parent, title, color, x, y, width, height, parameters, out, type, desc, cacheable);
         panes.push(b);
         return b;
     }
@@ -834,7 +950,7 @@ class Blueprint {
             let pwidth = temp.GetMetrics().width;
             temp.Release();
             if(controlArgs) {
-                let tempcontrol = new PrimitiveControl(0, 0, ...controlArgs);
+                const tempcontrol = createControlBasedOnType(param, 16, 16); //new PrimitiveControl(0, 0, ...controlArgs);
                 pwidth += tempcontrol.width;
                 tempcontrol.destroy();
             }
@@ -863,7 +979,7 @@ class Blueprint {
         return {width, height};
     }
 
-    constructor(parent, title, color, x, y, width, height, parameters, out, type, desc) {
+    constructor(parent, title, color, x, y, width, height, parameters, out, type, desc, cacheable) {
         this.parent = parent; //just in case? (nevermind lol it seems like i don't need it)
         this.title = title;
         this.x = x;
@@ -881,6 +997,7 @@ class Blueprint {
         this.type = type;
         this.desc = desc; ///hover and show it
         this._special = false;
+        this.cacheable = cacheable;
 
         this.selectionGradient = Gradient.LinearGradientBrush(
             d2d.CreateGradientStopCollection([0.0, 241/255, 176/255, 0.0], [1.0, 205/255, 104/255, 0.0]),
@@ -924,11 +1041,12 @@ class Blueprint {
         }else {
             this.gradients.push(undefined, undefined, 
                 Gradient.LinearGradientBrush(
-                    d2d.CreateGradientStopCollection([0.0, 168/255, 168/255, 168/255, .7], [0.4, 100/255, 100/255, 100/255, .5], [1.0, 32/255, 32/255, 32/255, .1]),
+                    //d2d.CreateGradientStopCollection([0.0, 168/255, 168/255, 168/255, .7], [0.4, 100/255, 100/255, 100/255, .5], [1.0, 32/255, 32/255, 32/255, .1]),
+                    d2d.CreateGradientStopCollection([0.0, ...color, .7], [1.0, 32/255, 32/255, 32/255, .1]),
                     0, 0, 0, this.height,
                 ),
                 Gradient.LinearGradientBrush(
-                    d2d.CreateGradientStopCollection([0.0, 1.0, 1.0, 1.0], [0.2, 0.0, 0.0, 0.0, 0.0]),
+                    d2d.CreateGradientStopCollection([0.0, ...color], [0.2, 0.0, 0.0, 0.0, 0.0]),
                     2, Blueprint.captionHeight-2, 2, (Blueprint.captionHeight*2)-6, //pointing down
                 ),
             );
@@ -1007,7 +1125,7 @@ class Blueprint {
             this.out[i] = pobj;
             //this.outText.push(d2d.CreateTextLayout(name, font, w, h));
         }
-        const color = Blueprint.paramColors[param] ?? [.8, .8, .8];
+        const color = Blueprint.paramColors[param] ?? Blueprint.defaultColor;
         const gsc = d2d.CreateGradientStopCollection([0.0, ...color], [0.5, 0.0, 0.0, 0.0, 0.0]);
 
         this.gradients.push(
@@ -1021,7 +1139,7 @@ class Blueprint {
     drawPin(out, i, param, connection) {
         const y = (i+1)*Blueprint.captionHeight+Blueprint.padding;
         let ex;
-        const color = Blueprint.paramColors[param.type] ?? [.8, .8, .8];
+        const color = Blueprint.paramColors[param.type] ?? Blueprint.defaultColor;
         if(!out) {
             ex = Blueprint.padding-8;
             d2d.FillRectangle(Blueprint.padding, y, 100, this.height, this.gradients[4+i]);
@@ -1084,7 +1202,7 @@ class Blueprint {
     redraw() { //wait i could lowkey draw basically all of these into a bitmap and draw that instead (efficiency) i was thinking about using a CommandList too //https://learn.microsoft.com/en-us/windows/win32/direct2d/improving-direct2d-performance
         //https://learn.microsoft.com/en-us/windows/win32/direct2d/printing-and-command-lists
         //https://github.com/MicrosoftDocs/win32/blob/docs/desktop-src/direct3d12/d2d-using-d3d11on12.md
-        if(activePane == this) {
+        if(Blueprint.active == this) {
             d2d.DrawRoundedRectangle(0, 0, this.width, this.height, 2, 2, this.selectionGradient, 4, roundStrokeStyle);
         }
 
@@ -1246,6 +1364,20 @@ class Blueprint {
     keyDown(wp) {
         if(wp == VK_DELETE || wp == VK_BACK) {
             dirty = true;
+            for(let l = 0; l < this.connections.in.length; l++) { //i think i accidently put i++ the first time or something!
+                const pin = this.connections.in[l]; //{i, source, id}
+                if(pin) delete pin.source.connections.out[pin.i][pin.id]; //.receiver.source = newbp; //bruh...
+            }
+            for(let l = 0; l < this.connections.out.length; l++) {
+                //const pin = newbp.connections.out[i];
+                const outarray = this.connections.out[l];
+                if(outarray) {
+                    for(const key in outarray) {
+                        const pin = outarray[key]; //receiver : {i, source}
+                        delete pin.receiver.source.connections.in[pin.receiver.i]; //.source = newbp; //bruh...
+                    }
+                }
+            }
             this.destroy();
         }
     }
@@ -1323,6 +1455,7 @@ Blueprint.paramColors["VERTEX_SHADER"] = [136/255, 255/255, 0.0];
 Blueprint.paramColors["SHADER"] = [200/255, 200/255, 200/255];
 Blueprint.paramColors["string"] = [251/255, 0/255, 209/255];
 Blueprint.paramColors["number"] = [27/255, 191/255, 147/255];
+Blueprint.paramColors["bigint"] = [153/255, 135/255, 201/255];
 //Blueprint.paramColors["BOOL"] = Blueprint.paramColors.number; //WinAPI's BOOL type is actually just an int
 //Blueprint.paramColors["HWND"] = Blueprint.paramColors.number;
 Blueprint.paramColors["boolean"] = [146/255, 0.0, 0.0];
@@ -1385,12 +1518,40 @@ Blueprint.meta_functions["FOR_LOOP"] = function(firstIndex, lastIndex) {
 
 //oh boy for loop with break is kinda weird because i don't check which exec pin im plugged into
 
+Blueprint.meta_functions["STRICT_NOT_EQUAL"] = function(left, right) {
+    return left !== right;
+}
+
+Blueprint.meta_functions["STRICT_EQUAL"] = function(left, right) {
+    return left === right;
+}
+
 Blueprint.meta_functions["NOT_EQUAL"] = function(left, right) {
     return left != right;
 }
 
 Blueprint.meta_functions["EQUAL"] = function(left, right) {
     return left == right;
+}
+
+Blueprint.meta_functions["GREATER_THAN"] = function(left, right) {
+    return left > right;
+}
+
+Blueprint.meta_functions["GREATER_THAN_OR_EQUAL"] = function(left, right) {
+    return left >= right;
+}
+
+Blueprint.meta_functions["LESS_THAN"] = function(left, right) {
+    return left < right;
+}
+
+Blueprint.meta_functions["LESS_THAN_OR_EQUAL"] = function(left, right) {
+    return left <= right;
+}
+
+Blueprint.meta_functions["NEGATE"] = function(value) {
+    return -value;
 }
 
 Blueprint.meta_functions["AND"] = function(left, right) {
@@ -1421,6 +1582,29 @@ Blueprint.meta_functions["SET"] = function(newvalue) { //i gotta check if set is
     return newvalue;
 }
 
+Blueprint.meta_functions["ADD"] = function(value1, value2) {
+    return value1 + value2;
+}
+Blueprint.meta_functions["SUBTRACT"] = function(value1, value2) {
+    return value1 - value2;
+}
+Blueprint.meta_functions["DIVIDE"] = function(value1, value2) {
+    return value1 / value2;
+}
+Blueprint.meta_functions["MULTIPLY"] = function(value1, value2) {
+    return value1 * value2;
+}
+Blueprint.meta_functions["MODULO"] = function(value1, value2) {
+    return value1 % value2;
+}
+Blueprint.meta_functions["POWER"] = function(base, exponent) {
+    return base ** exponent;
+}
+
+//Blueprint.meta_functions["FORMAT_STRING"] = function(string, ...args) { //yeah idk this seems like a monster to tackle
+//
+//}
+
 /*Blueprint.meta_functions["__TATTLETAIL__"] = function(window) { //https://www.youtube.com/watch?v=nI26a2pDxGk
 
 }*/
@@ -1450,7 +1634,7 @@ class BlueprintMenu {
     scrollY = 0;
     scrollVelocity = 0;
 
-    static singleton = undefined;
+    static singleton = undefined; //oops i think i meant instance but i forgor
 
     static commandList = [ //haha not the d2d one
         //{name, desc, parameters, out, type?}
@@ -1459,10 +1643,24 @@ class BlueprintMenu {
         {name: "FOR_LOOP", desc: "for loop", parameters: ["exec : exec", "First Index : number", "Last Index : number"], out: ["Loop Body : exec", "Index : number", "Completed : exec"], type : BPTYPE_PURE},
         {name: "NOT_EQUAL", desc: "!=", parameters: [" : number", " : number"], out: [" : boolean"], type: BPTYPE_BARE},
         {name: "EQUAL", desc: "==", parameters: [" : number", " : number"], out: [" : boolean"], type: BPTYPE_BARE},
+        {name: "STRICT_NOT_EQUAL", desc: "!==", parameters: [" : number", " : number"], out: [" : boolean"], type: BPTYPE_BARE},
+        {name: "STRICT_EQUAL", desc: "===", parameters: [" : number", " : number"], out: [" : boolean"], type: BPTYPE_BARE},
+        {name: "GREATER_THAN", desc: ">", parameters: [" : number", " : number"], out: [" : boolean"], type: BPTYPE_BARE},
+        {name: "GREATER_THAN_OR_EQUAL", desc: ">=", parameters: [" : number", " : number"], out: [" : boolean"], type: BPTYPE_BARE},
+        {name: "LESS_THAN", desc: "<", parameters: [" : number", " : number"], out: [" : boolean"], type: BPTYPE_BARE},
+        {name: "LESS_THAN_OR_EQUAL", desc: "<=", parameters: [" : number", " : number"], out: [" : boolean"], type: BPTYPE_BARE},
+        {name: "NEGATE", desc: "-", parameters: [" : number"], out: [" : number"], type: BPTYPE_BARE},
         {name: "AND", desc: "&&", parameters: [" : boolean", " : boolean"], out: [" : boolean"], type: BPTYPE_BARE},
         {name: "OR", desc: "||", parameters: [" : boolean", " : boolean"], out: [" : boolean"], type: BPTYPE_BARE},
         {name: "NOT", desc: "!", parameters: [" : boolean"], out: [" : boolean"], type: BPTYPE_BARE},
         {name: "RUSSIAN_ROULETTE", desc: "calls a totally random function with the specified parameters", parameters: ["any : any"], out: ["any : any"]},
+        
+        {name: "ADD", desc: "+", parameters: [" : float", " : float"], out: [" : float"], type: BPTYPE_BARE},
+        {name: "SUBTRACT", desc: "-", parameters: [" : float", " : float"], out: [" : float"], type: BPTYPE_BARE},
+        {name: "DIVIDE", desc: "/", parameters: [" : float", " : float"], out: [" : float"], type: BPTYPE_BARE},
+        {name: "MULTIPLY", desc: "*", parameters: [" : float", " : float"], out: [" : float"], type: BPTYPE_BARE},
+        {name: "MODULO", desc: "%", parameters: [" : float", " : float"], out: [" : float"], type: BPTYPE_BARE},
+        {name: "POWER", desc: "**", parameters: ["base : float", "exponent : float"], out: [" : float"], type: BPTYPE_BARE},
         //i was gonna use this regex but i realized i could eval it instead -> /registerFunc *\( *(["'`])(\w+)\1 *, *(["'`])function \2\(([A-z0-9:_, ]+)\) *: *(\w+)\3/
         //damn well i already wanted to add some networking functions for a custom discord client burt wwteverf
     ];
@@ -1628,10 +1826,10 @@ class BlueprintMenu {
             const i = Math.floor((mouse.y-checkY)/12);    //(mouse.y-92)/12; //i think?
             const j = Math.floor(this.scrollY) + i;
             //print(i, j);
-            const {name, desc, parameters, out, type, parent} = BlueprintMenu.commandList[j];
+            const {name, desc, parameters, out, type, parent, cacheable} = BlueprintMenu.commandList[j];
             //print(typeof(parameters), typeof(out));
-            print(name, desc, parameters, out, type, parent);
-            const bp = Blueprint.create(undefined, name, this.x, this.y, parameters, out, type ?? BPTYPE_NOTPURE, desc); //ok putting undefined here is a real sign that i really don't need to hold on to the hwnd in Blueprint lmao
+            print(name, desc, parameters, out, type, parent, cacheable);
+            const bp = Blueprint.create(undefined, name, this.x, this.y, parameters, out, type ?? BPTYPE_NOTPURE, desc, cacheable); //ok putting undefined here is a real sign that i really don't need to hold on to the hwnd in Blueprint lmao
             if(parent && parent == "variable") {
                 print("parent valid!", bp.title, bp.title.substring(4));
                 bp.variable = Blueprint.variables[bp.title.substring(4)];
@@ -1752,11 +1950,67 @@ class PropertyDropdownMenu { //written for PropertyMenu!
     }
 }*/
 
-class VariableDetailDropdownMenu extends PropertyDropdownMenu {
-    kvcontrols = []; //key value controls
+class DetailDropdownMenu extends PropertyDropdownMenu {
+    kvcontrols = [];
+    constructor(name, height) {
+        super(name, height, undefined);
+    }
+
+    drawcontents(x, y) {
+        for(let i = 0; i < this.kvcontrols.length; i++) {
+            const [label, control] = this.kvcontrols[i];
+            colorBrush.SetColor(229/255, 229/255, 229/255);
+            d2d.DrawTextLayout(x, y+(i*24)+4, label, colorBrush);
+            //if(control instanceof PrimitiveControl) {
+                //d2d.SetTransform(Matrix3x2F.Translation(PropertyMenu.instance.x+x+(PropertyMenu.instance.width/2),PropertyMenu.instance.y+y+(i*24)+4));
+                //control.redraw();
+                //d2d.SetTransform(Matrix3x2F.Translation(PropertyMenu.instance.x, PropertyMenu.instance.y)); //x+camera.x, y+camera.y));
+                control.redraw(x+PropertyMenu.instance.width/2, y+(i*24)+4);
+            //}else {
+            //    control.redraw(x, y+(i*24)+4);
+            //}
+        }
+    }
+
+    hittest(mouse, y) {
+        for(let i = 0; i < this.kvcontrols.length; i++) {
+            const control = this.kvcontrols[i][1];
+            //let ht;
+            //if(control instanceof PrimitiveControl) {
+            //    const localmouse = {x: mouse.x-PropertyMenu.instance.width/2, y: mouse.y-y-24-((i)*24)-4}; //OHHH i had to use i+1 because the 24 titlebar
+            //    //print(localmouse);
+            //    ht = control.hittest(localmouse);
+            //}else {
+            const    ht = control.hittest(mouse, PropertyMenu.instance.width/2, y+24+(i*24)+4); //hittest?.
+            //}
+            if(ht) {
+                return ht;
+            }
+        }
+        //no return [NULL] here because i do that at the end in PropertyMenu
+    }
+
+    resize() {
+        for(let i = 0; i < this.kvcontrols.length; i++) {
+            const control = this.kvcontrols[i][1];
+            control.width = PropertyMenu.instance.width/2;
+        }
+    }
+
+    destroy() {
+        for(let i = 0; i < this.kvcontrols.length; i++) {
+            const [label, control] = this.kvcontrols[i];
+            label.Release();
+            control.destroy();
+        }
+    }
+}
+
+class VariableDetailDropdownMenu extends DetailDropdownMenu {
+    //kvcontrols = []; //key value controls (now defined in DetailDropdownMenu)
 
     constructor(height) {//, name, type, desc, defaultvalue) {
-        super("Variable", height, undefined);
+        super("Variable", height);
         print("JUST DON'T FALL OUT THE SKY YK", VariableDropdownMenu.selected.type);
         //pcontorl.name = "Default Value";
         this.kvcontrols.push(
@@ -1838,7 +2092,7 @@ class VariableDetailDropdownMenu extends PropertyDropdownMenu {
             [
                 d2d.CreateTextLayout("Default Value", font, w, h),
                 createControlBasedOnType(VariableDropdownMenu.selected.type, PropertyMenu.instance.width/2, 16, VariableDropdownMenu.selected.defaultvalue, function() {
-                    this.verifyInput?.(); //i gotta verifyinput first (using ?. just in case it's not an input control)
+                    if(this instanceof EditControl) this.verifyInput(); //i gotta verifyinput first (using ?. just in case it's not an input control)
                     //d2d.DrawInput(?mango); //just typing shit
                     VariableDropdownMenu.selected.defaultvalue = this.value;
                 }),
@@ -1883,30 +2137,15 @@ class VariableDetailDropdownMenu extends PropertyDropdownMenu {
         for(let k = 0; k < panelen; k++) { //oops i had a for of loop here and was accidently decrementing i down there lol
             const pane = panes[k];
             const wasget = pane.title == "Get "+clname;
-            if(pane instanceof Blueprint && pane._special != 100 && (wasget || pane.title == "Set "+clname)) {
+            if(pane instanceof Blueprint && (wasget || pane.title == "Set "+clname)) {
                 const old = pane;
                 //const k = +pane.title.includes("Set");
                 //pane.title.replace(newname, this.value);
                 //pane._special = 100; //using _special 100 as a debounce so i don't recheck this one again! (nevermind i can just decrement the length too since i push the new blueprint in Blueprint.create)
                 print(i, j, wasget, wasget ? i : j);
-                const {name, desc, parameters, out, type} = BlueprintMenu.commandList[wasget ? i : j];
-                //print(typeof(parameters), typeof(out));
-                print(name, desc, parameters, out, type);
-                const newbp = Blueprint.create(undefined, name, old.x, old.y, parameters, out, type ?? BPTYPE_NOTPURE, desc); //ok putting undefined here is a real sign that i really don't need to hold on to the hwnd in Blueprint lmao                
+                Blueprint.recreate(old, BlueprintMenu.commandList[wasget ? i : j]);
                 newbp.variable = VariableDropdownMenu.selected;
-                newbp.connections = Object.assign({}, old.connections); //doudou oye
-                for(let l = 0; l < newbp.connections.in.length; l++) {
-                    const pin = newbp.connections.in[l]; //{i, source, id}
-                    pin.source.connections.out[pin.i][pin.id].receiver.source = newbp; //bruh...
-                }
-                for(let l = 0; l < newbp.connections.out.length; l++) {
-                    //const pin = newbp.connections.out[i];
-                    for(const key in newbp.connections.out[l]) {
-                        const pin = newbp.connections.out[l][key]; //receiver : {i, source}
-                        pin.receiver.source.connections.in[pin.receiver.i].source = newbp; //bruh...
-                    }
-                }
-                pane.destroy(); //oh shit bruh for some reason when i was testing this part it would "skip" the pane that got delete and i realized that i destroy the pane which splices it which fuckls up the shit nigga
+                //pane.destroy(); //oh shit bruh for some reason when i was testing this part it would "skip" the pane that got delete and i realized that i destroy the pane which splices it which fuckls up the shit nigga
                 //since in pane.destroy() i splice i must decrement k because the array has changed!
                 k--; //for some reason i've never thought to fix a concurrent modification exception type issue like this
                 panelen--;
@@ -1914,59 +2153,33 @@ class VariableDetailDropdownMenu extends PropertyDropdownMenu {
         }
     }
 
-    drawcontents(x, y) {
-        for(let i = 0; i < this.kvcontrols.length; i++) {
-            const [label, control] = this.kvcontrols[i];
-            colorBrush.SetColor(229/255, 229/255, 229/255);
-            d2d.DrawTextLayout(x, y+(i*24)+4, label, colorBrush);
-            //if(control instanceof PrimitiveControl) {
-                //d2d.SetTransform(Matrix3x2F.Translation(PropertyMenu.instance.x+x+(PropertyMenu.instance.width/2),PropertyMenu.instance.y+y+(i*24)+4));
-                //control.redraw();
-                //d2d.SetTransform(Matrix3x2F.Translation(PropertyMenu.instance.x, PropertyMenu.instance.y)); //x+camera.x, y+camera.y));
-                control.redraw(x+PropertyMenu.instance.width/2, y+(i*24)+4);
-            //}else {
-            //    control.redraw(x, y+(i*24)+4);
-            //}
-        }
-    }
-
-    hittest(mouse, y) {
-        for(let i = 0; i < this.kvcontrols.length; i++) {
-            const control = this.kvcontrols[i][1];
-            //let ht;
-            //if(control instanceof PrimitiveControl) {
-            //    const localmouse = {x: mouse.x-PropertyMenu.instance.width/2, y: mouse.y-y-24-((i)*24)-4}; //OHHH i had to use i+1 because the 24 titlebar
-            //    //print(localmouse);
-            //    ht = control.hittest(localmouse);
-            //}else {
-            const    ht = control.hittest(mouse, PropertyMenu.instance.width/2, y+24+(i*24)+4); //hittest?.
-            //}
-            if(ht) {
-                return ht;
-            }
-        }
-        //no return [NULL] here because i do that at the end in PropertyMenu
-    }
-
-    resize() {
-        for(let i = 0; i < this.kvcontrols.length; i++) {
-            const control = this.kvcontrols[i][1];
-            control.width = PropertyMenu.instance.width/2;
-        }
-    }
-
-    destroy() {
-        for(let i = 0; i < this.kvcontrols.length; i++) {
-            const [label, control] = this.kvcontrols[i];
-            label.Release();
-            control.destroy();
-        }
-    }
-
     //name
     //type
     //tooltip
     //default value
+}
+
+class FunctionDetailDropdownMenu extends DetailDropdownMenu {
+    constructor(height) {
+        super("Function", height);
+
+        this.kvcontrols.push(
+            [
+                d2d.CreateTextLayout("Pure", font, w, h),
+                new CheckboxControl(16, 16, Blueprint.active.type == BPTYPE_PURE, function() {
+                    //recreate the WHOLE blueprint as its type has changed
+                    const i = BlueprintMenu.commandList.findIndex(({name}) => name == Blueprint.active.title);
+                    if(i != -1) {
+                        const cl = BlueprintMenu.commandList[i];                                                                 //BPTYPE_PURE is 0 BPTYPE_NOTPURE is 1
+                        Blueprint.active = Blueprint.recreate(Blueprint.active, {name: cl.name, desc: cl.desc, parameters: cl.parameters, out: cl.out, type: +!this.value, parent: cl.parent}); //, cacheable: cl.cacheable});
+                    }else {
+                        print(`something went wrong bruh we couldn't find the associated command list for ${Blueprint.active.title}\x07`);
+                    }
+                }),
+            ],
+            //add labels for the parameters and outs of this blueprint
+        );
+    }
 }
 
 class VariableDropdownMenu extends PropertyDropdownMenu { //no release methods because PropertyMenu isn't meant to be closed
@@ -1979,12 +2192,10 @@ class VariableDropdownMenu extends PropertyDropdownMenu { //no release methods b
     static set selected(newvalue) {
         VariableDropdownMenu.#selectedVariable = newvalue;
         //using a setter so i can add the variable dropdown menu
-        if(!(PropertyMenu.instance.dropdownMenus[0] instanceof VariableDropdownMenu)) {
-            PropertyMenu.instance.dropdownMenus[0].destroy();
-            PropertyMenu.instance.dropdownMenus.splice(0, 1);
-        }
-        PropertyMenu.instance.dropdownMenus.splice(0, 0, new VariableDetailDropdownMenu(300));
         //PropertyMenu.instance.dropdownMenus[0] = new VariableDetailDropdownMenu(300);
+        if(newvalue != undefined) {
+            PropertyMenu.addVariableDetails();
+        }
     }
 
     constructor(height) {
@@ -2027,7 +2238,7 @@ class VariableDropdownMenu extends PropertyDropdownMenu { //no release methods b
                 colorBrush.SetColor(241/255, 176/255, 0.0);
                 d2d.FillRectangle(x, y+16*i, x+PropertyMenu.instance.width-2, y+16*(i+1), colorBrush);
             }
-            const color = Blueprint.paramColors[bpv.type] ?? [.8, .8, .8];
+            const color = Blueprint.paramColors[bpv.type] ?? Blueprint.defaultColor;
             colorBrush.SetColor(...color);
             d2d.FillRoundedRectangle(x, y+16*(i), x+16, y+16*(i+1), 2, 2, colorBrush);
             colorBrush.SetColor(1.0, 1.0, 1.0);
@@ -2110,11 +2321,34 @@ class PropertyMenu { //lowkey this might be a singleton too because im only goin
         panes.push(PropertyMenu.instance);
     }
 
+    static removeOldDetailMenu() {
+        if(!(PropertyMenu.instance.dropdownMenus[0] instanceof VariableDropdownMenu)) { //checking if dropdownMenus[0] is not a VariableDropdownMenu
+            PropertyMenu.instance.dropdownMenus[0].destroy();
+            PropertyMenu.instance.dropdownMenus.splice(0, 1);
+        }
+        dirty = true; //;)
+        //VariableDropdownMenu.editing = false; //just in case (even though i probably won't use this property)
+        //VariableDropdownMenu.selected = undefined;
+    }
+
+    static addVariableDetails() {
+        PropertyMenu.removeOldDetailMenu();
+        PropertyMenu.instance.dropdownMenus.splice(0, 0, new VariableDetailDropdownMenu(PropertyMenu.instance.height/(PropertyMenu.instance.dropdownMenus.length+1))); //oih yheah (+1 since we adding this one)
+        Blueprint.active = undefined;
+    }
+
+    static addFunctionDetails() {
+        PropertyMenu.removeOldDetailMenu();
+        PropertyMenu.instance.dropdownMenus.splice(0, 0, new FunctionDetailDropdownMenu(PropertyMenu.instance.height/(PropertyMenu.instance.dropdownMenus.length+1))); //oih yheah (+1 since we adding this one)
+        VariableDropdownMenu.editing = false;
+        VariableDropdownMenu.selected = undefined;
+    }
+
     constructor() {
         this.dropdownMenus.push(
             //new VariableDetailDropdownMenu(300),
             //new DetailDropdownMenu(300),
-            new VariableDropdownMenu(300),
+            new VariableDropdownMenu(this.height/2),
             //new PropertyDropdownMenu("Details", 300),
             //new PropertyDropdownMenu("Variables", 300, {buttonDown: function(mouse) {
             //    print("make new variable bruh");
@@ -2232,7 +2466,12 @@ function parseCommandList() {
 
         BlueprintMenu.commandList.push({name, desc, parameters, out: [`${out} : ${out}`]});
     }
-    const extension = system("curl -i https://raw.githubusercontent.com/MagicQuest/JBS3Extension/refs/heads/main/src/extension.ts").split("\n"); //well i would use fetch but right now it only works with HTTP bruh
+    let extension = system("curl -i https://raw.githubusercontent.com/MagicQuest/JBS3Extension/refs/heads/main/src/extension.ts").split("\n"); //well i would use fetch but right now it only works with HTTP bruh
+    //print(extension, typeof(extension), !!extension);
+    if(extension.length == 1) {
+        //lol my internet stopped working so im gonna make it read from my disk instead
+        extension = require("fs").read("D:/scripts/vs-extensim/src/extension.ts").split("\n"); //ignore the path's mispelling of extension
+    }
     for(const line of extension) {
         if(line.includes("registerFunc")) {
             try {
@@ -2302,8 +2541,8 @@ function executeBlueprints() {
             for(let i = j; i < source.parameters.length; i++) {
                 const param = source.parameters[i];
                 let val = 0;
-                const cachedData = cache[paneIndex];
-                if(!cachedData?.[i]) { //if cachedData is undefined or (?.) if cachedData[i] is undefined
+                //const cachedData = cache[paneIndex];
+                //if(!cachedData?.[i]) { //if cachedData is undefined or (?.) if cachedData[i] is undefined
                     if(source.connections.in[i]) {
                         const inpin = source.connections.in[i];
                         //if(inpin.source instanceof Blueprint) { //inpin.source could be a primitive value like true or false (nope nevermind i changed it lol)
@@ -2331,15 +2570,16 @@ function executeBlueprints() {
                     //    val = "";
                     //}
 
-                    if(notpure) {
-                        if(!cachedData) {
-                            cache[paneIndex] = {};
-                        }
-                        cache[paneIndex][i] = val;
-                    }
-                }else {
-                    val = cachedData[i];
-                }
+                //    if(notpure) {
+                //        if(!cachedData) {
+                //            cache[paneIndex] = {};
+                //        }
+                //        cache[paneIndex][i] = val;
+                //    }
+                //}else {
+                //    print(`using cached parameter ${i} for ${source.title}`)
+                //    val = cachedData[i];
+                //}
                 args.push(val);
             }
             //return args;
@@ -2362,6 +2602,7 @@ function executeBlueprints() {
                 dirty = true;
             }
         }else {
+            print(`using cache[paneIndex].value for ${source.title} (${paneIndex})`);
             result = cache[paneIndex].value;
         }
         return result;
@@ -2378,7 +2619,7 @@ function executeBlueprints() {
         print(current.title);
         interpretParametersAndExecute(current);
 
-        print(!!next, loopStack.length);
+        print(!!next ? "cont" : "no futher", loopStack.length);
         if(!next && loopStack.length != 0) {
             next = loopStack.at(-1);
             print("loop");
@@ -2556,11 +2797,17 @@ function windowProc(hwnd, msg, wp, lp) {
         SetCapture(hwnd);
         const mouse = {x: GET_X_LPARAM(lp)-camera.x, y: GET_Y_LPARAM(lp)-camera.y}; //lp is client mouse pos
         
-        if(BlueprintMenu.singleton && hit.pane != BlueprintMenu.singleton) {
+        if(BlueprintMenu.singleton && hit.pane != BlueprintMenu.singleton) { //hmmm i might need a custom array for these kinds of modal windows that go away when you click elsewhere
             BlueprintMenu.close();
         }
-        if(activePane != hit.pane) {
-            activePane = undefined;
+        if(DropdownControlMenu.instance && hit.pane != DropdownControlMenu.instance) {
+            DropdownControlMenu.close();
+        }
+        if(Blueprint.active != hit.pane && (hit.pane instanceof Blueprint || hit.pane == undefined)) {
+            if(Blueprint.active && PropertyMenu.instance.dropdownMenus[0] instanceof FunctionDetailDropdownMenu) { //lol
+                PropertyMenu.removeOldDetailMenu();
+            }
+            Blueprint.active = undefined;
         }
 
         if(hit.result) {
@@ -2680,6 +2927,7 @@ function windowProc(hwnd, msg, wp, lp) {
     
             if(receiver) {
                                             //boy this is looking confusing...
+                //oops i might have forgot, make sure you';re not connecting an exec pin to anmything lese
                 activePin.source.connections.out[activePin.i][activePin.id].receiver = receiver; //{i: receiver.data, source: receiver.blueprint};
                 const receiverpin = receiver.source.connections.in[receiver.i]; //{i, source, id}
                 if(receiverpin) { //if A was connected to B and C wants to connect to B, then i tell A that it's no longer connected
@@ -2746,13 +2994,14 @@ function windowProc(hwnd, msg, wp, lp) {
         if(wp == VK_ESCAPE) {
             if(Editable.editing) Editable.endInput();
             if(BlueprintMenu.singleton) BlueprintMenu.close();
+            if(DropdownControlMenu.instance) DropdownControlMenu.close();
         }
         if(Editable.editing && (wp > VK_SPACE || wp <= VK_DELETE)) {
             Editable.modify(wp);
         }
 
-        if(activePane && !Editable.editing) {
-            activePane.keyDown?.(wp);
+        if(Blueprint.active && !Editable.editing) {
+            Blueprint.active.keyDown?.(wp);
         }
     }else if(msg == WM_CHAR) { //WM_CHAR will send the keycode of actual characters (like abc or !@#) but WM_KEYDOWN will send the keycode for every character BUT it won't send characters modified by shift (so if you hit shift+1 it will only send 1 instead of ! like WM_CHAR) also not to mention WM_KEYDOWN sends the capitalized keycode for letters (idk why)
         //so clearly i should've used WM_CHAR in jbstudio3.js

@@ -8390,7 +8390,7 @@ namespace DIRECT2D {
         Local<Context> context = isolate->GetCurrentContext();
         Local<Object> object = DIRECT2D::Templates::_TextLayout->NewInstance(context).ToLocalChecked();
         object->Set(context, LITERAL("internalPtr"), Number::New(isolate, (LONG_PTR)ptr));
-        object->Set(context, LITERAL("text"), text);
+        object->Set(context, LITERAL("text"), text->ToString(context).ToLocalChecked()); //oops this was messing up jbsblueprints.js
         return object;
     }
 
