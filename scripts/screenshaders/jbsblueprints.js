@@ -3,9 +3,12 @@
 
 //add labels for the parameters and outs of this blueprint
 //oops i might have forgot, make sure you';re not connecting an exec pin to anmything lese
-//stop Sleep and SET from being cached !!!
+//let double exec IN pins be possible (unfortunately)
+//stop Sleep and SET from being cached !!! (actually i think if current is the one being interpreted it should be executed every time? also when caching in a loop, store the cached values in loopStack.at(-1) so when it repeats i clear that cache! I think it true that this may be a valid alternative for the cacheable property and this line as a whole. )
 //probably should make a modal class or something like that for BlueprintMenu and DropdownControlMenu
 //then test changing variable types again
+//quite possibly make static functions for managing pin connections because BOY is it confusing
+//also make the shine type thing brighter a little brighter than color
 
 //const rp = print;
 //print = function(...args) {};
@@ -1034,7 +1037,7 @@ class Blueprint {
                     0, Blueprint.captionHeight, this.width, this.height,
                 ),
                 Gradient.LinearGradientBrush(
-                    d2d.CreateGradientStopCollection([0.0, ...color], [0.2, 0.0, 0.0, 0.0, 0.0]),
+                    d2d.CreateGradientStopCollection([0.0, ...(color.map(c => c+.2))], [0.2, 0.0, 0.0, 0.0, 0.0]),
                     2, 2, 2, Blueprint.captionHeight-2, //pointing down
                 ),
             )
@@ -1046,7 +1049,7 @@ class Blueprint {
                     0, 0, 0, this.height,
                 ),
                 Gradient.LinearGradientBrush(
-                    d2d.CreateGradientStopCollection([0.0, ...color], [0.2, 0.0, 0.0, 0.0, 0.0]),
+                    d2d.CreateGradientStopCollection([0.0, ...(color.map(c => c+.2))], [0.2, 0.0, 0.0, 0.0, 0.0]),
                     2, Blueprint.captionHeight-2, 2, (Blueprint.captionHeight*2)-6, //pointing down
                 ),
             );
@@ -2821,7 +2824,7 @@ function windowProc(hwnd, msg, wp, lp) {
             }else if(hit.result == CONTEXTMENU || hit.result == WHEEL) {
                 //no
             }else if(hit.result == DRAG) {
-                if(GetKey(VK_MENU)) {
+                if(GetKey(VK_MENU) && hit.pane instanceof Blueprint) {
                     const anyoutconnections = Object.values(hit.pane.connections.out[hit.data] ?? {});
                     if(anyoutconnections.length) {
                         for(const connection of Object.values(anyoutconnections)) {
@@ -2836,15 +2839,17 @@ function windowProc(hwnd, msg, wp, lp) {
             }else if(hit.result == DROP) {
                 print(hit.data);
 
-                const inpin = hit.pane.connections.in[hit.data]; //{i, source, id}
-                if(inpin) {
-                    if(GetKey(VK_MENU)) {
-                        delete inpin.source.connections.out[inpin.i][inpin.id];
-                        hit.pane.connections.in[hit.data] = undefined;
-                    }else {
-                        const {i, source, id} = inpin;
-                        hit.pane.connections.in[hit.data] = undefined;
-                        Draggable.select(source.preDrag?.(mouse, i, id) ?? source, mouse, false, false);
+                if(hit.pane instanceof Blueprint) {
+                    const inpin = hit.pane.connections.in[hit.data]; //{i, source, id}
+                    if(inpin) {
+                        if(GetKey(VK_MENU)) {
+                            delete inpin.source.connections.out[inpin.i][inpin.id];
+                            hit.pane.connections.in[hit.data] = undefined;
+                        }else {
+                            const {i, source, id} = inpin;
+                            hit.pane.connections.in[hit.data] = undefined;
+                            Draggable.select(source.preDrag?.(mouse, i, id) ?? source, mouse, false, false);
+                        }
                     }
                 }
             }else if(hit.result == TEXT) {

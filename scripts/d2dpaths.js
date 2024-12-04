@@ -181,7 +181,8 @@ function createFunGeometry() { //https://learn.microsoft.com/en-us/windows/win32
     tempSink.Close();
     print(tempSink.Release());
 
-    return {sun: {geometry: sun, color: ColorF.Orange}, leftMountain: {geometry: leftMountain, color: ColorF.OliveDrab}, river: {geometry: river, color: ColorF.LightSkyBlue}, rightMountain: {geometry: rightMountain, color: ColorF.YellowGreen}};
+                                //i changed it so now it's D2D1.ColorF...
+    return {sun: {geometry: sun, color: D2D1.ColorF.Orange}, leftMountain: {geometry: leftMountain, color: D2D1.ColorF.OliveDrab}, river: {geometry: river, color: D2D1.ColorF.LightSkyBlue}, rightMountain: {geometry: rightMountain, color: D2D1.ColorF.YellowGreen}};
 }
 
 function windowProc(hwnd, msg, wp, lp) {
@@ -193,7 +194,6 @@ function windowProc(hwnd, msg, wp, lp) {
         //path = d2d.CreatePathGeometry();
         //sink = path.Open();
         //print(path, sink);
-
         geometries = createFunGeometry();
         
         //sink.SetFillMode(D2D1_FILL_MODE_WINDING);

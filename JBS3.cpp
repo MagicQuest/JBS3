@@ -174,7 +174,9 @@ void Print(const v8::FunctionCallbackInfo<v8::Value>&info);
 
 namespace jsImpl {
     using namespace v8;
-    Local<Object> createWinRect(Isolate* isolate, RECT r) {
+
+    template<class T>
+    Local<Object> createWinRect(Isolate* isolate, T r) {
         Local<Object> jsRect = Object::New(isolate);
 
         jsRect->Set(isolate->GetCurrentContext(), LITERAL("left"), Number::New(isolate, r.left));
@@ -2625,6 +2627,16 @@ namespace DIRECT2D {
         return matrix;
     }
 
+    D2D1_RECT_F fromJSRectF(Isolate* isolate, const Local<Object>& jsRect) {
+        Local<Context> context = isolate->GetCurrentContext();
+        return D2D1::RectF(
+            FloatFI(jsRect->Get(context, LITERAL("left")).ToLocalChecked()),
+            FloatFI(jsRect->Get(context, LITERAL("top")).ToLocalChecked()),
+            FloatFI(jsRect->Get(context, LITERAL("right")).ToLocalChecked()),
+            FloatFI(jsRect->Get(context, LITERAL("bottom")).ToLocalChecked())
+        );
+    }
+
     Local<Object> getColorFImpl(Isolate* isolate, D2D1_COLOR_F color) {
         Local<Object> jsColor = Object::New(isolate);
 
@@ -2683,6 +2695,10 @@ namespace DIRECT2D {
     Local<Object> getSimplifiedGeometrySinkImpl(Isolate* isolate, ID2D1SimplifiedGeometrySink* simplifiedGeoSink);
     Local<Object> getGeometrySinkImpl(Isolate* isolate, ID2D1GeometrySink* geoSink);
     Local<Object> getPathGeometryImpl(Isolate* isolate, ID2D1PathGeometry1* path);
+    Local<Object> getTransformedGeometryImpl(Isolate* isolate, ID2D1TransformedGeometry* transGeometry);
+    Local<Object> getRectangleGeometryImpl(Isolate* isolate, ID2D1RectangleGeometry* rectGeometry);
+    Local<Object> getRoundedRectangleGeometryImpl(Isolate* isolate, ID2D1RoundedRectangleGeometry* roundedRectGeometry);
+    Local<Object> getEllipseGeometryImpl(Isolate* isolate, ID2D1EllipseGeometry* ellipseGeometry);
     Local<Object> getDXGIDebug1Impl(Isolate* isolate, IDXGIDebug1* dbg);
     Local<Object> getID2D1EffectImpl(Isolate* isolate, ID2D1Effect* effect);
     Local<Object> getCanvasD2D(Isolate* isolate, Direct2D* d2d);
@@ -2728,6 +2744,10 @@ namespace DIRECT2D {
         Local<ObjectTemplate> _ID2D1SimplifiedGeometrySink;
         Local<ObjectTemplate> _ID2D1GeometrySink;
         Local<ObjectTemplate> _ID2D1PathGeometry1;
+        Local<ObjectTemplate> _ID2D1TransformedGeometry;
+        Local<ObjectTemplate> _ID2D1RectangleGeometry;
+        Local<ObjectTemplate> _ID2D1RoundedRectangleGeometry;
+        Local<ObjectTemplate> _ID2D1EllipseGeometry;
         Local<ObjectTemplate> _IDXGIDebug1;
 
         Local<ObjectTemplate> _ID2D1Effect;
@@ -2736,6 +2756,7 @@ namespace DIRECT2D {
         Local<ObjectTemplate> _2DRenderingContext;
         Local<ObjectTemplate> _GLContext;
         Local<ObjectTemplate> _WICHelper;
+
 
         Local<ObjectTemplate> createIUnknownImpl(Isolate* isolate) {
             Local<ObjectTemplate> jsGenericIU = ObjectTemplate::New(isolate);
@@ -2873,7 +2894,7 @@ namespace DIRECT2D {
                 Isolate* isolate = info.GetIsolate();
                 IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
                 DWRITE_TRIMMING trimmingOptions;
-                font->GetTrimming(&trimmingOptions, NULL);
+                RetIfFailed(font->GetTrimming(&trimmingOptions, NULL), "GetTrimming failed? (IDWriteTextFormat)");
 
                 Local<Object> jsTrimmingOpt = Object::New(isolate);
 
@@ -4615,13 +4636,14 @@ namespace DIRECT2D {
                 Local<Context> context = isolate->GetCurrentContext();
                 ID2D1Geometry* geo = (ID2D1Geometry*)IntegerFI(info.This()->GetRealNamedProperty(context, LITERAL("internalPtr")).ToLocalChecked());
                 D2D1_RECT_F rectf{};
-                D2D1_MATRIX_3X2_F* trans = nullptr;
+                D2D1_MATRIX_3X2_F trans = D2D1::IdentityMatrix();
                 //if (info[0]->IsNumber()) { //assuming it's 0 so null
                 //    //trans = (D2D1_MATRIX_3X2_F*)IntegerFI(info[0]);
                 //}
                 //else if (info[0]->IsObject()) {
                 if (!info[0]->IsNumber() && info[0]->IsObject()) {
-                    trans = new D2D1_MATRIX_3X2_F(DIRECT2D::fromJSMatrix3x2(isolate, info[0].As<Object>()));
+                    //trans = new D2D1_MATRIX_3X2_F(DIRECT2D::fromJSMatrix3x2(isolate, info[0].As<Object>()));
+                    trans = DIRECT2D::fromJSMatrix3x2(isolate, info[0].As<Object>());
                 }
                 RetIfFailed(geo->GetBounds(trans, &rectf), "ID2D1Geometry->GetBounds failed");
                 Local<Object> mango = Object::New(isolate);
@@ -4630,22 +4652,23 @@ namespace DIRECT2D {
                 mango->Set(context, LITERAL("right"), Number::New(isolate, rectf.right));
                 mango->Set(context, LITERAL("bottom"), Number::New(isolate, rectf.bottom));
                 info.GetReturnValue().Set(mango);
-                if (trans != nullptr) {
-                    delete trans;
-                }
+                //if (trans != nullptr) {
+                //    delete trans;
+                //}
             }));
             jsG->Set(isolate, "GetWidenedBounds", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
                 Isolate* isolate = info.GetIsolate();
                 Local<Context> context = isolate->GetCurrentContext();
                 ID2D1Geometry* geo = (ID2D1Geometry*)IntegerFI(info.This()->GetRealNamedProperty(context, LITERAL("internalPtr")).ToLocalChecked());
                 D2D1_RECT_F rectf{};
-                D2D1_MATRIX_3X2_F* trans = nullptr;
+                D2D1_MATRIX_3X2_F trans = D2D1::IdentityMatrix();
                 //if (info[0]->IsNumber()) { //assuming it's 0 so null
                     //trans = (D2D1_MATRIX_3X2_F*)IntegerFI(info[0]);
                 //}
                 //else if (info[0]->IsObject()) {
                 if (!info[0]->IsNumber() && info[0]->IsObject()) {
-                    trans = new D2D1_MATRIX_3X2_F(DIRECT2D::fromJSMatrix3x2(isolate, info[0].As<Object>()));
+                    //trans = new D2D1_MATRIX_3X2_F(DIRECT2D::fromJSMatrix3x2(isolate, info[0].As<Object>()));
+                    trans = DIRECT2D::fromJSMatrix3x2(isolate, info[0].As<Object>());
                 }
                 ID2D1StrokeStyle* strokeStyle = NULL;
                 if (!info[1]->IsNumber() && info[1]->IsObject()) {
@@ -4658,148 +4681,157 @@ namespace DIRECT2D {
                 mango->Set(context, LITERAL("right"), Number::New(isolate, rectf.right));
                 mango->Set(context, LITERAL("bottom"), Number::New(isolate, rectf.bottom));
                 info.GetReturnValue().Set(mango);
-                if (trans != nullptr) {
-                    delete trans;
-                }
+                //if (trans != nullptr) {
+                //    delete trans;
+                //}
             }));
             jsG->Set(isolate, "StrokeContainsPoint", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
                 Isolate* isolate = info.GetIsolate();
                 ID2D1Geometry* geo = (ID2D1Geometry*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
                 ID2D1StrokeStyle* strokeStyle = NULL;
-                D2D1_MATRIX_3X2_F* trans = nullptr;
+                D2D1_MATRIX_3X2_F trans = D2D1::IdentityMatrix();
                 if (!info[3]->IsNumber() && info[3]->IsObject()) {
                     strokeStyle = (ID2D1StrokeStyle*)IntegerFI(info[3].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()); //(ID2D1StrokeStyle*)IntegerFI(info[6]);
                 }
                 if (!info[4]->IsNumber() && info[4]->IsObject()) {
-                    trans = new D2D1_MATRIX_3X2_F(DIRECT2D::fromJSMatrix3x2(isolate, info[0].As<Object>()));
+                    //trans = new D2D1_MATRIX_3X2_F(DIRECT2D::fromJSMatrix3x2(isolate, info[0].As<Object>()));
+                    trans = DIRECT2D::fromJSMatrix3x2(isolate, info[4].As<Object>());
                 }
                 BOOL contains = 0;
                 ContIfFailed(geo->StrokeContainsPoint(D2D1::Point2F(FloatFI(info[0]), FloatFI(info[1])), FloatFI(info[2]), strokeStyle, trans, &contains), "StrokeContainsPoint failed..");
                 info.GetReturnValue().Set(Number::New(isolate, contains));
-                if (trans != nullptr) {
-                    delete trans;
-                }
+                //if (trans != nullptr) {
+                //    delete trans;
+                //}
             }));
             jsG->Set(isolate, "FillContainsPoint", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
                 Isolate* isolate = info.GetIsolate();
                 ID2D1Geometry* geo = (ID2D1Geometry*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
-                D2D1_MATRIX_3X2_F* trans = nullptr;
+                D2D1_MATRIX_3X2_F trans = D2D1::IdentityMatrix();
                 if (!info[2]->IsNumber() && info[2]->IsObject()) {
-                    trans = new D2D1_MATRIX_3X2_F(DIRECT2D::fromJSMatrix3x2(isolate, info[2].As<Object>()));
+                    //trans = new D2D1_MATRIX_3X2_F(DIRECT2D::fromJSMatrix3x2(isolate, info[2].As<Object>()));
+                    trans = DIRECT2D::fromJSMatrix3x2(isolate, info[2].As<Object>());
                 }
                 BOOL contains = 0;
                 ContIfFailed(geo->FillContainsPoint(D2D1::Point2F(FloatFI(info[0]), FloatFI(info[1])), trans, &contains), "FillContainsPoint failed...");
                 info.GetReturnValue().Set(Number::New(isolate, contains));
-                if (trans != nullptr) {
-                    delete trans;
-                }
+                //if (trans != nullptr) {
+                //    delete trans;
+                //}
             }));
             jsG->Set(isolate, "CompareWithGeometry", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
                 Isolate* isolate = info.GetIsolate();
                 ID2D1Geometry* geo = (ID2D1Geometry*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
                 ID2D1Geometry* otherGeo = (ID2D1Geometry*)IntegerFI(info[0].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
-                D2D1_MATRIX_3X2_F* trans = nullptr;
+                D2D1_MATRIX_3X2_F trans = D2D1::IdentityMatrix();
                 if (!info[1]->IsNumber() && info[1]->IsObject()) {
-                    trans = new D2D1_MATRIX_3X2_F(DIRECT2D::fromJSMatrix3x2(isolate, info[2].As<Object>()));
+                    //trans = new D2D1_MATRIX_3X2_F(DIRECT2D::fromJSMatrix3x2(isolate, info[2].As<Object>()));
+                    trans = DIRECT2D::fromJSMatrix3x2(isolate, info[1].As<Object>());
                 }
                 D2D1_GEOMETRY_RELATION relation;
                 ContIfFailed(geo->CompareWithGeometry(otherGeo, trans, &relation), "CompareWithGeometry failed (amybe you forgot to pass a simplified geo sink object )");
                 info.GetReturnValue().Set(Number::New(isolate, relation));
-                if (trans != nullptr) {
-                    delete trans;
-                }
+                //if (trans != nullptr) {
+                //    delete trans;
+                //}
             }));
             jsG->Set(isolate, "Simplify", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
                 Isolate* isolate = info.GetIsolate();
                 ID2D1Geometry* geo = (ID2D1Geometry*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
-                D2D1_MATRIX_3X2_F* trans = nullptr;
+                D2D1_MATRIX_3X2_F trans = D2D1::IdentityMatrix();
                 if (!info[1]->IsNumber() && info[1]->IsObject()) {
-                    trans = new D2D1_MATRIX_3X2_F(DIRECT2D::fromJSMatrix3x2(isolate, info[1].As<Object>()));
+                    //trans = new D2D1_MATRIX_3X2_F(DIRECT2D::fromJSMatrix3x2(isolate, info[1].As<Object>()));
+                    trans = DIRECT2D::fromJSMatrix3x2(isolate, info[1].As<Object>());
                 }
                 ID2D1SimplifiedGeometrySink* simplifiedGeoSink = (ID2D1SimplifiedGeometrySink*)IntegerFI(info[2].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
                 //if (!info[2]->IsNumber() && info[2]->IsObject()) {
                 //    simplifiedGeoSink = (ID2D1SimplifiedGeometrySink*)IntegerFI(info[2].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
                 //}
                 ContIfFailed(geo->Simplify((D2D1_GEOMETRY_SIMPLIFICATION_OPTION)IntegerFI(info[0]), trans, simplifiedGeoSink), "Simplify failed (perhaps you forgot to create and pass a simplified geometry sink object? lowk i idk)");
-                if (trans != nullptr) {
-                    delete trans;
-                }
+                //if (trans != nullptr) {
+                //    delete trans;
+                //}
             }));
             jsG->Set(isolate, "Tessellate", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
                 Isolate* isolate = info.GetIsolate();
                 ID2D1Geometry* geo = (ID2D1Geometry*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
-                D2D1_MATRIX_3X2_F* trans = nullptr;
+                D2D1_MATRIX_3X2_F trans = D2D1::IdentityMatrix();
                 if (!info[0]->IsNumber() && info[0]->IsObject()) {
-                    trans = new D2D1_MATRIX_3X2_F(DIRECT2D::fromJSMatrix3x2(isolate, info[0].As<Object>()));
+                    //trans = new D2D1_MATRIX_3X2_F(DIRECT2D::fromJSMatrix3x2(isolate, info[0].As<Object>()));
+                    trans = DIRECT2D::fromJSMatrix3x2(isolate, info[0].As<Object>());
                 }
                 ID2D1TessellationSink* tesselationSink = (ID2D1TessellationSink*)IntegerFI(info[1].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
                 ContIfFailed(geo->Tessellate(trans, tesselationSink), "Tessellate failed...");
-                if (trans != nullptr) {
-                    delete trans;
-                }
+                //if (trans != nullptr) {
+                //    delete trans;
+                //}
             }));
             jsG->Set(isolate, "CombineWithGeometry", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
                 Isolate* isolate = info.GetIsolate();
                 ID2D1Geometry* geo = (ID2D1Geometry*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
                 ID2D1Geometry* otherGeo = (ID2D1Geometry*)IntegerFI(info[0].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
-                D2D1_MATRIX_3X2_F* trans = nullptr;
+                D2D1_MATRIX_3X2_F trans = D2D1::IdentityMatrix();
                 if (!info[2]->IsNumber() && info[2]->IsObject()) {
-                    trans = new D2D1_MATRIX_3X2_F(DIRECT2D::fromJSMatrix3x2(isolate, info[2].As<Object>()));
+                    //trans = new D2D1_MATRIX_3X2_F(DIRECT2D::fromJSMatrix3x2(isolate, info[2].As<Object>()));
+                    trans = DIRECT2D::fromJSMatrix3x2(isolate, info[2].As<Object>());
                 }
                 ID2D1SimplifiedGeometrySink* simplifiedGeoSink = (ID2D1SimplifiedGeometrySink*)IntegerFI(info[3].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
                 ContIfFailed(geo->CombineWithGeometry(otherGeo, (D2D1_COMBINE_MODE)IntegerFI(info[1]), trans, simplifiedGeoSink), "CombineWithGeometry failed (amybe you forgot to pass a simplified geo sink object )");
-                if (trans != nullptr) {
-                    delete trans;
-                }
+                //if (trans != nullptr) {
+                //    delete trans;
+                //}
             }));
             jsG->Set(isolate, "Outline", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
                 Isolate* isolate = info.GetIsolate();
                 ID2D1Geometry* geo = (ID2D1Geometry*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
-                D2D1_MATRIX_3X2_F* trans = nullptr;
+                D2D1_MATRIX_3X2_F trans = D2D1::IdentityMatrix();
                 if (!info[0]->IsNumber() && info[0]->IsObject()) {
-                    trans = new D2D1_MATRIX_3X2_F(DIRECT2D::fromJSMatrix3x2(isolate, info[0].As<Object>()));
+                    //trans = new D2D1_MATRIX_3X2_F(DIRECT2D::fromJSMatrix3x2(isolate, info[0].As<Object>()));
+                    trans = DIRECT2D::fromJSMatrix3x2(isolate, info[0].As<Object>());
                 }
                 ID2D1SimplifiedGeometrySink* simplifiedGeoSink = (ID2D1SimplifiedGeometrySink*)IntegerFI(info[1].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
                 ContIfFailed(geo->Outline(trans, simplifiedGeoSink), "Outline failed");
-                if (trans != nullptr) {
-                    delete trans;
-                }
+                //if (trans != nullptr) {
+                //    delete trans;
+                //}
             }));
             jsG->Set(isolate, "ComputeArea", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
                 Isolate* isolate = info.GetIsolate();
                 ID2D1Geometry* geo = (ID2D1Geometry*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
-                D2D1_MATRIX_3X2_F* trans = nullptr;
+                D2D1_MATRIX_3X2_F trans = D2D1::IdentityMatrix();
                 if (!info[0]->IsNumber() && info[0]->IsObject()) {
-                    trans = new D2D1_MATRIX_3X2_F(DIRECT2D::fromJSMatrix3x2(isolate, info[0].As<Object>()));
+                    //trans = new D2D1_MATRIX_3X2_F(DIRECT2D::fromJSMatrix3x2(isolate, info[0].As<Object>()));
+                    trans = DIRECT2D::fromJSMatrix3x2(isolate, info[0].As<Object>());
                 }
                 FLOAT area = 0.0f;
                 ContIfFailed(geo->ComputeArea(trans, &area), "ComputeArea failedf");
                 info.GetReturnValue().Set(Number::New(isolate, area));
-                if (trans != nullptr) {
-                    delete trans;
-                }
+                //if (trans != nullptr) {
+                //    delete trans;
+                //}
             }));
             jsG->Set(isolate, "ComputeLength", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
                 Isolate* isolate = info.GetIsolate();
                 ID2D1Geometry* geo = (ID2D1Geometry*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
-                D2D1_MATRIX_3X2_F* trans = nullptr;
+                D2D1_MATRIX_3X2_F trans = D2D1::IdentityMatrix();
                 if (!info[0]->IsNumber() && info[0]->IsObject()) {
-                    trans = new D2D1_MATRIX_3X2_F(DIRECT2D::fromJSMatrix3x2(isolate, info[0].As<Object>()));
+                    //trans = new D2D1_MATRIX_3X2_F(DIRECT2D::fromJSMatrix3x2(isolate, info[0].As<Object>()));
                 }
                 FLOAT length = 0.0f;
                 ContIfFailed(geo->ComputeLength(trans, &length), "ComputeLength failedf");
                 info.GetReturnValue().Set(Number::New(isolate, length));
-                if (trans != nullptr) {
-                    delete trans;
-                }
+                //if (trans != nullptr) {
+                //    delete trans;
+                //}
             }));
             jsG->Set(isolate, "ComputePointAtLength", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
                 Isolate* isolate = info.GetIsolate();
                 Local<Context> context = isolate->GetCurrentContext();
                 ID2D1Geometry* geo = (ID2D1Geometry*)IntegerFI(info.This()->GetRealNamedProperty(context, LITERAL("internalPtr")).ToLocalChecked());
-                D2D1_MATRIX_3X2_F* trans = nullptr;
+                D2D1_MATRIX_3X2_F trans = D2D1::IdentityMatrix();
                 if (!info[1]->IsNumber() && info[1]->IsObject()) {
-                    trans = new D2D1_MATRIX_3X2_F(DIRECT2D::fromJSMatrix3x2(isolate, info[1].As<Object>()));
+                    //trans = new D2D1_MATRIX_3X2_F(DIRECT2D::fromJSMatrix3x2(isolate, info[1].As<Object>()));
+                    trans = DIRECT2D::fromJSMatrix3x2(isolate, info[1].As<Object>());
                 }
                 D2D1_POINT_2F p2f{};
                 D2D1_POINT_2F tv{};
@@ -4808,29 +4840,30 @@ namespace DIRECT2D {
                 jsInfo->Set(context, LITERAL("point"), DIRECT2D::getPoint2FImpl(isolate, p2f));
                 jsInfo->Set(context, LITERAL("unitTangentVector"), DIRECT2D::getPoint2FImpl(isolate, tv));
                 info.GetReturnValue().Set(jsInfo);
-                if (trans != nullptr) {
-                    delete trans;
-                }
+                //if (trans != nullptr) {
+                //    delete trans;
+                //}
             }));
             jsG->Set(isolate, "Widen", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
                 Isolate* isolate = info.GetIsolate();
                 ID2D1Geometry* geo = (ID2D1Geometry*)IntegerFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
                 ID2D1StrokeStyle* strokeStyle = NULL;
-                D2D1_MATRIX_3X2_F* trans = nullptr;
+                D2D1_MATRIX_3X2_F trans = D2D1::IdentityMatrix();
                 if (!info[1]->IsNumber() && info[1]->IsObject()) {
                     strokeStyle = (ID2D1StrokeStyle*)IntegerFI(info[1].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()); //(ID2D1StrokeStyle*)IntegerFI(info[6]);
                 }
                 if (!info[2]->IsNumber() && info[2]->IsObject()) {
-                    trans = new D2D1_MATRIX_3X2_F(DIRECT2D::fromJSMatrix3x2(isolate, info[2].As<Object>()));
+                    //trans = new D2D1_MATRIX_3X2_F(DIRECT2D::fromJSMatrix3x2(isolate, info[2].As<Object>()));
+                    trans = DIRECT2D::fromJSMatrix3x2(isolate, info[2].As<Object>());
                 }
                 ID2D1SimplifiedGeometrySink* simplifiedGeoSink = (ID2D1SimplifiedGeometrySink*)IntegerFI(info[3].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
                 //if (!info[2]->IsNumber() && info[2]->IsObject()) {
                 //    simplifiedGeoSink = (ID2D1SimplifiedGeometrySink*)IntegerFI(info[2].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
                 //}
                 ContIfFailed(geo->Widen(FloatFI(info[0]), strokeStyle, trans, simplifiedGeoSink), "Widen failed (perhaps you forgot to create and pass a simplified geometry sink object? lowk i idk)");
-                if (trans != nullptr) {
-                    delete trans;
-                }
+                //if (trans != nullptr) {
+                //    delete trans;
+                //}
             }));
             return jsG;
         }
@@ -5096,6 +5129,82 @@ namespace DIRECT2D {
                 info.GetReturnValue().Set(Number::New(isolate, count));
             }));
             return jsPG;//->NewInstance(isolate->GetCurrentContext()).ToLocalChecked();
+        }
+
+        Local<ObjectTemplate> createTransformedGeometry(Isolate* isolate) {
+            Local<ObjectTemplate> jsTransGeometry = createGeometryImpl(isolate);
+            jsTransGeometry->Set(isolate, "GetTransform", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1TransformedGeometry* transGeometry = (ID2D1TransformedGeometry*)IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+                //DXCORE_ERROR_EVENT_NOT_UNREGISTERED
+                D2D1_MATRIX_3X2_F transform;
+                transGeometry->GetTransform(&transform);
+
+                info.GetReturnValue().Set(DIRECT2D::getMatrix3x2FImpl(isolate, transform));
+            }));
+            jsTransGeometry->Set(isolate, "GetSourceGeometry", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1TransformedGeometry* transGeometry = (ID2D1TransformedGeometry*)IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+                ID2D1Geometry* source;
+                transGeometry->GetSourceGeometry(&source);
+                
+                info.GetReturnValue().Set(DIRECT2D::getGeometryImpl(isolate, source));
+            }));
+            return jsTransGeometry;
+        }
+
+        Local<ObjectTemplate> createRectangleGeometry(Isolate* isolate) {
+            Local<ObjectTemplate> jsRectGeometry = createGeometryImpl(isolate);
+            jsRectGeometry->Set(isolate, "GetRect", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                ID2D1RectangleGeometry* rectGeometry = (ID2D1RectangleGeometry*)IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+
+                D2D1_RECT_F rect;
+                rectGeometry->GetRect(&rect);
+
+                info.GetReturnValue().Set(jsImpl::createWinRect(isolate, rect));
+            }));
+            return jsRectGeometry;
+        }
+
+        Local<ObjectTemplate> createRoundedRectangleGeometry(Isolate* isolate) {
+            Local<ObjectTemplate> jsRoundedRectGeometry = createGeometryImpl(isolate);
+            jsRoundedRectGeometry->Set(isolate, "GetRoundedRect", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                Local<Context> context = isolate->GetCurrentContext();
+                ID2D1RoundedRectangleGeometry* roundedRectGeometry = (ID2D1RoundedRectangleGeometry*)IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+
+                D2D1_ROUNDED_RECT roundedRect;
+                roundedRectGeometry->GetRoundedRect(&roundedRect);
+
+                Local<Object> jsRoundedRect = Object::New(isolate);
+                jsRoundedRect->Set(context, LITERAL("rect"), jsImpl::createWinRect(isolate, roundedRect.rect));
+                jsRoundedRect->Set(context, LITERAL("radiusX"), Number::New(isolate, roundedRect.radiusX));
+                jsRoundedRect->Set(context, LITERAL("radiusY"), Number::New(isolate, roundedRect.radiusY));
+
+                info.GetReturnValue().Set(jsRoundedRect);
+            }));
+            return jsRoundedRectGeometry;
+        }
+
+        Local<ObjectTemplate> createEllipseGeometry(Isolate* isolate) {
+            Local<ObjectTemplate> jsEllipseGeometry = createGeometryImpl(isolate);
+            jsEllipseGeometry->Set(isolate, "GetEllipse", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                Local<Context> context = isolate->GetCurrentContext();
+                ID2D1EllipseGeometry* ellipseGeometry = (ID2D1EllipseGeometry*)IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+
+                D2D1_ELLIPSE ellipse;
+                ellipseGeometry->GetEllipse(&ellipse);
+
+                Local<Object> jsEllipseGeometry = Object::New(isolate);
+                jsEllipseGeometry->Set(context, LITERAL("point"), jsImpl::createWinPoint(isolate, ellipse.point));
+                jsEllipseGeometry->Set(context, LITERAL("radiusX"), Number::New(isolate, ellipse.radiusX));
+                jsEllipseGeometry->Set(context, LITERAL("radiusY"), Number::New(isolate, ellipse.radiusY));
+
+                info.GetReturnValue().Set(jsEllipseGeometry);
+            }));
+            return jsEllipseGeometry;
         }
 
         Local<ObjectTemplate> createDXGIDebug1Impl(Isolate* isolate) {
@@ -6173,6 +6282,193 @@ namespace DIRECT2D {
                 Local<Object> jsBrush = DIRECT2D::getID2D1SolidColorBrushImpl(isolate, newBrush);
 
                 info.GetReturnValue().Set(jsBrush); //->NewInstance(isolate->GetCurrentContext()).ToLocalChecked());
+            }));
+            context->Set(isolate, "GetMetricsForText", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                Local<Context> context = isolate->GetCurrentContext();
+                Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(context, LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(context).FromJust();
+
+                IDWriteTextFormat* textFormat = (IDWriteTextFormat*)info[1].As<Object>()->GetRealNamedProperty(context, LITERAL("internalPtr")).ToLocalChecked()->IntegerValue(context).FromJust();
+                IDWriteTextLayout* layout;
+
+                RetPrintIfFailed(d2d->textfactory->CreateTextLayout(WStringFI(info[0]), wcslen(WStringFI(info[0])), textFormat, FloatFI(info[2]), FloatFI(info[3]), &layout), "CreateTextLayout failed for GetMetricsForText");
+                
+                DWRITE_TEXT_METRICS textMetrics{ 0 };
+
+                RetPrintIfFailed(layout->GetMetrics(&textMetrics), "GetMetrics failed for GetMetricsForText");
+
+                Local<Object> jsMetrics = Object::New(isolate);
+
+                jsMetrics->Set(context, LITERAL("left"), Number::New(isolate, textMetrics.left));
+                jsMetrics->Set(context, LITERAL("top"), Number::New(isolate, textMetrics.top));
+                jsMetrics->Set(context, LITERAL("width"), Number::New(isolate, textMetrics.width));
+                jsMetrics->Set(context, LITERAL("widthIncludingTrailingWhitespace"), Number::New(isolate, textMetrics.widthIncludingTrailingWhitespace));
+                jsMetrics->Set(context, LITERAL("height"), Number::New(isolate, textMetrics.height));
+                jsMetrics->Set(context, LITERAL("layoutWidth"), Number::New(isolate, textMetrics.layoutWidth));
+                jsMetrics->Set(context, LITERAL("layoutHeight"), Number::New(isolate, textMetrics.layoutHeight));
+                jsMetrics->Set(context, LITERAL("maxBidiReorderingDepth"), Number::New(isolate, textMetrics.maxBidiReorderingDepth));
+                jsMetrics->Set(context, LITERAL("lineCount"), Number::New(isolate, textMetrics.lineCount));
+
+                layout->Release();
+
+                info.GetReturnValue().Set(jsMetrics);
+            }));
+            context->Set(isolate, "CreateTransformedGeometry", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                ID2D1Geometry* sourceGeometry = (ID2D1Geometry*)IntegerFI(info[0].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+                D2D1_MATRIX_3X2_F transform = D2D1::IdentityMatrix();
+                ID2D1TransformedGeometry* transGeometry;
+                if (!info[1]->IsNumber() && info[1]->IsObject()) {
+                    transform = DIRECT2D::fromJSMatrix3x2(isolate, info[1].As<Object>());
+                }
+                RetPrintIfFailed(d2d->factory->CreateTransformedGeometry(sourceGeometry, transform, &transGeometry), "CreateTransformedGeometry failed...");
+                info.GetReturnValue().Set(DIRECT2D::getTransformedGeometryImpl(isolate, transGeometry));
+            }));
+            context->Set(isolate, "CreateRectangleGeometry", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                Local<Context> context = isolate->GetCurrentContext();
+                Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(context, LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(context).FromJust();
+
+                ID2D1RectangleGeometry* rectGeometry;
+
+                D2D1_RECT_F rect;
+
+                if (info.Length() == 1) {
+                    //lets assume they passed in an object like InfiniteRect
+                    Local<Object> jsRectF = info[0].As<Object>();
+                    rect = D2D1::RectF(
+                        FloatFI(jsRectF->Get(context, LITERAL("left")).ToLocalChecked()),
+                        FloatFI(jsRectF->Get(context, LITERAL("top")).ToLocalChecked()),
+                        FloatFI(jsRectF->Get(context, LITERAL("right")).ToLocalChecked()),
+                        FloatFI(jsRectF->Get(context, LITERAL("bottom")).ToLocalChecked())
+                    );
+                }
+                else {
+                    rect = D2D1::RectF(FloatFI(info[0]), FloatFI(info[1]), FloatFI(info[2]), FloatFI(info[3]));
+                }
+                RetPrintIfFailed(d2d->factory->CreateRectangleGeometry(rect, &rectGeometry), "CreateRectangleGeometry failed...");
+                
+                info.GetReturnValue().Set(DIRECT2D::getRectangleGeometryImpl(isolate, rectGeometry));
+            }));
+            context->Set(isolate, "CreateRoundedRectangleGeometry", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                Local<Context> context = isolate->GetCurrentContext();
+                Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(context, LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(context).FromJust();
+
+                ID2D1RoundedRectangleGeometry* roundedRectGeometry;
+
+                D2D1_ROUNDED_RECT rect;
+
+                if (info.Length() == 1) {
+                    //lets assume they passed in an object like InfiniteRect
+                    Local<Object> jsRoundedRect = info[0].As<Object>();
+                    Local<Object> jsRectF = jsRoundedRect->Get(context, LITERAL("rect")).ToLocalChecked().As<Object>();
+                    rect = D2D1::RoundedRect(
+                        D2D1::RectF(
+                            FloatFI(jsRectF->Get(context, LITERAL("left")).ToLocalChecked()),
+                            FloatFI(jsRectF->Get(context, LITERAL("top")).ToLocalChecked()),
+                            FloatFI(jsRectF->Get(context, LITERAL("right")).ToLocalChecked()),
+                            FloatFI(jsRectF->Get(context, LITERAL("bottom")).ToLocalChecked())
+                        ),
+                        FloatFI(jsRoundedRect->Get(context, LITERAL("radiusX")).ToLocalChecked()),
+                        FloatFI(jsRoundedRect->Get(context, LITERAL("radiusY")).ToLocalChecked())
+                    );
+                }
+                else {
+                    rect = D2D1::RoundedRect(D2D1::RectF(FloatFI(info[0]), FloatFI(info[1]), FloatFI(info[2]), FloatFI(info[3])), FloatFI(info[4]), FloatFI(info[5]));
+                }
+                RetPrintIfFailed(d2d->factory->CreateRoundedRectangleGeometry(rect, &roundedRectGeometry), "CreateRoundedRectangleGeometry failed...");
+                
+                info.GetReturnValue().Set(DIRECT2D::getRoundedRectangleGeometryImpl(isolate, roundedRectGeometry));
+            }));
+            context->Set(isolate, "CreateEllipseGeometry", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                Local<Context> context = isolate->GetCurrentContext();
+                Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(context, LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(context).FromJust();
+
+                ID2D1EllipseGeometry* ellipseGeometry;
+
+                D2D1_ELLIPSE ellipse;
+
+                if (info.Length() == 1) {
+                    //lets assume they passed in an object like InfiniteRect
+                    Local<Object> jsEllipse = info[0].As<Object>();
+                    Local<Object> jsPoint = jsEllipse->Get(context, LITERAL("point")).ToLocalChecked().As<Object>();
+                    ellipse = D2D1::Ellipse(
+                        D2D1::Point2F(
+                            FloatFI(jsPoint->Get(context, LITERAL("x")).ToLocalChecked()),
+                            FloatFI(jsPoint->Get(context, LITERAL("y")).ToLocalChecked())
+                        ),
+                        FloatFI(jsEllipse->Get(context, LITERAL("radiusX")).ToLocalChecked()),
+                        FloatFI(jsEllipse->Get(context, LITERAL("radiusY")).ToLocalChecked())
+                    );
+                }
+                else {
+                    ellipse = D2D1::Ellipse(D2D1::Point2F(FloatFI(info[0]), FloatFI(info[1])), FloatFI(info[2]), FloatFI(info[3]));
+                }
+                RetPrintIfFailed(d2d->factory->CreateEllipseGeometry(ellipse, &ellipseGeometry), "CreateEllipseGeometry failed...");
+                
+                info.GetReturnValue().Set(DIRECT2D::getEllipseGeometryImpl(isolate, ellipseGeometry));
+            }));
+            context->Set(isolate, "CreateLayer", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                ID2D1Layer* layer;
+                if (info.Length() != 0) {
+                    D2D1_SIZE_F size = D2D1::SizeF(FloatFI(info[0]), FloatFI(info[1]));
+                    RetPrintIfFailed(d2d->renderTarget->CreateLayer(size, &layer), "renderTarget->CreateLayer failed");
+                }
+                else {
+                    RetPrintIfFailed(d2d->renderTarget->CreateLayer(&layer), "renderTarget->CreateLayer failed");
+                }
+
+                info.GetReturnValue().Set(DIRECT2D::getIUnknownImpl(isolate, layer)); //da,mn layer don't got nothing in it
+            }));
+            context->Set(isolate, "PushLayer", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                Local<Context> context = isolate->GetCurrentContext();
+                Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(context, LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(context).FromJust();
+
+                ID2D1Layer* layer = NULL;
+
+                D2D1_LAYER_PARAMETERS parameters{};
+                if (info[0]->IsObject()) {
+                    Local<Object> jsLP = info[0].As<Object>();
+                    Local<Value> jsContentBounds = jsLP->Get(context, LITERAL("contentBounds")).ToLocalChecked();
+                    D2D1_RECT_F contentBounds{};
+                    if (jsContentBounds->IsObject()) {
+                        contentBounds = DIRECT2D::fromJSRectF(isolate, jsContentBounds.As<Object>());
+                    }
+                    Local<Value> jsMaskTransform = jsLP->Get(context, LITERAL("maskTransform")).ToLocalChecked();
+                    D2D1_MATRIX_3X2_F maskTransform = D2D1::IdentityMatrix();
+                    if (jsMaskTransform->IsObject()) {
+                        maskTransform = DIRECT2D::fromJSMatrix3x2(isolate, jsMaskTransform.As<Object>());
+                    }
+                    parameters = D2D1::LayerParameters(
+                        contentBounds,
+                        (ID2D1Geometry*)IntegerFI(jsLP->Get(context, LITERAL("geometricMask")).ToLocalChecked()),
+                        (D2D1_ANTIALIAS_MODE)IntegerFI(jsLP->Get(context, LITERAL("maskAntialiasMode")).ToLocalChecked()),
+                        maskTransform,
+                        (FLOAT)FloatFI(jsLP->Get(context, LITERAL("opacity")).ToLocalChecked()),
+                        (ID2D1Brush*)IntegerFI(jsLP->Get(context, LITERAL("opacityBrush")).ToLocalChecked()),
+                        (D2D1_LAYER_OPTIONS)IntegerFI(jsLP->Get(context, LITERAL("layerOptions")).ToLocalChecked())
+                    );
+                }
+                if (info[1]->IsObject()) {
+                    layer = (ID2D1Layer*)IntegerFI(info[1].As<Object>()->Get(context, LITERAL("internalPtr")).ToLocalChecked());
+                }
+
+                d2d->renderTarget->PushLayer(parameters, layer);
+            }));
+            context->Set(isolate, "PopLayer", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                Local<Context> context = isolate->GetCurrentContext();
+                Direct2D* d2d = (Direct2D*)info.This()->GetRealNamedProperty(context, LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(context).FromJust();
+                
+                d2d->renderTarget->PopLayer();
             }));
             context->Set(isolate, "DXGIGetDebugInterface1", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
                 Isolate* isolate = info.GetIsolate();
@@ -8358,6 +8654,10 @@ namespace DIRECT2D {
             _ID2D1SimplifiedGeometrySink = createSimplifiedGeometrySinkImpl(isolate);
             _ID2D1GeometrySink = createGeometrySinkImpl(isolate);
             _ID2D1PathGeometry1 = createPathGeometryImpl(isolate);
+            _ID2D1TransformedGeometry = createTransformedGeometry(isolate);
+            _ID2D1RectangleGeometry = createRectangleGeometry(isolate);
+            _ID2D1RoundedRectangleGeometry = createRoundedRectangleGeometry(isolate);
+            _ID2D1EllipseGeometry = createEllipseGeometry(isolate);
             _IDXGIDebug1 = createDXGIDebug1Impl(isolate);
 
             _ID2D1Effect = HandleMyGoofyD2D1EffectsInMyNewTemplatesNamespace(isolate); //JSCreateEffect::HandleMyGoofyD2D1EffectsFromAnotherNamespace(isolate); //createID2D1EffectImpl(isolate);
@@ -8599,6 +8899,35 @@ namespace DIRECT2D {
         return jsGeometry;
     }
 
+    Local<Object> getTransformedGeometryImpl(Isolate* isolate, ID2D1TransformedGeometry* transGeometry) {
+        Local<Context> context = isolate->GetCurrentContext();
+        Local<Object> jsGeometry = DIRECT2D::Templates::_ID2D1TransformedGeometry->NewInstance(context).ToLocalChecked();
+        jsGeometry->Set(context, LITERAL("internalPtr"), Number::New(isolate, (LONG_PTR)transGeometry)); //i guess i could use Integer::New instead idk
+        return jsGeometry;
+    }
+
+    //https://regexr.com/89j33
+    Local<Object> getRectangleGeometryImpl(Isolate* isolate, ID2D1RectangleGeometry* rectGeometry) {
+        Local<Context> context = isolate->GetCurrentContext();
+        Local<Object> jsRectangleGeometry = DIRECT2D::Templates::_ID2D1RectangleGeometry->NewInstance(context).ToLocalChecked();
+        jsRectangleGeometry->Set(context, LITERAL("internalPtr"), Number::New(isolate, (LONG_PTR)rectGeometry));
+        return jsRectangleGeometry;
+    }
+
+    Local<Object> getRoundedRectangleGeometryImpl(Isolate* isolate, ID2D1RoundedRectangleGeometry* roundedRectGeometry) {
+        Local<Context> context = isolate->GetCurrentContext();
+        Local<Object> jsRoundedRectangleGeometry = DIRECT2D::Templates::_ID2D1RoundedRectangleGeometry->NewInstance(context).ToLocalChecked();
+        jsRoundedRectangleGeometry->Set(context, LITERAL("internalPtr"), Number::New(isolate, (LONG_PTR)roundedRectGeometry));
+        return jsRoundedRectangleGeometry;
+    }
+
+    Local<Object> getEllipseGeometryImpl(Isolate* isolate, ID2D1EllipseGeometry* ellipseGeometry) {
+        Local<Context> context = isolate->GetCurrentContext();
+        Local<Object> jsEllipseGeometry = DIRECT2D::Templates::_ID2D1EllipseGeometry->NewInstance(context).ToLocalChecked();
+        jsEllipseGeometry->Set(context, LITERAL("internalPtr"), Number::New(isolate, (LONG_PTR)ellipseGeometry));
+        return jsEllipseGeometry;
+    }
+
     Local<Object> getDXGIDebug1Impl(Isolate* isolate, IDXGIDebug1* dbg) {
         Local<Context> context = isolate->GetCurrentContext();
         Local<Object> jsDebug = DIRECT2D::Templates::_IDXGIDebug1->NewInstance(context).ToLocalChecked();
@@ -8737,6 +9066,105 @@ namespace DIRECT2D {
         Local<Object> jsWIC = DIRECT2D::Templates::_WICHelper->NewInstance(context).ToLocalChecked();
         jsWIC->Set(context, LITERAL("internalPtr"), Number::New(isolate, (LONG_PTR)wic));
         return jsWIC;
+    }
+
+    namespace D2D1Impl {
+        V8FUNC(InfiniteRectWrapper) {
+            Isolate* isolate = info.GetIsolate();
+            Local<Context> context = isolate->GetCurrentContext();
+
+            D2D1_RECT_F i = D2D1::InfiniteRect();
+
+            Local<Object> jsRectF = Object::New(isolate);
+            jsRectF->Set(context, LITERAL("left"), Number::New(isolate, i.left));
+            jsRectF->Set(context, LITERAL("top"), Number::New(isolate, i.top));
+            jsRectF->Set(context, LITERAL("right"), Number::New(isolate, i.right));
+            jsRectF->Set(context, LITERAL("bottom"), Number::New(isolate, i.bottom));
+            info.GetReturnValue().Set(jsRectF);
+        }
+
+        V8FUNC(RectFWrapper) {
+            using namespace v8;
+            Isolate* isolate = info.GetIsolate();
+            Local<Context> context = isolate->GetCurrentContext();
+
+            Local<Object> jsRectF = Object::New(isolate);
+
+            jsRectF->Set(context, LITERAL("left"), info[0]->ToNumber(context).ToLocalChecked());
+            jsRectF->Set(context, LITERAL("top"), info[1]->ToNumber(context).ToLocalChecked());
+            jsRectF->Set(context, LITERAL("right"), info[2]->ToNumber(context).ToLocalChecked());
+            jsRectF->Set(context, LITERAL("bottom"), info[3]->ToNumber(context).ToLocalChecked());
+
+            info.GetReturnValue().Set(jsRectF);
+        }
+
+        V8FUNC(RoundedRectWrapper) {
+            using namespace v8;
+            Isolate* isolate = info.GetIsolate();
+            Local<Context> context = isolate->GetCurrentContext();
+
+            Local<Object> jsRoundedRect = Object::New(isolate);
+
+            Local<Object> jsRectF = Object::New(isolate);
+            jsRectF->Set(context, LITERAL("left"), info[0]->ToNumber(context).ToLocalChecked());
+            jsRectF->Set(context, LITERAL("top"), info[1]->ToNumber(context).ToLocalChecked());
+            jsRectF->Set(context, LITERAL("right"), info[2]->ToNumber(context).ToLocalChecked());
+            jsRectF->Set(context, LITERAL("bottom"), info[3]->ToNumber(context).ToLocalChecked());
+
+            jsRoundedRect->Set(context, LITERAL("rect"), jsRectF);
+            jsRoundedRect->Set(context, LITERAL("radiusX"), info[4]);
+            jsRoundedRect->Set(context, LITERAL("radiusY"), info[5]);
+
+            info.GetReturnValue().Set(jsRoundedRect);
+        }
+
+        V8FUNC(EllipseWrapper) {
+            using namespace v8;
+            Isolate* isolate = info.GetIsolate();
+            Local<Context> context = isolate->GetCurrentContext();
+            
+            Local<Object> jsEllipse = Object::New(isolate);
+
+            Local<Object> jsPoint = Object::New(isolate);
+            jsPoint->Set(context, LITERAL("x"), info[0]);
+            jsPoint->Set(context, LITERAL("y"), info[1]);
+
+            jsEllipse->Set(context, LITERAL("point"), jsPoint);
+            jsEllipse->Set(context, LITERAL("radiusX"), info[2]);
+            jsEllipse->Set(context, LITERAL("radiusY"), info[3]);
+
+            info.GetReturnValue().Set(jsEllipse);
+        }
+
+        V8FUNC(LayerParametersWrapper) {
+            using namespace v8;
+            Isolate* isolate = info.GetIsolate();
+            Local<Context> context = isolate->GetCurrentContext();
+
+            Local<Object> jsLP = Object::New(isolate);
+
+            jsLP->Set(context, LITERAL("contentBounds"), info[0]);
+            Local<Value> geometricMask = info[1];
+            if (geometricMask->IsObject()) {
+                geometricMask = info[1].As<Object>()->Get(context, LITERAL("internalPtr")).ToLocalChecked();
+            }
+            jsLP->Set(context, LITERAL("geometricMask"), geometricMask);
+            jsLP->Set(context, LITERAL("maskAntialiasMode"), info[2]);
+            jsLP->Set(context, LITERAL("maskTransform"), info[3]);
+            Local<Value> opacity = info[4];
+            if (opacity->IsNullOrUndefined()) {
+                opacity = Number::New(isolate, 1.0);
+            }
+            jsLP->Set(context, LITERAL("opacity"), opacity);
+            Local<Value> opacityBrush = info[5];
+            if (opacityBrush->IsObject()) {
+                opacityBrush = info[5].As<Object>()->Get(context, LITERAL("internalPtr")).ToLocalChecked();
+            }
+            jsLP->Set(context, LITERAL("opacityBrush"), opacityBrush);
+            jsLP->Set(context, LITERAL("layerOptions"), info[6]);
+
+            info.GetReturnValue().Set(jsLP);
+        }
     }
 
     float f(float x) {
@@ -15079,6 +15507,21 @@ V8FUNC(OVERLAPPEDWrapper) {
     info.GetReturnValue().Set(jsOverlapped);
 }
 
+V8FUNC(RectFWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    Local<Context> context = isolate->GetCurrentContext();
+
+    Local<Object> jsRectF = Object::New(isolate);
+
+    jsRectF->Set(context, LITERAL("left"), info[0]);
+    jsRectF->Set(context, LITERAL("top"), info[1]);
+    jsRectF->Set(context, LITERAL("right"), info[2]);
+    jsRectF->Set(context, LITERAL("bottom"), info[3]);
+
+    info.GetReturnValue().Set(jsRectF);
+}
+
 //V8FUNC(ObjectTest) {
 //    using namespace v8;
 //    Isolate* isolate = info.GetIsolate();
@@ -16941,6 +17384,12 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const wchar_t* filename
     //}
     //Local<Array> jsArr = Array::New(isolate, elem##id, 13);
 
+    Local<ObjectTemplate> jsD2D1 = ObjectTemplate::New(isolate);
+    jsD2D1->Set(isolate, "InfiniteRect", FunctionTemplate::New(isolate, DIRECT2D::D2D1Impl::InfiniteRectWrapper));
+    jsD2D1->Set(isolate, "RectF", FunctionTemplate::New(isolate, DIRECT2D::D2D1Impl::RectFWrapper));
+    jsD2D1->Set(isolate, "RoundedRect", FunctionTemplate::New(isolate, DIRECT2D::D2D1Impl::RoundedRectWrapper));
+    jsD2D1->Set(isolate, "Ellipse", FunctionTemplate::New(isolate, DIRECT2D::D2D1Impl::EllipseWrapper));
+    jsD2D1->Set(isolate, "LayerParameters", FunctionTemplate::New(isolate, DIRECT2D::D2D1Impl::LayerParametersWrapper));
     Local<ObjectTemplate> jsColorF = ObjectTemplate::New(isolate);
     jsColorF->Set(isolate, "AliceBlue", Number::New(isolate, D2D1::ColorF::AliceBlue));
     jsColorF->Set(isolate, "AntiqueWhite", Number::New(isolate, D2D1::ColorF::AntiqueWhite));
@@ -17083,7 +17532,9 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const wchar_t* filename
     jsColorF->Set(isolate, "Yellow", Number::New(isolate, D2D1::ColorF::Yellow));
     jsColorF->Set(isolate, "YellowGreen", Number::New(isolate, D2D1::ColorF::YellowGreen));
 
-    global->Set(isolate, "ColorF", jsColorF);
+    jsD2D1->Set(isolate, "ColorF", jsColorF);
+    //global->Set(isolate, "ColorF", jsColorF);
+    global->Set(isolate, "D2D1", jsD2D1);
 
     setGlobalConst(DCX_WINDOW);
     setGlobalConst(DCX_CACHE);
@@ -17788,6 +18239,9 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const wchar_t* filename
     /// </summary>
     setGlobalConst(D2D1_ANTIALIAS_MODE_ALIASED);
         setGlobalConst(D2D1_ANTIALIAS_MODE_FORCE_DWORD);
+
+    setGlobalConst(D2D1_LAYER_OPTIONS_NONE);
+    setGlobalConst(D2D1_LAYER_OPTIONS_INITIALIZE_FOR_CLEARTYPE);
 
 //#define D2D1_BITMAP_INTERPOLATION_MODE_NEAREST_NEIGHBOR D2D1_BITMAP_INTERPOLATION_MODE_NEAREST_NEIGHBOR
 //#define D2D1_BITMAP_INTERPOLATION_MODE_LINEAR D2D1_BITMAP_INTERPOLATION_MODE_LINEAR
@@ -18704,7 +19158,8 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrevInstance, PWSTR nCmdList, in
     //1.5.77 i changed the return value of GetDpi
     //1.5.90 fixed every DIRECT2D get#Impl function from returning a NEW object template every time (JBSBLUEPRINTS NOW STAYS AT LESS THAN 100MB!!!!)
     //1.6.0 fixed EVERY object template that was created in a FunctionTemplate!!
-    print("JBS3 -> Version 1.6.0"); //so idk how normal version things work so the first number will probably stay one --- i will increment the second number if i change an existing function like when i remade the CreateWindowClass and CreateWindow functions --- i might random increment the third number if i feel like it
+    //1.6.01 i changed ColorF to be inside of D2D1
+    print("JBS3 -> Version 1.6.01"); //so idk how normal version things work so the first number will probably stay one --- i will increment the second number if i change an existing function like when i remade the CreateWindowClass and CreateWindow functions --- i might random increment the third number if i feel like it
     print(screenWidth << "x" << screenHeight);
     
 
