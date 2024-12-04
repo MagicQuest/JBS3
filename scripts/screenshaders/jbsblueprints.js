@@ -1,14 +1,10 @@
 //imma be honest the code that goes into drawing and managing the blueprints might not be good BUT IT WORKS
 //i might try to clean this shit up at some point so it's not a tangled mess of classes
 
-//add labels for the parameters and outs of this blueprint
-//oops i might have forgot, make sure you';re not connecting an exec pin to anmything lese
-//let double exec IN pins be possible (unfortunately)
 //stop Sleep and SET from being cached !!! (actually i think if current is the one being interpreted it should be executed every time? also when caching in a loop, store the cached values in loopStack.at(-1) so when it repeats i clear that cache! I think it true that this may be a valid alternative for the cacheable property and this line as a whole. )
+//test if unreal still caches unpure function connected to a while condition or something
 //probably should make a modal class or something like that for BlueprintMenu and DropdownControlMenu
-//then test changing variable types again
 //quite possibly make static functions for managing pin connections because BOY is it confusing
-//also make the shine type thing brighter a little brighter than color
 
 //const rp = print;
 //print = function(...args) {};
@@ -19,7 +15,7 @@ let dirty = false;
 let hit = {}; // {result, pane, data}
 //let hitpane;
 let activeButton;
-let activePin;
+let activePin; //{i, source, id}
 //let activePane;
 let draws = 0;
 let throwawayObjects = [];
@@ -438,6 +434,49 @@ class PrimitiveControl { //hell yeah brother (this object isn't meant to be on i
     }*/
 }
 
+class StaticControl {
+    width = 100;
+    height = 16;
+    value = "Sample Text";
+    color = [1.0, 1.0, 1.0];
+
+    constructor(width = 100, height = 16, value = "Sample Text", color = [1.0, 1.0, 1.0]) {
+        this.width = width;
+        this.height = height;
+        this.value = d2d.CreateTextLayout(value, font, this.width, this.height);
+        this.color = color;
+    }
+
+    redraw(x, y) {
+        colorBrush.SetColor(...this.color);
+        d2d.DrawTextLayout(x, y, this.value, colorBrush);
+    }
+
+    hittest(mouse, x, y) {
+
+    }
+
+    destroy() {
+        this.value.Release();
+    }
+}
+
+class WatchStaticControl extends StaticControl {
+    constructor(width, height, object, property, color) {
+        super(width, height, object[property], color);
+        this.object = object;
+        this.property = property;
+    }
+
+    redraw(x, y) {
+        if(this.object[this.property] != this.value.text) {
+            this.value.Release();
+            this.value = d2d.CreateTextLayout(this.object[this.property], font, this.width, this.height);
+        }
+        super.redraw(x, y);
+    }
+}
+
 class CheckboxControl {
     width = 16;
     height = 16;
@@ -796,8 +835,8 @@ class Blueprint {
     y = 0;
     width = 256;
     height = 100;
-    parameters = []; //i JUST realized that parameters should be an array of objects
-    out = [];
+    parameters = []; //i JUST realized that parameters should be an array of objects {type, text, control?}
+    out = []; //{type, text}
     type = BPTYPE_PURE;
 
     //gradientStops = [];
@@ -805,7 +844,10 @@ class Blueprint {
     //paramText = []; //efficientcy
     //outText = [];
 
-    connections = {in: [], out: []};
+    connections = {
+        in: [], //Array<{i, source, id}> (if param 0 is an exec pin then in[0] is an object instead)
+        out: [] //Array<{{key: {receiver : {i, source}}}>
+    };
 
     static padding = 16;
     static radius = 4;
@@ -853,17 +895,30 @@ class Blueprint {
             if(old.type != type) {
                 //using the old blueprint here so i can get rid of the thingy yk
                 if(type == BPTYPE_PURE && l == 0) {
-                    const pin = old.connections.in[l]; //{i, source, id}
-                    if(pin) delete pin.source.connections.out[pin.i][pin.id];
+                    const pconnections = old.connections.in[l]; //{i, source, id}
+                    for(const key of Object.keys(pconnections)) {
+                        const pin = pconnections[key];
+                        if(pin) delete pin.source.connections.out[pin.i][pin.id];
+                    }
                     //n = 1;
                     continue;
                 }
             }
             const oldpin = old.connections.in[l];
-            newbp.connections.in[l-m] = oldpin;
-            const pin = newbp.connections.in[l-m];
-            pin.source.connections.out[pin.i][pin.id].receiver.i = l-m; //bruh...
-            pin.source.connections.out[pin.i][pin.id].receiver.source = newbp; //bruh...
+            if(oldpin) {
+                newbp.connections.in[l-m] = oldpin;
+                const maybepin = newbp.connections.in[l-m];
+                if(newbp.parameters[l-m].type == "exec") {
+                    for(const key of Object.keys(maybepin)) {
+                        const pin = maybepin[key];
+                        pin.source.connections.out[pin.i][pin.id].receiver.i = l-m; //bruh......
+                        pin.source.connections.out[pin.i][pin.id].receiver.source = newbp; //bruh......    
+                    }
+                }else {
+                    maybepin.source.connections.out[pin.i][pin.id].receiver.i = l-m; //bruh...
+                    maybepin.source.connections.out[pin.i][pin.id].receiver.source = newbp; //bruh...
+                }
+            }
         }
         //let maxoutlength = newbp.connections.out.length;
         //if(maxoutlength > old.connections.out.length) {
@@ -877,19 +932,22 @@ class Blueprint {
                 if(old.type != type) {
                     if(type == BPTYPE_PURE && l == 0) {
                         const pin = old.connections.out[l][key]; //receiver : {i, source}
-                        if(pin) pin.receiver.source.connections.in[pin.receiver.i] = undefined;
+                        //if(pin) pin.receiver.source.connections.in[pin.receiver.i] = undefined;
+                        if(pin) delete pin.receiver.source.connections.in[pin.receiver.i][pin.receiver.id];
                         //n = 1;
                         continue;
                     }
                 }
                 const oldpin = old.connections.out[l][key];
-                if(!newbp.connections.out[l-m]) {
-                    newbp.connections.out[l-m] = {};
+                if(oldpin) {
+                    if(!newbp.connections.out[l-m]) {
+                        newbp.connections.out[l-m] = {};
+                    }
+                    newbp.connections.out[l-m][key] = oldpin;
+                    const pin = newbp.connections.out[l-m][key];
+                    pin.receiver.source.connections.in[pin.receiver.i].i = l-m; //bruh...
+                    pin.receiver.source.connections.in[pin.receiver.i].source = newbp; //bruh...
                 }
-                newbp.connections.out[l-m][key] = oldpin;
-                const pin = newbp.connections.out[l-m][key];
-                pin.receiver.source.connections.in[pin.receiver.i].i = l-m; //bruh...
-                pin.receiver.source.connections.in[pin.receiver.i].source = newbp; //bruh...
             }
         }
         return newbp;
@@ -1123,6 +1181,10 @@ class Blueprint {
                 if(pobj.control instanceof EditControl) pobj.control.autoresize = true;
             }
             this.parameters[i] = pobj; //i don't need the variable name anymore because i store it in the text layout paramText[i]
+            if(param.includes("exec")) { //using includes just in case there's a space somewhere idk
+                this.connections.in[i] = {};
+            }
+            //this.connections.in[i] = {}; //.
             //this.paramText.push(d2d.CreateTextLayout(name, font, w, h));
         }else {
             this.out[i] = pobj;
@@ -1233,7 +1295,10 @@ class Blueprint {
         //d2d.FillRectangle(0, Blueprint.captionHeight, this.width, this.height, this.gradients[2]);
         for(let i = 0; i < this.parameters.length; i++) {
             const param = this.parameters[i];
-            const connection = this.connections.in[i];
+            let connection = this.connections.in[i];
+            if(connection && param.type == "exec") {
+                connection = Object.keys(connection).length;
+            }
             this.drawPin(false, i, param, connection);
             const tl = param.text.GetMetrics(); //this.paramText[i].GetMetrics();
             if(connection) {
@@ -1368,8 +1433,15 @@ class Blueprint {
         if(wp == VK_DELETE || wp == VK_BACK) {
             dirty = true;
             for(let l = 0; l < this.connections.in.length; l++) { //i think i accidently put i++ the first time or something!
-                const pin = this.connections.in[l]; //{i, source, id}
-                if(pin) delete pin.source.connections.out[pin.i][pin.id]; //.receiver.source = newbp; //bruh...
+                const maybepin = this.connections.in[l]; //{i, source, id}
+                if(this.parameters[l].type == "exec") {
+                    for(const key of Object.keys(maybepin)) {
+                        const pin = pconnections[key];
+                        if(pin) delete pin.source.connections.out[pin.i][pin.id]; //.receiver.source = newbp; //bruh...
+                    }
+                }else {
+                    if(maybepin) delete maybepin.source.connections.out[maybepin.i][maybepin.id];
+                }
             }
             for(let l = 0; l < this.connections.out.length; l++) {
                 //const pin = newbp.connections.out[i];
@@ -1436,7 +1508,8 @@ class Blueprint {
                 //if we pulling an exec pin and it was already connected to something we gotta disconnect that
                 if(this.connections.out[data][id]) {
                     const receiver = this.connections.out[data][id].receiver;
-                    receiver.source.connections.in[receiver.i] = undefined;
+                    //receiver.source.connections.in[receiver.i] = undefined;
+                    delete receiver.source.connections.in[receiver.i][receiver.id];
                 }
             }else {
                 id = draws;
@@ -1484,15 +1557,15 @@ Blueprint.meta_functions["IF"] = function(bool) {
 }
 
 Blueprint.meta_functions["WHILE"] = function(bool) {
+    const loopStackIndex = loopStack.findIndex(({source}) => source == this);
     if(bool && !GetKey(VK_ESCAPE)) { //break out of infinite loop with escape!
-        if(loopStack.indexOf(this) == -1) { //haha oops
-            loopStack.push(this);
+        if(loopStackIndex == -1) { //haha oops
+            loopStack.push({source: this, cache: {}});
         }
         next = this.connections.out[0]?.[0]?.receiver?.source; //the loop body exec pin
     }else {
-        let i = loopStack.indexOf(this);
-        if(i != -1) { //haha oops
-            loopStack.splice(i, 1);
+        if(loopStackIndex != -1) { //haha oops
+            loopStack.splice(loopStackIndex, 1);
         }
         next = this.connections.out[1]?.[0]?.receiver?.source; //the second pin (the completed exec)
     }
@@ -1502,14 +1575,15 @@ Blueprint.meta_functions["FOR_LOOP"] = function(firstIndex, lastIndex) {
     //wait where am i going to store the index?!
     //ok i actually might do it in _special haha
     let index = 0;
-    if(loopStack.indexOf(this) == -1) { //haha oops
-        loopStack.push(this);
+    const loopStackIndex = loopStack.findIndex(({source}) => source == this);
+    if(loopStackIndex == -1) { //haha oops
+        loopStack.push({source: this, cache: {}});
         index = firstIndex;
     }else {
         index = this._special+1; //oops i forgot the plus 1 and started an infinite loop
     }
     if(index > lastIndex || GetKey(VK_ESCAPE)) {
-        loopStack.splice(loopStack.indexOf(this), 1);
+        loopStack.splice(loopStackIndex, 1);
         next = this.connections.out[2]?.[0]?.receiver?.source; //the third pin (the completed exec)
     }else {
         next = this.connections.out[0]?.[0]?.receiver?.source;
@@ -1644,10 +1718,10 @@ class BlueprintMenu {
         {name: "IF", desc: "branch", parameters: ["exec : exec", "Condition : boolean"], out: ["True : exec", "False : exec"], type: BPTYPE_PURE},
         {name: "WHILE", desc: "while loop (break infinite loop by holding escape!)", parameters: ["exec : exec", "Condition: boolean"], out: ["Loop Body : exec", "Completed : exec"], type : BPTYPE_PURE},
         {name: "FOR_LOOP", desc: "for loop", parameters: ["exec : exec", "First Index : number", "Last Index : number"], out: ["Loop Body : exec", "Index : number", "Completed : exec"], type : BPTYPE_PURE},
-        {name: "NOT_EQUAL", desc: "!=", parameters: [" : number", " : number"], out: [" : boolean"], type: BPTYPE_BARE},
-        {name: "EQUAL", desc: "==", parameters: [" : number", " : number"], out: [" : boolean"], type: BPTYPE_BARE},
-        {name: "STRICT_NOT_EQUAL", desc: "!==", parameters: [" : number", " : number"], out: [" : boolean"], type: BPTYPE_BARE},
-        {name: "STRICT_EQUAL", desc: "===", parameters: [" : number", " : number"], out: [" : boolean"], type: BPTYPE_BARE},
+        {name: "NOT_EQUAL", desc: "!=", parameters: [" : any", " : any"], out: [" : boolean"], type: BPTYPE_BARE},
+        {name: "EQUAL", desc: "==", parameters: [" : any", " : any"], out: [" : boolean"], type: BPTYPE_BARE},
+        {name: "STRICT_NOT_EQUAL", desc: "!==", parameters: [" : any", " : any"], out: [" : boolean"], type: BPTYPE_BARE},
+        {name: "STRICT_EQUAL", desc: "===", parameters: [" : any", " : any"], out: [" : boolean"], type: BPTYPE_BARE},
         {name: "GREATER_THAN", desc: ">", parameters: [" : number", " : number"], out: [" : boolean"], type: BPTYPE_BARE},
         {name: "GREATER_THAN_OR_EQUAL", desc: ">=", parameters: [" : number", " : number"], out: [" : boolean"], type: BPTYPE_BARE},
         {name: "LESS_THAN", desc: "<", parameters: [" : number", " : number"], out: [" : boolean"], type: BPTYPE_BARE},
@@ -1963,12 +2037,13 @@ class DetailDropdownMenu extends PropertyDropdownMenu {
         for(let i = 0; i < this.kvcontrols.length; i++) {
             const [label, control] = this.kvcontrols[i];
             colorBrush.SetColor(229/255, 229/255, 229/255);
-            d2d.DrawTextLayout(x, y+(i*24)+4, label, colorBrush);
+            const cy = (i*(control.height+8))+4;
+            d2d.DrawTextLayout(x, y+cy, label, colorBrush);
             //if(control instanceof PrimitiveControl) {
                 //d2d.SetTransform(Matrix3x2F.Translation(PropertyMenu.instance.x+x+(PropertyMenu.instance.width/2),PropertyMenu.instance.y+y+(i*24)+4));
                 //control.redraw();
                 //d2d.SetTransform(Matrix3x2F.Translation(PropertyMenu.instance.x, PropertyMenu.instance.y)); //x+camera.x, y+camera.y));
-                control.redraw(x+PropertyMenu.instance.width/2, y+(i*24)+4);
+                control.redraw(x+PropertyMenu.instance.width/2, y+cy);
             //}else {
             //    control.redraw(x, y+(i*24)+4);
             //}
@@ -2146,7 +2221,7 @@ class VariableDetailDropdownMenu extends DetailDropdownMenu {
                 //pane.title.replace(newname, this.value);
                 //pane._special = 100; //using _special 100 as a debounce so i don't recheck this one again! (nevermind i can just decrement the length too since i push the new blueprint in Blueprint.create)
                 print(i, j, wasget, wasget ? i : j);
-                Blueprint.recreate(old, BlueprintMenu.commandList[wasget ? i : j]);
+                const newbp = Blueprint.recreate(old, BlueprintMenu.commandList[wasget ? i : j]);
                 newbp.variable = VariableDropdownMenu.selected;
                 //pane.destroy(); //oh shit bruh for some reason when i was testing this part it would "skip" the pane that got delete and i realized that i destroy the pane which splices it which fuckls up the shit nigga
                 //since in pane.destroy() i splice i must decrement k because the array has changed!
@@ -2182,6 +2257,58 @@ class FunctionDetailDropdownMenu extends DetailDropdownMenu {
             ],
             //add labels for the parameters and outs of this blueprint
         );
+
+        for(let i = 0; i < Blueprint.active.parameters.length; i++) {
+            const {type, text, control} = Blueprint.active.parameters[i];
+            //let labeltext;
+            let customcontrol;
+            const maybepin = Blueprint.active.connections.in[i];
+            if(maybepin) {
+                if(Blueprint.active.parameters[i].type == "exec") {
+                    let letext = "";
+                    for(const key of Object.keys(maybepin)) {
+                        const pin = maybepin[key];
+                        letext += `${pin.source.title}'s ${pin.source.out[pin.i].text.text} (${pin.i})`;
+                    }
+                    customcontrol = new StaticControl(100, 16, letext);
+                }else {
+                    //const pin = Blueprint.active.connections.in[i];
+                    customcontrol = new StaticControl(100, 16, `${maybepin.source.title}'s ${maybepin.source.out[maybepin.i].text.text} (${maybepin.i})`);
+                }
+            }
+            else if(control) {
+                customcontrol = new WatchStaticControl(100, 16, Blueprint.active.parameters[i].control, "value");
+                //labeltext = control.value;
+            }else {
+                customcontrol = new StaticControl(100, 16, "None lil nigga");
+            }
+            this.kvcontrols.push(
+                [
+                    d2d.CreateTextLayout(`Parameter ${i} (${text.text}): `, font, w, h),
+                    customcontrol,
+                    //new WatchStaticControl(100, 16, object, property),
+                ],
+            );
+        }
+
+        //for(let i = 0; i < Blueprint.active.out.length; i++) {
+        //    const {type, text} = Blueprint.active.out[i];
+        //    //let labeltext;
+        //    let customcontrol;
+        //    if(Blueprint.active.connections.out[i]) {
+        //        const pin = Blueprint.active.connections.out[i].receiver;
+        //        customcontrol = new StaticControl(100, 16, `${pin.source.title}'s ${pin.source.in[pin.i].text.text} (${pin.i})`);
+        //    }else {
+        //        customcontrol = new StaticControl(100, 16, "None lil nigga");
+        //    }
+        //    this.kvcontrols.push(
+        //        [
+        //            d2d.CreateTextLayout(`Parameter ${i} (${text.text}): `, font, w, h),
+        //            customcontrol,
+        //            //new WatchStaticControl(100, 16, object, property),
+        //        ],
+        //    );
+        //}
     }
 }
 
@@ -2451,9 +2578,12 @@ function parseCommandList() {
             /*}else if(out.includes('wstring')) {
                 out = out.replaceAll("wstring", "string"); //lol
             */}else {
-                out = out.split(" |")[0].trimEnd();
+                const nameandparam = out.split(" |")[0].trimEnd();
+                out = [`${nameandparam} : ${nameandparam}`];
                 print(name, outstr, "o;", out, out.length);
             }
+        }else {
+            out = [`${out} : ${out}`]
         }
 
         for(let i = 0; i < parameters.length; i++) {
@@ -2467,7 +2597,7 @@ function parseCommandList() {
             }
         }
 
-        BlueprintMenu.commandList.push({name, desc, parameters, out: [`${out} : ${out}`]});
+        BlueprintMenu.commandList.push({name, desc, parameters, out});
     }
     let extension = system("curl -i https://raw.githubusercontent.com/MagicQuest/JBS3Extension/refs/heads/main/src/extension.ts").split("\n"); //well i would use fetch but right now it only works with HTTP bruh
     //print(extension, typeof(extension), !!extension);
@@ -2506,6 +2636,11 @@ function recur(obj, name="") {
     return list;
 }
 
+function serializeBlueprints() {
+    //ouuuuuhhhh this might be kinda hard...
+    //i also want to be able to copy and paste them (maybe with the real clipboard / program)
+}
+
 function executeBlueprints() {
     //assuming panes[0] is the event start blueprint because it's the first one i make
     const start = panes[0];
@@ -2519,7 +2654,7 @@ function executeBlueprints() {
     //print(recur(start.connections));
     print("spacebar exec");
     
-    const cache = {};
+    const globalcache = {};
     
     for(const pane of panes) {
         //if(pane instanceof Blueprint) pane._special = false;
@@ -2540,6 +2675,12 @@ function executeBlueprints() {
         const j = (notpure || source.parameters[0]?.type == "exec") ? 1 : 0;
         const paneIndex = panes.indexOf(source);
         let result;
+        let cache;
+        if(loopStack.length > 0) {
+            cache = loopStack.at(-1).cache;
+        }else {
+            cache = globalcache;
+        }
         if(!cache[paneIndex]?.value) {
             for(let i = j; i < source.parameters.length; i++) {
                 const param = source.parameters[i];
@@ -2624,7 +2765,9 @@ function executeBlueprints() {
 
         print(!!next ? "cont" : "no futher", loopStack.length);
         if(!next && loopStack.length != 0) {
-            next = loopStack.at(-1);
+            const loop = loopStack.at(-1);
+            next = loop.source;
+            loop.cache = {}; //clear the cache my boy
             print("loop");
         }
         
@@ -2829,7 +2972,11 @@ function windowProc(hwnd, msg, wp, lp) {
                     if(anyoutconnections.length) {
                         for(const connection of Object.values(anyoutconnections)) {
                             const out = connection.receiver;
-                            out.source.connections.in[out.i] = undefined;
+                            if(out.source.parameters[out.i].type == "exec") {
+                                delete out.source.connections.in[out.i][out.id]; //oops i wrote out.data
+                            }else {
+                                out.source.connections.in[out.i] = undefined;
+                            }
                         }
                     }
                     hit.pane.connections.out[hit.data] = undefined;
@@ -2841,13 +2988,37 @@ function windowProc(hwnd, msg, wp, lp) {
 
                 if(hit.pane instanceof Blueprint) {
                     const inpin = hit.pane.connections.in[hit.data]; //{i, source, id}
-                    if(inpin) {
+                    const execpin = hit.pane.parameters[hit.data].type == "exec";
+                    if((inpin && execpin && Object.keys(inpin).length) || (inpin && !execpin)) { //oops this if is cap
                         if(GetKey(VK_MENU)) {
-                            delete inpin.source.connections.out[inpin.i][inpin.id];
-                            hit.pane.connections.in[hit.data] = undefined;
+                            if(execpin) {
+                                for(const key of Object.keys(inpin)) {
+                                    const pin = inpin[key];
+                                    delete pin.source.connections.out[pin.i][pin.id];
+                                }
+                                hit.pane.connections.in[hit.data] = {};
+                            }else {
+                                delete inpin.source.connections.out[inpin.i][inpin.id];
+                                hit.pane.connections.in[hit.data] = undefined;
+                            }
                         }else {
-                            const {i, source, id} = inpin;
-                            hit.pane.connections.in[hit.data] = undefined;
+                            //let obj;
+                            let i, source, id;
+                            if(execpin) {
+                                const firstkey = Object.keys(inpin)[0];
+                                //obj = inpin[firstkey];
+                                i = inpin[firstkey].i;
+                                source = inpin[firstkey].source;
+                                id = inpin[firstkey].id;
+                                delete inpin[firstkey];
+                            }else {
+                                //obj = inpin;
+                                i = inpin.i;
+                                source = inpin.source;
+                                id = inpin.id;
+                                hit.pane.connections.in[hit.data] = undefined;
+                            }
+                            //const {i, source, id} = obj;
                             Draggable.select(source.preDrag?.(mouse, i, id) ?? source, mouse, false, false);
                         }
                     }
@@ -2925,22 +3096,41 @@ function windowProc(hwnd, msg, wp, lp) {
                     //mouse.y -= pane.y; //to client (oops i was directly modifying mouse)
                     const [legit, data] = pane.hittest(clientmouse);
                     if(legit == DROP) {
-                        receiver = {i: data, source: pane};
+                        receiver = {i: data, source: pane}; //id is just a random number
+                        if(pane.parameters[data].type == "exec") {
+                            receiver.id = draws;
+                        }
                     }
                 }
-            }    
+            }
     
             if(receiver) {
                                             //boy this is looking confusing...
                 //oops i might have forgot, make sure you';re not connecting an exec pin to anmything lese
-                activePin.source.connections.out[activePin.i][activePin.id].receiver = receiver; //{i: receiver.data, source: receiver.blueprint};
-                const receiverpin = receiver.source.connections.in[receiver.i]; //{i, source, id}
-                if(receiverpin) { //if A was connected to B and C wants to connect to B, then i tell A that it's no longer connected
-                    //this happens when something is already connected and you connect ANOTHER thing to this one
-                    //receiverpin.source.connections.out[receiverpin.i] = undefined; //receiverpin.i (i think?)
-                    delete receiverpin.source.connections.out[receiverpin.i][receiverpin.id];
+                let execpincheck = 0; //if execpincheck == 2 then they're both exec pins, if execpincheck == 0 then they're both not exec pins, but if execpincheck == 1 then you doing something wrong my boy
+                execpincheck += (activePin.source.out[activePin.i].type == "exec");
+                execpincheck += (receiver.source.parameters[receiver.i].type == "exec");
+                if(execpincheck == 1) {
+                    //hell nah you mixing exec pins and non exec
+                    delete activePin.source.connections.out[activePin.i][activePin.id];
+                }else {
+
+                    /*if(activePin.source.out[activePin.i].type == "exec" || receiver.source.in[receiver.i].type == "exec") {
+                        
+                    }*/
+                    activePin.source.connections.out[activePin.i][activePin.id].receiver = receiver; //{i: receiver.data, source: receiver.blueprint};
+                    if(execpincheck != 2) {
+                        const receiverpin = receiver.source.connections.in[receiver.i]; //{i, source, id}
+                        if(receiverpin) { //if A was connected to B and C wants to connect to B, then i tell A that it's no longer connected
+                            //this happens when something is already connected and you connect ANOTHER thing to this one
+                            //receiverpin.source.connections.out[receiverpin.i] = undefined; //receiverpin.i (i think?)
+                            delete receiverpin.source.connections.out[receiverpin.i][receiverpin.id];
+                        }
+                        receiver.source.connections.in[receiver.i] = activePin; //.source = activePin;
+                    }else {
+                        receiver.source.connections.in[receiver.i][receiver.id] = activePin;
+                    }
                 }
-                receiver.source.connections.in[receiver.i] = activePin; //.source = activePin;
                 //print(activePin.i, receiver.i);
             }else {
                 //if(activePin.source.connections.out[activePin.i]?.receiver) { //moved into preDrag
