@@ -2,9 +2,10 @@
 //i might try to clean this shit up at some point so it's not a tangled mess of classes
 
 //stop Sleep and SET from being cached !!! (actually i think if current is the one being interpreted it should be executed every time? also when caching in a loop, store the cached values in loopStack.at(-1) so when it repeats i clear that cache! I think it true that this may be a valid alternative for the cacheable property and this line as a whole. )
-//test if unreal still caches unpure function connected to a while condition or something
+//test if unreal still caches unpure function connected to a while condition or something (yeah nah if you connect an unpure function to a while loop in unreal it'll tell you there's an infinite loop)
 //probably should make a modal class or something like that for BlueprintMenu and DropdownControlMenu
 //quite possibly make static functions for managing pin connections because BOY is it confusing
+//make some animation class or global array like magicquest.github.io/v2 !
 
 //const rp = print;
 //print = function(...args) {};
@@ -846,14 +847,14 @@ class Blueprint {
 
     connections = {
         in: [], //Array<{i, source, id}> (if param 0 is an exec pin then in[0] is an object instead)
-        out: [] //Array<{{key: {receiver : {i, source}}}>
+        out: [] //Array<{{key: {receiver : {i, source, id?}}}>
     };
 
     static padding = 16;
     static radius = 4;
 
     static meta_functions = {};
-    static variables = {};
+    static variables /*: {type : string, textlayout : IDWriteTextLayout, defaultvalue : any}*/ = {};
 
     static active = undefined; //the currently selected blueprint
 
@@ -862,10 +863,10 @@ class Blueprint {
     static recreate(old, cl) {
         old.destroy();
 
-        const {name, desc, parameters, out, type, cacheable} = cl;
+        const {name, desc, parameters, out, type} = cl;
         //print(typeof(parameters), typeof(out));
-        print("RECREATING", name, desc, parameters, out, type, cacheable);
-        const newbp = Blueprint.create(undefined, name, old.x, old.y, parameters, out, type ?? BPTYPE_NOTPURE, desc, cacheable); //ok putting undefined here is a real sign that i really don't need to hold on to the hwnd in Blueprint lmao                
+        print("RECREATING", name, desc, parameters, out, type);
+        const newbp = Blueprint.create(undefined, name, old.x, old.y, parameters, out, type ?? BPTYPE_NOTPURE, desc); //ok putting undefined here is a real sign that i really don't need to hold on to the hwnd in Blueprint lmao                
         //newbp.connections = Object.assign({}, old.connections); //doudou oye
         let m = 0;
         if(old.type != type) {
@@ -896,9 +897,11 @@ class Blueprint {
                 //using the old blueprint here so i can get rid of the thingy yk
                 if(type == BPTYPE_PURE && l == 0) {
                     const pconnections = old.connections.in[l]; //{i, source, id}
-                    for(const key of Object.keys(pconnections)) {
-                        const pin = pconnections[key];
-                        if(pin) delete pin.source.connections.out[pin.i][pin.id];
+                    if(pconnections) {
+                        for(const key of Object.keys(pconnections)) {
+                            const pin = pconnections[key];
+                            if(pin) delete pin.source.connections.out[pin.i][pin.id];
+                        }
                     }
                     //n = 1;
                     continue;
@@ -972,10 +975,10 @@ class Blueprint {
     }
 
     //static create(parent, title, color, x, y, width, height, parameters, out, type) {
-    static create(parent, title, x, y, parameters, out, type, desc, cacheable) {
+    static create(parent, title, x, y, parameters, out, type, desc) {
         const color = Blueprint.getColorByInfo(title, type, out);
         const {width, height} = Blueprint.getAppropriateSize(title, parameters, out, type);
-        const b = new Blueprint(parent, title, color, x, y, width, height, parameters, out, type, desc, cacheable);
+        const b = new Blueprint(parent, title, color, x, y, width, height, parameters, out, type, desc);
         panes.push(b);
         return b;
     }
@@ -1040,7 +1043,7 @@ class Blueprint {
         return {width, height};
     }
 
-    constructor(parent, title, color, x, y, width, height, parameters, out, type, desc, cacheable) {
+    constructor(parent, title, color, x, y, width, height, parameters, out, type, desc) {
         this.parent = parent; //just in case? (nevermind lol it seems like i don't need it)
         this.title = title;
         this.x = x;
@@ -1058,7 +1061,6 @@ class Blueprint {
         this.type = type;
         this.desc = desc; ///hover and show it
         this._special = false;
-        this.cacheable = cacheable;
 
         this.selectionGradient = Gradient.LinearGradientBrush(
             d2d.CreateGradientStopCollection([0.0, 241/255, 176/255, 0.0], [1.0, 205/255, 104/255, 0.0]),
@@ -1434,13 +1436,15 @@ class Blueprint {
             dirty = true;
             for(let l = 0; l < this.connections.in.length; l++) { //i think i accidently put i++ the first time or something!
                 const maybepin = this.connections.in[l]; //{i, source, id}
-                if(this.parameters[l].type == "exec") {
-                    for(const key of Object.keys(maybepin)) {
-                        const pin = pconnections[key];
-                        if(pin) delete pin.source.connections.out[pin.i][pin.id]; //.receiver.source = newbp; //bruh...
+                if(maybepin) {
+                    if(this.parameters[l].type == "exec") {
+                        for(const key of Object.keys(maybepin)) {
+                            const pin = maybepin[key];
+                            if(pin) delete pin.source.connections.out[pin.i][pin.id]; //.receiver.source = newbp; //bruh...
+                        }
+                    }else {
+                        delete maybepin.source.connections.out[maybepin.i][maybepin.id];
                     }
-                }else {
-                    if(maybepin) delete maybepin.source.connections.out[maybepin.i][maybepin.id];
                 }
             }
             for(let l = 0; l < this.connections.out.length; l++) {
@@ -1695,6 +1699,8 @@ Blueprint.meta_functions["POWER"] = function(base, exponent) {
 //    }
 //}
 
+//class $__c_l_a_z_z____________________ {
+
 class BlueprintMenu {
     x = 0;
     y = 0;
@@ -1711,7 +1717,7 @@ class BlueprintMenu {
     scrollY = 0;
     scrollVelocity = 0;
 
-    static singleton = undefined; //oops i think i meant instance but i forgor
+    static singleton = undefined; //oops i think i meant instance but i forgor the names
 
     static commandList = [ //haha not the d2d one
         //{name, desc, parameters, out, type?}
@@ -1903,10 +1909,10 @@ class BlueprintMenu {
             const i = Math.floor((mouse.y-checkY)/12);    //(mouse.y-92)/12; //i think?
             const j = Math.floor(this.scrollY) + i;
             //print(i, j);
-            const {name, desc, parameters, out, type, parent, cacheable} = BlueprintMenu.commandList[j];
+            const {name, desc, parameters, out, type, parent} = BlueprintMenu.commandList[j];
             //print(typeof(parameters), typeof(out));
-            print(name, desc, parameters, out, type, parent, cacheable);
-            const bp = Blueprint.create(undefined, name, this.x, this.y, parameters, out, type ?? BPTYPE_NOTPURE, desc, cacheable); //ok putting undefined here is a real sign that i really don't need to hold on to the hwnd in Blueprint lmao
+            print(name, desc, parameters, out, type, parent);
+            const bp = Blueprint.create(undefined, name, this.x, this.y, parameters, out, type ?? BPTYPE_NOTPURE, desc); //ok putting undefined here is a real sign that i really don't need to hold on to the hwnd in Blueprint lmao
             if(parent && parent == "variable") {
                 print("parent valid!", bp.title, bp.title.substring(4));
                 bp.variable = Blueprint.variables[bp.title.substring(4)];
@@ -2636,9 +2642,106 @@ function recur(obj, name="") {
     return list;
 }
 
-function serializeBlueprints() {
-    //ouuuuuhhhh this might be kinda hard...
+function saveBlueprintsJSON() {
+    //ouuuuuhhhh this might be kinda hard... (hold on i got it)
     //i also want to be able to copy and paste them (maybe with the real clipboard / program)
+    let bpids = {};
+    let json = {variables: {}, blueprints: []};
+    for(const varname of Object.keys(Blueprint.variables)) {
+        const $var = Blueprint.variables[varname];
+        json.variables[varname].type = $var.type;
+        json.variables[varname].defaultvalue = $var.defaultvalue;
+        //no textlayout because you can't save that lol and i'll just create it again
+    }
+
+    //first loop to establish ids
+    let i = 0;
+    for(const pane of panes) {
+        if(pane instanceof Blueprint) {
+            //json.blueprints.push();
+            bpids[pane] = i;
+            i++;
+        }
+    }
+
+    for(const pane of panes) {
+        if(pane instanceof Blueprint) {
+            const object = {
+                title: pane.title,
+                x: pane.x,
+                y: pane.y,
+                //probably not gonna store the size because im probably gonna have to create them again anyways
+                parameters: [], //control values
+                id: bpids[pane], //just in case (just now realizing that i write "just in case" a lot)
+                connections: {
+                    in: [],
+                    out: [],
+                }
+            };
+            //not writing down the types of these parameters since im probably gonna create the blueprint again and it'll already know all that probably
+            for(let i = 0; i < pane.parameters.length; i++) {
+                const {type, text, control} = pane.parameters[i];
+                
+                if(control) {
+                    object.parameters[i] = {control: {value: control.value}};
+                }
+                
+                const maybepin = pane.connections.in[i];
+                if(maybepin) {
+                    if(type == "exec") {
+                        object.connections.in[i] = {};
+                        for(const key in maybepin) {//of Object.keys(maybepin)) { //oh wait i forgot that `in` does the same thing as `of Object.keys(...)`
+                            const pin = maybepin[key];
+                            object.connections.in[i][key] = {
+                                i: pin.i,
+                                source: bpids[pin.source],
+                                id: pin.id,
+                            };
+                        }
+                    }else {
+                        object.connections.in[i] = {
+                            i: maybepin.i,
+                            source: bpids[maybepin.source],
+                            id: maybepin.id,
+                        };
+                    }
+                }
+            }
+
+            for(let i = 0; i < pane.out.length; i++) {
+                const maybepin = pane.connections.out[i];
+                if(maybepin) {
+                    object.connections.out[i] = {};
+                    for(const key in maybepin) {//of Object.keys(maybepin)) {
+                        const pin = maybepin[key];
+                        object.connections.out[i][key] = {
+                            receiver: {
+                                i: pin.receiver.i,
+                                source: bpids[pin.receiver.source],
+                                id: pin.receiver.id,
+                            }
+                        }
+                    }
+                }
+            }
+            
+            json.blueprints.push(object);
+        }
+    }
+    //print(json);
+    return JSON.stringify(json);
+}
+
+function parseBlueprintsJSON(str) {
+    const bpids = {};
+    const json = JSON.parse(str); // {variables : [], blueprints: []}
+    for(const varname in json.variables) {
+        const $var = json.variables[varname];
+        Blueprint.variables[varname] = $var;
+        Blueprint.variables[varname].textlayout = d2d.CreateTextLayout(varname, font, w, h); //oh yeah
+    }
+
+    //create em yk
 }
 
 function executeBlueprints() {
@@ -2681,7 +2784,7 @@ function executeBlueprints() {
         }else {
             cache = globalcache;
         }
-        if(!cache[paneIndex]?.value) {
+        if(!cache[paneIndex]?.value || current == source) { //if we're interpreting the current pin then we'll execute it anyways since that seems reasonable
             for(let i = j; i < source.parameters.length; i++) {
                 const param = source.parameters[i];
                 let val = 0;
@@ -2735,7 +2838,23 @@ function executeBlueprints() {
             }else if(Blueprint.meta_functions[source.title]) {
                 result = Blueprint.meta_functions[source.title].call(source, ...args);
             }else {
-                result = globalThis[source.title](...args); //lowkey im just gonna name the branch function like IF or something so i can just define it earlier (ok i did it differently than that)
+                const split = source.title.split(".");
+                if(split.length > 1) {
+                    //oh wait i guess you could recursively get the objetct and then call it like
+                    let object = globalThis;
+                    for(const name of split) {
+                        object = object[name];
+                    }
+                    result = object(...args);
+                    //const evalstr = `globalThis`;
+                    //for(const name of split) {
+                    //    evalstr += `.${name}`;
+                    //}
+                    //evalstr += `(...args)`;
+                    //result = eval(evalstr);
+                }else {
+                    result = globalThis[source.title](...args); //lowkey im just gonna name the branch function like IF or something so i can just define it earlier (ok i did it differently than that)
+                }
             }
             if(notpure) {
                 if(!cache[paneIndex]) {
@@ -2743,7 +2862,7 @@ function executeBlueprints() {
                 }
                 cache[paneIndex].value = result;
                 source._special = true;
-                dirty = true;
+                dirty = true; //lol
             }
         }else {
             print(`using cache[paneIndex].value for ${source.title} (${paneIndex})`);
@@ -3184,6 +3303,8 @@ function windowProc(hwnd, msg, wp, lp) {
             }else {
                 BlueprintMenu.open(hwnd);
             }
+        }else if(wp == "S".charCodeAt(0) && GetKey(VK_CONTROL)) {
+            print(saveBlueprintsJSON());
         }
 
         if(wp == VK_ESCAPE) {

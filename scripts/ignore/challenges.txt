@@ -1,9 +1,13 @@
 {"nx": 1550, "ny": 450, "nw": 512, "nh": 300, "b": false}
-SetBkColor(memDC, RGB(255, 255, 255)); CreateFontSimple("burbank big cd bd", 10, 20); //haha fortnite font burbank big cd bd
+SetBkColor(memDC, RGB(255, 255, 255)); CreateFontSimple("burbank big cd bd", 10/1.25, 20/1.25); //haha fortnite font burbank big cd bd
 
-hit niggas with the iron man kit unibeam
-deal more damage with doom arcane
-eliminate with war machine arsenal
+use sprite shine to reveal nearby sprites in diff matcheds
+hit niggas with ar 10 times
+return sprites to sprirte shine boon
+deal 1000 damage with **the blade**
+
+//(<b>shit i need to use a text layout for special effects like</b>)
+//wait nevermind im using gdi to draw this shit aren't i
 
 ${String.fromCharCode(0xd83e, 0xdd13)}
 //${[memDC, (WS_BORDER & GetWindowLongPtr(hwnd, GWL_STYLE)) == WS_BORDER, WS_BORDER]}

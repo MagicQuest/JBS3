@@ -5269,6 +5269,9 @@ namespace DIRECT2D {
                 //if (mode == D2D1_COLORMANAGEMENT_PROP_DESTINATION_RENDERING_INTENT) {
                 //    effect->SetValue(D2D1_COLORMANAGEMENT_PROP_DESTINATION_RENDERING_INTENT, (D2D1_RENDERING_INTENT)IntegerFI(info[1]));
                 //}
+                
+                //yeah why the hell is SetValue a template?
+                //also i could just cast the enum to a dword and its value to a const BYTE* (i think?)
                 if (strcmp(mode, "D2D1_GAUSSIANBLUR_PROP_STANDARD_DEVIATION") == 0) {
                     effect->SetValue(D2D1_GAUSSIANBLUR_PROP_STANDARD_DEVIATION, (FLOAT)FloatFI(info[1]));
                     return;
@@ -5338,7 +5341,8 @@ namespace DIRECT2D {
                     return;
                 }
                 if (strcmp(mode, "D2D1_BITMAPSOURCE_PROP_WIC_BITMAP_SOURCE") == 0) {
-                    effect->SetValue(D2D1_BITMAPSOURCE_PROP_WIC_BITMAP_SOURCE, (IUnknown*)IntegerFI(info[1]));
+                    IUnknown* value = (IUnknown*)IntegerFI(info[1].As<Object>()->Get(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+                    effect->SetValue(D2D1_BITMAPSOURCE_PROP_WIC_BITMAP_SOURCE, value); //hey what the hell
                     return;
                 }
                 if (strcmp(mode, "D2D1_BITMAPSOURCE_PROP_SCALE") == 0) {
@@ -5503,7 +5507,8 @@ namespace DIRECT2D {
                     return;
                 }
                 if (strcmp(mode, "D2D1_COLORMANAGEMENT_PROP_SOURCE_COLOR_CONTEXT") == 0) {
-                    effect->SetValue(D2D1_COLORMANAGEMENT_PROP_SOURCE_COLOR_CONTEXT, (ID2D1ColorContext*)IntegerFI(info[1]));
+                    ID2D1ColorContext* value = (ID2D1ColorContext*)IntegerFI(info[1].As<Object>()->Get(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+                    effect->SetValue(D2D1_COLORMANAGEMENT_PROP_SOURCE_COLOR_CONTEXT, value);
                     return;
                 }
                 if (strcmp(mode, "D2D1_COLORMANAGEMENT_PROP_SOURCE_RENDERING_INTENT") == 0) {
@@ -5511,7 +5516,8 @@ namespace DIRECT2D {
                     return;
                 }
                 if (strcmp(mode, "D2D1_COLORMANAGEMENT_PROP_DESTINATION_COLOR_CONTEXT") == 0) {
-                    effect->SetValue(D2D1_COLORMANAGEMENT_PROP_DESTINATION_COLOR_CONTEXT, (ID2D1ColorContext*)IntegerFI(info[1]));
+                    ID2D1ColorContext* value = (ID2D1ColorContext*)IntegerFI(info[1].As<Object>()->Get(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+                    effect->SetValue(D2D1_COLORMANAGEMENT_PROP_DESTINATION_COLOR_CONTEXT, value);
                     return;
                 }
                 if (strcmp(mode, "D2D1_COLORMANAGEMENT_PROP_DESTINATION_RENDERING_INTENT") == 0) {
@@ -6132,7 +6138,8 @@ namespace DIRECT2D {
                     return;
                 }
                 if (strcmp(mode, "D2D1_LOOKUPTABLE3D_PROP_LUT") == 0) {
-                    effect->SetValue(D2D1_LOOKUPTABLE3D_PROP_LUT, (IUnknown*)IntegerFI(info[1]));
+                    IUnknown* value = (IUnknown*)IntegerFI(info[1].As<Object>()->Get(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
+                    effect->SetValue(D2D1_LOOKUPTABLE3D_PROP_LUT, value);
                     return;
                 }
                 if (strcmp(mode, "D2D1_LOOKUPTABLE3D_PROP_ALPHA_MODE") == 0) {
