@@ -854,7 +854,7 @@ class Blueprint {
     static radius = 4;
 
     static meta_functions = {};
-    static variables /*: {type : string, textlayout : IDWriteTextLayout, defaultvalue : any}*/ = {};
+    static variables /*: {type : string, textlayout : IDWriteTextLayout, desc : string, defaultvalue : any}*/ = {};
 
     static active = undefined; //the currently selected blueprint
 
@@ -1176,7 +1176,7 @@ class Blueprint {
         if(!out) {
             const controlArgs = PrimitiveControl.validPrimitives[param];
             if(controlArgs != undefined) { //oops
-                const tl = pobj.text.GetMetrics();
+                //const tl = pobj.text.GetMetrics();
                 //pobj.control = new PrimitiveControl(Blueprint.padding+tl.width+8, (i+1)*Blueprint.captionHeight + Blueprint.padding, ...controlArgs);
                 //oh boy PrimitiveControl overhaul (demolition)
                 pobj.control = createControlBasedOnType(param, 16, 16);
@@ -1927,6 +1927,9 @@ class BlueprintMenu {
         }
         this.contextSensitive.destroy();
         this.valueText.Release();
+        for(let i = 0; i < this.text.length; i++) {
+            this.text[i].Release(); //oops
+        }
         panes.splice(panes.indexOf(this), 1);
     }
 }
@@ -1952,6 +1955,10 @@ class PropertyDropdownMenu { //written for PropertyMenu!
         }else {
             return 24+2; //24 because of the height of the titlebar. +2 for padding
         }
+    }
+
+    destroy() {
+        this.name.Release();
     }
 }
 
@@ -2082,6 +2089,7 @@ class DetailDropdownMenu extends PropertyDropdownMenu {
     }
 
     destroy() {
+        super.destroy();
         for(let i = 0; i < this.kvcontrols.length; i++) {
             const [label, control] = this.kvcontrols[i];
             label.Release();
@@ -2439,6 +2447,11 @@ class VariableDropdownMenu extends PropertyDropdownMenu { //no release methods b
             }
         }
     }
+
+    destroy() {
+        super.destroy();
+        //vCBE idk
+    }
 }
 
 class PropertyMenu { //lowkey this might be a singleton too because im only going to make one of these
@@ -2459,7 +2472,7 @@ class PropertyMenu { //lowkey this might be a singleton too because im only goin
 
     static removeOldDetailMenu() {
         if(!(PropertyMenu.instance.dropdownMenus[0] instanceof VariableDropdownMenu)) { //checking if dropdownMenus[0] is not a VariableDropdownMenu
-            PropertyMenu.instance.dropdownMenus[0].destroy();
+            PropertyMenu.instance.dropdownMenus[0].destroy(); //wait what was this calling???? (ohhhh DetailDropdownMenu has a destroy function)
             PropertyMenu.instance.dropdownMenus.splice(0, 1);
         }
         dirty = true; //;)
@@ -2562,7 +2575,8 @@ class PropertyMenu { //lowkey this might be a singleton too because im only goin
 
     destroy() {
         for(const dropdown of this.dropdownMenus) {
-            dropdown.name.Release();
+            dropdown.destroy();
+            //dropdown.name.Release();
         }
     }
 }
@@ -2645,12 +2659,14 @@ function recur(obj, name="") {
 function saveBlueprintsJSON() {
     //ouuuuuhhhh this might be kinda hard... (hold on i got it)
     //i also want to be able to copy and paste them (maybe with the real clipboard / program)
-    let bpids = {};
+    let bpids = new Map();//{};
     let json = {variables: {}, blueprints: []};
     for(const varname of Object.keys(Blueprint.variables)) {
         const $var = Blueprint.variables[varname];
+        json.variables[varname] = {};
         json.variables[varname].type = $var.type;
         json.variables[varname].defaultvalue = $var.defaultvalue;
+        json.variables[varname].desc = $var.desc;
         //no textlayout because you can't save that lol and i'll just create it again
     }
 
@@ -2659,7 +2675,9 @@ function saveBlueprintsJSON() {
     for(const pane of panes) {
         if(pane instanceof Blueprint) {
             //json.blueprints.push();
-            bpids[pane] = i;
+            //bpids[pane] = i; //oh this doesn't work...
+            //now i gotta make it a map
+            bpids.set(pane, i);
             i++;
         }
     }
@@ -2672,7 +2690,7 @@ function saveBlueprintsJSON() {
                 y: pane.y,
                 //probably not gonna store the size because im probably gonna have to create them again anyways
                 parameters: [], //control values
-                id: bpids[pane], //just in case (just now realizing that i write "just in case" a lot)
+                id: bpids.get(pane),//bpids[pane], //just in case (just now realizing that i write "just in case" a lot)
                 connections: {
                     in: [],
                     out: [],
@@ -2694,14 +2712,14 @@ function saveBlueprintsJSON() {
                             const pin = maybepin[key];
                             object.connections.in[i][key] = {
                                 i: pin.i,
-                                source: bpids[pin.source],
+                                source: bpids.get(pin.source),
                                 id: pin.id,
                             };
                         }
                     }else {
                         object.connections.in[i] = {
                             i: maybepin.i,
-                            source: bpids[maybepin.source],
+                            source: bpids.get(maybepin.source),
                             id: maybepin.id,
                         };
                     }
@@ -2717,7 +2735,7 @@ function saveBlueprintsJSON() {
                         object.connections.out[i][key] = {
                             receiver: {
                                 i: pin.receiver.i,
-                                source: bpids[pin.receiver.source],
+                                source: bpids.get(pin.receiver.source),
                                 id: pin.receiver.id,
                             }
                         }
@@ -2732,16 +2750,97 @@ function saveBlueprintsJSON() {
     return JSON.stringify(json);
 }
 
-function parseBlueprintsJSON(str) {
-    const bpids = {};
+function loadBlueprintsJSON(str) {
+    const bpids = {}; //using an object here instead because im just doing [id] = Blueprint
     const json = JSON.parse(str); // {variables : [], blueprints: []}
-    for(const varname in json.variables) {
+    //oh shoot i gotta get rid of old variables in the commandList
+    for(let i = 0; i < BlueprintMenu.commandList.length; i++) { //get rid of variables in command list
+        const {name} = BlueprintMenu.commandList[i];
+        for(const varname in Blueprint.variables) {
+            if(name == `Get ${varname}` || name == `Set ${varname}`) {
+                BlueprintMenu.commandList.splice(i, 1);
+                i--; //man this is goated and im kinda mad i've never thought of this before
+            }
+        }
+    }
+    for(const varname in Blueprint.variables) { //release the textlayouts before getting rid of references
+        const $var = Blueprint.variables[varname];
+        $var.textlayout.Release(); //lo!
+    }
+
+    Blueprint.variables = {};
+
+    for(const varname in json.variables) { //add variables
         const $var = json.variables[varname];
         Blueprint.variables[varname] = $var;
         Blueprint.variables[varname].textlayout = d2d.CreateTextLayout(varname, font, w, h); //oh yeah
+
+        BlueprintMenu.commandList.push({name: `Get ${this.vCBE.value}`, desc: VariableDropdownMenu.selected.desc, parameters: [], out: [`${this.vCBE.value} : ${VariableDropdownMenu.selected.type}`], type: BPTYPE_BARE, parent: "variable"});
+        BlueprintMenu.commandList.push({name: `Set ${this.vCBE.value}`, desc: VariableDropdownMenu.selected.desc, parameters: [`${this.vCBE.value} : ${VariableDropdownMenu.selected.type}`], out: [` : ${VariableDropdownMenu.selected.type}`], type: BPTYPE_NOTPURE, parent: "variable"});
+    }
+
+    Blueprint.active = undefined;
+    for(let i = 0; i < panes.length; i++) { //delete previous blueprints
+        const pane = panes[i];
+        if(pane instanceof Blueprint) {
+            pane.destroy(); //oops i modify panes in Blueprint#destroy
+            i--;
+        }
     }
 
     //create em yk
+    for(const blueprint of json.blueprints) { //create blueprints, set ids, and set parameter control values
+        const cli = BlueprintMenu.commandList.findIndex(({name}) => name == blueprint.title);
+        let newbp;
+        if(cli != -1) {
+            //const newbp = Blueprint.recreate(blueprint, BlueprintMenu.commandList[cli], true);
+            const {name, desc, parameters, out, type} = BlueprintMenu.commandList[cli];
+            newbp = Blueprint.create(undefined, name, blueprint.x, blueprint.y, parameters, out, type ?? BPTYPE_NOTPURE, desc);
+            for(let i = 0; i < newbp.parameters.length; i++) {
+                const {control} = newbp.parameters[i];
+                if(control) {
+                    control.value = blueprint.parameters[i].control.value;
+                }
+            }
+        }else {
+            print(`${cli} (${blueprint.title}) not found in BlueprintMenu.commandList! (it's probably the event start node)`);
+            if(blueprint.id == 0 || blueprint.title == "Event Start") {
+                newbp = new Blueprint(undefined, "Event Start", [162/255, 38/255, 30/255], 0, 0, 190, 72, [], [], BPTYPE_EVENT);
+                panes.splice(0, 0, newbp);
+            }
+        }
+        bpids[blueprint.id] = newbp;
+    }
+
+    for(const blueprint of json.blueprints) { //fix connections
+        const newbp = bpids[blueprint.id];
+        for(let i = 0; i < blueprint.connections.in.length; i++) {
+            const maybepin = blueprint.connections.in[i];
+            if(maybepin) {
+                if(newbp.parameters[i].type == "exec") {
+                    for(const key in maybepin) {
+                        const pin = maybepin[key];
+                        pin.source = bpids[pin.source];
+                    }
+                }else {
+                    maybepin.source = bpids[maybepin.source];
+                }
+            }
+        }
+        newbp.connections.in = blueprint.connections.in;
+
+        for(let i = 0; i < blueprint.connections.out.length; i++) {
+            const maybe = blueprint.connections.out[i];
+            if(maybe) {
+                for(const key in maybe) {
+                    const pin = maybe[key];
+                    pin.receiver.source = bpids[pin.receiver.source];
+                }
+            }
+        }
+        newbp.connections.out = blueprint.connections.out;
+        
+    }
 }
 
 function executeBlueprints() {
@@ -3304,7 +3403,39 @@ function windowProc(hwnd, msg, wp, lp) {
                 BlueprintMenu.open(hwnd);
             }
         }else if(wp == "S".charCodeAt(0) && GetKey(VK_CONTROL)) {
-            print(saveBlueprintsJSON());
+            //print(saveBlueprintsJSON());
+            const paths = showSaveFilePicker({
+                types: [
+                    {
+                        description: "Text files yk",
+                        accept: [".json", ".txt"] //i can't be bothered to implement the mime types :sob:
+                    }
+                ],
+            });
+            if(paths) {
+                const fs = require("fs");
+                print(paths); //wait i thought paths was an array (maybe it's not when im using the save picker idk)
+                fs.write(paths, saveBlueprintsJSON());
+            }else {
+                print(saveBlueprintsJSON());
+            }
+        }else if(wp == "O".charCodeAt(0) && GetKey(VK_CONTROL)) {
+            const paths = showOpenFilePicker({
+                multiple: false,
+                types: [
+                    {
+                        description: "Text files yk",
+                        accept: [".json", ".txt"] //i can't be bothered to implement the mime types :sob:
+                    }
+                ]
+            });
+
+            if(paths) {
+                const fs = require("fs");
+                print(paths);
+                const str = fs.read(paths);
+                loadBlueprintsJSON(str);
+            }
         }
 
         if(wp == VK_ESCAPE) {

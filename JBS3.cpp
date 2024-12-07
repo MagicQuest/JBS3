@@ -2850,7 +2850,8 @@ namespace DIRECT2D {
             }));
             jsFont->Set(isolate, "GetLineSpacing", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
                 Isolate* isolate = info.GetIsolate();
-                IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                Local<Context> context = isolate->GetCurrentContext();
+                IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(context, LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(context).FromJust();
                 DWRITE_LINE_SPACING_METHOD lineSpacingMehtod; //keeping this mispelling LO!
                 FLOAT lineSpacing, baseline;
 
@@ -2858,9 +2859,9 @@ namespace DIRECT2D {
 
                 Local<Object> jsLineSpacingInfo = Object::New(isolate);
 
-                jsLineSpacingInfo->Set(isolate->GetCurrentContext(), LITERAL("lineSpacingMethod"), Number::New(isolate, lineSpacingMehtod));
-                jsLineSpacingInfo->Set(isolate->GetCurrentContext(), LITERAL("lineSpacing"), Number::New(isolate, lineSpacing));
-                jsLineSpacingInfo->Set(isolate->GetCurrentContext(), LITERAL("baseline"), Number::New(isolate, baseline));
+                jsLineSpacingInfo->Set(context, LITERAL("lineSpacingMethod"), Number::New(isolate, lineSpacingMehtod));
+                jsLineSpacingInfo->Set(context, LITERAL("lineSpacing"), Number::New(isolate, lineSpacing));
+                jsLineSpacingInfo->Set(context, LITERAL("baseline"), Number::New(isolate, baseline));
 
                 info.GetReturnValue().Set(jsLineSpacingInfo);
             }));
@@ -2909,19 +2910,36 @@ namespace DIRECT2D {
                 Isolate* isolate = info.GetIsolate();
                 IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
 
-                font->SetFlowDirection((DWRITE_FLOW_DIRECTION)IntegerFI(info[0]));
+                RetPrintIfFailed(font->SetFlowDirection((DWRITE_FLOW_DIRECTION)IntegerFI(info[0])), "SetFlowDirection failed...");
             }));
             jsFont->Set(isolate, "SetIncrementalTabStop", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
                 Isolate* isolate = info.GetIsolate();
                 IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
 
-                font->SetIncrementalTabStop(FloatFI(info[0]));
+                RetPrintIfFailed(font->SetIncrementalTabStop(FloatFI(info[0])), "SetIncrementalTabSlop failed..."); //lel
             }));
             jsFont->Set(isolate, "SetLineSpacing", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
                 Isolate* isolate = info.GetIsolate();
                 IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
 
-                font->SetLineSpacing((DWRITE_LINE_SPACING_METHOD)IntegerFI(info[0]), FloatFI(info[1]), FloatFI(info[2]));
+                DWRITE_LINE_SPACING_METHOD lineSpacingMethod;
+                FLOAT lineSpacing;
+                FLOAT baseline;
+
+                if (info.Length() == 1 && info[0]->IsObject()) {
+                    Local<Context> context = isolate->GetCurrentContext();
+                    Local<Object> jsLSM = info[0].As<Object>();
+                    lineSpacingMethod = (DWRITE_LINE_SPACING_METHOD)IntegerFI(jsLSM->Get(context, LITERAL("lineSpacingMethod")).ToLocalChecked());
+                    lineSpacing = FloatFI(jsLSM->Get(context, LITERAL("lineSpacing")).ToLocalChecked());
+                    baseline = FloatFI(jsLSM->Get(context, LITERAL("baseline")).ToLocalChecked());
+                }
+                else {
+                    lineSpacingMethod = (DWRITE_LINE_SPACING_METHOD)IntegerFI(info[0]);
+                    lineSpacing = FloatFI(info[1]);
+                    baseline = FloatFI(info[2]);
+                }
+
+                RetPrintIfFailed(font->SetLineSpacing(lineSpacingMethod, lineSpacing, baseline), "SetLineSpacing failed...");
             }));
             jsFont->Set(isolate, "SetParagraphAlignment", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
                 Isolate* isolate = info.GetIsolate();
@@ -2945,9 +2963,19 @@ namespace DIRECT2D {
                 Isolate* isolate = info.GetIsolate();
                 IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
 
-                DWRITE_TRIMMING trimmingOptions{ (DWRITE_TRIMMING_GRANULARITY)IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]) };
-
-                font->SetTrimming(&trimmingOptions, nullptr);
+                DWRITE_TRIMMING trimmingOptions;//{ (DWRITE_TRIMMING_GRANULARITY)IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]) };
+                if (info.Length() == 1 && info[0]->IsObject()) {
+                    //probably passed in an object for it
+                    Local<Context> context = isolate->GetCurrentContext();
+                    Local<Object> jsTrimming = info[0].As<Object>();
+                    trimmingOptions.granularity = DWRITE_TRIMMING_GRANULARITY(IntegerFI(jsTrimming->Get(context, LITERAL("granularity")).ToLocalChecked()));
+                    trimmingOptions.delimiter = UINT32(IntegerFI(jsTrimming->Get(context, LITERAL("delimiter")).ToLocalChecked()));
+                    trimmingOptions.delimiterCount = UINT32(IntegerFI(jsTrimming->Get(context, LITERAL("delimiterCount")).ToLocalChecked()));
+                }
+                else {
+                    trimmingOptions = { (DWRITE_TRIMMING_GRANULARITY)IntegerFI(info[0]), (UINT32)IntegerFI(info[1]), (UINT32)IntegerFI(info[2]) };
+                }
+                RetPrintIfFailed(font->SetTrimming(&trimmingOptions, nullptr), "SetTrimming failed...");
                 //WOAH JUST SAW THIS ON THE NET! https://stackoverflow.com/questions/51009082/display-text-in-a-specified-rectangle-with-directwrite
                 //font->SetTrimming(&DWRITE_TRIMMING{ (DWRITE_TRIMMING_GRANULARITY)IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]) }, nullptr);
                 //nvm it didn't work :sob:
@@ -2956,7 +2984,7 @@ namespace DIRECT2D {
                 Isolate* isolate = info.GetIsolate();
                 IDWriteTextFormat* font = (IDWriteTextFormat*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
 
-                font->SetWordWrapping((DWRITE_WORD_WRAPPING)IntegerFI(info[0]));
+                RetPrintIfFailed(font->SetWordWrapping((DWRITE_WORD_WRAPPING)IntegerFI(info[0])), "SetWordWrapping failed...");
             }));
             if (parent) {
                 jsFont->Set(isolate, "SetFontSize", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
@@ -2995,7 +3023,7 @@ namespace DIRECT2D {
                     font->Release();
                     info.This()->Set(isolate->GetCurrentContext(), LITERAL("internalPtr"), Number::New(isolate, (LONG_PTR)font2));
                     //remakefontonbjecnts
-                    }));
+                }));
             }
             //jsFont->Set(isolate, "Release", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
             //    Isolate* isolate = info.GetIsolate();
@@ -3039,13 +3067,20 @@ namespace DIRECT2D {
                 Isolate* isolate = info.GetIsolate();
                 IDWriteTextLayout* layout = (IDWriteTextLayout*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
 
-                IUnknown* drawingEffect;
+                IUnknown* drawingEffect = nullptr;
 
                 DWRITE_TEXT_RANGE textRange = DIRECT2D::genTextRange(isolate, layout, IntegerFI(info[1]), info[2]);
 
                 RetIfFailed(layout->GetDrawingEffect(IntegerFI(info[0]), &drawingEffect, &textRange), "GetDrawingEffect failed");
 
-                info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)drawingEffect));
+                if (drawingEffect != nullptr) {
+                    Local<Object> jsDrawingEffect = DIRECT2D::getIUnknownImpl(isolate, drawingEffect);
+
+                    info.GetReturnValue().Set(jsDrawingEffect);
+                }
+                else {
+                    info.GetReturnValue().Set(0);
+                }
             }));
 
             //jsLayout->Set(isolate, "GetInlineObject", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
@@ -12657,7 +12692,8 @@ void showFilePicker(const v8::FunctionCallbackInfo<v8::Value>& info, bool saveDi
         if (SUCCEEDED(hr))
         {
             if (multiple) {
-                /*hr = */pfd->SetOptions(dwOptions | FOS_ALLOWMULTISELECT);
+                hr = pfd->SetOptions(dwOptions | FOS_ALLOWMULTISELECT);
+                PrintIfFailed(hr, "SetOptions (for multiple: true) failefd...");
             }
             int saveTypesCount = excludeAcceptAll ? 0 : 1;
             Local<Array> types;
@@ -12665,7 +12701,7 @@ void showFilePicker(const v8::FunctionCallbackInfo<v8::Value>& info, bool saveDi
                 types = options->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("types")).ToLocalChecked().As<Array>();
                 saveTypesCount += types->Length();
             }
-            COMDLG_FILTERSPEC* c_rgSaveTypes = new COMDLG_FILTERSPEC[saveTypesCount];
+            COMDLG_FILTERSPEC* c_rgSaveTypes = new COMDLG_FILTERSPEC[saveTypesCount]; //this could be a vector tho
             if(hasTypes) { //this is really ugly but not as ugly as i originally had in mind (having 2 checks for hasTypes)
                 for (int i = 0; i < types->Length(); i++) {
                     Local<Object> typeInfo = types->Get(isolate->GetCurrentContext(), i).ToLocalChecked().As<Object>();
@@ -12690,10 +12726,14 @@ void showFilePicker(const v8::FunctionCallbackInfo<v8::Value>& info, bool saveDi
                         }
                     }
 
-                    wchar_t* descPtr = new wchar_t[desc->Length()];
+                    //OHHHHH i was getting heap corruptions when i called pfd->Show(NULL) and obviously this was the place to check
+                    //it turns out the desc->Length() and wcslen don't include the null terminator but wcscpy copies it too (so my buffers were 2 bytes short i think?)
+                    wchar_t* descPtr = new wchar_t[desc->Length()+2];
+                    print("length: " << desc->Length() << " probably required length: " << wcslen(WStringFI(desc)));
                     wcscpy(descPtr, WStringFI(desc)); //i guess i could use memcpy because i know the length...
+                    //memcpy(descPtr, WStringFI(desc), desc->Length());
 
-                    wchar_t* vecPtr = new wchar_t[aTWS.length()];
+                    wchar_t* vecPtr = new wchar_t[aTWS.length()+2]; //the goog' says it probably doesn't include the null terminator either
                     wcscpy(vecPtr, &aTWS[0]);
 
                     c_rgSaveTypes[i] = { descPtr, vecPtr }; //lets hope this c_str() keeps working outside this scope (bruh this shit really running off of duktape (get it) and hopes and dreams (haha get it frisk))
@@ -12704,12 +12744,17 @@ void showFilePicker(const v8::FunctionCallbackInfo<v8::Value>& info, bool saveDi
                 }
             }
             if (!excludeAcceptAll) {
-                c_rgSaveTypes[saveTypesCount - 1] = { L"All Files (*.*)", L"*.*" };
+                //well since im deleting the strings later in this branch i gotta make these new too or else im gonna corrupt the heap or something idk (surprisingly this hasn't happened yet somehow for this function) (ok nevermind im getting heap errors AFTER i tried "fixing" the problem)
+                //OHHHHH what i wrote above this comment was totally wrong because im only deleting the wchar_t arrays counted by types->Length()
+                //wchar_t* descPtr = new wchar_t[16] {L"All Files (*.*)"};
+                //wchar_t* vecPtr = new wchar_t[4] {L"*.*"};
+                c_rgSaveTypes[saveTypesCount - 1] = { L"All Files (*.*)", L"*.*" };//{ descPtr, vecPtr };
             }
 
             //pfd->SetFileTypes(ARRAYSIZE(c_rgSaveTypes), c_rgSaveTypes); //when using new for c_rgSaveTypes ARRAYSIZE gives me an error and it suggests _ARRAYSIZE so lets see
             //alright bruh this is all stupid the only thing arraysize did was literally say how many {}s were inside c_rgSaveTypes (which is saveTypesCount)
-            pfd->SetFileTypes(saveTypesCount, c_rgSaveTypes);
+            hr = pfd->SetFileTypes(saveTypesCount, c_rgSaveTypes);
+            PrintIfFailed(hr, "SetFileTypes failed (better fix this part because im prolly causing a memory leak by catching here)");
             // Show the Open dialog.
             hr = pfd->Show(NULL);
 
@@ -12726,46 +12771,84 @@ void showFilePicker(const v8::FunctionCallbackInfo<v8::Value>& info, bool saveDi
                         if (SUCCEEDED(hr))
                         {
                             DWORD items;
-                            if (SUCCEEDED(psiaResults->GetCount(&items))) {
+                            hr = psiaResults->GetCount(&items);
+                            if (SUCCEEDED(hr)) {
                                 std::cout << items << std::endl;
                                 Local<Array> jsArr = Array::New(isolate, items);
                                 for (int i = 0; i < items; i++) {
                                     IShellItem* shellItem; //should i release this object? (for some reason they don't in the docs and maybe they are released when psiaResults are released that sorta thing)
-                                    if (SUCCEEDED(psiaResults->GetItemAt(i, &shellItem))) {
+                                    hr = psiaResults->GetItemAt(i, &shellItem);
+                                    if (SUCCEEDED(hr)) {
                                         wchar_t* path = NULL; //it's so weird and kinda annoying how they use special types like PWSTR and half of them mean the exact same thing
-                                        if (SUCCEEDED(shellItem->GetDisplayName(SIGDN_FILESYSPATH, &path))) {
+                                        hr = shellItem->GetDisplayName(SIGDN_FILESYSPATH, &path);
+                                        if (SUCCEEDED(hr)) {
                                             //info.GetReturnValue().Set(String::NewFromTwoByte(isolate, (const uint16_t*)path).ToLocalChecked());
                                             jsArr->Set(isolate->GetCurrentContext(), i, String::NewFromTwoByte(isolate, (const uint16_t*)path).ToLocalChecked());
                                         }
+                                        else {
+                                            PrintIfFailed(hr, "shellItem->GetDisplayName(SIGDN_FILESYSPATH, wchar_t**) failed...");
+                                        }
+                                    }
+                                    else {
+                                        PrintIfFailed(hr, "psiaResults->GetItemAt(" << i << ", IShellItem**) failed...");
                                     }
                                     shellItem->Release();
                                 }
                                 info.GetReturnValue().Set(jsArr);
+                            }
+                            else {
+                                PrintIfFailed(hr, "psiaResults->GetCount(DWORD*) fvailed...");
                             }
                             //
                             // You can add your own code here to handle the results.
                             //
                             psiaResults->Release();
                         }
+                        else {
+                            PrintIfFailed(hr, "ifod->GetResults(IShellItemArray**)");
+                        }
+                    }
+                    else {
+                        PrintIfFailed(hr, "pfd->QueryInterface(IOpenFileDialog**)");
                     }
                 }else {
                     IShellItem* shellItem;
-                    if (SUCCEEDED(pfd->GetResult(&shellItem))) {
+                    hr = pfd->GetResult(&shellItem);
+                    if (SUCCEEDED(hr)) {
                         wchar_t* path = NULL;
-                        if (SUCCEEDED(shellItem->GetDisplayName(SIGDN_FILESYSPATH, &path))) {
+                        hr = shellItem->GetDisplayName(SIGDN_FILESYSPATH, &path);
+                        if (SUCCEEDED(hr)) {
                             info.GetReturnValue().Set(String::NewFromTwoByte(isolate, (const uint16_t*)path).ToLocalChecked());
                         }
+                        else {
+                            PrintIfFailed(hr, "shellItem->GetDisplayName(SIGDN_FILESYSPATH, &path); failed...");
+                        }
+                    }
+                    else {
+                        PrintIfFailed(hr, "pfd->GetResult(&shellItem) failed...");
                     }
                     shellItem->Release();
                 }
             }
+            else {// if (hr != WININET_E_OPERATION_CANCELLED) { //idk what the code is for when it's cancelled
+                PrintIfFailed(hr, "pfd->Show failed... (probably cancelled by the user)");
+            }
+            print("maxl ength<? " << types->Length() << " " << saveTypesCount);
             for (int i = 0; i < types->Length(); i++) {
+                //print(i << " name " << (wchar_t*)c_rgSaveTypes[i].pszName);
+                //print(i << " spec " << (wchar_t*)c_rgSaveTypes[i].pszSpec);
                 delete[] c_rgSaveTypes[i].pszName; //hopefully no memory leaks heree
                 delete[] c_rgSaveTypes[i].pszSpec;
             }
             delete[] c_rgSaveTypes;
         }
+        else {
+            PrintIfFailed(hr, "GetOptions failed (uh oh idk how that happened)");
+        }
         pfd->Release();
+    }
+    else {
+        PrintIfFailed(hr, "CoCreateInstance(CLSID_File....Dialog) failed!");
     }
 
     /*OPENFILENAME ofn; //Starting with Windows Vista, the Open and Save As common dialog boxes have been superseded by the Common Item Dialog (im not using all that bruh IFileDialog uses COM and the "basic" example is complicated ASL)

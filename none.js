@@ -1,5 +1,6 @@
-const window = FindWindow(null, "Documents");//"JBS3 (Running) - Microsoft Visual Studio");
-const d2d = createCanvas("d2d", ID2D1DCRenderTarget, window);
+const wic = InitializeWIC();
+const window = FindWindow(null, "Documents - File Explorer");//"JBS3 (Running) - Microsoft Visual Studio");
+const d2d = createCanvas("d2d", ID2D1DCRenderTarget, window, wic);
 
 print("window:", window);
 print(d2d, d2d.internalDXPtr);
@@ -148,16 +149,17 @@ while (!GetKey(VK_ESCAPE)) {
 }
 
 brush.Release();
-d2d.Release();
 font.Release();
-bitmap.Release();
 bitmapBrush.Release();
-GSC.Release();
+bitmap.Release();
 gradientBrush.Release();
+GSC.Release();
 radialBrush.Release();
 radialGradient.Release();
-screenBitmap.Release();
 screenBitmapBrush.Release();
+screenBitmap.Release();
+d2d.Release();
+wic.Release();
 //}, 16);
 
 //d2d.DrawEllipse(100,100,100,100,brush,50);//when i lose constrol AHHH AH H AH  UH UH AHHH AHH AHH UH UHI NEED YU LOVE

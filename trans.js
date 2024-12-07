@@ -1,5 +1,6 @@
-const window = FindWindow(null, "Documents");//"JBS3 (Running) - Microsoft Visual Studio");
-const d2d = createCanvas("d2d", ID2D1DCRenderTarget, window);
+const wic = InitializeWIC();
+const window = FindWindow(null, "Documents - File Explorer");//"JBS3 (Running) - Microsoft Visual Studio");
+const d2d = createCanvas("d2d", ID2D1DCRenderTarget, window, wic);
 
 const brush = d2d.CreateSolidColorBrush(1.0, 0.0, 1.0, 1.0);
 
@@ -60,6 +61,7 @@ while (!GetKey(VK_ESCAPE)) {
 }
 
 brush.Release();
-d2d.Release();
-bitmap.Release();
 bitmapBrush.Release();
+bitmap.Release();
+d2d.Release();
+wic.Release();
