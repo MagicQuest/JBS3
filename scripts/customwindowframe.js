@@ -2,6 +2,8 @@
 //https://learn.microsoft.com/en-us/windows/win32/dwm/customframe
 //this where i got my INFO from
 
+//the viena soundfont editor looks kida lit with their nonclient area drawing (plus i guess unreal does it too)
+
 let window;
 const width = 500;
 const height = 500;

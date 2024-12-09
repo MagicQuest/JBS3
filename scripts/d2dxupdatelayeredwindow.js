@@ -5,6 +5,8 @@
 //oh shit i just learned that you might be able to use QueryInterface on any ID2D1RenderTarget type shits to get an ID2D1DeviceContext! https://stackoverflow.com/questions/9021244/how-to-work-with-pixels-using-direct2d/22217372#comment54979996_22217372
 //this is also pretty cool https://katyscode.wordpress.com/2013/01/23/migrating-existing-direct2d-applications-to-use-direct2d-1-1-functionality-in-windows-7/
 
+//the viena soundfont editor looks kida lit with their nonclient area drawing (plus i guess unreal does it too)
+
 let windowWidth = 512; //current width (for when you resize it)
 let windowHeight = 512;
 

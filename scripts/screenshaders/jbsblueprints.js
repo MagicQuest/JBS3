@@ -1913,7 +1913,7 @@ class BlueprintMenu {
             //print(typeof(parameters), typeof(out));
             print(name, desc, parameters, out, type, parent);
             const bp = Blueprint.create(undefined, name, this.x, this.y, parameters, out, type ?? BPTYPE_NOTPURE, desc); //ok putting undefined here is a real sign that i really don't need to hold on to the hwnd in Blueprint lmao
-            if(parent && parent == "variable") {
+            if(parent == "variable") { //i don't have to check if parent is valid first because you can still check undefined with no error (undefined == "variable" //false)
                 print("parent valid!", bp.title, bp.title.substring(4));
                 bp.variable = Blueprint.variables[bp.title.substring(4)];
             }
@@ -2694,7 +2694,8 @@ function saveBlueprintsJSON() {
                 connections: {
                     in: [],
                     out: [],
-                }
+                },
+                type: pane.type, //oops forgot
             };
             //not writing down the types of these parameters since im probably gonna create the blueprint again and it'll already know all that probably
             for(let i = 0; i < pane.parameters.length; i++) {
@@ -2775,8 +2776,8 @@ function loadBlueprintsJSON(str) {
         Blueprint.variables[varname] = $var;
         Blueprint.variables[varname].textlayout = d2d.CreateTextLayout(varname, font, w, h); //oh yeah
 
-        BlueprintMenu.commandList.push({name: `Get ${this.vCBE.value}`, desc: VariableDropdownMenu.selected.desc, parameters: [], out: [`${this.vCBE.value} : ${VariableDropdownMenu.selected.type}`], type: BPTYPE_BARE, parent: "variable"});
-        BlueprintMenu.commandList.push({name: `Set ${this.vCBE.value}`, desc: VariableDropdownMenu.selected.desc, parameters: [`${this.vCBE.value} : ${VariableDropdownMenu.selected.type}`], out: [` : ${VariableDropdownMenu.selected.type}`], type: BPTYPE_NOTPURE, parent: "variable"});
+        BlueprintMenu.commandList.push({name: `Get ${varname}`, desc: $var.desc, parameters: [], out: [`${varname} : ${$var.type}`], type: BPTYPE_BARE, parent: "variable"});
+        BlueprintMenu.commandList.push({name: `Set ${varname}`, desc: $var.desc, parameters: [`${varname} : ${$var.type}`], out: [` : ${$var.type}`], type: BPTYPE_NOTPURE, parent: "variable"});
     }
 
     Blueprint.active = undefined;
@@ -2794,8 +2795,12 @@ function loadBlueprintsJSON(str) {
         let newbp;
         if(cli != -1) {
             //const newbp = Blueprint.recreate(blueprint, BlueprintMenu.commandList[cli], true);
-            const {name, desc, parameters, out, type} = BlueprintMenu.commandList[cli];
-            newbp = Blueprint.create(undefined, name, blueprint.x, blueprint.y, parameters, out, type ?? BPTYPE_NOTPURE, desc);
+            const {name, desc, parameters, out, type, parent} = BlueprintMenu.commandList[cli]; //we don't need type as we save it in the json
+            newbp = Blueprint.create(undefined, name, blueprint.x, blueprint.y, parameters, out, blueprint.type, desc);
+            if(parent == "variable") { //might put this part inside of Blueprint.create
+                //well now we gotta figure out which one
+                newbp.variable = Blueprint.variables[newbp.title.substring(4)];
+            }
             for(let i = 0; i < newbp.parameters.length; i++) {
                 const {control} = newbp.parameters[i];
                 if(control) {
@@ -2841,6 +2846,8 @@ function loadBlueprintsJSON(str) {
         newbp.connections.out = blueprint.connections.out;
         
     }
+
+    dirty = true;
 }
 
 function executeBlueprints() {
@@ -3394,6 +3401,7 @@ function windowProc(hwnd, msg, wp, lp) {
         }else if(wp == "T".charCodeAt(0)) {
             //const dbg = d2d.DXGIGetDebugInterface1();
             //print(d2d.DXGI_DEBUG_ALL);
+            //ReportLiveObjects logs in the debug window of visual studio (not the console)
             //dbg.ReportLiveObjects(d2d.DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_ALL); //dang it bruh this only logs d3d and dxgi related object (no d2d)
             //dbg.Release();
         }else if(wp == " ".charCodeAt(0) && !Editable.editing) {
