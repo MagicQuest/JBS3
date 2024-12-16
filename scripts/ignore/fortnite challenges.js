@@ -51,7 +51,7 @@ function readanddrawmyshit(hwnd) {
         }
 
 
-        font = eval(contents[1]);
+        font = eval(contents[1]); //apparently new Function is faster?
         fheight = GetObjectHFONT(font).lfHeight;
         contents.splice(0, 1); //just snip that out there
         contents.splice(0, 1); //just snip that out there

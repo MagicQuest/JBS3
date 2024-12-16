@@ -3,9 +3,10 @@
 
 //stop Sleep and SET from being cached !!! (actually i think if current is the one being interpreted it should be executed every time? also when caching in a loop, store the cached values in loopStack.at(-1) so when it repeats i clear that cache! I think it true that this may be a valid alternative for the cacheable property and this line as a whole. )
 //test if unreal still caches unpure function connected to a while condition or something (yeah nah if you connect an unpure function to a while loop in unreal it'll tell you there's an infinite loop)
-//probably should make a modal class or something like that for BlueprintMenu and DropdownControlMenu
+//probably should make a modal class or something like that for BlueprintMenu and DropdownControlMenu (likely so)
 //quite possibly make static functions for managing pin connections because BOY is it confusing
 //make some animation class or global array like magicquest.github.io/v2 !
+//i might make BlueprintMenu's scrollBox static but honestly idk if it's THAT important like idk
 
 //const rp = print;
 //print = function(...args) {};
@@ -737,6 +738,38 @@ class EditControl {
     }
 }
 
+class TextButtonControl extends StaticControl {
+    constructor(width, height, value, color, callback) {
+        super(width, height, value, color);
+        this.callback = callback.bind(this);
+        this.hover = false;
+    }
+
+    redraw(x, y) {
+        if(this.hover) {
+            colorBrush.SetColor(0.0, 0.0, 0.0, .4);
+            d2d.FillRectangle(x, y, x+this.width, y+this.height, colorBrush);
+        }
+        super.redraw(x, y);
+    }
+
+    buttonDown(mouse) {
+        this.callback(mouse);
+    }
+
+    hittest(mouse, x, y) { //StaticControl has "no" hittest method
+        this.hover = false;
+        if(withinBounds({x, y, width: this.width, height: this.height}, mouse)) {
+            this.hover = true;
+            return [BUTTON, this];
+        }
+    }
+
+    destroy() {
+        super.destroy();
+    }
+}
+
 class DropdownButtonControl {
     options = [];
     callback = undefined; 
@@ -750,6 +783,7 @@ class DropdownButtonControl {
         this.value = value ?? options[0];
         this.width = width;
         this.height = height;
+        print("lazymaxxing by not creating a text layout for value in dropdown button ctonrol");
     }
 
     onEdit(newvalue) {
@@ -771,7 +805,7 @@ class DropdownButtonControl {
         colorBrush.SetColor(229/255, 229/255, 229/255);
         d2d.FillRoundedRectangle(x, y, x+this.width-4, y+this.height, 1, 1, colorBrush);
         colorBrush.SetColor(0.0, 0.0, 0.0);
-        d2d.DrawText(this.value, font, x, y, w, h, colorBrush);
+        d2d.DrawText(this.value, font, x, y, w, h, colorBrush); //lazy...
     }
 
     hittest(mouse, x, y) {
@@ -794,6 +828,14 @@ function createControlBasedOnType(type, width, height, ...args) {
     }else if(primitivetype == PRIMITIVE_DROPDOWN) {
         return new DropdownButtonControl(width, height, ...args);
     }
+}
+
+function hittestChildControl(control, mouse) { //checkAndHittestChildControl(control, mouse) {
+    //if(withinBounds(control, mouse)) {
+        const clientmouse = {x: mouse.x-control.x, y: mouse.y-control.y};
+        return control.hittest(clientmouse);
+    //}
+    //return undefined;
 }
 
 const baseTypes = {
@@ -830,7 +872,7 @@ class Blueprint {
     //static captionHeight = GetSystemMetrics(SM_CYCAPTION) + GetSystemMetrics(SM_CYEDGE)*2; //27
     static captionHeight = 21;
 
-    parent = NULL;
+    //parent = NULL; //yeah im finally taking this property out back
     title = "";
     x = 0;
     y = 0;
@@ -860,13 +902,24 @@ class Blueprint {
 
     /*static*/selectionGradient = undefined;
 
+                                        //WAIT A SEC i create the scroll box EVERY TIME I OPEN the blueprint menu!!! which is actually really weird and MAYBE i'll change it but idk lol (oh my god i wasn't even destroying the scroll box until now!)
+    static addNewVariable(varobj, name, desc, paramtype) {//, updatescrollbox = true) { //when calling addNewVariable from VariableDropdownMenu's endInput i want to clear the scrollbox 
+        Blueprint.variables[name] = varobj;
+        BlueprintMenu.commandList.push({name: `Get ${name}`, desc, parameters: [], out: [`${name} : ${paramtype}`], type: BPTYPE_BARE, parent: "variable"});
+        BlueprintMenu.commandList.push({name: `Set ${name}`, desc, parameters: [`${name} : ${paramtype}`], out: [` : ${paramtype}`], type: BPTYPE_NOTPURE, parent: "variable"});
+        //if(updatescrollbox) {
+        //    BlueprintMenu.singleton.scrollBox.clear();
+        //    BlueprintMenu.singleton.scrollBox.elements = Blueprint.newElementsFromCommandList();
+        //}
+    }
+
     static recreate(old, cl) {
         old.destroy();
 
-        const {name, desc, parameters, out, type} = cl;
+        const {name, desc, parameters, out, type, constant} = cl;
         //print(typeof(parameters), typeof(out));
         print("RECREATING", name, desc, parameters, out, type);
-        const newbp = Blueprint.create(undefined, name, old.x, old.y, parameters, out, type ?? BPTYPE_NOTPURE, desc); //ok putting undefined here is a real sign that i really don't need to hold on to the hwnd in Blueprint lmao                
+        const newbp = Blueprint.create(/*undefined, */name, old.x, old.y, parameters, out, type ?? BPTYPE_NOTPURE, desc, constant); //ok putting undefined here is a real sign that i really don't need to hold on to the hwnd in Blueprint lmao                
         //newbp.connections = Object.assign({}, old.connections); //doudou oye
         let m = 0;
         if(old.type != type) {
@@ -910,17 +963,17 @@ class Blueprint {
             const oldpin = old.connections.in[l];
             if(oldpin) {
                 newbp.connections.in[l-m] = oldpin;
-                const maybepin = newbp.connections.in[l-m];
-                if(newbp.parameters[l-m].type == "exec") {
+                const maybepin = newbp.connections.in[l-m]; //connections.in is now always an object instead of only being an object when the parameter is exec 
+            //    if(newbp.parameters[l-m].type == "exec") {
                     for(const key of Object.keys(maybepin)) {
                         const pin = maybepin[key];
                         pin.source.connections.out[pin.i][pin.id].receiver.i = l-m; //bruh......
                         pin.source.connections.out[pin.i][pin.id].receiver.source = newbp; //bruh......    
                     }
-                }else {
-                    maybepin.source.connections.out[pin.i][pin.id].receiver.i = l-m; //bruh...
-                    maybepin.source.connections.out[pin.i][pin.id].receiver.source = newbp; //bruh...
-                }
+            //    }else {
+            //        maybepin.source.connections.out[maybepin.i][maybepin.id].receiver.i = l-m; //bruh...
+            //        maybepin.source.connections.out[maybepin.i][maybepin.id].receiver.source = newbp; //bruh...
+            //    }
             }
         }
         //let maxoutlength = newbp.connections.out.length;
@@ -948,8 +1001,12 @@ class Blueprint {
                     }
                     newbp.connections.out[l-m][key] = oldpin;
                     const pin = newbp.connections.out[l-m][key];
-                    pin.receiver.source.connections.in[pin.receiver.i].i = l-m; //bruh...
-                    pin.receiver.source.connections.in[pin.receiver.i].source = newbp; //bruh...
+                    //if(pin.receiver.source.parameters[pin.receiver.i].type == "exec") {
+                    //
+                    //}
+
+                    pin.receiver.source.connections.in[pin.receiver.i][pin.receiver.id].i = l-m; //bruh...
+                    pin.receiver.source.connections.in[pin.receiver.i][pin.receiver.id].source = newbp; //bruh...
                 }
             }
         }
@@ -975,10 +1032,33 @@ class Blueprint {
     }
 
     //static create(parent, title, color, x, y, width, height, parameters, out, type) {
-    static create(parent, title, x, y, parameters, out, type, desc) {
+    static create(/*parent, */title, x, y, parameters, out, type, desc, parent, constant = false) {
         const color = Blueprint.getColorByInfo(title, type, out);
         const {width, height} = Blueprint.getAppropriateSize(title, parameters, out, type);
-        const b = new Blueprint(parent, title, color, x, y, width, height, parameters, out, type, desc);
+        const b = new Blueprint(/*parent, */title, color, x, y, width, height, parameters, out, type, desc);
+        if(parent == "variable") { //i don't have to check if parent is valid first because you can still check undefined with no error (undefined == "variable" //false)
+            print("parent valid!", b.title, b.title.substring(4));
+            b.variable = Blueprint.variables[b.title.substring(4)];
+        }
+        if(constant) {
+            let value;
+            const split = title.split(".");
+            if(split.length > 1) {
+                //oh wait i guess you could recursively get the objetct and then call it like
+                let object = globalThis;
+                for(const name of split) {
+                    object = object[name];
+                }
+                value = object;
+            }else {
+                value = globalThis[title];
+            }
+
+            b.variable = {value};
+        }
+        /*else if(parent == "Global values") {
+            b.variable = {value: globalThis[title]}; //quickest solution in the west
+        }*/
         panes.push(b);
         return b;
     }
@@ -1043,8 +1123,8 @@ class Blueprint {
         return {width, height};
     }
 
-    constructor(parent, title, color, x, y, width, height, parameters, out, type, desc) {
-        this.parent = parent; //just in case? (nevermind lol it seems like i don't need it)
+    constructor(/*parent, */title, color, x, y, width, height, parameters, out, type, desc) {
+        //this.parent = parent; //just in case? (nevermind lol it seems like i don't need it)
         this.title = title;
         this.x = x;
         this.y = y;
@@ -1183,9 +1263,9 @@ class Blueprint {
                 if(pobj.control instanceof EditControl) pobj.control.autoresize = true;
             }
             this.parameters[i] = pobj; //i don't need the variable name anymore because i store it in the text layout paramText[i]
-            if(param.includes("exec")) { //using includes just in case there's a space somewhere idk
+            //if(param.includes("exec")) { //using includes just in case there's a space somewhere idk
                 this.connections.in[i] = {};
-            }
+            //}
             //this.connections.in[i] = {}; //.
             //this.paramText.push(d2d.CreateTextLayout(name, font, w, h));
         }else {
@@ -1297,10 +1377,10 @@ class Blueprint {
         //d2d.FillRectangle(0, Blueprint.captionHeight, this.width, this.height, this.gradients[2]);
         for(let i = 0; i < this.parameters.length; i++) {
             const param = this.parameters[i];
-            let connection = this.connections.in[i];
-            if(connection && param.type == "exec") {
-                connection = Object.keys(connection).length;
-            }
+            let connection = Object.keys(this.connections.in[i]).length;
+            //if(connection && param.type == "exec") {
+            //    connection = Object.keys(connection).length;
+            //}
             this.drawPin(false, i, param, connection);
             const tl = param.text.GetMetrics(); //this.paramText[i].GetMetrics();
             if(connection) {
@@ -1386,7 +1466,6 @@ class Blueprint {
                     //r&&d2d.DrawText(`${r.id}`, font, halfX+16, halfY+16, halfX+80, halfY+80, colorBrush);
                     //print(path.Release(), "path release?}"); //lowkey idk if this is getting released but idk how to check
                     throwawayObjects.push(path);
-                    
                 }
             }
         }
@@ -1410,7 +1489,7 @@ class Blueprint {
                 const tl = text.GetMetrics(); //this.paramText[i].GetMetrics();
                 if(withinBounds({x: Blueprint.padding-8-Blueprint.radius-2, y: (i+1)*Blueprint.captionHeight+Blueprint.padding-Blueprint.radius-2, width: Blueprint.radius*2+2+tl.width, height: Blueprint.radius*2+2+tl.height}, mouse)) {
                     return [DROP, i];
-                }else if(control && !this.connections.in[i]) {
+                }else if(control && !Object.keys(this.connections.in[i]).length) {
                     //this.x+camera.x+Blueprint.padding+tl.width+8
                     //this.y+camera.y+(i+1)*Blueprint.captionHeight + Blueprint.padding
                                                             //oops i didn't use parethesis here and it was not doing what i expected
@@ -1437,14 +1516,14 @@ class Blueprint {
             for(let l = 0; l < this.connections.in.length; l++) { //i think i accidently put i++ the first time or something!
                 const maybepin = this.connections.in[l]; //{i, source, id}
                 if(maybepin) {
-                    if(this.parameters[l].type == "exec") {
+                    //if(this.parameters[l].type == "exec") {
                         for(const key of Object.keys(maybepin)) {
                             const pin = maybepin[key];
                             if(pin) delete pin.source.connections.out[pin.i][pin.id]; //.receiver.source = newbp; //bruh...
                         }
-                    }else {
-                        delete maybepin.source.connections.out[maybepin.i][maybepin.id];
-                    }
+                    //}else {
+                    //    delete maybepin.source.connections.out[maybepin.i][maybepin.id];
+                    //}
                 }
             }
             for(let l = 0; l < this.connections.out.length; l++) {
@@ -1453,11 +1532,12 @@ class Blueprint {
                 if(outarray) {
                     for(const key in outarray) {
                         const pin = outarray[key]; //receiver : {i, source}
-                        delete pin.receiver.source.connections.in[pin.receiver.i]; //.source = newbp; //bruh...
+                        delete pin.receiver.source.connections.in[pin.receiver.i][pin.receiver.id]; //.source = newbp; //bruh...
                     }
                 }
             }
             this.destroy();
+            Blueprint.active = undefined; //oops i was calling destroy which also released the same object multiple times which crashed jbs
         }
     }
 
@@ -1647,6 +1727,34 @@ Blueprint.meta_functions["NOT"] = function(left) {
     return !left;
 }
 
+Blueprint.meta_functions["BITWISE_AND"] = function(left, right) {
+    return left & right;
+}
+
+Blueprint.meta_functions["BITWISE_NOT"] = function(left) {
+    return ~left;
+}
+
+Blueprint.meta_functions["BITWISE_OR"] = function(left, right) {
+    return left | right;
+}
+
+Blueprint.meta_functions["BITWISE_XOR"] = function(left, right) {
+    return left ^ right;
+}
+
+Blueprint.meta_functions["BITWISE_LEFTSHIFT"] = function(left, right) {
+    return left << right;
+}
+
+Blueprint.meta_functions["BITWISE_RIGHTSHIFT"] = function(left, right) {
+    return left >> right;
+}
+
+Blueprint.meta_functions["BITWISE_UNSIGNEDRIGHTSHIFT"] = function(left, right) {
+    return left >>> right;
+}
+
 Blueprint.meta_functions["RUSSIAN_ROULETTE"] = function(...args) { //variable length? (lowkey idk if it's gonna look that good if i really do it) (ok wait i just realized it wouldn't be hard at all to make them resizable and add pins (probably))
     const keys = Object.keys(globalThis);
     while(true) {
@@ -1701,6 +1809,262 @@ Blueprint.meta_functions["POWER"] = function(base, exponent) {
 
 //class $__c_l_a_z_z____________________ {
 
+class DropdownList { //damn this instantly gets rid of the optimizations i was trying to make with VerticalScrollBox...
+    constructor(width, elements, title, color = [1.0, 1.0, 1.0]) {
+        this._width = width; //ok this is weird lowkey
+        //this._height = DropdownList.closedHeight;
+        this.open = false;
+        this.elements = elements;
+        this.title = d2d.CreateTextLayout("> "+title, font, w, h);
+        this.color = color;
+    }
+
+    static closedHeight = 12;
+
+    get width() {
+        if(this.open) {
+            return this._width;
+        }else {
+            return this.title.GetMetrics().width;
+        }
+    }
+
+    get height() {
+        let _height = DropdownList.closedHeight;
+        if(this.open) {
+            let cumHeight = 0;
+            for(const {height} of this.elements) {
+                cumHeight += height;
+            }
+            _height += cumHeight; //this._height;
+        }
+        return _height;
+    }
+
+    redraw(x, y) {
+        colorBrush.SetColor(...this.color);
+        d2d.DrawTextLayout(x, y, this.title, colorBrush);
+
+        if(this.open) {
+            let cumHeight = 0;
+            for(const element of this.elements) {
+                element.redraw(x+14, y+DropdownList.closedHeight+cumHeight);
+                cumHeight += element.height;
+            }
+        }
+    }
+
+    buttonDown() {
+        this.open = !this.open;
+    }
+
+    hittest(mouse, x, y) {
+        if(withinBounds({x, y, width: this.width, height: DropdownList.closedHeight}, mouse)) {
+            return [BUTTON, this];
+        }else if(this.open) {
+            let cumHeight = 0;
+            for(const element of this.elements) {
+                const ht = element.hittest(mouse, x+14, y+DropdownList.closedHeight+cumHeight);
+                if(ht) {
+                    return ht;
+                }
+                cumHeight += element.height;
+            }
+        }
+    }
+
+    destroy() {
+        this.title.Release();
+        for(const element of this.elements) {
+            element.destroy();
+        }
+    }
+}
+
+class VerticalScrollBox {
+    x = 0;
+    y = 0;
+    width = 0;
+    height = 0;
+
+    scroll = {
+        y: 0,
+        velocity: 0,
+        barHeight: 20,
+    };
+
+    constructor(x, y, width, height, elements, smooth = true) { //assuming we know the position when we create it (unlike CheckboxControl and the other control ones like that yk)
+        this.x = x;
+        this.y = y;
+        this.width = width;
+        this.height = height;
+        this.elements = elements;
+        this.smooth = smooth;
+        this.rectangle = d2d.CreateRectangleGeometry(this.x, this.y, this.x+this.width, this.y+this.height);
+    }
+
+    getElementsHeight(elementtofind = undefined) {
+        let height = 0;
+        for(const element of this.elements) {
+            if(element == elementtofind) {
+                break;
+            }
+            height += element.height;
+        }
+        return height;
+    }
+
+    getFirstVisibleElementIndexAndCountUntilOffscreen() {
+        let fve = undefined;
+        let index = 0;
+        let elementHeights = 0;
+        let count = 0;
+        let firstVisibleHeight = 0;
+        //for(const element of this.elements) {
+        for(let i = 0; i < this.elements.length; i++) {
+            const element = this.elements[i];
+            if(this.scroll.y <= elementHeights) { //haha i have to use less than or EQUAL because not using smooth scrolling would snap to each height
+                if(!fve) {
+                    //actually i'd want the element BEFORE this one because if it's really long it would get cut off otherwise
+                    if(i == 0) {
+                        index = i;
+                        fve = element;
+                        firstVisibleHeight = elementHeights;
+                    }else {
+                        index = i-1;
+                        fve = this.elements[i-1];
+                        firstVisibleHeight = elementHeights-fve.height;
+                        count++;
+                    }
+                }else {
+                    count++;
+                    //if(this.scroll.y+this.height <= elementHeights) {
+                    if(this.scroll.y+this.height < elementHeights) {
+                        //count++; //there we go
+                        break;
+                    }
+                }
+                //return [fve, i];
+            }else if(i == this.elements.length-1 && !fve) {
+                index = i;
+                fve = element;
+                firstVisibleHeight = elementHeights;
+            }
+            elementHeights += element.height;
+        }
+        count++;
+        return [index, firstVisibleHeight, count];
+    }
+
+    redraw() {
+        //not gonna draw a background tho
+        if(Math.abs(this.scroll.velocity) > 0.01) {
+            this.scroll.y = Math.min(this.getElementsHeight(), Math.max(0, this.scroll.y+this.scroll.velocity));
+            if(this.smooth) {
+                this.scroll.velocity *= .95;
+            }else {
+                this.scroll.velocity = 0;
+            }
+            //dirty = true; //lol! (aw damn wait it's already true (OHHHHHhhhh so that's what i meant (yeah when redraw is called dirty is already true and after it's called i set dirty to false...)))
+        }
+
+        
+        d2d.PushLayer(new D2D1.LayerParameters(D2D1.InfiniteRect(), this.rectangle)); //clips any overflowing text for meh (count has 1 extra that is usually outside the border)
+        
+        //const arrlen = (this.height/this.getElementsHeight())+1; //yeah no
+        const [firstVisibleElementIndex, firstVisibleHeight, count] = this.getFirstVisibleElementIndexAndCountUntilOffscreen();
+
+        //print("fvei", firstVisibleElementIndex, firstVisibleHeight, count);
+        print("amount to draw", count);
+
+        //for(let i = 0; i < arrlen; i++) {
+        let cumHeight = 0; //cumulative
+        const distancebecausescrolled = firstVisibleHeight-this.scroll.y;
+        //print("distance becase scro", distancebecausescrolled);
+        for(let i = 0; i < count; i++) {
+            const element = this.elements[firstVisibleElementIndex+i];
+            element.redraw(this.x, this.y+cumHeight+distancebecausescrolled);
+            cumHeight += element.height;
+            //const j = Math.floor(this.scroll.y) + i;
+            //const text = this.contents[j];
+            //if(text) d2d.DrawTextLayout(0, (i-(this.scroll.y%1))*textheight, text, colorBrush);
+        }
+        d2d.PopLayer();
+
+        const scrollbarY = (this.scroll.y/this.getElementsHeight())*(this.height-this.scroll.barHeight); //-barHeight because that's how tall i've decided to make the scrollbar lol
+
+        d2d.FillRectangle(this.x+this.width-12, this.y+scrollbarY, this.x+this.width-2, this.y+scrollbarY+this.scroll.barHeight, colorBrush);
+    }
+
+    //lowkey idk about the scrollbar being draggable i might have to think on that
+
+    //preDrag(mouse, data) { //predrag does not send mouse in client space or whatever the word to describve it its 
+    //    //const clienty = (this.y-this.scroll.y)-mouse.y;
+    //    //print(clienty, "clienty", this.scroll.y);
+    //    const elementsHeight = this.getElementsHeight();
+    //    const scrollbarY = (this.scroll.y/elementsHeight)*(this.height-this.scroll.barHeight);
+    //    const tempscrollobjecttohelpmedothis = {x: 0, y: scrollbarY, onDrag: (function() { //oh i was supposed to use scrollBarY instead of this.scroll.y
+    //        print(tempscrollobjecttohelpmedothis.y);
+    //        this.scroll.y = clamp(0, elementsHeight, (tempscrollobjecttohelpmedothis.y/(this.height-this.scroll.barHeight))*elementsHeight); //! (subtracting height - barHeight so that the mouse doesn't slip away when you drag to the bottom!)
+    //        //ok wait this kinda sucks idk imma do it right in jbsblueprints tho trust.
+    //    }).bind(this)};
+    //    return tempscrollobjecttohelpmedothis;
+    //}
+
+    hittest(mouse) {
+        const scrollbarY = (this.scroll.y/this.getElementsHeight())*(this.height-this.scroll.barHeight);
+        if(withinBounds({x: this.width-12, y: scrollbarY, width: 10, height: this.scroll.barHeight}, mouse)) {
+            //return [DRAG]; //no data because im doing it kinda weird
+        }else {
+            const [firstVisibleElementIndex, firstVisibleHeight, count] = this.getFirstVisibleElementIndexAndCountUntilOffscreen();
+
+            let cumHeight = 0; //cumulative
+            const distancebecausescrolled = firstVisibleHeight-this.scroll.y;
+            for(let i = 0; i < count; i++) {
+                const element = this.elements[firstVisibleElementIndex+i];
+                //if(withinBounds({x: 0, y: cumHeight+distancebecausescrolled, width: element.width, height: element.height}, mouse)) {
+                
+                const ht = element.hittest(mouse, 0, cumHeight+distancebecausescrolled);
+                if(ht) {
+                    return ht;
+                }
+                //}
+                //element.redraw(0, cumHeight+distancebecausescrolled);
+                cumHeight += element.height;
+            }    
+        }
+        
+        return [WHEEL, this]; //oops it wanted to scroll on BlueprintMenu since it was the currently hit **pane**
+    }
+
+    wheel(wp) {
+        //print(wp);
+        const scrollY = -wp/120
+        print(scrollY);
+        if(this.smooth) {
+            print("smoove scrole");
+            //oh i was wondering why this new version scrolled slower and it was because i changed how it worked so i gotta add more to the velocity now
+            //this.scroll.velocity += scrollY/5;
+            this.scroll.velocity += scrollY*2.5;
+        }else {
+            const [firstVisibleElementIndex] = this.getFirstVisibleElementIndexAndCountUntilOffscreen();
+            this.scroll.velocity += this.elements[firstVisibleElementIndex].height*scrollY; //*scrollY for negative
+        }
+    }
+
+    clear() {
+        for(const element of this.elements) {
+            element.destroy();
+        }
+        this.elements = [];
+    }
+
+    destroy() {
+        this.clear();
+        this.rectangle.Release(); //almost forgot
+    }
+}
+
 class BlueprintMenu {
     x = 0;
     y = 0;
@@ -1714,36 +2078,44 @@ class BlueprintMenu {
     value = ""; //i could make editable configurable in that, i could tell it which variable to edit, but idgaf
     valueText = undefined;
 
-    scrollY = 0;
-    scrollVelocity = 0;
+    //scrollY = 0;
+    //scrollVelocity = 0;
+    scrollBox = undefined;
 
     static singleton = undefined; //oops i think i meant instance but i forgor the names
 
     static commandList = [ //haha not the d2d one
         //{name, desc, parameters, out, type?}
-        {name: "IF", desc: "branch", parameters: ["exec : exec", "Condition : boolean"], out: ["True : exec", "False : exec"], type: BPTYPE_PURE},
-        {name: "WHILE", desc: "while loop (break infinite loop by holding escape!)", parameters: ["exec : exec", "Condition: boolean"], out: ["Loop Body : exec", "Completed : exec"], type : BPTYPE_PURE},
-        {name: "FOR_LOOP", desc: "for loop", parameters: ["exec : exec", "First Index : number", "Last Index : number"], out: ["Loop Body : exec", "Index : number", "Completed : exec"], type : BPTYPE_PURE},
-        {name: "NOT_EQUAL", desc: "!=", parameters: [" : any", " : any"], out: [" : boolean"], type: BPTYPE_BARE},
-        {name: "EQUAL", desc: "==", parameters: [" : any", " : any"], out: [" : boolean"], type: BPTYPE_BARE},
-        {name: "STRICT_NOT_EQUAL", desc: "!==", parameters: [" : any", " : any"], out: [" : boolean"], type: BPTYPE_BARE},
-        {name: "STRICT_EQUAL", desc: "===", parameters: [" : any", " : any"], out: [" : boolean"], type: BPTYPE_BARE},
-        {name: "GREATER_THAN", desc: ">", parameters: [" : number", " : number"], out: [" : boolean"], type: BPTYPE_BARE},
-        {name: "GREATER_THAN_OR_EQUAL", desc: ">=", parameters: [" : number", " : number"], out: [" : boolean"], type: BPTYPE_BARE},
-        {name: "LESS_THAN", desc: "<", parameters: [" : number", " : number"], out: [" : boolean"], type: BPTYPE_BARE},
-        {name: "LESS_THAN_OR_EQUAL", desc: "<=", parameters: [" : number", " : number"], out: [" : boolean"], type: BPTYPE_BARE},
-        {name: "NEGATE", desc: "-", parameters: [" : number"], out: [" : number"], type: BPTYPE_BARE},
-        {name: "AND", desc: "&&", parameters: [" : boolean", " : boolean"], out: [" : boolean"], type: BPTYPE_BARE},
-        {name: "OR", desc: "||", parameters: [" : boolean", " : boolean"], out: [" : boolean"], type: BPTYPE_BARE},
-        {name: "NOT", desc: "!", parameters: [" : boolean"], out: [" : boolean"], type: BPTYPE_BARE},
-        {name: "RUSSIAN_ROULETTE", desc: "calls a totally random function with the specified parameters", parameters: ["any : any"], out: ["any : any"]},
+        {name: "IF", desc: "branch", parameters: ["exec : exec", "Condition : boolean"], out: ["True : exec", "False : exec"], type: BPTYPE_PURE, parent: "meta"},
+        {name: "WHILE", desc: "while loop (break infinite loop by holding escape!)", parameters: ["exec : exec", "Condition: boolean"], out: ["Loop Body : exec", "Completed : exec"], type : BPTYPE_PURE, parent: "meta"},
+        {name: "FOR_LOOP", desc: "for loop", parameters: ["exec : exec", "First Index : number", "Last Index : number"], out: ["Loop Body : exec", "Index : number", "Completed : exec"], type : BPTYPE_PURE, parent: "meta"},
+        {name: "NOT_EQUAL", desc: "!=", parameters: [" : any", " : any"], out: [" : boolean"], type: BPTYPE_BARE, parent: "meta"},
+        {name: "EQUAL", desc: "==", parameters: [" : any", " : any"], out: [" : boolean"], type: BPTYPE_BARE, parent: "meta"},
+        {name: "STRICT_NOT_EQUAL", desc: "!==", parameters: [" : any", " : any"], out: [" : boolean"], type: BPTYPE_BARE, parent: "meta"},
+        {name: "STRICT_EQUAL", desc: "===", parameters: [" : any", " : any"], out: [" : boolean"], type: BPTYPE_BARE, parent: "meta"},
+        {name: "GREATER_THAN", desc: ">", parameters: [" : number", " : number"], out: [" : boolean"], type: BPTYPE_BARE, parent: "meta"},
+        {name: "GREATER_THAN_OR_EQUAL", desc: ">=", parameters: [" : number", " : number"], out: [" : boolean"], type: BPTYPE_BARE, parent: "meta"},
+        {name: "LESS_THAN", desc: "<", parameters: [" : number", " : number"], out: [" : boolean"], type: BPTYPE_BARE, parent: "meta"},
+        {name: "LESS_THAN_OR_EQUAL", desc: "<=", parameters: [" : number", " : number"], out: [" : boolean"], type: BPTYPE_BARE, parent: "meta"},
+        {name: "NEGATE", desc: "-", parameters: [" : number"], out: [" : number"], type: BPTYPE_BARE, parent: "meta"},
+        {name: "AND", desc: "&&", parameters: [" : boolean", " : boolean"], out: [" : boolean"], type: BPTYPE_BARE, parent: "meta"},
+        {name: "OR", desc: "||", parameters: [" : boolean", " : boolean"], out: [" : boolean"], type: BPTYPE_BARE, parent: "meta"},
+        {name: "NOT", desc: "!", parameters: [" : boolean"], out: [" : boolean"], type: BPTYPE_BARE, parent: "meta"},
+        {name: "BITWISE_AND", desc: "&", parameters: [" : number", " : number"], out: [" : number"], type: BPTYPE_BARE, parent: "meta"},
+        {name: "BITWISE_NOT", desc: "~", parameters: [" : number"], out: [" : number"], type: BPTYPE_BARE, parent: "meta"},
+        {name: "BITWISE_OR", desc: "|", parameters: [" : number", " : number"], out: [" : number"], type: BPTYPE_BARE, parent: "meta"},
+        {name: "BITWISE_XOR", desc: "^", parameters: [" : number", " : number"], out: [" : number"], type: BPTYPE_BARE, parent: "meta"},
+        {name: "BITWISE_LEFTSHIFT", desc: "<<", parameters: [" : number", " : number"], out: [" : number"], type: BPTYPE_BARE, parent: "meta"},
+        {name: "BITWISE_RIGHTSHIFT", desc: ">>", parameters: [" : number", " : number"], out: [" : number"], type: BPTYPE_BARE, parent: "meta"},
+        {name: "BITWISE_UNSIGNEDRIGHTSHIFT", desc: ">>>", parameters: [" : number", " : number"], out: [" : number"], type: BPTYPE_BARE, parent: "meta"},
+        {name: "RUSSIAN_ROULETTE", desc: "calls a totally random function with the specified parameters", parameters: ["any : any"], out: ["any : any"], parent: "meta"},
         
-        {name: "ADD", desc: "+", parameters: [" : float", " : float"], out: [" : float"], type: BPTYPE_BARE},
-        {name: "SUBTRACT", desc: "-", parameters: [" : float", " : float"], out: [" : float"], type: BPTYPE_BARE},
-        {name: "DIVIDE", desc: "/", parameters: [" : float", " : float"], out: [" : float"], type: BPTYPE_BARE},
-        {name: "MULTIPLY", desc: "*", parameters: [" : float", " : float"], out: [" : float"], type: BPTYPE_BARE},
-        {name: "MODULO", desc: "%", parameters: [" : float", " : float"], out: [" : float"], type: BPTYPE_BARE},
-        {name: "POWER", desc: "**", parameters: ["base : float", "exponent : float"], out: [" : float"], type: BPTYPE_BARE},
+        {name: "ADD", desc: "+", parameters: [" : float", " : float"], out: [" : float"], type: BPTYPE_BARE, parent: "meta"},
+        {name: "SUBTRACT", desc: "-", parameters: [" : float", " : float"], out: [" : float"], type: BPTYPE_BARE, parent: "meta"},
+        {name: "DIVIDE", desc: "/", parameters: [" : float", " : float"], out: [" : float"], type: BPTYPE_BARE, parent: "meta"},
+        {name: "MULTIPLY", desc: "*", parameters: [" : float", " : float"], out: [" : float"], type: BPTYPE_BARE, parent: "meta"},
+        {name: "MODULO", desc: "%", parameters: [" : float", " : float"], out: [" : float"], type: BPTYPE_BARE, parent: "meta"},
+        {name: "POWER", desc: "**", parameters: ["base : float", "exponent : float"], out: [" : float"], type: BPTYPE_BARE, parent: "meta"},
         //i was gonna use this regex but i realized i could eval it instead -> /registerFunc *\( *(["'`])(\w+)\1 *, *(["'`])function \2\(([A-z0-9:_, ]+)\) *: *(\w+)\3/
         //damn well i already wanted to add some networking functions for a custom discord client burt wwteverf
     ];
@@ -1754,10 +2126,10 @@ class BlueprintMenu {
         const value = BlueprintMenu.singleton.value.toLowerCase();
         for(let i = 0; i < value.length; i++) { //came up with this bad boy meself
             const snip = value.substring(0, i+1);
-            bv += (b.name.toLowerCase()).includes(snip);
-            av += (a.name.toLowerCase()).includes(snip);
+            bv += (b.command.name.toLowerCase()).includes(snip);
+            av += (a.command.name.toLowerCase()).includes(snip);
         }
-        return bv - av;    
+        return bv - av;
     }
 
     static open(hwnd) { //hwnd is actually important this time
@@ -1778,6 +2150,56 @@ class BlueprintMenu {
     static close() {
         BlueprintMenu.singleton.destroy();
         BlueprintMenu.singleton = undefined;
+    }
+
+    static textButtonCallback() { //this function is used for the callback in TextButtonControl so "this" refers to the TextButtonControl object!
+        const {name, desc, parameters, out, type, parent, constant} = this.command;
+        //print(typeof(parameters), typeof(out));
+        print(name, desc, parameters, out, type, parent);
+        Blueprint.create(/*undefined, */name, BlueprintMenu.singleton.x, BlueprintMenu.singleton.y, parameters, out, type ?? BPTYPE_NOTPURE, desc, parent, constant); //ok putting undefined here is a real sign that i really don't need to hold on to the hwnd in Blueprint lmao
+        BlueprintMenu.close();        
+    }
+
+    static newElementsFromCommandList() {
+        const elements = [];
+        const lists = {};
+        for(const command of BlueprintMenu.commandList) {
+            const metrics = d2d.GetMetricsForText(command.name, font, w, h);
+            
+            const tbc = new TextButtonControl(metrics.width, metrics.height/*+(Math.round(Math.random())*160)*/, command.name, [1.0, 1.0, 1.0], BlueprintMenu.textButtonCallback);
+
+            tbc.command = command; //reference :smirk:
+
+            if(command.parent) {
+                if(lists[command.parent]) {
+                    lists[command.parent].elements.push(tbc);
+                }else {
+                    lists[command.parent] = new DropdownList(BlueprintMenu.singleton.width-14-4, [tbc], command.parent);
+                }
+            }else {
+                elements.push(
+                    tbc,
+                );
+            }
+        }
+
+        for(const key in lists) {
+            elements.push(lists[key]);
+        }
+        return elements;
+    }
+
+    sortScrollbox() {
+        function sortIt(a, b) {
+            a.elements.sort(BlueprintMenu.searchSort);
+            b.elements.sort(BlueprintMenu.searchSort);
+
+            return BlueprintMenu.searchSort(a.elements[0], b.elements[0]); //yeah probably
+        }
+
+        this.scrollBox.elements.sort(sortIt);
+
+        this.scrollBox.elements[0].open = true; //opens the first list
     }
 
     constructor(mouse) {
@@ -1804,6 +2226,8 @@ class BlueprintMenu {
             d2d.CreateTextLayout("Context Sensitive", font, w, h),
         );
         this.valueText = d2d.CreateTextLayout(this.value, font, this.width, this.height);
+
+        this.scrollBox = new VerticalScrollBox(14, 92, this.width-14-4, this.height-92-4, BlueprintMenu.newElementsFromCommandList(), true);
     }
 
     redraw() { //lowkey idj why i called it redraw
@@ -1832,25 +2256,31 @@ class BlueprintMenu {
             this.valueText = d2d.CreateTextLayout(this.value, font, this.width, this.height);
             //lowkey feel weird about doing this in the drawing function but the way i made it is kinda asking for it
             if(this.value == "") {
-                BlueprintMenu.commandList.sort((a, b) => a.name.localeCompare(b.name));
+                //BlueprintMenu.commandList.sort((a, b) => a.name.localeCompare(b.name));
+                //this.scrollBox.elements.sort((a, b) => a.command.name.localeCompare(b.command.name));
+                this.scrollBox.elements.sort((a, b) => a.title.text.localeCompare(b.title.text));
             }else {
-                BlueprintMenu.commandList.sort(BlueprintMenu.searchSort);
+                this.sortScrollbox();
+                //this.scrollBox.elements.sort(BlueprintMenu.searchSort);
+                //BlueprintMenu.commandList.sort(BlueprintMenu.searchSort);
             }
-            this.scrollY = 0;
+            //this.scrollY = 0;
         }
 
+        this.scrollBox.redraw();
+
         colorBrush.SetColor(0.0, 0.0, 0.0);
-        
-        if(Editable.edited == this) {
+    
+        if(Editable.edited == this) { //still drawing and using a custom EditControl here for the search box since editable doesn't have a callback for every keystroke so yeha
             //const t = d2d.CreateTextLayout(this.value.slice(0, Editable.caret), font, 100, 16);
             //const {widthIncludingTrailingWhitespace} = t.GetMetrics(); //if there are trailing spaces it doesn't show that and it's weird
-
+        
             
             const hit = this.valueText.HitTestTextPosition(Editable.caret, false); //who knew this function's main purpose was this use case
             //print(hit.x, hit.hitTestMetrics.width);
             const caretX = hit.x+8; //plus 4 because im drawing the text 4 pixels away from 0
             const caretY = hit.y+34;
-
+        
             
             //const pos = ; //lowkey might have to make a text layout to see how wide each character is
             d2d.DrawLine(caretX, caretY, caretX, caretY+16, colorBrush, 1, roundStrokeStyle);
@@ -1858,21 +2288,21 @@ class BlueprintMenu {
         }
         d2d.DrawTextLayout(8, 34, this.valueText, colorBrush);
 
-        colorBrush.SetColor(229/255, 229/255, 229/255);
+        //colorBrush.SetColor(229/255, 229/255, 229/255);
 
-        if(Math.abs(this.scrollVelocity) > 0.01) {
-            this.scrollY = Math.min(BlueprintMenu.commandList.length, Math.max(0, this.scrollY+this.scrollVelocity));
-            this.scrollVelocity *= .95;
-            //dirty = true; //lol! (aw damn wait it's already true)
-            
-        }
+        //if(Math.abs(this.scrollVelocity) > 0.01) {
+        //    this.scrollY = Math.min(BlueprintMenu.commandList.length, Math.max(0, this.scrollY+this.scrollVelocity));
+        //    this.scrollVelocity *= .95;
+        //    //dirty = true; //lol! (aw damn wait it's already true)
+        //    
+        //}
 
-        for(let i = 0; i < (400-92)/12; i++) {
-            const j = Math.floor(this.scrollY) + i; //had to think about this one in bed
-            if(j < BlueprintMenu.commandList.length) {
-                d2d.DrawText(BlueprintMenu.commandList[j].name/* + " " + i + " " + j*/, font, 14, 92+((i-(this.scrollY%1))*12), w, h, colorBrush);
-            }
-        }
+        //for(let i = 0; i < (400-92)/12; i++) {
+        //    const j = Math.floor(this.scrollY) + i; //had to think about this one in bed
+        //    if(j < BlueprintMenu.commandList.length) {
+        //        d2d.DrawText(BlueprintMenu.commandList[j].name/* + " " + i + " " + j*/, font, 14, 92+((i-(this.scrollY%1))*12), w, h, colorBrush);
+        //    }
+        //}
 
         d2d.FillRectangle(4, this.height-16, this.width-4, this.height-4, this.gradients[1]); //lol for some reason i never added this one
     }
@@ -1883,25 +2313,30 @@ class BlueprintMenu {
             return [TEXT, [i, this]];
         }else if(withinBounds({x: 0, y: 0, width: 270, height: 30}, mouse)) {
             return [MOVE];
+        }else if(withinBounds(this.scrollBox, mouse)) {
+            return hittestChildControl(this.scrollBox, mouse);
         }else {
             //print({x: mouse.x-(280), y: mouse.y-(10)});
             const ht = this.contextSensitive.hittest(mouse, 280, 10); //({x: mouse.x-280, y: mouse.y-10}); //ermmm this is kinda weird lowkey (nah but PrimitiveControl was really made for Blueprint so i'm still a genius)
             if(ht) {
                 return ht;
-            }else if(mouse.y > 92) {
-                return [WHEEL];
-            }
+            }//else if(withinBounds(control, mouse)) {
+            //if(mouse.y > 92) {
+                //return [WHEEL];
+
+                //const ht =  //this.scrollBox.hittest({x: mouse.x-this.scrollBox.x, y: mouse.y-this.scrollBox.y});
+            //}
             return [NULL];
         }
     }
 
-    wheel(wp) {
-        let scrollY = -wp/120; //idk why it's 120 (also im negating it because i want scrolling up to be -1)
-        print(scrollY);
-        this.scrollVelocity += scrollY/5;
-    }
+    //wheel(wp) {
+    //    let scrollY = -wp/120; //idk why it's 120 (also im negating it because i want scrolling up to be -1)
+    //    print(scrollY);
+    //    this.scrollVelocity += scrollY/5;
+    //}
 
-    mouseDown(mouse) {
+    /*mouseDown(mouse) {
         print(mouse);
         const checkY = 92-(this.scrollY%1)*12;
         if(mouse.y > checkY) {
@@ -1919,9 +2354,10 @@ class BlueprintMenu {
             }
             BlueprintMenu.close();
         }
-    }
+    }*/
 
     destroy() {
+        this.scrollBox.destroy();
         for(let i = 0; i < this.gradients.length; i++) {
             this.gradients[i].Release();
         }
@@ -1949,7 +2385,7 @@ class PropertyDropdownMenu { //written for PropertyMenu!
         this.open = !this.open;
     }
 
-    getHeight() {
+    getHeight() { //lowkey could've just set a getter for height (which i might do for another class later...)
         if(this.open) {
             return this.height;
         }else {
@@ -2243,6 +2679,11 @@ class VariableDetailDropdownMenu extends DetailDropdownMenu {
                 panelen--;
             }
         }
+
+        if(BlueprintMenu.singleton) { //lowkey you probably will not have it open at the same time as a variable name change but im not 100% sure about that
+            BlueprintMenu.singleton.scrollBox.clear();
+            BlueprintMenu.singleton.scrollBox.elements = BlueprintMenu.newElementsFromCommandList();
+        }
     }
 
     //name
@@ -2278,17 +2719,18 @@ class FunctionDetailDropdownMenu extends DetailDropdownMenu {
             let customcontrol;
             const maybepin = Blueprint.active.connections.in[i];
             if(maybepin) {
-                if(Blueprint.active.parameters[i].type == "exec") {
+                //if(Blueprint.active.parameters[i].type == "exec") {
                     let letext = "";
                     for(const key of Object.keys(maybepin)) {
                         const pin = maybepin[key];
+                                //this is some bullshit bruh text.text im sorry for writing this LMAO
                         letext += `${pin.source.title}'s ${pin.source.out[pin.i].text.text} (${pin.i})`;
                     }
                     customcontrol = new StaticControl(100, 16, letext);
-                }else {
-                    //const pin = Blueprint.active.connections.in[i];
-                    customcontrol = new StaticControl(100, 16, `${maybepin.source.title}'s ${maybepin.source.out[maybepin.i].text.text} (${maybepin.i})`);
-                }
+                //}else {
+                //    //const pin = Blueprint.active.connections.in[i];
+                //    customcontrol = new StaticControl(100, 16, `${maybepin.source.title}'s ${maybepin.source.out[maybepin.i].text.text} (${maybepin.i})`);
+                //}
             }
             else if(control) {
                 customcontrol = new WatchStaticControl(100, 16, Blueprint.active.parameters[i].control, "value");
@@ -2364,10 +2806,10 @@ class VariableDropdownMenu extends PropertyDropdownMenu { //no release methods b
             Editable.beginInput(0, this.vCBE);
             return;
         }
-        Blueprint.variables[this.vCBE.value] = {type: "boolean", textlayout: this.vCBE.textlayout, desc: "My new variable :)", defaultvalue: false}; //default type
-        VariableDropdownMenu.selected = Blueprint.variables[this.vCBE.value];
-        BlueprintMenu.commandList.push({name: `Get ${this.vCBE.value}`, desc: VariableDropdownMenu.selected.desc, parameters: [], out: [`${this.vCBE.value} : ${VariableDropdownMenu.selected.type}`], type: BPTYPE_BARE, parent: "variable"});
-        BlueprintMenu.commandList.push({name: `Set ${this.vCBE.value}`, desc: VariableDropdownMenu.selected.desc, parameters: [`${this.vCBE.value} : ${VariableDropdownMenu.selected.type}`], out: [` : ${VariableDropdownMenu.selected.type}`], type: BPTYPE_NOTPURE, parent: "variable"});
+        //Blueprint.variables[this.vCBE.value] = {type: "boolean", textlayout: this.vCBE.textlayout, desc: "My new variable :)", defaultvalue: false}; //default type
+        const varobj = {type: "boolean", textlayout: this.vCBE.textlayout, desc: "My new variable :)", defaultvalue: false}; //default type
+        VariableDropdownMenu.selected = varobj; //Blueprint.variables[this.vCBE.value];
+        Blueprint.addNewVariable(varobj, this.vCBE.value, VariableDropdownMenu.selected.desc, VariableDropdownMenu.selected.type);
         this.vCBE = undefined;
     }
 
@@ -2583,14 +3025,15 @@ class PropertyMenu { //lowkey this might be a singleton too because im only goin
 
 function parseCommandList() {
     //lowkey GetForegroundWindow and FindWindow should be pure
-    function registerFunc(name, signature, desc) {
+    function registerFunc(name, signature, desc, parent = "JBS") {
         let startI = signature.indexOf("(")+1;
         let endI = signature.indexOf(")");
-        let parameters = signature.slice(startI, endI).split(",");
+        let parameters = signature.slice(startI, endI).split(","); //why did i use slice and not substring and what's the difference?
         let outstr = signature.slice(endI+1);
 
         //print(parameters, out);
-        let out = outstr.match(typeRegex)?.[2];
+        //print(outstr);
+        let out = outstr.match(/: *(.+)/)?.[1];
 
         if(!Blueprint.paramColors[out]) {
             if(out.includes("void")) {
@@ -2609,7 +3052,7 @@ function parseCommandList() {
         for(let i = 0; i < parameters.length; i++) {
             //oops some parameters are like HWND | number so im stripping the ' |'
             //and also some are just (void)
-            if(parameters[i] == "void") {
+            if(parameters[i] == "void" || parameters[i] == "") {
                 parameters.splice(i, 1);
                 i--; //i literally just had this thought that maybe if i decrement i after removing an element we'd be good...
             }else {
@@ -2617,9 +3060,12 @@ function parseCommandList() {
             }
         }
 
-        BlueprintMenu.commandList.push({name, desc, parameters, out});
+        BlueprintMenu.commandList.push({name, desc, parameters, out, parent});
     }
-    let extension = system("curl -i https://raw.githubusercontent.com/MagicQuest/JBS3Extension/refs/heads/main/src/extension.ts").split("\n"); //well i would use fetch but right now it only works with HTTP bruh
+
+    //wait i've been using the -i flag for no reason this whole time and i didn't even know?! (im not even sure why i added it maybe i thought it meant it would NOT include the response headers)
+    let extension = system("curl https://raw.githubusercontent.com/MagicQuest/JBS3Extension/refs/heads/main/src/extension.ts").split("\n"); //well i would use fetch but right now it only works with HTTP bruh
+    let macromaxxing = false;
     //print(extension, typeof(extension), !!extension);
     if(extension.length == 1) {
         //lol my internet stopped working so im gonna make it read from my disk instead
@@ -2628,12 +3074,220 @@ function parseCommandList() {
     for(const line of extension) {
         if(line.includes("registerFunc")) {
             try {
-                eval(line); //im using eval here instead of regex so i can hijack registerFunc
+                eval(line); //im using eval here instead of regex so i can hijack registerFunc (which yk i guess is KINDA dangerous so...)
             }catch(e) {
                 print(e.toString());
             }
+        }else if(line.includes("const macros:string[]") || macromaxxing) {
+            if(!macromaxxing) macromaxxing = true;
+
+            //if(!line.includes("//")) {
+            const check = line.match(/ +(["'`])(.+)\1/);
+            if(check) {
+                const name = check[2];
+                const paramtype = typeof(globalThis[name]);
+                BlueprintMenu.commandList.push({name, desc: "", parameters: [], out: [`${name} : ${paramtype}`], type: BPTYPE_BARE, parent: "Global values", constant: true});
+            }else {
+                print("macro likely commented out: ", line);
+            }
+            //}
         }
     }
+
+    //now lets add every javascript object...
+    //you have to use getOwnPropertyNames to get the names of the built-in objects like Object or Array
+    //this doesn't include Math tho so im gonna do objects like that in the next array
+    //oh wait i wrote all this and realized i could use lib.es5.d.ts...
+    /*for(const key of Object.getOwnPropertyNames(globalThis)) {
+        const value = globalThis[key];
+        if(typeof(value) == "function") {
+            const props = Object.getOwnPropertyNames(value);
+            if(props.includes("length") && !props.includes("arguments")) {
+                print(key, value);
+                //now i gotta do the same thing to find value's static functions
+                for(const stepkey of Object.getOwnPropertyNames(value)) {
+                    const stepvalue = value[stepkey];
+                    if(typeof(stepvalue) == "function") {
+                        if(props.includes("length")) {
+                            if(props.includes("arguments")) {
+                                print(`sub class? ${key}'s ${stepkey}`);
+                            }else {
+                                print(`${key}'s ${stepkey}`);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    const jsGlobalObjects = [Math];
+    for(const value of jsGlobalObjects) {
+
+    }*/
+
+    const latest = "es2024"; //i assume
+
+    let dir = "https://raw.githubusercontent.com/microsoft/TypeScript/main/src/lib";
+
+    let jsDocs = system(`curl ${dir}/${latest}.d.ts`).split("\n"); //unfortunately these typescript files are split up and i have to manually look through them
+    let offline = jsDocs.length == 1;
+    if(offline) {
+        dir = "E:/Microsoft VS Code/resources/app/extensions/node_modules/typescript/lib/lib";
+        jsDocs = require("fs").read(`${dir}.${latest}.d.ts`);
+    }
+
+    const specialTypes = {};
+    let currentNamespace = "";
+    let currentType = undefined;
+
+    function iterateThroughTypescriptReferences(file) {
+        //print("now reading "+file);
+        for(let i = 0; i < file.length; i++) {
+            const line = file[i];
+            //print(line);
+            if(line.startsWith("/// <reference")) {
+                const filename = line.match(/\/\/\/ \<reference lib=(["'`])(.+)\1/)[2];
+                if(filename.includes("decorators")) { //im being lazy here but i don't need to read these anyways
+                    continue;
+                }
+                let nextfile;
+                if(!offline) {
+                    nextfile = system(`curl ${dir}/${filename}.d.ts`).split("\n");
+                }else {
+                    nextfile = require("fs").read(`${dir}.${filename}.d.ts`);
+                }
+                printNoHighlight("about to read "+filename);
+                iterateThroughTypescriptReferences(nextfile);
+            }else if(line) {
+                if(line.startsWith("declare")) {
+                    const [_, type, sig] = line.match(/declare (\w+) ([^\n\r;{]+);*(?: {)*/);
+                    //printNoHighlight(`${_} (${type}) (${sig})`);
+                    if(type == "var") {
+                        const split = sig.split(":");
+                        const name = split[0];
+                        const paramtype = split[1].trimLeft();
+                        if(specialTypes[paramtype]) {
+                            //class with static methods/properties
+                            const definitions = specialTypes[paramtype];
+                            for(const definition of definitions) {
+                                if(definition.type == "method") {
+                                    registerFunc(definition.name, definition.sig, "", paramtype);
+                                }else if(definition.type == "property") {
+                                    BlueprintMenu.commandList.push({name: definition.name, desc: "", parameters: [], out: [`${definition.name} : ${definition.paramtype}`], type: BPTYPE_BARE, parent: paramtype, constant: true});
+                                }
+                            }
+                        }else {
+                            BlueprintMenu.commandList.push({name, desc: "", parameters: [], out: [`${name} : ${paramtype}`], type: BPTYPE_BARE, parent: "Global values", constant: true});
+                        }
+                    }else if(type == "function") {
+                        registerFunc(sig.substring(0, sig.indexOf("(")), sig, "", "Javascript");
+                    }else if(type == "namespace") {
+                        //unfortunately my regex leaves a space so i gotta trim the name here
+                        currentNamespace = sig.trimEnd();
+                    }
+                }else if(line.startsWith("interface")) {
+                    currentType = line.match(/interface (\w+)/)[1];
+                    if(currentNamespace) {
+                        currentType = currentNamespace+"."+currentType;
+                    }
+                    if(!specialTypes[currentType]) {
+                        specialTypes[currentType] = [];
+                    }
+                    //printNoHighlight("declaring interface as", currentType);
+                }else if(currentType) {
+                    let trim = line.trimLeft();
+                    if(trim.startsWith("}")) {
+                        //printNoHighlight("exiting interface scope");
+                        currentType = undefined;
+                    }else {
+                        if(line.includes("(") && line.includes("):")) { //function signature here
+                            let name = trim.substring(0, trim.indexOf("("));
+                            //if(currentType.includes("Constructor")) {
+                                name = currentType.split("Constructor")[0]+"."+name;
+                            //}
+                            const sig = trim.substring(0, trim.indexOf(";"));
+                            //not registering here because some interfaces are defined but not declared so when they get declared i will registerFunc them then
+                            //registerFunc(trim.substring(0, trim.indexOf("(")), trim.substring(0, trim.indexOf(";")), "", currentType); //no description because im not reading the comments lol
+                            specialTypes[currentType].push({name, sig, type: "method"});
+                            //printNoHighlight(`including ${currentType}'s method ${name} in specialTypes`);
+                        }else if(!trim.startsWith("*") && !trim.startsWith("/")) { //true then not a comment
+                            trim = trim.split("readonly ").join("");
+                            //print(trim);
+                            if(trim.startsWith("[")) {
+                                printNoHighlight(`special indexing thing which idk how to deal with ( ${line} )`);
+                            }else if(trim.includes("=>")) {
+                                printNoHighlight(`special arrow operator happening here no thanks! ( ${line} )`);
+                            }else {
+                                //let [_, quote, name, paramtype] = line.match(/(?:readonly )*(["'`])*([\w\?]+)\1 *: *(\w+);/); //sounds right (kinda surprised i thought of the quote trick and it actually works) (for some reason RegExpConstructor has its properties in quotes)
+                                //regexr.com/8a2ul                               //extra symbols for RegExpConstructor
+                                if((trim.endsWith("{") && !trim.includes("}")) || (trim.endsWith("(") && !trim.includes(")")) || trim.endsWith(",")) { //in es2018.regexp.d.ts it puts the object definitions in multiple lines
+                                    printNoHighlight(`specially defined object that i can't be bothered to implement because idk how i'll do it yet ( ${line} )`);
+                                    const closer = trim.endsWith("{") ? "}" : ")";
+                                    const temp = file.slice(i);
+                                    const slice = temp.slice(0, temp.findIndex(l => (l.trimLeft() == `${closer};` || l.includes(`${closer}: `))));
+                                    printNoHighlight("skipping ", slice.length);
+                                    i += slice.length;
+                                    //const name = trim.match(/([^\n\r?:]+)/)[1];
+                                    //const temp = file.slice(i);
+                                    //const slice = temp.slice(0, temp.findIndex(l => l.trimLeft() == "};"));
+                                    //for(const sline of slice) {
+                                    //    const [_, innerName, innerType, valueType] = sline.trimLeft().match(/\[(.+) *: *(.+)\] *: *(.+);/);
+                                    //    if(innerName == "key") {
+                                    //        specialTypes[currentType].push({name, paramtype})
+                                    //    }else if(innerName == "index") {
+                                    //
+                                    //    }
+                                    //}
+                                }else {
+                                    if(trim.indexOf(" | ") != -1) {
+                                        printNoHighlight(`removing | for line ( ${line} )`);
+                                        trim = trim.slice(0, trim.indexOf(" | "))+";";
+                                    }
+                                    const match = trim.match(/(["'`])*([\w_$?&+`']+)\1 *: *([\w\[\] <,>]+);/);
+                                    if(!match) {
+                                        printNoHighlight(`match not found for line ( ${line} )`);
+                                        //system("pause");
+                                        //getline("Pause...");
+                                        continue;
+                                    }
+                                    let [_, quote, name, paramtype] = match; //had to get rid of the readonly bit because im just gonna snip it out earlier
+                                    name = currentType.split("Constructor")[0]+"."+name.split("?").join(""); //PropertyDescriptor has properties that are defined like configurable?: boolean; so i gotta get rid of that question mark
+                                    specialTypes[currentType].push({name, paramtype, type: "property"});
+                                    //printNoHighlight(`including ${currentType}'s property ${name} in specialTypes`);
+                                }
+                            }
+                        }
+                    }
+                }else if(currentNamespace) {
+                    let trim = line.trimLeft();
+                    if(trim.startsWith("}")) {
+                        //printNoHighlight("exiting namespace scope");
+                        currentNamespace = undefined;
+                    }
+                }
+            }
+        }
+    }
+
+    iterateThroughTypescriptReferences(jsDocs);
+
+    //for(const line of jsDocs) {
+    //for(let i = 0; i < 100; i++) {
+    //    const line = jsDocs[i];
+    //    if(line.startsWith("declare")) {
+    //        const [_, type, sig] = line.match(/declare (\w+) (.+);/);
+    //        print(`${_} (${type}) (${sig})`);
+    //        if(type == "var") {
+    //            const split = sig.split(":");
+    //            const name = split[0];
+    //            const paramtype = split[1].trimLeft();
+    //            BlueprintMenu.commandList.push({name, desc: "", parameters: [], out: [`${name} : ${paramtype}`], type: BPTYPE_BARE, parent: "Global values"});
+    //        }else if(type == "function") {
+    //            registerFunc(sig.substring(0, sig.indexOf("(")), sig, "", "Javascript");
+    //        }
+    //    }
+    //}
 }
 
 let w = 800+200; //200 for right menu
@@ -2707,7 +3361,7 @@ function saveBlueprintsJSON() {
                 
                 const maybepin = pane.connections.in[i];
                 if(maybepin) {
-                    if(type == "exec") {
+                    //if(type == "exec") {
                         object.connections.in[i] = {};
                         for(const key in maybepin) {//of Object.keys(maybepin)) { //oh wait i forgot that `in` does the same thing as `of Object.keys(...)`
                             const pin = maybepin[key];
@@ -2717,13 +3371,13 @@ function saveBlueprintsJSON() {
                                 id: pin.id,
                             };
                         }
-                    }else {
-                        object.connections.in[i] = {
-                            i: maybepin.i,
-                            source: bpids.get(maybepin.source),
-                            id: maybepin.id,
-                        };
-                    }
+                    //}else {
+                    //    object.connections.in[i] = {
+                    //        i: maybepin.i,
+                    //        source: bpids.get(maybepin.source),
+                    //        id: maybepin.id,
+                    //    };
+                    //}
                 }
             }
 
@@ -2756,9 +3410,15 @@ function loadBlueprintsJSON(str) {
     const json = JSON.parse(str); // {variables : [], blueprints: []}
     //oh shoot i gotta get rid of old variables in the commandList
     for(let i = 0; i < BlueprintMenu.commandList.length; i++) { //get rid of variables in command list
-        const {name} = BlueprintMenu.commandList[i];
+        const commandInList = BlueprintMenu.commandList[i];
         for(const varname in Blueprint.variables) {
-            if(name == `Get ${varname}` || name == `Set ${varname}`) {
+            if(commandInList.name == `Get ${varname}` || commandInList.name == `Set ${varname}`) {
+                //const scrollBox = BlueprintMenu.singleton.scrollBox; //nevermind i've decided to recreate every element in scrollBox instead of replacing some of them because i don't want to make elements anywhere else because it would be weird yk i guess idk man
+                //const elementIndex = scrollBox.elements.findIndex(({command}) => command==commandInList);
+                //if(elementIndex != -1) {
+                //    scrollBox.elements[elementIndex].destroy();
+                //    BlueprintMenu.singleton.scrollBox.elements.splice(elementIndex, 1);
+                //}
                 BlueprintMenu.commandList.splice(i, 1);
                 i--; //man this is goated and im kinda mad i've never thought of this before
             }
@@ -2773,11 +3433,20 @@ function loadBlueprintsJSON(str) {
 
     for(const varname in json.variables) { //add variables
         const $var = json.variables[varname];
-        Blueprint.variables[varname] = $var;
-        Blueprint.variables[varname].textlayout = d2d.CreateTextLayout(varname, font, w, h); //oh yeah
+        //Blueprint.variables[varname] = $var;
+        //Blueprint.variables[varname].textlayout = d2d.CreateTextLayout(varname, font, w, h); //oh yeah
+        $var.textlayout = d2d.CreateTextLayout(varname, font, w, h); //setting it directly on $var for Blueprint.addNewVariable to work lol
 
-        BlueprintMenu.commandList.push({name: `Get ${varname}`, desc: $var.desc, parameters: [], out: [`${varname} : ${$var.type}`], type: BPTYPE_BARE, parent: "variable"});
-        BlueprintMenu.commandList.push({name: `Set ${varname}`, desc: $var.desc, parameters: [`${varname} : ${$var.type}`], out: [` : ${$var.type}`], type: BPTYPE_NOTPURE, parent: "variable"});
+        //BlueprintMenu.commandList.push({name: `Get ${varname}`, desc: $var.desc, parameters: [], out: [`${varname} : ${$var.type}`], type: BPTYPE_BARE, parent: "variable"});
+        //BlueprintMenu.commandList.push({name: `Set ${varname}`, desc: $var.desc, parameters: [`${varname} : ${$var.type}`], out: [` : ${$var.type}`], type: BPTYPE_NOTPURE, parent: "variable"});
+        
+        Blueprint.addNewVariable($var, varname, $var.desc, $var.type); //, false); //since im in a loop here it probably would make sense to update the scrollbox AFTER the loop so im passing false (nah so i just realized that BlueprintMenu.singleton is only valid while it's on screen and that also means that the scrollbox is created every time the BlueprintMenu is opened so basically what imtryna say here is that i probably don't have to update teh scrollbox anywayas)
+    }
+
+    //update scrollbox (just in case the BlueprintMenu is open?)
+    if(BlueprintMenu.singleton) {
+        BlueprintMenu.singleton.scrollBox.clear();
+        BlueprintMenu.singleton.scrollBox.elements = Blueprint.newElementsFromCommandList();
     }
 
     Blueprint.active = undefined;
@@ -2795,12 +3464,8 @@ function loadBlueprintsJSON(str) {
         let newbp;
         if(cli != -1) {
             //const newbp = Blueprint.recreate(blueprint, BlueprintMenu.commandList[cli], true);
-            const {name, desc, parameters, out, type, parent} = BlueprintMenu.commandList[cli]; //we don't need type as we save it in the json
-            newbp = Blueprint.create(undefined, name, blueprint.x, blueprint.y, parameters, out, blueprint.type, desc);
-            if(parent == "variable") { //might put this part inside of Blueprint.create
-                //well now we gotta figure out which one
-                newbp.variable = Blueprint.variables[newbp.title.substring(4)];
-            }
+            const {name, desc, parameters, out, type, parent, constant} = BlueprintMenu.commandList[cli]; //we don't need type as we save it in the json
+            newbp = Blueprint.create(/*undefined, */name, blueprint.x, blueprint.y, parameters, out, blueprint.type, desc, parent, constant);
             for(let i = 0; i < newbp.parameters.length; i++) {
                 const {control} = newbp.parameters[i];
                 if(control) {
@@ -2810,7 +3475,7 @@ function loadBlueprintsJSON(str) {
         }else {
             print(`${cli} (${blueprint.title}) not found in BlueprintMenu.commandList! (it's probably the event start node)`);
             if(blueprint.id == 0 || blueprint.title == "Event Start") {
-                newbp = new Blueprint(undefined, "Event Start", [162/255, 38/255, 30/255], 0, 0, 190, 72, [], [], BPTYPE_EVENT);
+                newbp = new Blueprint(/*undefined, */"Event Start", [162/255, 38/255, 30/255], 0, 0, 190, 72, [], [], BPTYPE_EVENT);
                 panes.splice(0, 0, newbp);
             }
         }
@@ -2820,17 +3485,19 @@ function loadBlueprintsJSON(str) {
     for(const blueprint of json.blueprints) { //fix connections
         const newbp = bpids[blueprint.id];
         for(let i = 0; i < blueprint.connections.in.length; i++) {
-            const maybepin = blueprint.connections.in[i];
-            if(maybepin) {
-                if(newbp.parameters[i].type == "exec") {
-                    for(const key in maybepin) {
-                        const pin = maybepin[key];
+            const maybe = blueprint.connections.in[i];
+            if(maybe) {
+                //if(newbp.parameters[i].type == "exec") {
+                    for(const key in maybe) {
+                        const pin = maybe[key];
                         pin.source = bpids[pin.source];
                     }
-                }else {
-                    maybepin.source = bpids[maybepin.source];
-                }
-            }
+                //}else {
+                //    maybepin.source = bpids[maybepin.source];
+                //}
+            }else {
+                blueprint.connections.in[i] = {}; //just in case?
+            }                                                      
         }
         newbp.connections.in = blueprint.connections.in;
 
@@ -2890,14 +3557,18 @@ function executeBlueprints() {
         }else {
             cache = globalcache;
         }
-        if(!cache[paneIndex]?.value || current == source) { //if we're interpreting the current pin then we'll execute it anyways since that seems reasonable
+        //if(!cache[paneIndex]?.value || current == source) { //if we're interpreting the current pin then we'll execute it anyways since that seems reasonable
+        //OHHHH i should've been checking if the value property existed instead of its value
+        if(!cache[paneIndex] || !cache[paneIndex].hasOwnProperty("value") || current == source) {
+            //print("tweakin", paneIndex, cache[paneIndex], current == source); //i was trying to figure out why russian roulette would sometimes not get cached (it was because when it returned 0 or undefined i was checking the cached value instead of if the property existed)
             for(let i = j; i < source.parameters.length; i++) {
                 const param = source.parameters[i];
                 let val = 0;
                 //const cachedData = cache[paneIndex];
                 //if(!cachedData?.[i]) { //if cachedData is undefined or (?.) if cachedData[i] is undefined
-                    if(source.connections.in[i]) {
-                        const inpin = source.connections.in[i];
+                    const keysforpin = Object.keys(source.connections.in[i]);
+                    if(keysforpin.length) {
+                        const inpin = source.connections.in[i][keysforpin[0]]; //accesses the first pin
                         //if(inpin.source instanceof Blueprint) { //inpin.source could be a primitive value like true or false (nope nevermind i changed it lol)
                             //const inPaneIndex = panes.indexOf(inpin.source);
                             //const inCachedData = cache[inPaneIndex];
@@ -3060,23 +3731,23 @@ function windowProc(hwnd, msg, wp, lp) {
         
         //otherwnd = new BottomPane(hwnd); //no longer blocks the thread as i make and draw every control myself
         //this list is not permanant and im just gonna loop through JBSExtension's extension.ts to get every function and stuff like that
-        panes.push(new Blueprint(hwnd, "Event Start", [162/255, 38/255, 30/255], 0, 0, 190, 72, [], [], BPTYPE_EVENT)); //bptype_event adds exec and delegate pin
+        panes.push(new Blueprint(/*hwnd, */"Event Start", [162/255, 38/255, 30/255], 0, 0, 190, 72, [], [], BPTYPE_EVENT)); //bptype_event adds exec and delegate pin
         //let size = Blueprint.getAppropriateSize("SetWindowText", ["window : HWND", "text : string"], ["success : BOOL"], BPTYPE_NOTPURE);
         //print(size);
         //Blueprint.create(hwnd, "SetWindowText", [120/255, 168/255, 115/255], 300, 300, size.width, size.height, ["window : HWND", "text : string"], ["success : BOOL"], BPTYPE_NOTPURE);
-        Blueprint.create(hwnd, "SetWindowText", 300, 300, ["window : HWND", "text : string"], ["success : BOOL"], BPTYPE_NOTPURE);
-        panes.push(new Blueprint(hwnd, "SetWindowText", [120/255, 168/255, 115/255], 300, 300, 221, 105, ["window : HWND", "text : string"], ["success : BOOL"], BPTYPE_NOTPURE));
-        panes.push(new Blueprint(hwnd, "GetWindowText", [120/255, 168/255, 115/255], 300, 300, 221, 105, ["window : HWND"], ["text : string"], BPTYPE_PURE));
+        Blueprint.create(/*hwnd, */"SetWindowText", 300, 300, ["window : HWND", "text : string"], ["success : BOOL"], BPTYPE_NOTPURE);
+        panes.push(new Blueprint(/*hwnd, */"SetWindowText", [120/255, 168/255, 115/255], 300, 300, 221, 105, ["window : HWND", "text : string"], ["success : BOOL"], BPTYPE_NOTPURE));
+        panes.push(new Blueprint(/*hwnd, */"GetWindowText", [120/255, 168/255, 115/255], 300, 300, 221, 105, ["window : HWND"], ["text : string"], BPTYPE_PURE));
         //size = Blueprint.getAppropriateSize("GetConsoleWindow", [], ["console : HWND"], BPTYPE_NOTPURE);
         //Blueprint.create(hwnd, "GetConsoleWindow", [120/255, 168/255, 115/255], 400, 400, size.width, size.height, [], ["console : HWND"], BPTYPE_NOTPURE);
-        Blueprint.create(hwnd, "GetConsoleWindow", 400, 400, [], ["console : HWND"], BPTYPE_NOTPURE);
-        panes.push(new Blueprint(hwnd, "GetConsoleWindow", [120/255, 168/255, 115/255], 400, 400, 150, 64, [], ["console : HWND"], BPTYPE_NOTPURE));
-        panes.push(new Blueprint(hwnd, "FindWindow", [120/255, 168/255, 115/255], 400, 400, 150, 90, ["className? : string", "windowTitle : string"], ["window : HWND"], BPTYPE_PURE));
-        panes.push(new Blueprint(hwnd, "version", [251/255, 0/255, 209/255], 400, 400, 150, 64, [], ["version : string"], BPTYPE_PURE));
-        panes.push(new Blueprint(hwnd, "Program", [95/255, 150/255, 187/255], 300, 100, 221, 90*2, ["fragmentShader : FRAGMENT_SHADER", "vertexShader : VERTEX_SHADER"], [], BPTYPE_NOTPURE));
-        panes.push(new Blueprint(hwnd, "Shader", [120/255, 168/255, 115/255], 0, 100, 221, 90, ["filename : string", "type : number"], ["shader : SHADER"], BPTYPE_PURE));
-        panes.push(new Blueprint(hwnd, "print", [95/255, 150/255, 187/255], 500, 500, 150, 90, ["In String : string"], [], BPTYPE_NOTPURE));
-        panes.push(new Blueprint(hwnd, "Beep", [120/255, 168/255, 115/255], 100, 500, 200, 130, ["frequency : number", "durationMs : number", "nonblocking? : boolean"], ["success : BOOL"], BPTYPE_NOTPURE));
+        Blueprint.create(/*hwnd, */"GetConsoleWindow", 400, 400, [], ["console : HWND"], BPTYPE_NOTPURE);
+        panes.push(new Blueprint(/*hwnd, */"GetConsoleWindow", [120/255, 168/255, 115/255], 400, 400, 150, 64, [], ["console : HWND"], BPTYPE_NOTPURE));
+        panes.push(new Blueprint(/*hwnd, */"FindWindow", [120/255, 168/255, 115/255], 400, 400, 150, 90, ["className? : string", "windowTitle : string"], ["window : HWND"], BPTYPE_PURE));
+        panes.push(new Blueprint(/*hwnd, */"version", [251/255, 0/255, 209/255], 400, 400, 150, 64, [], ["version : string"], BPTYPE_PURE));
+        panes.push(new Blueprint(/*hwnd, */"Program", [95/255, 150/255, 187/255], 300, 100, 221, 90*2, ["fragmentShader : FRAGMENT_SHADER", "vertexShader : VERTEX_SHADER"], [], BPTYPE_NOTPURE));
+        panes.push(new Blueprint(/*hwnd, */"Shader", [120/255, 168/255, 115/255], 0, 100, 221, 90, ["filename : string", "type : number"], ["shader : SHADER"], BPTYPE_PURE));
+        panes.push(new Blueprint(/*hwnd, */"print", [95/255, 150/255, 187/255], 500, 500, 150, 90, ["In String : string"], [], BPTYPE_NOTPURE));
+        panes.push(new Blueprint(/*hwnd, */"Beep", [120/255, 168/255, 115/255], 100, 500, 200, 130, ["frequency : number", "durationMs : number", "nonblocking? : boolean"], ["success : BOOL"], BPTYPE_NOTPURE));
         PropertyMenu.create();
         d2dpaint();
         SetTimer(hwnd, 0, 16); //lowkey this is only for BlueprintMenu smooth scrolling lmao
@@ -3101,6 +3772,7 @@ function windowProc(hwnd, msg, wp, lp) {
 
         if(filenames && filenames[0]) {
             //dragndropshaderpopup(hwnd).script = require("fs").read(filenames[0]);
+            loadBlueprintsJSON(require("fs").read(filenames[0]));
         }
 
         dirty = true;
@@ -3197,11 +3869,11 @@ function windowProc(hwnd, msg, wp, lp) {
                     if(anyoutconnections.length) {
                         for(const connection of Object.values(anyoutconnections)) {
                             const out = connection.receiver;
-                            if(out.source.parameters[out.i].type == "exec") {
+                            //if(out.source.parameters[out.i].type == "exec") {
                                 delete out.source.connections.in[out.i][out.id]; //oops i wrote out.data
-                            }else {
-                                out.source.connections.in[out.i] = undefined;
-                            }
+                            //}else {
+                            //    out.source.connections.in[out.i] = undefined;
+                            //}
                         }
                     }
                     hit.pane.connections.out[hit.data] = undefined;
@@ -3213,40 +3885,42 @@ function windowProc(hwnd, msg, wp, lp) {
 
                 if(hit.pane instanceof Blueprint) {
                     const inpin = hit.pane.connections.in[hit.data]; //{i, source, id}
-                    const execpin = hit.pane.parameters[hit.data].type == "exec";
-                    if((inpin && execpin && Object.keys(inpin).length) || (inpin && !execpin)) { //oops this if is cap
+                    //const execpin = hit.pane.parameters[hit.data].type == "exec";
+                    //if((inpin && execpin && Object.keys(inpin).length) || (inpin && !execpin)) { //oops this if is cap (what?)
                         if(GetKey(VK_MENU)) {
-                            if(execpin) {
+                            //if(execpin) {
                                 for(const key of Object.keys(inpin)) {
                                     const pin = inpin[key];
                                     delete pin.source.connections.out[pin.i][pin.id];
                                 }
                                 hit.pane.connections.in[hit.data] = {};
-                            }else {
-                                delete inpin.source.connections.out[inpin.i][inpin.id];
-                                hit.pane.connections.in[hit.data] = undefined;
-                            }
+                            //}else {
+                            //    delete inpin.source.connections.out[inpin.i][inpin.id];
+                            //    hit.pane.connections.in[hit.data] = undefined;
+                            //}
                         }else {
                             //let obj;
                             let i, source, id;
-                            if(execpin) {
-                                const firstkey = Object.keys(inpin)[0];
-                                //obj = inpin[firstkey];
-                                i = inpin[firstkey].i;
-                                source = inpin[firstkey].source;
-                                id = inpin[firstkey].id;
-                                delete inpin[firstkey];
-                            }else {
-                                //obj = inpin;
-                                i = inpin.i;
-                                source = inpin.source;
-                                id = inpin.id;
-                                hit.pane.connections.in[hit.data] = undefined;
+                            const firstkey = Object.keys(inpin)[0];
+                            if(firstkey) {
+                                //if(execpin) {
+                                    //obj = inpin[firstkey];
+                                    i = inpin[firstkey].i;
+                                    source = inpin[firstkey].source;
+                                    id = inpin[firstkey].id;
+                                    delete inpin[firstkey];
+                                //}else {
+                                //    //obj = inpin;
+                                //    i = inpin.i;
+                                //    source = inpin.source;
+                                //    id = inpin.id;
+                                //    hit.pane.connections.in[hit.data] = undefined;
+                                //}
+                                //const {i, source, id} = obj;
+                                Draggable.select(source.preDrag?.(mouse, i, id) ?? source, mouse, false, false);
                             }
-                            //const {i, source, id} = obj;
-                            Draggable.select(source.preDrag?.(mouse, i, id) ?? source, mouse, false, false);
                         }
-                    }
+                    //}
                 }
             }else if(hit.result == TEXT) {
                 Editable.beginInput(hit.data[0], hit.data[1]); //haha i made hit.data = [i, object]
@@ -3324,6 +3998,8 @@ function windowProc(hwnd, msg, wp, lp) {
                         receiver = {i: data, source: pane}; //id is just a random number
                         if(pane.parameters[data].type == "exec") {
                             receiver.id = draws;
+                        }else {
+                            receiver.id = 0;
                         }
                     }
                 }
@@ -3345,16 +4021,18 @@ function windowProc(hwnd, msg, wp, lp) {
                     }*/
                     activePin.source.connections.out[activePin.i][activePin.id].receiver = receiver; //{i: receiver.data, source: receiver.blueprint};
                     if(execpincheck != 2) {
-                        const receiverpin = receiver.source.connections.in[receiver.i]; //{i, source, id}
+                        const receiverpin = receiver.source.connections.in[receiver.i][receiver.id]; //{i, source, id}
                         if(receiverpin) { //if A was connected to B and C wants to connect to B, then i tell A that it's no longer connected
                             //this happens when something is already connected and you connect ANOTHER thing to this one
                             //receiverpin.source.connections.out[receiverpin.i] = undefined; //receiverpin.i (i think?)
                             delete receiverpin.source.connections.out[receiverpin.i][receiverpin.id];
                         }
-                        receiver.source.connections.in[receiver.i] = activePin; //.source = activePin;
-                    }else {
-                        receiver.source.connections.in[receiver.i][receiver.id] = activePin;
-                    }
+                        //receiver.source.connections.in[receiver.i] = activePin; //.source = activePin;
+                    }//else {
+                    //    receiver.source.connections.in[receiver.i][receiver.id] = activePin;
+                    //}
+
+                    receiver.source.connections.in[receiver.i][receiver.id] = activePin;
                 }
                 //print(activePin.i, receiver.i);
             }else {
@@ -3453,6 +4131,13 @@ function windowProc(hwnd, msg, wp, lp) {
         }
         if(Editable.editing && (wp > VK_SPACE || wp <= VK_DELETE)) {
             Editable.modify(wp);
+        }else if(hit.result == WHEEL && (wp == VK_UP || wp == VK_DOWN)) {
+            const y = wp == VK_UP ? 120 : -120;
+            if(hit.data) {
+                hit.data.wheel(y);
+            }else {
+                hit.pane.wheel(y);
+            }
         }
 
         if(Blueprint.active && !Editable.editing) {
@@ -3476,7 +4161,11 @@ function windowProc(hwnd, msg, wp, lp) {
     }else if(msg == WM_MOUSEWHEEL) {
         //print(wp, GET_WHEEL_DELTA_WPARAM(wp), lp); //ok no lie i had to make GET_WHEEL_DELTA_WPARAM for this
         if(hit.result == WHEEL) {
-            hit.pane?.wheel(GET_WHEEL_DELTA_WPARAM(wp));
+            if(hit.data) {
+                hit.data.wheel(GET_WHEEL_DELTA_WPARAM(wp));
+            }else {
+                hit.pane.wheel(GET_WHEEL_DELTA_WPARAM(wp));
+            }
         }
         //if(dragging) {
         //            //oh yeah dragging is a string holding either cPos or c2Pos
@@ -3485,8 +4174,11 @@ function windowProc(hwnd, msg, wp, lp) {
         //    console.log(radii);
         //    gl.uniform2fv(uniformLocations["radii"], radii);
         //}
-    }else if(msg == WM_TIMER) {
-        if(Math.abs(BlueprintMenu.singleton?.scrollVelocity) > 0.01) { //Math.abs(undefined) == NaN
+    }else if(msg == WM_TIMER) { //for smooth scrolling
+        //if(Math.abs(BlueprintMenu.singleton?.scrollVelocity) > 0.01) { //Math.abs(undefined) == NaN
+        //    dirty = true;
+        //}
+        if(BlueprintMenu.singleton && Math.abs(BlueprintMenu.singleton.scrollBox.scroll.velocity) > 0.01) {
             dirty = true;
         }
     }

@@ -152,8 +152,11 @@ class ScrollBox {
         d2d.FillRectangle(this.width-12, scrollbarY, this.width-2, scrollbarY+this.scroll.scrollBarHeight, colorBrush);
     }
 
-    preDrag(mouse, data) {
-        const tempscrollobjecttohelpmedothis = {x: 0, y: this.scroll.y, onDrag: (function() {
+    preDrag(mouse, data) { //predrag does not send mouse in client space or whatever the word to describve it its 
+        //const clienty = (this.y-this.scroll.y)-mouse.y;
+        //print(clienty, "clienty", this.scroll.y);
+        const scrollbarY = (this.scroll.y/this.contents.length)*(this.height-this.scroll.scrollBarHeight);
+        const tempscrollobjecttohelpmedothis = {x: 0, y: scrollbarY, onDrag: (function() { //oh i was supposed to use scrollBarY instead of this.scroll.y
             print(tempscrollobjecttohelpmedothis.y);
             this.scroll.y = clamp(0, this.contents.length, (tempscrollobjecttohelpmedothis.y/(this.height-this.scroll.scrollBarHeight))*this.contents.length); //! (subtracting height - scrollBarHeight so that the mouse doesn't slip away when you drag to the bottom!)
             //ok wait this kinda sucks idk imma do it right in jbsblueprints tho trust.
