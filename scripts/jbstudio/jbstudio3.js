@@ -1,8 +1,8 @@
 //im not even gonna lie i have no idea why this has been my most buggy script (i blame spawn/beep, showOpenFilePicker) (method fluidsynth.LoadNewSf2 was killing myshit but i was doing it wrong lmao i fixed it)
 
 //let hBankMenu, hProgMenu;
-let hMenu, hLayoutMenu, hGainMenu, hInstrumentMenu;
-let d2d, brush, font, biggerfont, /*testBmp,*/ dragging;
+let hMenu, hLayoutMenu, hGainMenu, hSustainMenu, hInstrumentMenu;
+let d2d, brush, font, biggerfont, /*testBmp,*/ dragging, bitmapToBeTiled, tiledBars;
 let width = 1280;
 let height = 720;
 let scrollPos = 0.5;
@@ -16,6 +16,50 @@ let playing = false;
 let playJ = 0;
 let sortedNotes;
 let noteEndTimes;
+let sustain = false;
+let sustainedKeys = {};
+let sustainLengthMS = 5000; //millisieconds
+
+function createTiledBarsBrush() { //some stuff snatched from /d2dbackgroundtiling.js
+    bitmapToBeTiled = d2d.CreateBitmap(4*23, 20);
+
+    //both of these are surprisingly valid ways of creating a bitmap that can be drawn to!
+    const tempRenderTarget = d2d.CreateBitmapFromDxgiSurface(D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW, DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED);
+    //const tempRenderTarget = d2d.CreateBitmap1(4*23, 20, D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW, DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED, NULL, 0);
+    
+    d2d.SetTarget(tempRenderTarget); //drawing to the backBitmap so i can copy its contents (after i draw to it) into "bitmap" to use it with CreateBitmapBrush
+
+    d2d.BeginDraw();
+
+    //d2d.Clear(0.0, 0.0, 0.0);
+    brush.SetColor(42/255, 58/255, 68/255);
+
+    let dark = false;
+    for(let i = 0; i <= 4; i++) {
+        if((i+1)%4 == 0) {
+            brush.SetColor(34/255, 50/255, 60/255);
+            dark = true;
+        }else if(dark) {
+            brush.SetColor(42/255, 58/255, 68/255);
+            dark = false;
+        }
+        const x = (23*i);
+
+        d2d.DrawLine(x, 0, x, 20, brush);
+    }
+
+    d2d.EndDraw(true); //OH! i can't present it! (i'm pretty sure presenting switches the targetBitmap to what ever is currently selected)
+
+    //bitmap.CopyFromRenderTarget(0, 0, d2d.backBitmap, 0, 0, tileSize, tileSize); //hell yeah (oh wait no for this to work you'd have to pass d2d)
+    bitmapToBeTiled.CopyFromBitmap(0, 0, tempRenderTarget, 0, 0, 4*23, 20); //hell yeah
+
+    d2d.SetTarget(d2d.targetBitmap);
+
+    tempRenderTarget.Release(); //don't forget to release the new bitmap bruh (probably after you set the target to something else)
+
+    tiledBars = d2d.CreateBitmapBrush(bitmapToBeTiled);  
+    tiledBars.SetExtendMode(D2D1_EXTEND_MODE_WRAP, D2D1_EXTEND_MODE_WRAP);
+}
 
 let pianoKeys = [];
 
@@ -27,12 +71,16 @@ const SAVE_COMMAND = 3;
 const EXIT_COMMAND = 4;
 
 const GAINSTART_COMMAND = 5;
+const GAINSTART_COMMAND_END = GAINSTART_COMMAND+10;
 
 const LOADSF2_COMMAND = 21;
 const STOPSOUND_COMMAND = 22;
 
 const FLLAYOUT_COMMAND = 50;
 const VPLAYOUT_COMMAND = 51;
+
+const SUSTAINLENGTH_COMMAND = 52;
+const SUSTAINLENGTH_COMMAND_END = SUSTAINLENGTH_COMMAND+5;
 
 const INSTRUMENTPRESETSTART_COMMAND = 100;
 
@@ -351,12 +399,16 @@ function playTone(key, pitch, up = false) {
             pianoKeys[note].color = [1, 155/255, 0];
             fluidsynthinst.noteon(0, note, 100);
         }else {
-            //print(pitch, key, "off");
-            if(pianoKeys[note].lastColor) {
-                pianoKeys[note].color = pianoKeys[note].lastColor; //OHHHH jbstudio will crash after you release shift while the virtual piano layout is on and it's because when you release shift it gets sent over to playTone as 48 (the "0" key) and when it tries to release this note it sets color to undefined because lastColor wasn't defined yet (when i made this part i assumed that there couldn't be any random note offs)
-                delete pianoKeys[note].lastColor; //delete this property so i can check if it already exists when you call playTone (because to fire playTone again with up being false means you held the key for too long and it started sending repeat messages lmao)
+            if(sustain) {
+                sustainedKeys[note] = Date.now(); //using keys instead of an array so there are no duplicates (i guess i could also do this with an array too but whatever)
+            }else {
+               //print(pitch, key, "off");
+                if(pianoKeys[note].lastColor) {
+                    pianoKeys[note].color = pianoKeys[note].lastColor; //OHHHH jbstudio will crash after you release shift while the virtual piano layout is on and it's because when you release shift it gets sent over to playTone as 48 (the "0" key) and when it tries to release this note it sets color to undefined because lastColor wasn't defined yet (when i made this part i assumed that there couldn't be any random note offs)
+                    delete pianoKeys[note].lastColor; //delete this property so i can check if it already exists when you call playTone (because to fire playTone again with up being false means you held the key for too long and it started sending repeat messages lmao)
+                }
+                fluidsynthinst.noteoff(0, note);
             }
-            fluidsynthinst.noteoff(0, note);
         }
     }
 }
@@ -438,6 +490,8 @@ function windowProc(hwnd, msg, wp, lp) {
 
         d2d = createCanvas("d2d", ID2D1DeviceContext, hwnd);  //DComposition
         brush = d2d.CreateSolidColorBrush(1.0, 1.0, 0.0);
+
+        createTiledBarsBrush();
         
         font = d2d.CreateFont("arial", 12);
         biggerfont = d2d.CreateFont("arial", 30);
@@ -479,6 +533,7 @@ function windowProc(hwnd, msg, wp, lp) {
         let hFileMenu = CreateMenu();
         hLayoutMenu = CreateMenu();
         hGainMenu = CreateMenu();
+        hSustainMenu = CreateMenu();
         hInstrumentMenu = CreateMenu();
         AppendMenu(hFileMenu, MF_STRING, NEW_COMMAND, "New");
         AppendMenu(hFileMenu, MF_STRING, OPEN_COMMAND, "Open...");
@@ -502,6 +557,11 @@ function windowProc(hwnd, msg, wp, lp) {
         }
         AppendMenu(hMenu, MF_POPUP, hGainMenu, "Set gain level");
 
+        for(let i = 0; i < 6; i++) {
+            AppendMenu(hSustainMenu, MF_STRING | (i == 3 ? MF_CHECKED : MF_UNCHECKED), SUSTAINLENGTH_COMMAND+i, (625*(2**(i)))+" MS");
+        }
+        AppendMenu(hMenu, MF_POPUP | MF_GRAYED, hSustainMenu, "Set sustain length");
+
         AppendMenu(hMenu, MF_POPUP, hInstrumentMenu, "Select Instrument");
 
         fluidsynthinst = new fluidsynth(__dirname+"\\fluidsynth\\TimGM6mb.sf2"); //i gotta create this shit here so i can change hBankMenu and hProgMenu
@@ -518,30 +578,35 @@ function windowProc(hwnd, msg, wp, lp) {
         //print(mouse.y, scrollBarX.y);
         //let {width, height} = d2d.GetSize();
 
-        brush.SetColor(42/255, 58/255, 68/255);
-        let dark = false;
-        for(let i = /*4*/0; i <= Math.floor(width/23); i++) { //dang my math is brazy
-            if((i+1)%4 == 0) {
-                brush.SetColor(34/255, 50/255, 60/255);
-                dark = true;
-            }else if(dark) {
-                brush.SetColor(42/255, 58/255, 68/255);
-                dark = false;
-            }
-            let x = (23*i)-scrollPosX*scrollWidth;
-            //while(x < 0) {
-            //    x = x < 0 ? width+x : x; //i SWEAR there is an easier way to do this but im trying really hard and i can't figure it out
-            //}
-            //WAIT I THINK I GOT IT
-            x = x < 0 ? (width*(Math.ceil(Math.abs(x)/width))+x) : x;
-            d2d.DrawLine(x, 0, x, height, brush);
-        }
+        //brush.SetColor(42/255, 58/255, 68/255);
+
+        //stand down stupid complicated math that i should've realized there was another way to do...
+        //let dark = false;
+        //for(let i = /*4*/0; i <= Math.floor(width/23); i++) { //dang my math is brazy
+        //    if((i+1)%4 == 0) {
+        //        brush.SetColor(34/255, 50/255, 60/255);
+        //        dark = true;
+        //    }else if(dark) {
+        //        brush.SetColor(42/255, 58/255, 68/255);
+        //        dark = false;
+        //    }
+        //    let x = (23*i)-scrollPosX*scrollWidth;
+        //    //while(x < 0) {
+        //    //    x = x < 0 ? width+x : x; //i SWEAR there is an easier way to do this but im trying really hard and i can't figure it out
+        //    //}
+        //    //WAIT I THINK I GOT IT
+        //    x = x < 0 ? (width*(Math.ceil(Math.abs(x)/width))+x) : x;
+        //    d2d.DrawLine(x, 0, x, height, brush);
+        //}
+
+        tiledBars.SetTransform(Matrix3x2F.Translation(-scrollPosX*scrollWidth, 0));
+        d2d.FillRectangle(70, 0, width, height, tiledBars);
 
         DrawPianoKeys(mouse);
 
         //print(dragging);
 
-        dragging?.Drag(mouse); //goated operator for times like these
+        dragging?.Drag(mouse); //goated operator for times like these (nah nah my abstract Draggable in jbsblueprints blows this out of the water)
 
         scrollBar.y = scrollPos * (height-70);
         scrollBar.Update(mouse);
@@ -550,8 +615,30 @@ function windowProc(hwnd, msg, wp, lp) {
         scrollBarX.Update(mouse);
 
         for(let note of pianoRollNotes) {
-            note.Update(mouse);
+            note.Update(mouse); //kinda inefficient if you ask me... updating every note even if it's not on screen
         }
+
+        //if(sustain) {
+            for(const note in sustainedKeys) {
+                const keytime = sustainedKeys[note];
+                //print(note, Date.now()-keytime);
+                if((Date.now()-keytime) > sustainLengthMS) {
+                    //const pitch = Math.floor(note/12);
+                    //const key = Math.round((note/12 % 1)*12);
+                    
+                    //playTone(key, pitch, true);
+                    
+                    //deleting a key doesn't mess up the for...in loop does it? (according to my calculations it does not!)
+                    delete sustainedKeys[note];
+                
+                    if(pianoKeys[note].lastColor) {
+                        pianoKeys[note].color = pianoKeys[note].lastColor;
+                        delete pianoKeys[note].lastColor;
+                    }
+                    fluidsynthinst.noteoff(0, note);    
+                }
+            }
+        //}
 
         if(mouse.x > 70 && GetKeyDown(VK_LBUTTON) && !dragging) {
             let note = new ABSDraggable(mouse.x, mouse.y, 4*23, 20, [158/255, 209/255, 165/255], pianoRollNoteDrag);
@@ -656,41 +743,47 @@ function windowProc(hwnd, msg, wp, lp) {
         dragging = undefined;
     }else if(msg == WM_MOUSEWHEEL) {
         //print(GET_WHEEL_DELTA_WPARAM(wp), lp);
-        const wheel = GET_WHEEL_DELTA_WPARAM(wp)/-2400;
+        //const wheel = GET_WHEEL_DELTA_WPARAM(wp)/-2400;
+        const direction = GET_WHEEL_DELTA_WPARAM(wp)/-120;
         if((LOWORD(wp) & MK_SHIFT) == MK_SHIFT) {
-            scrollPosX = Math.min(Math.max(scrollPosX+wheel, 0), 1);
+            wheel = ((width-70)/scrollWidth)*direction; //-70 because of piano keys
+            scrollPosX = Math.min(Math.max(scrollPosX+wheel/2, 0), 1);
         }else {
+            wheel = direction/20;
             scrollPos = Math.min(Math.max(scrollPos+wheel, 0), 1);
         }
     }else if(msg == WM_KEYDOWN) {
-        print(String.fromCharCode(wp), wp);
-        let args;
-        if(pianoLayout == FLKeyNotes) {
-            args = pianoLayout[String.fromCharCode(wp)];
-        }else {
-            /*static*/ const shifted = { //i asked chat what i should do and he gave me the answer i wasn't tryna do so im just gonna do it anyways
-                0x30: 0x29,  // '0' -> ')'
-                0x31: 0x21,  // '1' -> '!'
-                0x32: 0x40,  // '2' -> '@'
-                0x33: 0x23,  // '3' -> '#'
-                0x34: 0x24,  // '4' -> '$'
-                0x35: 0x25,  // '5' -> '%'
-                0x36: 0x5E,  // '6' -> '^'
-                0x37: 0x26,  // '7' -> '&'
-                0x38: 0x2A,  // '8' -> '*'
-                0x39: 0x28,  // '9' -> '('
-            }
-            //args = pianoLayout[String.fromCharCode(shifted[wp] || (wp+(GetKey(VK_SHIFT) == 0)*32))]; //write dumb code bruh (wait this was actually dumb because it was wrong haha)
-            if(GetKey(VK_SHIFT)) { //why does WM_KEYDOWN not pass which modifier keys were active
-                args = pianoLayout[String.fromCharCode(shifted[wp] || wp)];
-                print(args, shifted[wp], wp);
-            }else {
-                args = pianoLayout[String.fromCharCode(shifted[wp] ? wp : wp+32)];
-            }
-        }
-        if(args) {
-            playTone(...args);
-        }
+        print("WM_KEYDOWN", String.fromCharCode(wp), wp);
+        //let args;
+        
+        //idk WHAT i was doing bruh all of this should've been in WM_CHAR!!! (that's basically what it's for)
+        //WM_CHAR will send capital and lowercase characters if you are holding shift/capslock but WM_KEYDOWN only sends what key was just hit
+        //if(pianoLayout == FLKeyNotes) {
+        //    args = pianoLayout[String.fromCharCode(wp)];
+        //}else {
+        //    /*static*/ const shifted = { //i asked chat what i should do and he gave me the answer i wasn't tryna do so im just gonna do it anyways
+        //        0x30: 0x29,  // '0' -> ')'
+        //        0x31: 0x21,  // '1' -> '!'
+        //        0x32: 0x40,  // '2' -> '@'
+        //        0x33: 0x23,  // '3' -> '#'
+        //        0x34: 0x24,  // '4' -> '$'
+        //        0x35: 0x25,  // '5' -> '%'
+        //        0x36: 0x5E,  // '6' -> '^'
+        //        0x37: 0x26,  // '7' -> '&'
+        //        0x38: 0x2A,  // '8' -> '*'
+        //        0x39: 0x28,  // '9' -> '('
+        //    }
+        //    //args = pianoLayout[String.fromCharCode(shifted[wp] || (wp+(GetKey(VK_SHIFT) == 0)*32))]; //write dumb code bruh (wait this was actually dumb because it was wrong haha)
+        //    if(GetKey(VK_SHIFT)) { //why does WM_KEYDOWN not pass which modifier keys were active
+        //        args = pianoLayout[String.fromCharCode(shifted[wp] || wp)];
+        //        print(args, shifted[wp], wp);
+        //    }else {
+        //        args = pianoLayout[String.fromCharCode(shifted[wp] ? wp : wp+32)];
+        //    }
+        //}
+        //if(args) {
+        //    playTone(...args);
+        //}
         if(wp == VK_UP || wp == VK_RIGHT) {
             //print(wp, lp);
             let mul = (GetKey(VK_SHIFT)) ? 1/5 : (GetKey(VK_CONTROL)) ? 10 : 1
@@ -746,6 +839,22 @@ function windowProc(hwnd, msg, wp, lp) {
                 //    
                 //}
             }
+        }else if(wp == VK_RETURN) {
+            sustain = !sustain;
+            print(hSustainMenu);
+            ModifyMenu(hMenu, 5, MF_BYPOSITION | MF_POPUP | (sustain ? MF_ENABLED : MF_GRAYED), hSustainMenu, "Set sustain length");
+            DrawMenuBar(hwnd);
+            //SetMenuItemInfo(hMenu, 3, true, {fMask: MIIM_STATE, fState: sustain ? MFS_GRAYED : MFS_DEFAULT});
+        }
+    }else if(msg == WM_CHAR) {
+        print("WM_CHAR", String.fromCharCode(wp), wp);
+        if(pianoLayout == FLKeyNotes) {
+            args = pianoLayout[String.fromCharCode(wp).toUpperCase()];
+        }else {
+            args = pianoLayout[String.fromCharCode(wp)];
+        }
+        if(args) {
+            playTone(...args);
         }
     }else if(msg == WM_KEYUP) {
         let args;
@@ -803,7 +912,7 @@ function windowProc(hwnd, msg, wp, lp) {
             print(pianoRollNotes);
         }else if(wp == EXIT_COMMAND) {
             DestroyWindow(hwnd);
-        }else if(wp >= GAINSTART_COMMAND && wp < GAINSTART_COMMAND+11) {
+        }else if(wp >= GAINSTART_COMMAND && wp <= GAINSTART_COMMAND_END) {
             print(wp-GAINSTART_COMMAND);
             for(let i = 0; i < 11; i++) {
                 //ModifyMenu(hGainMenu, GAINSTART_COMMAND+i, MF_BYCOMMAND | (wp==GAINSTART_COMMAND+i && MF_CHECKED), GAINSTART_COMMAND+i, NULL);
@@ -835,6 +944,11 @@ function windowProc(hwnd, msg, wp, lp) {
 
             SetMenuItemInfo(hLayoutMenu, 0, true, {fMask: MIIM_STATE, fState: wp == FLLAYOUT_COMMAND ? MFS_CHECKED : MFS_UNCHECKED});
             SetMenuItemInfo(hLayoutMenu, 1, true, {fMask: MIIM_STATE, fState: wp == VPLAYOUT_COMMAND ? MFS_CHECKED : MFS_UNCHECKED});
+        }else if(wp >= SUSTAINLENGTH_COMMAND && wp <= SUSTAINLENGTH_COMMAND_END) {
+            for(let i = 0; i < 6; i++) {        
+                SetMenuItemInfo(hSustainMenu, i, true, {fMask: MIIM_STATE, fState: wp == SUSTAINLENGTH_COMMAND+i ? MFS_CHECKED : MFS_UNCHECKED});
+            }
+            sustainLengthMS = 625*(2**(wp-SUSTAINLENGTH_COMMAND));
         }
         else if(wp >= INSTRUMENTPRESETSTART_COMMAND) { //one of the preset names in hInstrumentMenu
             print(wp-INSTRUMENTPRESETSTART_COMMAND);
@@ -854,6 +968,8 @@ function windowProc(hwnd, msg, wp, lp) {
     }
     else if(msg == WM_DESTROY) {
         PostQuitMessage(0);
+        //hMenu, hLayoutMenu, hGainMenu, hSustainMenu, hInstrumentMenu
+        print(DeleteMenu(hMenu), "== 1?"); //this gets em all right?
         font.Release();
         biggerfont.Release();
         brush.Release();
@@ -872,4 +988,4 @@ wc.hCursor = LoadCursor(NULL, IDC_ARROW);
 
 //using DragAcceptFiles instead of WS_EX_ACCEPTFILES even though im pretty sure there's no difference
 //im just writing this here to say that there's 2 ways of doing it
-window = CreateWindow(WS_EX_OVERLAPPEDWINDOW, wc, "jbstudio3.js (use arrows to edit tempo)", WS_OVERLAPPEDWINDOW | WS_VISIBLE, CW_USEDEFAULT, CW_USEDEFAULT, width+20, height+42+20, NULL, NULL, hInstance);
+window = CreateWindow(WS_EX_OVERLAPPEDWINDOW, wc, "jbstudio3.js (use arrows to edit tempo and enter to toggle sustain)", WS_OVERLAPPEDWINDOW | WS_VISIBLE, CW_USEDEFAULT, CW_USEDEFAULT, width+20, height+42+20, NULL, NULL, hInstance);

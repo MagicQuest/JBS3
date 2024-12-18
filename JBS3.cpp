@@ -3824,7 +3824,7 @@ namespace DIRECT2D {
                 ID2D1BitmapBrush* bmpBrush = (ID2D1BitmapBrush*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
 
                 bmpBrush->SetExtendModeX((D2D1_EXTEND_MODE)IntegerFI(info[0]));
-                bmpBrush->SetExtendModeY((D2D1_EXTEND_MODE)IntegerFI(info[0]));
+                bmpBrush->SetExtendModeY((D2D1_EXTEND_MODE)IntegerFI(info[1])); //bro
             }));
             jsBrush->Set(isolate, "SetInterpolationMode", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
                 Isolate* isolate = info.GetIsolate();
@@ -4170,7 +4170,8 @@ namespace DIRECT2D {
                 D2D1_POINT_2U point = D2D1::Point2U(IntegerFI(info[0]), IntegerFI(info[1]));
                 D2D1_RECT_U rect = D2D1::RectU(IntegerFI(info[3]), IntegerFI(info[4]), IntegerFI(info[5]), IntegerFI(info[6]));
 
-                ID2D1RenderTarget* rt = (ID2D1RenderTarget*)IntegerFI(info[2]);//info[2].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()->IntegerValue(isolate->GetCurrentContext()).FromJust();
+                //ID2D1RenderTarget* rt = (ID2D1RenderTarget*)IntegerFI(info[2]); //i wonder why i had it like this even though i (sorta) wrote out the correct version
+                ID2D1RenderTarget* rt = ((Direct2D*)info[2].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()->IntegerValue(isolate->GetCurrentContext()).FromJust())->renderTarget;
                 RetIfFailed(bmp->CopyFromRenderTarget(&point, rt, &rect), "CopyFromRenderTarget failed!~");
             }));
             jsBitmap->Set(isolate, "CopyFromMemory", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) { //oops i made this because i wanted to convert HICON to ID2D1Bitmap BUT wic can already basically do that with CreateBitmapFromHICON
@@ -6969,7 +6970,7 @@ namespace DIRECT2D {
 
                 ID2D1BitmapBrush* bmpBrush;
 
-                d2d->renderTarget->CreateBitmapBrush(bmp, &bmpBrush);
+                RetPrintIfFailed(d2d->renderTarget->CreateBitmapBrush(bmp, &bmpBrush), "CreateBitmapBrush failed!");
 
                 //Local<ObjectTemplate> jsBrush = DIRECT2D::getDefaultBrushImpl(isolate, bmpBrush, "bitmap");//ObjectTemplate::New(isolate);
             
