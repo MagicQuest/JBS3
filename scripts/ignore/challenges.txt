@@ -1,10 +1,10 @@
 {"nx": 1550, "ny": 450, "nw": 512, "nh": 300, "b": false}
 SetBkColor(memDC, RGB(255, 255, 255)); CreateFontSimple("burbank big cd bd", 10/1.25, 20/1.25); //haha fortnite font burbank big cd bd
 
-use sprite shine to reveal nearby sprites in diff matcheds
-hit niggas with ar 10 times
-return sprites to sprirte shine boon
-deal 1000 damage with **the blade**
+find the giant turtle
+collect a void oni mask in different matches (2/3)
+give weapons to an earth sprite
+collect epic or better weapons
 
 //(<b>shit i need to use a text layout for special effects like</b>)
 //wait nevermind im using gdi to draw this shit aren't i
