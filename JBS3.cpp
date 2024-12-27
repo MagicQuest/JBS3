@@ -16120,6 +16120,24 @@ V8FUNC(mt_makeobject) {
     info.GetReturnValue().Set(handle_scope.Escape(object));
 }
 
+//lol i couldn't remember what the name of this function was
+//well it was worth a shot, while i couldn't remember the name of the function i did remember that you could only use it when making drivers (it's written in wdm.h)
+//V8FUNC(DbgPrintWrapper) {
+//    using namespace v8;
+//    Isolate* isolate = info.GetIsolate();
+//
+//    DbgPrint();
+//}
+
+//ah nevermind
+V8FUNC(OutputDebugStringWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    OutputDebugString(WStringFI(info[0]));
+    OutputDebugString(L"\n");
+}
+
 //i think im allowed to use a snapshot thing to load these quicker
 //https://github.com/danbev/learning-v8/blob/master/notes/snapshots.md
 v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const wchar_t* filename, int nCmdShow) {
@@ -16202,6 +16220,8 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const wchar_t* filename
 
     setGlobal(mt_incremento);
     setGlobal(mt_makeobject);
+
+    setGlobalWrapper(OutputDebugString);
 
     //setGlobalWrapper(SystemParametersInfo);
     

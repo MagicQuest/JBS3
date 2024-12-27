@@ -5,7 +5,7 @@
 //it seems like it can't read .ico? (yeah i guess it's not on the list... fyi im using opencv 4.10.0)
 //.heic didn't work but it didn't crash
 //ok if you open too many videos your whole computer starts getting slower 😂
-//OH HELL NAH I OPENED LIKE 20 VIDEOS AND MY COMPUTER WQAS AT 95% memory (16 GB) but none of the apps i had open went above 500 MB (WHEN I CLOSED JBS3 THE MEMORY WHEN BACK DOWN TO 60% (JBS3 WAS SOMEHOW USING 30% BUT IT DIDN'T SAY IT (i wonder if this was a gdi thing or a DllLoad thing)))
+//OH HELL NAH I OPENED LIKE 20 VIDEOS AND MY COMPUTER WQAS AT 95% memory (16 GB) but none of the apps i had open went above 500 MB (WHEN I CLOSED JBS3 THE MEMORY WHEN BACK DOWN TO 60% (JBS3 WAS SOMEHOW USING 30% BUT IT DIDN'T SAY IT (i wonder if this was a gdi thing or a DllLoad thing))) //i think it was a gdi thing? maybe?
 
 let opencv_ffmpeg, opencv_world, opencvhelper; //no ffmpeg because im only using imread (ok nevermind)
 

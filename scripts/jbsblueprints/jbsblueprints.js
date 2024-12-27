@@ -1,18 +1,23 @@
 //imma be honest the code that goes into drawing and managing the blueprints might not be good BUT IT WORKS
 //i might try to clean this shit up at some point so it's not a tangled mess of classes
+//i think making this was a great example to me why you should actually think about everything it is you want your classes to do BEFORE you open vscode bro
 
-//stop Sleep and SET from being cached !!! (actually i think if current is the one being interpreted it should be executed every time? also when caching in a loop, store the cached values in loopStack.at(-1) so when it repeats i clear that cache! I think it true that this may be a valid alternative for the cacheable property and this line as a whole. )
-//test if unreal still caches unpure function connected to a while condition or something (yeah nah if you connect an unpure function to a while loop in unreal it'll tell you there's an infinite loop)
-//probably should make a modal class or something like that for BlueprintMenu and DropdownControlMenu (likely so)
-//quite possibly make static functions for managing pin connections because BOY is it confusing
-//make some animation class or global array like magicquest.github.io/v2 !
+//if im trying this again i should probably do these
 //i might make BlueprintMenu's scrollBox static but honestly idk if it's THAT important like idk
+//make some animation class or global array like magicquest.github.io/v2 !
+//probably should make a modal class or something like that for BlueprintMenu and DropdownControlMenu (likely so)
+
+//regex for json that was saved before i got rid of connections.out.receiver (you gotta format the json tho -> https://regexr.com/8adn0)
 
 //standardize connections so i can add a on connection added callback (nevermind i think the ways i manage connections is too specific to each use case to make a generic function for it)
-//format string for eval and russian roulette multiple parameters
+//format string for eval
 //add registerOARFAS for object returning functions
+//set timeout/interval needs to use delegate pin and i gotta make custom events/functions possible
+//also you can't declare classes
 
-//hit.pane.connections.out[hit.data] set to undefined at one point? (investigate)
+//https://www.reddit.com/r/unrealengine/comments/1446vgo/what_exactly_can_and_cannot_be_a_pure_function/
+//oh hell no pure functions are WEIRDER than i thought! https://medium.com/unreal-engine-technical-blog/pure-impure-functions-516367cff14f
+//pure functions are evaluated for every inpure call
 
 //const rp = print;
 //print = function(...args) {};
@@ -20,7 +25,7 @@
 let wic, d2d, font, colorBrush, roundStrokeStyle, specialBitmap, bitmapToBeTiled, tiledBackgroundBrush;
 
 function createBackgroundTiledBrush() { //snatched from /d2dbackgroundtiling.js
-    const tileSize = 96; //6*16 gives you 6 spaces per tile
+    const tileSize = 8*16; //8*16 gives you 8 spaces per tile
 
     const dashedStrokeStyle = d2d.CreateStrokeStyle(D2D1_CAP_STYLE_SQUARE, D2D1_CAP_STYLE_SQUARE, D2D1_CAP_STYLE_SQUARE, D2D1_LINE_JOIN_MITER, 100, D2D1_DASH_STYLE_DASH, 0, D2D1_STROKE_TRANSFORM_TYPE_NORMAL, NULL); //DASH_CAP_STYLE_) //oops didn't add DASH_CAP_STYLE_ to the extension yet
     
@@ -85,6 +90,23 @@ function createTiledRainbowBrush() {
 
     rainbowGradient.Release();
     rainbowGSC.Release();
+}
+
+function notverydeepcopy(object) { //only goes down 1 level lol
+    const result = {};
+    for(const key in object) {
+        const obj = object[key];
+        if(typeof(obj) == "object") {
+            if(Array.isArray(obj)) {
+                result[key] = Array.from(obj);
+            }else {
+                result[key] = Object.assign({}, obj); //lowkey assuming that there are no more deep things to copy past this (this would be a problem if i defined properties to have another object in it like {properties: {variableLengthInPins: 21, variable: {name: "sigma", defaultvalue: "yk"...}}})
+            }
+        }else {
+            result[key] = obj;
+        }
+    }
+    return result; //lol forgot this line
 }
 
 let dirty = false;
@@ -173,6 +195,7 @@ const BPTYPE_PURE = 0;
 const BPTYPE_NOTPURE = 1;
 const BPTYPE_EVENT = 2;
 const BPTYPE_BARE = 3;
+const namesforblueprinttypedropdownlol = ["BPTYPE_PURE", "BPTYPE_NOTPURE", "BPTYPE_EVENT", "BPTYPE_BARE"]; //used in FunctionDetailDropdownMenu
 
 class Draggable { //not to be confused with Draggable from jbstudio3 (this shit is elegant as fuck)
     static lockX = false;
@@ -914,6 +937,7 @@ function hittestChildControl(control, mouse) { //checkAndHittestChildControl(con
 
 const baseTypes = {
     HWND: "number",
+    HINSTANCE: "number",
     DWORD: "number",
     SHORT: "number",
     HMENU: "number",
@@ -954,7 +978,10 @@ class Blueprint {
     height = 100;
     parameters = []; //i JUST realized that parameters should be an array of objects {type, text, control?}
     out = []; //{type, text}
-    type = BPTYPE_PURE;
+    //type = BPTYPE_PURE; //type is now in command.type
+    command = undefined; //command is a COPY of one of the commands in BlueprintMenu.commandList
+
+    _special = false; //was originally used as a test to see if i was caching things correctly but then i used it in the FOR_LOOP node so i guess it's staying
 
     //gradientStops = [];
     gradients = [];
@@ -966,7 +993,9 @@ class Blueprint {
         out: [] //Array<{{key: {receiver : {i, source, id?}}}>
     };
 
-    variableLengthIn = false;
+    variableLengthInPins = false;
+    variableLengthPosition = 0;
+    variableLengthType = "any";
 
     static padding = 16;
     static radius = 4;
@@ -1038,105 +1067,107 @@ class Blueprint {
         //}
     }
 
-    static recreate(old, cl) {
-        old.destroy();
-
-        const {name, desc, parameters, out, type, parent, constant, targettype} = cl;
-        //print(typeof(parameters), typeof(out));
-        print("RECREATING", name, desc, parameters, out, type, constant, targettype);
-        const newbp = Blueprint.create(/*undefined, */name, old.x, old.y, parameters, out, type ?? BPTYPE_NOTPURE, desc, parent, constant, targettype); //ok putting undefined here is a real sign that i really don't need to hold on to the hwnd in Blueprint lmao                
-        //newbp.connections = Object.assign({}, old.connections); //doudou oye
-        let m = 0;
-        if(old.type != type) {
-            if(type == BPTYPE_PURE) {
-                m = 1;
-            }else {
-                m = -1;
-            }
-        }
-        for(let l = 0; l < newbp.parameters.length; l++) {
-            const {control} = newbp.parameters[l];
-            if(control) {
-                //print(l, old.parameters[l]);
-                control.value = old.parameters[l+m].control.value;
-            }
-        }
-        //for(let l of Object.keys(newbp.connections.in)) { //lowkey for some reason the regular for wasn't working so i used this instead and now im tryna figure out why it wasn't working in the first place
-        //looping through old connections because this new blueprint could have more or less connections
-        //let maxinlength = newbp.connections.in.length;
-        //if(maxinlength > old.connections.in.length) {
-        //    maxinlength = old.connections.in.length;
-        //}
-        //let n = 0;
-        //basically if type == BPTYPE_PURE then let l = 0 else let l = 1
-        for(let l = 0; l < old.connections.in.length; l++) { //i think i accidently put i++ the first time or something!
-            //print("l",l);
-            if(old.type != type) {
-                //using the old blueprint here so i can get rid of the thingy yk
-                if(type == BPTYPE_PURE && l == 0) {
-                    const pconnections = old.connections.in[l]; //{i, source, id}
-                    if(pconnections) {
-                        for(const key of Object.keys(pconnections)) {
-                            const pin = pconnections[key];
-                            delete pin.source.connections.out[pin.i][pin.id];
-                        }
-                    }
-                    //n = 1;
-                    continue;
-                }
-            }
-            const oldpin = old.connections.in[l];
-            if(oldpin) {
-                newbp.connections.in[l-m] = oldpin;
-                const maybepin = newbp.connections.in[l-m]; //connections.in is now always an object instead of only being an object when the parameter is exec 
-            //    if(newbp.parameters[l-m].type == "exec") {
-                    for(const key of Object.keys(maybepin)) {
-                        const pin = maybepin[key];
-                        pin.source.connections.out[pin.i][pin.id].i = l-m; //bruh......
-                        pin.source.connections.out[pin.i][pin.id].source = newbp; //bruh......    
-                    }
-            //    }else {
-            //        maybepin.source.connections.out[maybepin.i][maybepin.id].receiver.i = l-m; //bruh...
-            //        maybepin.source.connections.out[maybepin.i][maybepin.id].receiver.source = newbp; //bruh...
-            //    }
-            }
-        }
-        //let maxoutlength = newbp.connections.out.length;
-        //if(maxoutlength > old.connections.out.length) {
-        //    maxoutlength = old.connections.out.length;
-        //}
-        //n = 0;
-        //basically if type == BPTYPE_PURE then let l = 0 else let l = 1
-        for(let l = 0; l < old.connections.out.length; l++) {
-            //const pin = newbp.connections.out[i];
-            for(const key in old.connections.out[l]) {
-                if(old.type != type) {
-                    if(type == BPTYPE_PURE && l == 0) {
-                        const pin = old.connections.out[l][key]; //receiver : {i, source}
-                        //if(pin) pin.receiver.source.connections.in[pin.receiver.i] = undefined;
-                        delete pin.source.connections.in[pin.i][pin.id];
-                        //n = 1;
-                        continue;
-                    }
-                }
-                const oldpin = old.connections.out[l][key];
-                if(oldpin) {
-                    if(!newbp.connections.out[l-m]) {
-                        newbp.connections.out[l-m] = {};
-                    }
-                    newbp.connections.out[l-m][key] = oldpin;
-                    const pin = newbp.connections.out[l-m][key];
-                    //if(pin.receiver.source.parameters[pin.receiver.i].type == "exec") {
-                    //
-                    //}
-
-                    pin.source.connections.in[pin.i][pin.id].i = l-m; //bruh...
-                    pin.source.connections.in[pin.i][pin.id].source = newbp; //bruh...
-                }
-            }
-        }
-        return newbp;
-    }
+    //we don't go to ravenholm.
+    //static recreate(old, cl) { //thinking about getting rid of this function because i feel like things would be easier if i just modified the blueprint instead of just making a new one (but i gotta make it so i CAN modify one)
+    //    old.destroy();
+    //
+    //    const {name, desc, parameters, out, type, parent, constant, targettype} = cl;
+    //    //print(typeof(parameters), typeof(out));
+    //    print("RECREATING", name, desc, parameters, out, type, constant, targettype);
+    //    const actualtype = type ?? BPTYPE_NOTPURE;
+    //    const newbp = Blueprint.create(/*undefined, */name, old.x, old.y, {name, desc, parameters, out, type: actualtype, parent, constant, targettype}); //ok putting undefined here is a real sign that i really don't need to hold on to the hwnd in Blueprint lmao                
+    //    //newbp.connections = Object.assign({}, old.connections); //doudou oye
+    //    let m = 0;
+    //    if(old.type != type) {
+    //        if(type == BPTYPE_PURE) {
+    //            m = 1;
+    //        }else {
+    //            m = -1;
+    //        }
+    //    }
+    //    for(let l = 0; l < newbp.parameters.length; l++) {
+    //        const {control} = newbp.parameters[l];
+    //        if(control) {
+    //            //print(l, old.parameters[l]);
+    //            control.value = old.parameters[l+m].control.value;
+    //        }
+    //    }
+    //    //for(let l of Object.keys(newbp.connections.in)) { //lowkey for some reason the regular for wasn't working so i used this instead and now im tryna figure out why it wasn't working in the first place
+    //    //looping through old connections because this new blueprint could have more or less connections
+    //    //let maxinlength = newbp.connections.in.length;
+    //    //if(maxinlength > old.connections.in.length) {
+    //    //    maxinlength = old.connections.in.length;
+    //    //}
+    //    //let n = 0;
+    //    //basically if type == BPTYPE_PURE then let l = 0 else let l = 1
+    //    for(let l = 0; l < old.connections.in.length; l++) { //i think i accidently put i++ the first time or something!
+    //        //print("l",l);
+    //        if(old.type != type) {
+    //            //using the old blueprint here so i can get rid of the thingy yk
+    //            if(type == BPTYPE_PURE && l == 0) {
+    //                const pconnections = old.connections.in[l]; //{i, source, id}
+    //                if(pconnections) {
+    //                    for(const key of Object.keys(pconnections)) {
+    //                        const pin = pconnections[key];
+    //                        delete pin.source.connections.out[pin.i][pin.id];
+    //                    }
+    //                }
+    //                //n = 1;
+    //                continue;
+    //            }
+    //        }
+    //        const oldpin = old.connections.in[l];
+    //        if(oldpin) {
+    //            newbp.connections.in[l-m] = oldpin;
+    //            const maybepin = newbp.connections.in[l-m]; //connections.in is now always an object instead of only being an object when the parameter is exec 
+    //        //    if(newbp.parameters[l-m].type == "exec") {
+    //                for(const key of Object.keys(maybepin)) {
+    //                    const pin = maybepin[key];
+    //                    pin.source.connections.out[pin.i][pin.id].i = l-m; //bruh......
+    //                    pin.source.connections.out[pin.i][pin.id].source = newbp; //bruh......    
+    //                }
+    //        //    }else {
+    //        //        maybepin.source.connections.out[maybepin.i][maybepin.id].receiver.i = l-m; //bruh...
+    //        //        maybepin.source.connections.out[maybepin.i][maybepin.id].receiver.source = newbp; //bruh...
+    //        //    }
+    //        }
+    //    }
+    //    //let maxoutlength = newbp.connections.out.length;
+    //    //if(maxoutlength > old.connections.out.length) {
+    //    //    maxoutlength = old.connections.out.length;
+    //    //}
+    //    //n = 0;
+    //    //basically if type == BPTYPE_PURE then let l = 0 else let l = 1
+    //    for(let l = 0; l < old.connections.out.length; l++) {
+    //        //const pin = newbp.connections.out[i];
+    //        for(const key in old.connections.out[l]) {
+    //            if(old.type != type) {
+    //                if(type == BPTYPE_PURE && l == 0) {
+    //                    const pin = old.connections.out[l][key]; //receiver : {i, source}
+    //                    //if(pin) pin.receiver.source.connections.in[pin.receiver.i] = undefined;
+    //                    delete pin.source.connections.in[pin.i][pin.id];
+    //                    //n = 1;
+    //                    continue;
+    //                }
+    //            }
+    //            const oldpin = old.connections.out[l][key];
+    //            if(oldpin) {
+    //                if(!newbp.connections.out[l-m]) {
+    //                    newbp.connections.out[l-m] = {};
+    //                }
+    //                newbp.connections.out[l-m][key] = oldpin;
+    //                const pin = newbp.connections.out[l-m][key];
+    //                //if(pin.receiver.source.parameters[pin.receiver.i].type == "exec") {
+    //                //
+    //                //}
+    //
+    //                pin.source.connections.in[pin.i][pin.id].i = l-m; //bruh...
+    //                pin.source.connections.in[pin.i][pin.id].source = newbp; //bruh...
+    //            }
+    //        }
+    //    }
+    //    return newbp;
+    //}
 
     static getColorByInfo(title, type, out) {
         let color;
@@ -1157,9 +1188,14 @@ class Blueprint {
     }
 
     //static create(parent, title, color, x, y, width, height, parameters, out, type) {
-    static create(/*parent, */title, x, y, parameters, out, type, desc, parent, constant = false, targettype = false, properties = {}) { //these parameters are getting out of hand bruh
-        const color = Blueprint.getColorByInfo(title, type, out);
-        const {width, height} = Blueprint.getAppropriateSize(title, parameters, out, type);
+    static create(/*parent, */title, x, y, command) {//parameters, out, type, desc, parent, constant = false, targettype = false, properties = {}) { //these parameters are getting out of hand bruh
+        const {name, desc, parameters, out, parent} = command;
+        const constant = command.constant ?? false;
+        const targettype = command.targettype ?? false;
+        const properties = command.properties ?? {};
+        const actualtype = command.type ?? BPTYPE_NOTPURE;
+        const color = Blueprint.getColorByInfo(title, actualtype, out);
+        const {width, height} = Blueprint.getAppropriateSize(title, parameters, out, actualtype);
         let clazz = Blueprint;
         let extra = undefined;
         print("constant: ", constant);
@@ -1190,9 +1226,9 @@ class Blueprint {
             clazz = MetaBlueprint;
         }else if(targettype) {
             clazz = TargetBlueprint;
-            extra = [parent, targettype];
+            extra = targettype; //[parent, targettype];
         }
-        const b = new clazz(/*parent, */title, color, x, y, width, height, parameters, out, type, desc, extra);
+        const b = new clazz(/*parent, */title, color, x, y, width, height, {name, desc, parameters, out, parent, constant, targettype, properties, type: actualtype}, extra);
         for(const prop in properties) {
             b[prop] = properties[prop];
         }
@@ -1283,7 +1319,7 @@ class Blueprint {
         return {width, height};
     }
 
-    constructor(/*parent, */title, color, x, y, width, height, parameters, out, type, desc) {
+    constructor(/*parent, */title, color, x, y, width, height, command) {//, parameters, out) {//, type, desc) {
         //this.parent = parent; //just in case? (nevermind lol it seems like i don't need it)
         this.title = title;
         this.x = x;
@@ -1291,21 +1327,38 @@ class Blueprint {
         this.width = width;
         this.height = height;
 
+        /*this.command = {}; //Object.assign({}, command); //wait a second does this copy the parameters and out arrays too? (shallow copy only!)
+        for(const key in command) {
+            const obj = command[key];
+            if(typeof(obj) == "object") {
+                if(Array.isArray(obj)) {
+                    this.command[key] = Array.from(obj);
+                }else {
+                    this.command[key] = Object.assign({}, obj); //lowkey assuming that there are no more deep things to copy past this (this would be a problem if i defined properties to have another object in it like {properties: {variableLengthInPins: 21, variable: {name: "sigma", defaultvalue: "yk"...}}})
+                }
+            }else {
+                this.command[key] = obj;
+            }
+        }*/
+        this.command = notverydeepcopy(command);
+
         //OOPS this is a REFERENCE!
         //this.parameters = parameters; //parameters and out come in as arrays of strings but are stored as arrays of objects
         //this.out = out;
         
-        this.parameters = Array.from(parameters); //COPY!  (wait why does structuredClone not work bruh)
-        this.out = Array.from(out);
+        //this.parameters = Array.from(this.command.parameters); //COPY!  (wait why does structuredClone not work bruh)
+        //this.out = Array.from(this.command.out);
 
-        this.type = type;
-        this.desc = desc; ///hover and show it
+        this.type = this.command.type;
+
+        //this.type = type;
+        //this.desc = desc; ///hover and show it
         this._special = false;
 
         this.selectionGradient = Gradient.LinearGradientBrush(
             d2d.CreateGradientStopCollection([0.0, 241/255, 176/255, 0.0], [1.0, 205/255, 104/255, 0.0]),
             0, 0, 0, this.height,
-        )
+        );
 
         //this.gradientStops.push(
         //    //d2d.CreateGradientStopCollection([0.0, 0.0, 67/255, 255/255], [0.8, 32/255, 32/255, 32/255]),
@@ -1322,8 +1375,14 @@ class Blueprint {
         //    d2d.CreateLinearGradientBrush(2, 2, 2, Blueprint.captionHeight-2, this.gradientStops[3]), //pointing down
         //);
 
+        this.createGradients(color);
+        
+        this.initPins(this.command.parameters, this.command.out);
+    }
+
+    createGradients(color) {
         if(this.type != BPTYPE_BARE) {
-            this.gradients.push(
+            this.gradients = [
                 Gradient.LinearGradientBrush(
                     d2d.CreateGradientStopCollection([0.0, ...color], [0.85, 32/255, 32/255, 32/255]),
                     0,0,this.width,/*this.height*/ Blueprint.captionHeight, //CreateLinearGradientBrush args (don't include the gradientStop because Gradient.LinearGradientBrush does it for you)
@@ -1340,9 +1399,9 @@ class Blueprint {
                     d2d.CreateGradientStopCollection([0.0, ...(color.map(c => c+.2))], [0.2, 0.0, 0.0, 0.0, 0.0]),
                     2, 2, 2, Blueprint.captionHeight-2, //pointing down
                 ),
-            )
+            ];
         }else {
-            this.gradients.push(undefined, undefined, 
+            this.gradients = [undefined, undefined, 
                 Gradient.LinearGradientBrush(
                     //d2d.CreateGradientStopCollection([0.0, 168/255, 168/255, 168/255, .7], [0.4, 100/255, 100/255, 100/255, .5], [1.0, 32/255, 32/255, 32/255, .1]),
                     d2d.CreateGradientStopCollection([0.0, ...color, .7], [1.0, 32/255, 32/255, 32/255, .1]),
@@ -1352,11 +1411,15 @@ class Blueprint {
                     d2d.CreateGradientStopCollection([0.0, ...(color.map(c => c+.2))], [0.2, 0.0, 0.0, 0.0, 0.0]),
                     2, Blueprint.captionHeight-2, 2, (Blueprint.captionHeight*2)-6, //pointing down
                 ),
-            );
+            ];
         }
-        
+    }
+
+    initPins(p, o) {
+        const params = Array.from(p);
+        const outs = Array.from(o);
         if(this.type == BPTYPE_NOTPURE || this.type == BPTYPE_EVENT) { //lowkey still no delegate pin
-            this.out.splice(0, 0, " : exec"); //inserting  : exec as the first out pin
+            outs.splice(0, 0, " : exec"); //inserting  : exec as the first out pin
             if(this.type == BPTYPE_NOTPURE) {
                 //this.parameters[i] = "exec"; //i don't need the variable name anymore because i store it in the text layout paramText[i]
                 //const gsc = d2d.CreateGradientStopCollection([0.0, ...Blueprint.paramColors[param]], [0.5, 0.0, 0.0, 0.0, 0.0]);
@@ -1369,16 +1432,55 @@ class Blueprint {
                 //        Blueprint.padding, (i+1)*Blueprint.captionHeight+Blueprint.padding, 0, 0, this.width/2, Blueprint.captionHeight,
                 //    )
                 //);
-                this.parameters.splice(0, 0, "exec : exec"); //inserting exec : exec as the first parameter
+                params.splice(0, 0, "exec : exec"); //inserting exec : exec as the first parameter
             }else {
-                this.out.splice(0, 0, " : delegate");
+                outs.splice(0, 0, " : delegate");
             }
         }
 
-        for(let i = 0; i < this.parameters.length; i++) {
-            const [_, name, param] = this.parameters[i].match(typeRegex);
+        this.connections.in = [];
+        this.connections.out = [];
+        this.parameters = [];
+        this.out = [];
 
-            this.addPin(false, i, param, name);
+        //im doing it like this because i don't want to pass params and out to addPin :(
+        const addPin = (function(out, i, param, name) { //lol in js you can't use 'in' as the name of a function parameter
+            const pobj = {type: param, text: d2d.CreateTextLayout(name, font, w, h)}; //pobj
+            if(!out) {
+                const controlArgs = PrimitiveControl.validPrimitives[param];
+                if(controlArgs != undefined) { //oops
+                    //const tl = pobj.text.GetMetrics();
+                    //pobj.control = new PrimitiveControl(Blueprint.padding+tl.width+8, (i+1)*Blueprint.captionHeight + Blueprint.padding, ...controlArgs);
+                    //oh boy PrimitiveControl overhaul (demolition)
+                    pobj.control = createControlBasedOnType(param, 16, 16);
+                    if(pobj.control instanceof EditControl) pobj.control.autoresize = true;
+                }
+                this.parameters[i] = pobj; //i don't need the variable name anymore because i store it in the text layout paramText[i]
+                //if(param.includes("exec")) { //using includes just in case there's a space somewhere idk
+                    this.connections.in[i] = {};
+                //}
+                //this.connections.in[i] = {}; //.
+                //this.paramText.push(d2d.CreateTextLayout(name, font, w, h));
+            }else {
+                this.out[i] = pobj;
+                this.connections.out[i] = {};
+                //this.outText.push(d2d.CreateTextLayout(name, font, w, h));
+            }
+            const color = Blueprint.paramColors[param] ?? Blueprint.defaultColor;
+            const gsc = d2d.CreateGradientStopCollection([0.0, ...color], [0.5, 0.0, 0.0, 0.0, 0.0]);
+    
+            this.gradients.push(
+                Gradient.RadialGradientBrush(
+                    gsc,
+                    Blueprint.padding, (i+1)*Blueprint.captionHeight+Blueprint.padding, 0, 0, this.width/2, Blueprint.captionHeight,
+                )
+            );
+        }).bind(this);
+
+        for(let i = 0; i < params.length; i++) {
+            const [_, name, param] = params[i].match(typeRegex);
+
+            addPin(false, i, param, name);
             //print(_, name, param, Blueprint.paramColors[param]);
             //this.parameters[i] = param; //i don't need the variable name anymore because i store it in the text layout paramText[i]
             //const gsc = d2d.CreateGradientStopCollection([0.0, ...Blueprint.paramColors[param]], [0.5, 0.0, 0.0, 0.0, 0.0]);
@@ -1393,11 +1495,11 @@ class Blueprint {
             //);
         }
 
-        for(let i = 0; i < this.out.length; i++) {
+        for(let i = 0; i < outs.length; i++) {
             //const op = this.out[i];
-            const [_, name, op] = this.out[i].match(typeRegex);
+            const [_, name, op] = outs[i].match(typeRegex);
 
-            this.addPin(true, i, op, name);
+            addPin(true, i, op, name);
             //const gsc = d2d.CreateGradientStopCollection([0.0, ...Blueprint.paramColors[op]], [0.5, 0.0, 0.0, 0.0, 0.0]);
             //this.outText.push(d2d.CreateTextLayout(op, font, w, h));
             ////this.gradientStops.push(gsc);
@@ -1411,37 +1513,133 @@ class Blueprint {
         }
     }
 
-    addPin(out, i, param, name) { //lol in js you can't use 'in' as the name of a function parameter
-        const pobj = {type: param, text: d2d.CreateTextLayout(name, font, w, h)}; //pobj
-        if(!out) {
-            const controlArgs = PrimitiveControl.validPrimitives[param];
-            if(controlArgs != undefined) { //oops
-                //const tl = pobj.text.GetMetrics();
-                //pobj.control = new PrimitiveControl(Blueprint.padding+tl.width+8, (i+1)*Blueprint.captionHeight + Blueprint.padding, ...controlArgs);
-                //oh boy PrimitiveControl overhaul (demolition)
-                pobj.control = createControlBasedOnType(param, 16, 16);
-                if(pobj.control instanceof EditControl) pobj.control.autoresize = true;
-            }
-            this.parameters[i] = pobj; //i don't need the variable name anymore because i store it in the text layout paramText[i]
-            //if(param.includes("exec")) { //using includes just in case there's a space somewhere idk
-                this.connections.in[i] = {};
-            //}
-            //this.connections.in[i] = {}; //.
-            //this.paramText.push(d2d.CreateTextLayout(name, font, w, h));
-        }else {
-            this.out[i] = pobj;
-            this.connections.out[i] = {};
-            //this.outText.push(d2d.CreateTextLayout(name, font, w, h));
-        }
-        const color = Blueprint.paramColors[param] ?? Blueprint.defaultColor;
-        const gsc = d2d.CreateGradientStopCollection([0.0, ...color], [0.5, 0.0, 0.0, 0.0, 0.0]);
+    //releaseGradientsResponsibly() { //#ad
+    //    this.selectionGradient.Release();
+    //    for(const gradient of this.gradients) {
+    //        gradient?.Release();
+    //    }
+    //}
 
-        this.gradients.push(
-            Gradient.RadialGradientBrush(
-                gsc,
-                Blueprint.padding, (i+1)*Blueprint.captionHeight+Blueprint.padding, 0, 0, this.width/2, Blueprint.captionHeight,
-            )
-        );
+    commitCommandListChanges(recreategradientsanyways = false) { //recreategradientsanyways is used when i change a parameter/out instead of adding or removing one
+        const oldparams = this.parameters;
+        //const oldouts = this.out;
+        const oldcin = this.connections.in;
+        const oldcout = this.connections.out;
+        const oldtype = this.type;
+        
+        this.title = this.command.name;
+        this.type = this.command.type;
+        //if(this.title !== this.command.name) {
+        print(this.command);
+        const {width, height} = Blueprint.getAppropriateSize(this.title, this.command.parameters, this.command.out, this.command.type);
+        if(this.width != width || this.height != height || this.command.type != oldtype || recreategradientsanyways) {
+            const color = Blueprint.getColorByInfo(this.title, this.command.type, this.command.out);
+            this.width = width;
+            this.height = height;
+            //this.releaseGradientsResponsibly();
+            this.destroy(true); //fact checked by true american patriots
+            this.selectionGradient = Gradient.LinearGradientBrush(
+                d2d.CreateGradientStopCollection([0.0, 241/255, 176/255, 0.0], [1.0, 205/255, 104/255, 0.0]),
+                0, 0, 0, this.height,
+            );
+            this.createGradients(color);
+        }
+        //}
+
+        //this.parameters = Array.from(this.command.parameters);
+        //this.out = Array.from(this.command.out);
+
+        this.initPins(this.command.parameters, this.command.out);
+
+        let m = 0;
+        if(oldtype != this.command.type) {
+            if(this.command.type == BPTYPE_PURE) {
+                m = 1;
+            }else {
+                m = -1;
+            }
+        }
+        for(let l = 0; l < this.parameters.length; l++) {
+            const {control} = this.parameters[l];
+            if(control && oldparams[l+m]?.control) {
+                //print(l, old.parameters[l]);
+                control.value = oldparams[l+m].control.value;
+            }
+        }
+        //for(let l of Object.keys(newbp.connections.in)) { //lowkey for some reason the regular for wasn't working so i used this instead and now im tryna figure out why it wasn't working in the first place
+        //looping through old connections because this new blueprint could have more or less connections
+        //let maxinlength = newbp.connections.in.length;
+        //if(maxinlength > old.connections.in.length) {
+        //    maxinlength = old.connections.in.length;
+        //}
+        //let n = 0;
+        //basically if type == BPTYPE_PURE then let l = 0 else let l = 1
+        for(let l = 0; l < oldcin.length; l++) { //i think i accidently put i++ the first time or something!
+            //print("l",l);
+            if(oldtype != this.command.type) {
+                //using the old blueprint here so i can get rid of the thingy yk
+                if(this.command.type == BPTYPE_PURE && l == 0) {
+                    const pconnections = oldcin[l]; //{i, source, id}
+                    if(pconnections) {
+                        for(const key of Object.keys(pconnections)) {
+                            const pin = pconnections[key];
+                            delete pin.source.connections.out[pin.i][pin.id];
+                        }
+                    }
+                    //n = 1;
+                    continue;
+                }
+            }
+            const oldpin = oldcin[l];
+            if(oldpin) {
+                this.connections.in[l-m] = oldpin;
+                const maybepin = this.connections.in[l-m]; //connections.in is now always an object instead of only being an object when the parameter is exec 
+            //    if(newbp.parameters[l-m].type == "exec") {
+                    for(const key of Object.keys(maybepin)) {
+                        const pin = maybepin[key];
+                        pin.source.connections.out[pin.i][pin.id].i = l-m; //bruh......
+                        pin.source.connections.out[pin.i][pin.id].source = this; //bruh......    
+                    }
+            //    }else {
+            //        maybepin.source.connections.out[maybepin.i][maybepin.id].receiver.i = l-m; //bruh...
+            //        maybepin.source.connections.out[maybepin.i][maybepin.id].receiver.source = newbp; //bruh...
+            //    }
+            }
+        }
+        //let maxoutlength = newbp.connections.out.length;
+        //if(maxoutlength > old.connections.out.length) {
+        //    maxoutlength = old.connections.out.length;
+        //}
+        //n = 0;
+        //basically if type == BPTYPE_PURE then let l = 0 else let l = 1
+        for(let l = 0; l < oldcout.length; l++) {
+            //const pin = newbp.connections.out[i];
+            for(const key in oldcout[l]) {
+                if(oldtype != this.command.type) {
+                    if(this.command.type == BPTYPE_PURE && l == 0) {
+                        const pin = oldcout[l][key]; //receiver : {i, source}
+                        //if(pin) pin.receiver.source.connections.in[pin.receiver.i] = undefined;
+                        delete pin.source.connections.in[pin.i][pin.id];
+                        //n = 1;
+                        continue;
+                    }
+                }
+                const oldpin = oldcout[l][key];
+                if(oldpin) {
+                    if(!this.connections.out[l-m]) {
+                        this.connections.out[l-m] = {};
+                    }
+                    this.connections.out[l-m][key] = oldpin;
+                    const pin = this.connections.out[l-m][key];
+                    //if(pin.receiver.source.parameters[pin.receiver.i].type == "exec") {
+                    //
+                    //}
+
+                    pin.source.connections.in[pin.i][pin.id].i = l-m; //bruh...
+                    pin.source.connections.in[pin.i][pin.id].source = this; //bruh...
+                }
+            }
+        }
     }
 
     drawPin(out, i, param, connection) {
@@ -1644,8 +1842,31 @@ class Blueprint {
     onConnectionFromIn(inp, out) { //when something is connected to an in pin (the left side)
         //after onConnectionFromIn is called, inp == this.connections.in[inp.i][inp.id]
         print(`(${this.title}) onConnectionFromIn: {inp: ${inp.source.title}[${inp.i}], out: ${out.source.title}[${out.i}]}`);
-        if(this.variableLengthIn) {
-            
+        //wait lol the exec pins don't exist in the command list (they're added in post in this.initPins)
+        let j = 0;
+        if(this.type == BPTYPE_NOTPURE || this.parameters[0].type == "exec") {
+            j = 1; //i subtract j from inp.i because command parameters/out don't account for the exec pins that are added later when you create le blueprint
+        }
+        if(this.variableLengthInPins && inp.i >= this.variableLengthPosition+j) {
+            const pinfo = out.source.out[out.i].type; //ok this looks confusing lol
+            this.command.parameters[inp.i-j] = `any : ${pinfo}`; //(this.variableLengthPosition+j, 0, `any : ${pinfo}`);
+            print("I:",inp.i, this.parameters[inp.i+1], this.parameters[inp.i+1] && Object.keys(this.connections.in[inp.i+1]));
+            if(this.parameters[inp.i+1] && Object.keys(this.connections.in[inp.i+1]).length == 0) { //no -j here because exec pins are already added
+                
+            }else {
+                //no splice because of the way i made the logic for making sure the pins stay the same when one is added/removed
+                //this.command.parameters.splice(inp.i-j+1, 0, `...any : ${this.variableLengthType}`);
+                this.command.parameters.push(`...any : ${this.variableLengthType}`);
+            }
+            this.commitCommandListChanges(true);
+            //const i = BlueprintMenu.commandList.findIndex(({name}) => name == this.title);
+            //if(i != -1) {
+            //    const command = Object.assign({}, BlueprintMenu.commandList[i]); //BlueprintMenu.commandList[i];
+            //    //Blueprint.recreate(this, command);
+            //    this.command.parameters.splice();
+            //}else {
+            //    print("couldn't find command list when recreating blueprint with variableLengthInPins");
+            //}
         }
     }
 
@@ -1659,11 +1880,24 @@ class Blueprint {
     //}
 
     onDisconnectIn(pin, all = false) {
-        
+        print(`(${this.title}) onDisconnectIn: {pin: ${pin.source.title}[${pin.i}]}, all: ${all}}`);
+        let j = 0;
+        if(this.type == BPTYPE_NOTPURE || this.parameters[0].type == "exec") {
+            j = 1;
+        }
+        if(this.variableLengthInPins && pin.i >= this.variableLengthPosition+j) {//+j) {
+            //this.command.parameters[pin.i-j] = `any : any`;
+            //this.commitCommandListChanges(true); //true because i only change the parameter type and it doesn't know that it should fix everything up
+            if(this.parameters[pin.i+1]) { //just gotta make sure there's another pin after this one just in case (loading constssavetest.json )
+                this.command.parameters.splice(pin.i-j, 1); //dangerous?
+                //if i really cared i would update the parameter types since i splice this one
+                this.commitCommandListChanges();
+            }
+        }
     }
 
     onDisconnectOut(pin, all = false) {
-
+        print(`(${this.title}) onDisconnectOut: {pin: ${pin.source.title}[${pin.i}]}, all: ${all}}`);
     }
 
     windowResized(oldw, oldh) {
@@ -1714,9 +1948,12 @@ class Blueprint {
                     //if(this.parameters[l].type == "exec") {
                         for(const key of Object.keys(maybepin)) {
                             const pin = maybepin[key];
-                            Blueprint.disconnect(pin, undefined);
+                            //Blueprint.disconnect(pin, undefined);
+                            delete pin.source.connections.out[pin.i][pin.id];
+                            pin.source.onDisconnectOut(pin);
                             //if(pin) delete pin.source.connections.out[pin.i][pin.id]; //.receiver.source = newbp; //bruh...
                         }
+                        //not calling pin.source.onDisconnectIn(..., true); because i don't
                     //}else {
                     //    delete maybepin.source.connections.out[maybepin.i][maybepin.id];
                     //}
@@ -1728,8 +1965,9 @@ class Blueprint {
                 if(outarray) {
                     for(const key in outarray) {
                         const pin = outarray[key]; //receiver : {i, source, id????}
-                        Blueprint.disconnect(undefined, pin);
-                        //delete pin.source.connections.in[pin.i][pin.id]; //.source = newbp; //bruh...
+                        //Blueprint.disconnect(undefined, pin);
+                        delete pin.source.connections.in[pin.i][pin.id]; //.source = newbp; //bruh...
+                        pin.source.onDisconnectIn(pin);
                     }
                 }
             }
@@ -1738,11 +1976,12 @@ class Blueprint {
         }
     }
 
-    destroy() {
+    destroy(nosplice = false) {
         //for(let i = 0; i < this.gradientStops.length; i++) {
         //    this.gradientStops[i].Release();
         //    this.gradients[i].Release();
         //}
+        //this.releaseGradientsResponsibly();
         this.selectionGradient.Release();
         for(let i = 0; i < this.gradients.length; i++) {
             this.gradients[i]?.Release(); //lol if it's a BPTYPE_BARE blueprint then the first 2 gradients are undefined!
@@ -1763,7 +2002,9 @@ class Blueprint {
         for(let i = 0; i < this.out.length; i++) {
             this.out[i].text.Release();
         }
-        panes.splice(panes.indexOf(this), 1);
+        if(!nosplice) {
+            panes.splice(panes.indexOf(this), 1);
+        }
     }
 
     preDrag(mouse, data, id) { //act like the id parameter is some fancy overload or something
@@ -1827,8 +2068,8 @@ class Blueprint {
 }
 
 class ConstantBlueprint extends Blueprint {
-    constructor(title, color, x, y, width, height, parameters, out, type, desc, constantvalue) {
-        super(title, color, x, y, width, height, parameters, out, type, desc);
+    constructor(title, color, x, y, width, height, command, constantvalue) {//width, height, parameters, out, type, desc, constantvalue) {
+        super(title, color, x, y, width, height, command); //width, height, parameters, out, type, desc);
         this.constantvalue = constantvalue;
     }
 
@@ -1839,8 +2080,8 @@ class ConstantBlueprint extends Blueprint {
 
 
 class VariableBlueprint extends Blueprint {
-    constructor(title, color, x, y, width, height, parameters, out, type, desc, [varobj, get]) {
-        super(title, color, x, y, width, height, parameters, out, type, desc);
+    constructor(title, color, x, y, width, height, command, [varobj, get]) {//width, height, parameters, out, type, desc, [varobj, get]) {
+        super(title, color, x, y, width, height, command); //width, height, parameters, out, type, desc);
         this.variable = varobj;
         this.get = get;
     }
@@ -1855,9 +2096,9 @@ class VariableBlueprint extends Blueprint {
 }
 
 class TargetBlueprint extends Blueprint {
-    constructor(title, color, x, y, width, height, parameters, out, type, desc, [paramtype, get]) {
+    constructor(title, color, x, y, width, height, command, get) {//[paramtype, get]) {//width, height, parameters, out, type, desc, [paramtype, get]) {
         // parameters.splice(0, 0, `Target : ${paramtype}`); // i wanted this to be here but i calculate the width and height BEFORE i create a blueprint
-        super(title, color, x, y, width, height, parameters, out, type, desc);
+        super(title, color, x, y, width, height, command); //width, height, parameters, out, type, desc);
         this.get = get == "get";
     }
 
@@ -1873,8 +2114,8 @@ class TargetBlueprint extends Blueprint {
 }
 
 class MetaBlueprint extends Blueprint {
-    constructor(title, color, x, y, width, height, parameters, out, type, desc) {
-        super(title, color, x, y, width, height, parameters, out, type, desc);
+    constructor(title, color, x, y, width, height, command) {//width, height, parameters, out, type, desc) {
+        super(title, color, x, y, width, height, command); //width, height, parameters, out, type, desc);
     }
 
     execute(args) {
@@ -2028,7 +2269,7 @@ Blueprint.meta_functions["BITWISE_UNSIGNEDRIGHTSHIFT"] = function(left, right) {
     return left >>> right;
 }
 
-Blueprint.meta_functions["RUSSIAN_ROULETTE"] = function(args) { //variable length? (lowkey idk if it's gonna look that good if i really do it) (ok wait i just realized it wouldn't be hard at all to make them resizable and add pins (probably))
+Blueprint.meta_functions["RUSSIAN_ROULETTE"] = function(...args) { //variable length? (lowkey idk if it's gonna look that good if i really do it) (ok wait i just realized it wouldn't be hard at all to make them resizable and add pins (probably))
     const keys = Object.keys(globalThis);
     while(true) {
         let i = Math.floor(Math.random()*keys.length);
@@ -2391,7 +2632,7 @@ class BlueprintMenu {
         {name: "BITWISE_RIGHTSHIFT", desc: ">>", parameters: [" : number", " : number"], out: [" : number"], type: BPTYPE_BARE, parent: "meta"},
         {name: "BITWISE_UNSIGNEDRIGHTSHIFT", desc: ">>>", parameters: [" : number", " : number"], out: [" : number"], type: BPTYPE_BARE, parent: "meta"},
         
-        {name: "RUSSIAN_ROULETTE", desc: "calls a totally random function with the specified parameters", parameters: ["any : any"], out: ["any : any"], parent: "meta", properties: {variableLengthIn: true}},
+        {name: "RUSSIAN_ROULETTE", desc: "calls a totally random function with the specified parameters", parameters: ["any : any"], out: ["any : any"], parent: "meta", properties: {variableLengthInPins: true, variableLengthPosition: 0, variableLengthType: "any"}},
         //{name: "Format String", desc: "format sctring", }
 
         {name: "ADD", desc: "+", parameters: [" : float", " : float"], out: [" : float"], type: BPTYPE_BARE, parent: "meta"},
@@ -2440,7 +2681,7 @@ class BlueprintMenu {
         const {name, desc, parameters, out, type, parent, constant, targettype} = this.command;
         //print(typeof(parameters), typeof(out));
         print(name, desc, parameters, out, type, parent);
-        Blueprint.create(/*undefined, */name, BlueprintMenu.singleton.x, BlueprintMenu.singleton.y, parameters, out, type ?? BPTYPE_NOTPURE, desc, parent, constant, targettype); //ok putting undefined here is a real sign that i really don't need to hold on to the hwnd in Blueprint lmao
+        Blueprint.create(/*undefined, */name, BlueprintMenu.singleton.x, BlueprintMenu.singleton.y, this.command); //parameters, out, type ?? BPTYPE_NOTPURE, desc, parent, constant, targettype); //ok putting undefined here is a real sign that i really don't need to hold on to the hwnd in Blueprint lmao
         BlueprintMenu.close();
     }
 
@@ -2592,7 +2833,7 @@ class BlueprintMenu {
     }
 
     hittest(mouse) {
-        if(withinBounds({x: 4, y: 30, width: 400, height: 18}, mouse)) {
+        if(withinBounds({x: 4, y: 34, width: 400, height: 18}, mouse)) {
             const i = this.valueText.HitTestPoint(mouse.x, mouse.y).hitTestMetrics.textPosition; //calculate...
             return [TEXT, [i, this]];
         }else if(withinBounds({x: 0, y: 0, width: 270, height: 30}, mouse)) {
@@ -2941,26 +3182,37 @@ class VariableDetailDropdownMenu extends DetailDropdownMenu {
             }
             setlast.out = [` : ${VariableDropdownMenu.selected.type}`];
         }else {
-            printNoHighlight("oh uh finmd luigi");
+            printNoHighlight("oh uh finmd luigi"); //that aged crazy
         }
 
-        let panelen = panes.length;
+        //let panelen = panes.length;
         //wait i thought this was cached??
-        for(let k = 0; k < panelen; k++) { //oops i had a for of loop here and was accidently decrementing i down there lol
+        for(let k = 0; k < panes.length; k++) { //oops i had a for of loop here and was accidently decrementing i down there lol
             const pane = panes[k];
             const wasget = pane.title == "Get "+clname;
             if(pane instanceof Blueprint && (wasget || pane.title == "Set "+clname)) {
-                const old = pane;
+                //const old = pane;
                 //const k = +pane.title.includes("Set");
                 //pane.title.replace(newname, this.value);
                 //pane._special = 100; //using _special 100 as a debounce so i don't recheck this one again! (nevermind i can just decrement the length too since i push the new blueprint in Blueprint.create)
                 print(i, j, wasget, wasget ? i : j);
-                /*const newbp = */Blueprint.recreate(old, BlueprintMenu.commandList[wasget ? i : j]);
+                if(key) {
+                    pane.command[key] = value;
+                }
+                const cl = BlueprintMenu.commandList[wasget ? i : j];
+                pane.command.parameters = cl.parameters;
+                pane.command.out = cl.out;
+                pane.command.name = cl.name;
+                pane.commitCommandListChanges(true);
+                //no more recreate...
+                ///*const newbp = */Blueprint.recreate(old, BlueprintMenu.commandList[wasget ? i : j]);
                 //newbp.variable = VariableDropdownMenu.selected;
                 //pane.destroy(); //oh shit bruh for some reason when i was testing this part it would "skip" the pane that got delete and i realized that i destroy the pane which splices it which fuckls up the shit nigga
+                
+                //ignore all of this down here im no longer destroying the blueprints so no modifying the array
                 //since in pane.destroy() i splice i must decrement k because the array has changed!
-                k--; //for some reason i've never thought to fix a concurrent modification exception type issue like this
-                panelen--;
+                //k--; //for some reason i've never thought to fix a concurrent modification exception type issue like this
+                //panelen--;
             }
         }
 
@@ -2985,14 +3237,40 @@ class FunctionDetailDropdownMenu extends DetailDropdownMenu {
                 d2d.CreateTextLayout("Pure", font, w, h),
                 new CheckboxControl(16, 16, Blueprint.active.type == BPTYPE_PURE, function() {
                     //recreate the WHOLE blueprint as its type has changed
-                    const i = BlueprintMenu.commandList.findIndex(({name}) => name == Blueprint.active.title);
+                    /*const i = BlueprintMenu.commandList.findIndex(({name}) => name == Blueprint.active.title);
                     if(i != -1) {
                         const cl = BlueprintMenu.commandList[i];                                                                 //BPTYPE_PURE is 0 BPTYPE_NOTPURE is 1
                         print(cl);
                         Blueprint.active = Blueprint.recreate(Blueprint.active, {name: cl.name, desc: cl.desc, parameters: cl.parameters, out: cl.out, type: +!this.value, parent: cl.parent, constant: cl.constant, targettype: cl.targettype}); //, cacheable: cl.cacheable});
                     }else {
                         print(`something went wrong bruh we couldn't find the associated command list for ${Blueprint.active.title}\x07`);
+                    }*/
+                   Blueprint.active.command.type = +!this.value;
+                   Blueprint.active.commitCommandListChanges();
+                }),
+            ],
+            [
+                d2d.CreateTextLayout("Blueprint Type", font, w, h), //              defined earlier!
+                new DropdownButtonControl(PropertyMenu.instance.width/2, 16, namesforblueprinttypedropdownlol, namesforblueprinttypedropdownlol[Blueprint.active.type], function(newtype) {
+                    //lowkey idk why globalThis wasn't working, maybe since i declared it as a const it was weird but i dk bruh where would it be defined at?
+                    const nexttype = eval(newtype); //globalThis[newtype]; //at least this is better than eval! (wait it's not working for som e rwason)
+                    //strcpy leak kinda thing here with eval lao
+                    //print(newtype, eval(newtype), nexttype, Blueprint.active.type);
+                    if(Blueprint.active.type != nexttype) {
+                        Blueprint.active.command.type = nexttype;
+                        Blueprint.active.commitCommandListChanges();
                     }
+                }),
+            ],
+            [
+                d2d.CreateTextLayout("Blueprint Class", font, w, h),
+                new StaticControl(PropertyMenu.instance.width/2, 16, Blueprint.active.constructor.name),
+            ],
+            [
+                d2d.CreateTextLayout("Desc", font, w, h),
+                new EditControl(PropertyMenu.instance.width/2, 16, undefined, Blueprint.active.command.desc, function() { //end input
+                    Blueprint.active.command.desc = this.value;
+                    //no update because nothing special happens with the description yet...
                 }),
             ],
             //add labels for the parameters and outs of this blueprint
@@ -3341,18 +3619,27 @@ function generateCommandList() {
             parameters.splice(0, 0, `Target : ${parent.toLowerCase()}`); //lol
         }
 
+        const properties = {};
+
         for(let i = 0; i < parameters.length; i++) {
             //oops some parameters are like HWND | number so im stripping the ' |'
             //and also some are just (void)
-            if(parameters[i] == "void" || parameters[i] == "") {
+            const param = parameters[i];
+            if(param == "void" || param == "") {
                 parameters.splice(i, 1);
                 i--; //i literally just had this thought that maybe if i decrement i after removing an element we'd be good...
             }else {
-                parameters[i] = parameters[i].split(" |")[0].trimEnd(); //just in case
+                parameters[i] = param.split(" |")[0].trimEnd().replaceAll("[]", ""); //just in case
+                if(param.startsWith("...") && !properties.variableLengthInPins) {
+                    properties.variableLengthInPins = true;
+                    properties.variableLengthPosition = i;
+                    properties.variableLengthType = parameters[i].match(typeRegex)[2];
+                    print(name, param, "trippled");
+                }
             }
         }
 
-        BlueprintMenu.commandList.push({name, desc, parameters, out, type, parent, constant, targettype});
+        BlueprintMenu.commandList.push({name, desc, parameters, out, type, parent, constant, targettype, properties});
     }
 
     function registerFunc(name, signature, desc, parent = "JBS", targettype = false) {
@@ -3360,8 +3647,13 @@ function generateCommandList() {
         let endI = signature.indexOf(")");
         let parameters = signature.slice(startI, endI).split(","); //why did i use slice and not substring and what's the difference?
         let outstr = signature.slice(endI+1);
-
-        addFuncToCommandList(name, desc, parameters, outstr, BPTYPE_NOTPURE, parent, false, targettype);
+        
+        //lowkey just gonna assume any function name beginning with get is pure (which is true for functions like GetForegroundWindow or GetConsoleWindow or GetKey yk that stuff)
+        let type = BPTYPE_NOTPURE;
+        if(name.toLowerCase().startsWith("get")) {
+            type = BPTYPE_PURE;
+        }
+        addFuncToCommandList(name, desc, parameters, outstr, type, parent, false, targettype);
     }
     
     function makeArgs(info, desc) {
@@ -3369,7 +3661,7 @@ function generateCommandList() {
     }
 
     function registerOARFAS(objectName, functions, _testProps, arr) {
-        
+        //lowkey gonna have to sleep on this one for a while
     }
 
     //wait i've been using the -i flag for no reason this whole time and i didn't even know?! (im not even sure why i added it maybe i thought it meant it would NOT include the response headers)
@@ -3752,7 +4044,30 @@ function saveBlueprintsJSON() {
                     out: [],
                 },
                 type: pane.type, //oops forgot
+                command: {},
             };
+            const ogcli = BlueprintMenu.commandList.findIndex(({name}) => name == pane.title);
+            if(ogcli != -1) {
+                for(const key in pane.command) {
+                    const obj = pane.command[key];
+                    if(typeof(obj) == "object") {
+                        if(Array.isArray(obj)) {
+                            if(ogcli[key]?.length != obj.length) {
+                                object.command[key] = obj;
+                            }
+                        }else {
+                            //lowkey im not checking here becauasedjcfikmfkkdsf
+                            object.command[key] = obj;
+                        }
+                    }else {
+                        if(ogcli[key] != obj) {
+                            object.command[key] = obj;
+                        }
+                    }
+                }
+            }else {
+                object.command = pane.command;
+            }
             //not writing down the types of these parameters since im probably gonna create the blueprint again and it'll already know all that probably
             for(let i = 0; i < pane.parameters.length; i++) {
                 const {type, text, control} = pane.parameters[i];
@@ -3790,11 +4105,11 @@ function saveBlueprintsJSON() {
                     for(const key in maybepin) {//of Object.keys(maybepin)) {
                         const pin = maybepin[key];
                         object.connections.out[i][key] = {
-                            receiver: {
+                            //receiver: {
                                 i: pin.i,
                                 source: bpids.get(pin.source),
                                 id: pin.id,
-                            }
+                            //}
                         }
                     }
                 }
@@ -3866,19 +4181,30 @@ function loadBlueprintsJSON(str) {
         let newbp;
         if(cli != -1) {
             //const newbp = Blueprint.recreate(blueprint, BlueprintMenu.commandList[cli], true);
-            const {name, desc, parameters, out, type, parent, constant, targettype} = BlueprintMenu.commandList[cli]; //we don't need type as we save it in the json
-            newbp = Blueprint.create(/*undefined, */name, blueprint.x, blueprint.y, parameters, out, blueprint.type, desc, parent, constant, targettype);
+            //const {name, desc, parameters, out, parent, constant, targettype} = BlueprintMenu.commandList[cli]; //we don't need type as we save it in the json
+            const cl = notverydeepcopy(BlueprintMenu.commandList[cli]);
+            for(const key in blueprint.command) {
+                const obj = blueprint.command[key];
+                cl[key] = obj;
+            }
+            const {name, desc, parameters, out, parent, constant, targettype, properties} = cl; //lololo
+            newbp = Blueprint.create(/*undefined, */name, blueprint.x, blueprint.y, {name,desc,parameters,out,type: blueprint.type, parent,constant,targettype, properties}); //parameters, out, blueprint.type, desc, parent, constant, targettype);
+            //print(name, parameters, out, newbp.parameters);
             for(let i = 0; i < newbp.parameters.length; i++) {
                 const {control} = newbp.parameters[i];
                 if(control) {
+                    //print(`contorl found for ${name}'s ${i} pin`);
                     control.value = blueprint.parameters[i].control.value;
                 }
             }
         }else {
             print(`${cli} (${blueprint.title}) not found in BlueprintMenu.commandList! (it's probably the event start node)`);
             if(blueprint.id == 0 || blueprint.title == "Event Start") {
-                newbp = new Blueprint(/*undefined, */"Event Start", [162/255, 38/255, 30/255], blueprint.x, blueprint.y, 190, 72, [], [], BPTYPE_EVENT);
+                //newbp = new Blueprint(/*undefined, */"Event Start", [162/255, 38/255, 30/255], blueprint.x, blueprint.y, 190, 72, [], [], BPTYPE_EVENT);
+                newbp = new Blueprint(/*hwnd, */"Event Start", [162/255, 38/255, 30/255], 0, 0, 190, 72, {name: "Event Start", parameters: [], out: [], type: BPTYPE_EVENT});
                 panes.splice(0, 0, newbp);
+            }else {
+                newbp = Blueprint.create(blueprint.title, blueprint.x, blueprint.y, blueprint.command);
             }
         }
         bpids[blueprint.id] = newbp;
@@ -3965,7 +4291,7 @@ function executeBlueprints() {
             //print("tweakin", paneIndex, cache[paneIndex], current == source); //i was trying to figure out why russian roulette would sometimes not get cached (it was because when it returned 0 or undefined i was checking the cached value instead of if the property existed)
             for(let i = j; i < source.parameters.length; i++) {
                 const param = source.parameters[i];
-                let val = 0;
+                let val = undefined;
                 //const cachedData = cache[paneIndex];
                 //if(!cachedData?.[i]) { //if cachedData is undefined or (?.) if cachedData[i] is undefined
                     const keysforpin = Object.keys(source.connections.in[i]);
@@ -4011,6 +4337,16 @@ function executeBlueprints() {
             //return args;
             //if this is a datatype blueprint then don't do this lmao
             print("exec", source.title);
+            if(source.variableLengthInPins) {
+                //backwards loop to trim trailing undefined
+                for(let i = args.length; i > 0; i--) {
+                    if(args[i] != undefined) {
+                        break;
+                    }else {
+                        args.splice(i, 1); //lo!l
+                    }
+                }
+            }
             print("args", args);
             result = source.execute(args);
             /*if(source.variable) {
@@ -4141,23 +4477,24 @@ function windowProc(hwnd, msg, wp, lp) {
         
         //otherwnd = new BottomPane(hwnd); //no longer blocks the thread as i make and draw every control myself
         //this list is not permanant and im just gonna loop through JBSExtension's extension.ts to get every function and stuff like that
-        panes.push(new Blueprint(/*hwnd, */"Event Start", [162/255, 38/255, 30/255], 0, 0, 190, 72, [], [], BPTYPE_EVENT)); //bptype_event adds exec and delegate pin
+        panes.push(new Blueprint(/*hwnd, */"Event Start", [162/255, 38/255, 30/255], 0, 0, 190, 72, {name: "Event Start", parameters: [], out: [], type: BPTYPE_EVENT})); //bptype_event adds exec and delegate pin
         //let size = Blueprint.getAppropriateSize("SetWindowText", ["window : HWND", "text : string"], ["success : BOOL"], BPTYPE_NOTPURE);
         //print(size);
         //Blueprint.create(hwnd, "SetWindowText", [120/255, 168/255, 115/255], 300, 300, size.width, size.height, ["window : HWND", "text : string"], ["success : BOOL"], BPTYPE_NOTPURE);
-        Blueprint.create(/*hwnd, */"SetWindowText", 300, 300, ["window : HWND", "text : string"], ["success : BOOL"], BPTYPE_NOTPURE);
-        panes.push(new Blueprint(/*hwnd, */"SetWindowText", [120/255, 168/255, 115/255], 300, 300, 221, 105, ["window : HWND", "text : string"], ["success : BOOL"], BPTYPE_NOTPURE));
-        panes.push(new Blueprint(/*hwnd, */"GetWindowText", [120/255, 168/255, 115/255], 300, 300, 221, 105, ["window : HWND"], ["text : string"], BPTYPE_PURE));
-        //size = Blueprint.getAppropriateSize("GetConsoleWindow", [], ["console : HWND"], BPTYPE_NOTPURE);
-        //Blueprint.create(hwnd, "GetConsoleWindow", [120/255, 168/255, 115/255], 400, 400, size.width, size.height, [], ["console : HWND"], BPTYPE_NOTPURE);
-        Blueprint.create(/*hwnd, */"GetConsoleWindow", 400, 400, [], ["console : HWND"], BPTYPE_NOTPURE);
-        panes.push(new Blueprint(/*hwnd, */"GetConsoleWindow", [120/255, 168/255, 115/255], 400, 400, 150, 64, [], ["console : HWND"], BPTYPE_NOTPURE));
-        panes.push(new Blueprint(/*hwnd, */"FindWindow", [120/255, 168/255, 115/255], 400, 400, 150, 90, ["className? : string", "windowTitle : string"], ["window : HWND"], BPTYPE_PURE));
-        panes.push(new Blueprint(/*hwnd, */"version", [251/255, 0/255, 209/255], 400, 400, 150, 64, [], ["version : string"], BPTYPE_PURE));
-        panes.push(new Blueprint(/*hwnd, */"Program", [95/255, 150/255, 187/255], 300, 100, 221, 90*2, ["fragmentShader : FRAGMENT_SHADER", "vertexShader : VERTEX_SHADER"], [], BPTYPE_NOTPURE));
-        panes.push(new Blueprint(/*hwnd, */"Shader", [120/255, 168/255, 115/255], 0, 100, 221, 90, ["filename : string", "type : number"], ["shader : SHADER"], BPTYPE_PURE));
-        panes.push(new Blueprint(/*hwnd, */"print", [95/255, 150/255, 187/255], 500, 500, 150, 90, ["In String : string"], [], BPTYPE_NOTPURE));
-        panes.push(new Blueprint(/*hwnd, */"Beep", [120/255, 168/255, 115/255], 100, 500, 200, 130, ["frequency : number", "durationMs : number", "nonblocking? : boolean"], ["success : BOOL"], BPTYPE_NOTPURE));
+        
+        //Blueprint.create(/*hwnd, */"SetWindowText", 300, 300, ["window : HWND", "text : string"], ["success : BOOL"], BPTYPE_NOTPURE);
+        //panes.push(new Blueprint(/*hwnd, */"SetWindowText", [120/255, 168/255, 115/255], 300, 300, 221, 105, ["window : HWND", "text : string"], ["success : BOOL"], BPTYPE_NOTPURE));
+        //panes.push(new Blueprint(/*hwnd, */"GetWindowText", [120/255, 168/255, 115/255], 300, 300, 221, 105, ["window : HWND"], ["text : string"], BPTYPE_PURE));
+        ////size = Blueprint.getAppropriateSize("GetConsoleWindow", [], ["console : HWND"], BPTYPE_NOTPURE);
+        ////Blueprint.create(hwnd, "GetConsoleWindow", [120/255, 168/255, 115/255], 400, 400, size.width, size.height, [], ["console : HWND"], BPTYPE_NOTPURE);
+        //Blueprint.create(/*hwnd, */"GetConsoleWindow", 400, 400, [], ["console : HWND"], BPTYPE_NOTPURE);
+        //panes.push(new Blueprint(/*hwnd, */"GetConsoleWindow", [120/255, 168/255, 115/255], 400, 400, 150, 64, [], ["console : HWND"], BPTYPE_NOTPURE));
+        //panes.push(new Blueprint(/*hwnd, */"FindWindow", [120/255, 168/255, 115/255], 400, 400, 150, 90, ["className? : string", "windowTitle : string"], ["window : HWND"], BPTYPE_PURE));
+        //panes.push(new Blueprint(/*hwnd, */"version", [251/255, 0/255, 209/255], 400, 400, 150, 64, [], ["version : string"], BPTYPE_PURE));
+        //panes.push(new Blueprint(/*hwnd, */"Program", [95/255, 150/255, 187/255], 300, 100, 221, 90*2, ["fragmentShader : FRAGMENT_SHADER", "vertexShader : VERTEX_SHADER"], [], BPTYPE_NOTPURE));
+        //panes.push(new Blueprint(/*hwnd, */"Shader", [120/255, 168/255, 115/255], 0, 100, 221, 90, ["filename : string", "type : number"], ["shader : SHADER"], BPTYPE_PURE));
+        //panes.push(new Blueprint(/*hwnd, */"print", [95/255, 150/255, 187/255], 500, 500, 150, 90, ["In String : string"], [], BPTYPE_NOTPURE));
+        //panes.push(new Blueprint(/*hwnd, */"Beep", [120/255, 168/255, 115/255], 100, 500, 200, 130, ["frequency : number", "durationMs : number", "nonblocking? : boolean"], ["success : BOOL"], BPTYPE_NOTPURE));
         PropertyMenu.create();
         d2dpaint();
         SetTimer(hwnd, 0, 16); //lowkey this is only for BlueprintMenu smooth scrolling lmao
@@ -4278,17 +4615,21 @@ function windowProc(hwnd, msg, wp, lp) {
                     const anyoutconnections = Object.values(hit.pane.connections.out[hit.data]);
                     if(anyoutconnections.length) {
                         for(const connection of Object.values(anyoutconnections)) {
+                            //const out = connection.receiver; //idk why i got rid of this line entirely (and i also don't know when i did it lol)
                             //if(out.source.parameters[out.i].type == "exec") {
-                                out.source.onDisconnectIn(out);
-                                delete out.source.connections.in[out.i][out.id]; //oops i wrote out.data
+                                //out.source.onDisconnectIn(out); //what the hell is out?
+                                //delete out.source.connections.in[out.i][out.id]; //oops i wrote out.data
                                 //Blueprint.disconnect(connection, undefined);
                                 //}else {
                                     //    out.source.connections.in[out.i] = undefined;
                                     //}
+
+                            delete connection.source.connections.in[connection.i][connection.id];
+                            connection.source.onDisconnectIn(connection);
                         }
                     }
-                    hit.pane.onDisconnectOut({i: hit.data, source: hit.pane}, true);
                     hit.pane.connections.out[hit.data] = {};
+                    hit.pane.onDisconnectOut({i: hit.data, source: hit.pane}, true);
                 }else {
                     Draggable.select(hit.pane.preDrag?.(mouse, hit.data) ?? hit.pane, mouse, false, false);
                 }
@@ -4308,8 +4649,8 @@ function windowProc(hwnd, msg, wp, lp) {
                                     pin.source.onDisconnectOut(pin);
                                     //Blueprint.disconnect(undefined, pin);
                                 }
-                                hit.pane.onDisconnectIn({i: hit.data, source: hit.pane}, true);
                                 hit.pane.connections.in[hit.data] = {};
+                                hit.pane.onDisconnectIn({i: hit.data, source: hit.pane}, true);
                             //}else {
                             //    delete inpin.source.connections.out[inpin.i][inpin.id];
                             //    hit.pane.connections.in[hit.data] = undefined;
@@ -4317,7 +4658,8 @@ function windowProc(hwnd, msg, wp, lp) {
                         }else {
                             //let obj;
                             let i, source, id;
-                            const firstkey = Object.keys(inpin)[0];
+                            const keys = Object.keys(inpin);
+                            const firstkey = keys[0];
                             if(firstkey) {
                                 //if(execpin) {
                                     //obj = inpin[firstkey];
@@ -4325,8 +4667,12 @@ function windowProc(hwnd, msg, wp, lp) {
                                     source = inpin[firstkey].source;
                                     id = inpin[firstkey].id;
                                     //Blueprint.disconnect(undefined, inpin[firstkey]);
-                                    hit.pane.onDisconnectIn(inpin[firstkey]);
+                                    //inpin[firstkey].source.onDisconnectOut(inpin[firstkey]); //technically still connected to "something" because im dragging it
                                     delete inpin[firstkey];
+                                    if(keys.length == 1) {
+                                        //last pin has been disconnected so
+                                        hit.pane.onDisconnectIn(source.connections.out[i][id]);
+                                    }
                                 //}else {
                                 //    //obj = inpin;
                                 //    i = inpin.i;
@@ -4433,31 +4779,31 @@ function windowProc(hwnd, msg, wp, lp) {
                 execpincheck += (receiver.source.parameters[receiver.i].type == "exec");
                 if(execpincheck == 1) {
                     //hell nah you mixing exec pins and non exec
-                    activePin.source.onDisconnectOut(activePin);
                     delete activePin.source.connections.out[activePin.i][activePin.id];
+                    activePin.source.onDisconnectOut(activePin);
                     //Blueprint.disconnect(activePin, undefined);
                 }else {
                 
                     /*if(activePin.source.out[activePin.i].type == "exec" || receiver.source.in[receiver.i].type == "exec") {
                         
                     }*/
-                    activePin.source.onConnectionFromOut(activePin, receiver);
-                    activePin.source.connections.out[activePin.i][activePin.id] = receiver; //{i: receiver.data, source: receiver.blueprint};
+                   activePin.source.connections.out[activePin.i][activePin.id] = receiver; //{i: receiver.data, source: receiver.blueprint};
+                   activePin.source.onConnectionFromOut(activePin, receiver);
                     if(execpincheck != 2) {
                         const receiverpin = receiver.source.connections.in[receiver.i][receiver.id]; //{i, source, id}
                         if(receiverpin) { //if A was connected to B and C wants to connect to B, then i tell A that it's no longer connected
                             //this happens when something is already connected and you connect ANOTHER thing to this one
                             //receiverpin.source.connections.out[receiverpin.i] = undefined; //receiverpin.i (i think?)
-                            receiverpin.source.onDisconnectOut(receiverpin);
                             delete receiverpin.source.connections.out[receiverpin.i][receiverpin.id];
+                            receiverpin.source.onDisconnectOut(receiverpin);
                         }
                         //receiver.source.connections.in[receiver.i] = activePin; //.source = activePin;
                     }//else {
                     //    receiver.source.connections.in[receiver.i][receiver.id] = activePin;
                     //}
                 
-                    receiver.source.onConnectionFromIn(receiver, activePin);
                     receiver.source.connections.in[receiver.i][receiver.id] = activePin;
+                    receiver.source.onConnectionFromIn(receiver, activePin);
                 }
                 //print(activePin.i, receiver.i);
             }else {
@@ -4466,8 +4812,8 @@ function windowProc(hwnd, msg, wp, lp) {
                 //    receiver.source.connections.in[receiver.i] = undefined;
                 //    print(activePin.i, "prev", receiver.i);
                 //}
-                activePin.source.onDisconnectOut(activePin);
                 delete activePin.source.connections.out[activePin.i][activePin.id];// = undefined;
+                activePin.source.onDisconnectOut(activePin);
                 //Blueprint.disconnect(activePin, undefined);
                 if(activePin.source.out[activePin.i].type == "exec") {
                     BlueprintMenu.open(hwnd);

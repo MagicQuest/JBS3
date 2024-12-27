@@ -1,0 +1,332 @@
+{
+    "variables": {},
+    "blueprints": [
+        {
+            "title": "Event Start",
+            "x": 0,
+            "y": 0,
+            "parameters": [],
+            "id": 0,
+            "connections": {
+                "in": [],
+                "out": []
+            }
+        },
+        {
+            "title": "SetWindowText",
+            "x": 300,
+            "y": 300,
+            "parameters": [
+                {},
+                {
+                    "control": {
+                        "value": 0
+                    }
+                },
+                {
+                    "control": {
+                        "value": ""
+                    }
+                }
+            ],
+            "id": 1,
+            "connections": {
+                "in": [
+                    {},
+                    {},
+                    {}
+                ],
+                "out": [
+                    {},
+                    {}
+                ]
+            },
+            "command": {
+                "parameters": ["window : HWND", "text : string"],
+                "out": ["success : BOOL"], 
+                "type": 1
+            },
+            "type": 1
+        },
+        {
+            "title": "SetWindowText",
+            "x": 300,
+            "y": 300,
+            "parameters": [
+                {},
+                {
+                    "control": {
+                        "value": 0
+                    }
+                },
+                {
+                    "control": {
+                        "value": ""
+                    }
+                }
+            ],
+            "id": 2,
+            "connections": {
+                "in": [
+                    {},
+                    {},
+                    {}
+                ],
+                "out": [
+                    {},
+                    {}
+                ]
+            },
+            "command": {
+                "parameters": ["window : HWND", "text : string"],
+                "out": ["success : BOOL"], 
+                "type": 1
+            },
+            "type": 1
+        },
+        {
+            "title": "GetWindowText",
+            "x": 300,
+            "y": 300,
+            "parameters": [
+                {
+                    "control": {
+                        "value": 0
+                    }
+                }
+            ],
+            "id": 3,
+            "connections": {
+                "in": [
+                    {}
+                ],
+                "out": [
+                    {}
+                ]
+            },
+            "command": {
+                "parameters": ["window : HWND"],
+                "out": ["text : string"], 
+                "type": 0
+            },
+            "type": 0
+        },
+        {
+            "title": "GetConsoleWindow",
+            "x": 400,
+            "y": 400,
+            "parameters": [],
+            "id": 4,
+            "connections": {
+                "in": [],
+                "out": [
+                    {}
+                ]
+            },
+            "command": {
+                "parameters": [],
+                "out": ["console : HWND"],
+                "type": 0
+            },
+            "type": 0
+        },
+        {
+            "title": "GetConsoleWindow",
+            "x": 400,
+            "y": 400,
+            "parameters": [],
+            "id": 5,
+            "connections": {
+                "in": [],
+                "out": [
+                    {}
+                ]
+            },
+            "command": {
+                "parameters": [],
+                "out": ["console : HWND"],
+                "type": 0
+            },
+            "type": 0
+        },
+        {
+            "title": "FindWindow",
+            "x": 400,
+            "y": 400,
+            "parameters": [
+                {
+                    "control": {
+                        "value": ""
+                    }
+                },
+                {
+                    "control": {
+                        "value": ""
+                    }
+                }
+            ],
+            "id": 6,
+            "connections": {
+                "in": [
+                    {},
+                    {}
+                ],
+                "out": [
+                    {}
+                ]
+            },
+            "command": {
+                "parameters": ["className? : string", "windowTitle : string"],
+                "out": ["window : HWND"],
+                "type": 0
+            },
+            "type": 0
+        },
+        {
+            "title": "version",
+            "x": 400,
+            "y": 400,
+            "parameters": [],
+            "id": 7,
+            "connections": {
+                "in": [],
+                "out": [
+                    {}
+                ]
+            },
+            "command": {
+                "parameters": [],
+                "out": ["version : string"],
+                "type": 0
+            },
+            "type": 0
+        },
+        {
+            "title": "Program",
+            "x": 300,
+            "y": 100,
+            "parameters": [],
+            "id": 8,
+            "connections": {
+                "in": [
+                    {},
+                    {},
+                    {}
+                ],
+                "out": [
+                    {}
+                ]
+            },
+            "command": {
+                "parameters": ["fragmentShader : FRAGMENT_SHADER", "vertexShader : VERTEX_SHADER"],
+                "out": [],
+                "type": 1
+            },
+            "type": 1
+        },
+        {
+            "title": "Shader",
+            "x": 0,
+            "y": 100,
+            "parameters": [
+                {
+                    "control": {
+                        "value": ""
+                    }
+                },
+                {
+                    "control": {
+                        "value": 0
+                    }
+                }
+            ],
+            "id": 9,
+            "connections": {
+                "in": [
+                    {},
+                    {}
+                ],
+                "out": [
+                    {}
+                ]
+            },
+            "command": {
+                "parameters": ["filename : string", "type : number"],
+                "out": ["shader : SHADER"],
+                "type": 0
+            },
+            "type": 0
+        },
+        {
+            "title": "print",
+            "x": 500,
+            "y": 500,
+            "parameters": [
+                {},
+                {
+                    "control": {
+                        "value": ""
+                    }
+                }
+            ],
+            "id": 10,
+            "connections": {
+                "in": [
+                    {},
+                    {}
+                ],
+                "out": [
+                    {}
+                ]
+            },
+            "command": {
+                "parameters": ["In String : string"],
+                "out": [],
+                "type": 1
+            },
+            "type": 1
+        },
+        {
+            "title": "Beep",
+            "x": 100,
+            "y": 500,
+            "parameters": [
+                {},
+                {
+                    "control": {
+                        "value": 0
+                    }
+                },
+                {
+                    "control": {
+                        "value": 0
+                    }
+                },
+                {
+                    "control": {
+                        "value": false
+                    }
+                }
+            ],
+            "id": 11,
+            "connections": {
+                "in": [
+                    {},
+                    {},
+                    {},
+                    {}
+                ],
+                "out": [
+                    {},
+                    {}
+                ]
+            },
+            "command": {
+                "parameters": ["frequency : number", "durationMs : number", "nonblocking? : boolean"],
+                "out": ["success : BOOL"],
+                "type": 1
+            },
+            "type": 1
+        }
+    ]
+}
