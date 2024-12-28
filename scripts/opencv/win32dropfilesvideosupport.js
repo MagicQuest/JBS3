@@ -63,7 +63,7 @@ const cv = {
     CAP_PROP_READ_TIMEOUT_MSEC :54
 };
 
-function call(name, ...args) {
+function callWithType(name, returntype, ...args) {
     const types = {"boolean": VAR_BOOLEAN, "number": VAR_INT, "string": VAR_CSTRING}; //cstring probably
     let argTypes = [];
     for(let i = 0; i < args.length; i++) {
@@ -71,7 +71,11 @@ function call(name, ...args) {
         argTypes[i] = types[typeof(args[i])];
     }
     //print(argTypes);
-    return opencvhelper(name, args.length, args, argTypes, RETURN_NUMBER);
+    return opencvhelper(name, args.length, args, argTypes, returntype);
+}
+
+function call(name, ...args) {
+    return callWithType(name, RETURN_NUMBER, ...args);
 }
 
 function BGR_To_ARGB(data, w, h, channels) { //ok no lie this only works for images with 1, 3, or 4 channels lol
@@ -154,12 +158,20 @@ class VideoCapture {
         return call("isVideoCaptureOpened", this.cap);
     }
 
-    get(prop) {
-        return call("getCapProp", this.cap, prop);
+    get(prop) {//, float) {
+        //if(float || prop == cv.CAP_PROP_FPS) {
+            return callWithType("getCapProp", RETURN_FLOAT, this.cap, prop);
+        //}else {
+        //    return call("getCapProp", this.cap, prop);
+        //}
     }
 
-    set(prop, value) {
-        return call("setCapProp", this.cap, prop, value);
+    set(prop, value) { //VideoCapture->set takes a float as the second parameter/argument whtaver
+        //if(prop == cv.CAP_PROP_POS_FRAMES) {
+            return opencvhelper("setCapProp", 3, [this.cap, prop, value], [VAR_INT, VAR_INT, VAR_FLOAT], RETURN_NUMBER);
+        //}else {
+        //    return call("setCapProp", this.cap, prop, value);
+        //}
     }
 
     getDataAtFrame(frameNumber, length, callback) {

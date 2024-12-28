@@ -14,6 +14,7 @@
 //add registerOARFAS for object returning functions
 //set timeout/interval needs to use delegate pin and i gotta make custom events/functions possible
 //also you can't declare classes
+//maybe make a separate script dedicated to running blueprints so you can create a window and draw to it and stuff
 
 //https://www.reddit.com/r/unrealengine/comments/1446vgo/what_exactly_can_and_cannot_be_a_pure_function/
 //oh hell no pure functions are WEIRDER than i thought! https://medium.com/unreal-engine-technical-blog/pure-impure-functions-516367cff14f
@@ -917,13 +918,17 @@ class DropdownButtonControl {
 }
 
 function createControlBasedOnType(type, width, height, ...args) {
-    const [primitivetype, additional] = PrimitiveControl.validPrimitives[type];
-    if(primitivetype == PRIMITIVE_TOGGLE) {
-        return new CheckboxControl(width, height, ...args);
-    }else if(primitivetype == PRIMITIVE_INPUT) {
-        return new EditControl(width, height, additional, ...args); //[specil]
-    }else if(primitivetype == PRIMITIVE_DROPDOWN) {
-        return new DropdownButtonControl(width, height, ...args);
+    if(PrimitiveControl.validPrimitives[type]) {
+        const [primitivetype, additional] = PrimitiveControl.validPrimitives[type];
+        if(primitivetype == PRIMITIVE_TOGGLE) {
+            return new CheckboxControl(width, height, ...args);
+        }else if(primitivetype == PRIMITIVE_INPUT) {
+            return new EditControl(width, height, additional, ...args); //[specil]
+        }else if(primitivetype == PRIMITIVE_DROPDOWN) {
+            return new DropdownButtonControl(width, height, ...args);
+        }
+    }else {
+        return new StaticControl(width, height, args[0]);
     }
 }
 
@@ -2135,6 +2140,7 @@ Blueprint.paramColors["bigint"] = [153/255, 135/255, 201/255];
 Blueprint.paramColors["boolean"] = [146/255, 0.0, 0.0];
 Blueprint.paramColors["float"] = [161/255, 1.0, 69/255];
 Blueprint.paramColors["delegate"] = [1.0, 56/255, 56/255];
+Blueprint.paramColors["any"] = [1.0, 1.0, 1.0];
 
 for(const key in baseTypes) {
     Blueprint.paramColors[key] = Blueprint.paramColors[baseTypes[key]];
@@ -2644,6 +2650,7 @@ class BlueprintMenu {
         //i was gonna use this regex but i realized i could eval it instead -> /registerFunc *\( *(["'`])(\w+)\1 *, *(["'`])function \2\(([A-z0-9:_, ]+)\) *: *(\w+)\3/
         //damn well i already wanted to add some networking functions for a custom discord client burt wwteverf
     ];
+    static objectMethodList = {};
 
     static searchSort(a, b) {
         let bv = 0;
@@ -3590,6 +3597,78 @@ class PropertyMenu { //lowkey this might be a singleton too because im only goin
 }
 
 function generateCommandList() {
+    const specialTypes = {};
+
+    function doSpecialType(name) {
+        const definitions = specialTypes[name];
+        for(const definition of definitions) {
+            if(definition.type == "method") {
+                //if(!paramtype.includes("Constructor")) {
+                //    //not a constructor so this function is called on an instance of this object
+                //    //therefore we need a target
+                //    
+                //    //lowkey gotta reinvent the wheel here though (rewrite registerFunc) because i need to add the target parameter
+                //    let startI = definition.sig.indexOf("(")+1;
+                //    let endI = definition.sig.indexOf(")");
+                //    let parameters = definition.sig.slice(startI, endI).split(","); //why did i use slice and not substring and what's the difference?
+                //    let outstr = definition.sig.slice(endI+1);
+                //
+                //    //print(parameters, out);
+                //    //print(outstr);
+                //    let out = outstr.match(/: *(.+)/)?.[1];
+                //
+                //    if(!Blueprint.paramColors[out]) {
+                //        if(out.includes("void")) {
+                //            out = [];
+                //        /*}else if(out.includes('wstring')) {
+                //            out = out.replaceAll("wstring", "string"); //lol
+                //        */}else {
+                //            const nameandparam = out.split(" |")[0].trimEnd();
+                //            out = [`${nameandparam} : ${nameandparam}`];
+                //            print(definition.name, outstr, "o;", out, out.length);
+                //        }
+                //    }else {
+                //        out = [`${out} : ${out}`]
+                //    }
+                //
+                //    parameters.splice(0, 0, `Target : ${paramtype.toLowerCase()}`); //yeah ok
+                //
+                //    for(let i = 0; i < parameters.length; i++) {
+                //        //oops some parameters are like HWND | number so im stripping the ' |'
+                //        //and also some are just (void)
+                //        if(parameters[i] == "void" || parameters[i] == "") {
+                //            parameters.splice(i, 1);
+                //            i--; //i literally just had this thought that maybe if i decrement i after removing an element we'd be good...
+                //        }else {
+                //            parameters[i] = parameters[i].split(" |")[0].trimEnd(); //just in case
+                //        }
+                //    }
+                //
+                //    BlueprintMenu.commandList.push({name: definition.name, desc: "", parameters, out, parent: paramtype});            
+                //}else {
+                    let targettype = undefined;
+                    if(!definitions.var) {
+                        targettype = "set";
+                    }
+                    registerFunc(definition.name, definition.sig, definition.desc ?? "", name, targettype);
+                //}
+            }else if(definition.type == "property") {
+                if(!definitions.var) {
+                    const targettype = "get";
+                    //registerFunc(definition.name, , paramtype, targettype);
+                    addFuncToCommandList(definition.name, "", [], `: ${definition.paramtype}`, BPTYPE_PURE, name, false, targettype);
+                    //BlueprintMenu.commandList.push({name: definition.name, desc: "", parameters: [], out: [`${definition.name} : ${definition.paramtype}`], parent: paramtype, targettype});
+                }else {
+                    const constant = true;
+                    BlueprintMenu.commandList.push({name: definition.name, desc: "", parameters: [], out: [`${definition.name} : ${definition.paramtype}`], type: BPTYPE_BARE, parent: name, constant});
+                }
+                //BlueprintMenu.commandList.push({name: definition.name, desc: "", parameters: [], out: [`${definition.name} : ${definition.paramtype}`], type: BPTYPE_BARE, parent: paramtype, constant, targettype});
+            }
+        }
+    }
+
+    const functionswithspecialreturnedvalues = {};
+
     //lowkey GetForegroundWindow and FindWindow should be pure
     function registerGlobalObject(name, sig, desc) {
         BlueprintMenu.commandList.push({name, desc, parameters: [], out: [sig], type: BPTYPE_BARE, parent: "Global values", constant: true});
@@ -3601,13 +3680,26 @@ function generateCommandList() {
         let out = outstr.match(/: *(.+)/)?.[1];
 
         if(!Blueprint.paramColors[out]) {
+            if(!out) {
+                print(name, outstr);
+            }
             if(out.includes("void")) {
                 out = [];
             /*}else if(out.includes('wstring')) {
                 out = out.replaceAll("wstring", "string"); //lol
             */}else {
                 const nameandparam = out.split(" |")[0].trimEnd();
-                out = [`${nameandparam} : ${nameandparam}`];
+                //actually... eh fugget about it
+                //const key = Object.keys(functionswithspecialreturnedvalues).find(k => name.endsWith(k));
+                //if(functionswithspecialreturnedvalues[key]) {
+                //    out = [];
+                //    print(name, "using", key);
+                //    for(const propname of functionswithspecialreturnedvalues[key]) {
+                //        out.push(`${propname} : any`);
+                //    }
+                //}else {
+                    out = [`${nameandparam} : ${nameandparam}`];
+                //}
                 //print(name, outstr, "o;", out, out.length);
             }
         }else {
@@ -3660,43 +3752,149 @@ function generateCommandList() {
         return {info, desc, args: info.substring(info.indexOf("(")+1, info.indexOf(")")).split(", ")};
     }
 
-    function registerOARFAS(objectName, functions, _testProps, arr) {
+    const objectMethodList = {};
+    const vscode = {
+        CompletionItemKind: {
+            Text: 0,
+            Method: 1,
+            Function: 2,
+            Constructor: 3,
+            Field: 4,
+            Variable: 5,
+            Class: 6,
+            Interface: 7,
+            Module: 8,
+            Property: 9,
+            Unit: 10,
+            Value: 11,
+            Enum: 12,
+            Keyword: 13,
+            Snippet: 14,
+            Color: 15,
+            Reference: 17,
+            File: 16,
+            Folder: 18,
+            EnumMember: 19,
+            Constant: 20,
+            Struct: 21,
+            Event: 22,
+            Operator: 23,
+            TypeParameter: 24,
+            User: 25,
+            Issue: 26,    
+        }
+    }
+
+    function extendMethods(objectName, arr) {
+        return Object.assign(arr, objectMethodList[objectName].desc); //basically merges the target and source
+    }
+
+    function registerOARFAS(objectName, functions, testProps, arr) {
         //lowkey gonna have to sleep on this one for a while
+        specialTypes[objectName] = [];
+
+        objectMethodList[objectName] = {get: testProps, desc: arr};
+        BlueprintMenu.objectMethodList[objectName] = {get: testProps}; //only storing get testprops here because i only need desc for generating the command list
+
+        const propertieslist = [];
+
+        try {
+        for(const [propname, type] of testProps()) { //shouldn't error?
+            if(type) {
+                //ooooouuuuuuhhhhh
+            }else if(!type || type == vscode.CompletionItemKind.Field){
+                //yeh
+                specialTypes[objectName].push({name: `${objectName}.${propname}`, paramtype: "any", type: "property"});
+                propertieslist.push(propname);
+            }
+        }
+        }catch(e) {
+            print(`aw damn testProps failed for (${objectName}) (ignoring) ${e}`);
+        }
+
+        for(const func of functions) {
+            functionswithspecialreturnedvalues[func] = propertieslist;
+        }
+
+        for(const methname in arr) {
+            const {info, desc} = arr[methname];
+            specialTypes[objectName].push({name: `${objectName}.${methname}`, sig: info, type: "method", desc});
+        }
+    }
+
+    function registerGlobalObjectSignature(globalName, objectName) {
+        specialTypes[objectName].var = true;
     }
 
     //wait i've been using the -i flag for no reason this whole time and i didn't even know?! (im not even sure why i added it maybe i thought it meant it would NOT include the response headers)
     let extension = system("curl https://raw.githubusercontent.com/MagicQuest/JBS3Extension/refs/heads/main/src/extension.ts").split("\n"); //well i would use fetch but right now it only works with HTTP bruh
+    //let extension = {length: 1};
     let macromaxxing = false;
     //print(extension, typeof(extension), !!extension);
     if(extension.length == 1) {
         //lol my internet stopped working so im gonna make it read from my disk instead
         extension = require("fs").read("D:/scripts/vs-extensim/src/extension.ts").split("\n"); //ignore the path's mispelling of extension
     }
+
+    const getridoftstypesregex = /( *: *.+) ([={])/; //https://regexr.com/8aee2
+
+    for(let i = 0; i < extension.length; i++) {
+        const line = extension[i];
+        if(line.includes(": SignatureInfo {")) { //declaration
+            let fullfunction = line.replace(getridoftstypesregex, " $2")+"\n"; //HELL YESA
+            let j = i+1;
+            if(!line.endsWith("}")) { //not a one line definition
+                while (extension[j] != "}") {
+                    print("j", j);
+                    fullfunction += extension[j]+"\n";
+                    j++;
+                }
+                j++;
+                fullfunction += "}";
+            }
+            
+            try {
+                eval(fullfunction);
+            }catch(e) {
+                print("registerOARFAS fail", i+1, line, e.toString());
+            }
+            print(`signa current line ${i+1} (${line}) skipping to ${j-i-1} (${extension[i+(j-i)]})`);
+            i += (j-i)-1;
+        }else if(line.includes("registerOARFAS") && !line.startsWith("function")) {
+            //getting all the lines here instead of using the loop above just in case i use registerOARFAS in only one line
+            let fullfunction = line+"\n";
+            let j = i+1;
+            if(!line.endsWith(");")) { //not a one line definition
+                while (extension[j] != ");") {
+                    let currentline = extension[j];
+                    if(currentline.includes("let") && currentline.indexOf("let") < currentline.indexOf("=")) {
+                        currentline = currentline.replace(getridoftstypesregex, " $2");
+                    }
+                    fullfunction += currentline+"\n";
+                    j++;
+                }
+                j++;
+                fullfunction += ");";
+            }
+            
+            try {
+                eval(fullfunction);
+            }catch(e) {
+                print("registerOARFAS fail", i+1, line, e.toString());
+            }
+            print(`regoarfas current line ${i+1} (${line}) skipping to ${j-i-1} (${extension[i+(j-i)]})`);
+            i += (j-i)-1;
+        }
+    }
     for(let i = 0; i < extension.length; i++) {
         const line = extension[i];
     //for(const line of extension) {
-        if(line.includes("registerFunc") || line.includes("registerGlobalObject(")) {
+        if((line.includes("registerFunc") || line.includes("registerGlobalObject")) && !line.startsWith("function")) {
             try {
                 eval(line); //im using eval here instead of regex so i can hijack registerFunc (which yk i guess is KINDA dangerous so...)
             }catch(e) {
-                print(e.toString());
+                print("registerFunc/GloablObj/sig fail on line", i+1, `(${line})`, e.toString());
             }
-        }else if(line.includes("registerOARFAS")) {
-            //getting all the lines here instead of using the loop above just in case i use registerOARFAS in only one line
-            //let fullfunction = line+"\n";
-            //if(!line.endsWith(");")) { //not a one line definition
-            //    let j = i+1;
-            //    while (extension[j] != ");") {
-            //        fullfunction += extension[j]+"\n";
-            //    }
-            //    fullfunction += ");";
-            //}
-            //
-            //try {
-            //    eval(fullfunction);
-            //}catch(e) {
-            //    print(i, e.toString());
-            //}
         }else if(line.includes("const macros:string[]") || macromaxxing) {
             if(!macromaxxing) macromaxxing = true;
 
@@ -3749,100 +3947,45 @@ function generateCommandList() {
 
     const latest = "es2024"; //i assume
 
+    let maindir = __dirname+"/cache";
     let dir = "https://raw.githubusercontent.com/microsoft/TypeScript/main/src/lib";
 
-    let jsDocs = system(`curl ${dir}/${latest}.d.ts`).split("\n"); //unfortunately these typescript files are split up and i have to manually look through them
+    const fs = require('fs');
+
+    function loadfromcacheorinternetandthencacheit(name) {
+        let file = fs.read(`${maindir}/${name}.d.ts`);
+        if(!file) {
+            file = system(`curl ${dir}/${name}.d.ts`);
+            fs.write(`${maindir}/${name}.d.ts`, file);
+        }
+        return file.split("\n");
+    }
+
+    //let jsDocs = system(`curl ${dir}/${latest}.d.ts`).split("\n"); //unfortunately these typescript files are split up and i have to manually look through them
+    let jsDocs = loadfromcacheorinternetandthencacheit(latest);
     let offline = jsDocs.length == 1; //checking the length because if you split an empty string it will return [""]
     if(offline) {
         dir = "E:/Microsoft VS Code/resources/app/extensions/node_modules/typescript/lib/lib";
         jsDocs = require("fs").read(`${dir}.${latest}.d.ts`).split("\n");
+        print(dir, jsDocs);
     }
 
-    const specialTypes = {};
     let currentNamespace = "";
     let currentType = undefined;
-
-    function doSpecialType(paramtype) {
-        const definitions = specialTypes[paramtype];
-        for(const definition of definitions) {
-            if(definition.type == "method") {
-                //if(!paramtype.includes("Constructor")) {
-                //    //not a constructor so this function is called on an instance of this object
-                //    //therefore we need a target
-                //    
-                //    //lowkey gotta reinvent the wheel here though (rewrite registerFunc) because i need to add the target parameter
-                //    let startI = definition.sig.indexOf("(")+1;
-                //    let endI = definition.sig.indexOf(")");
-                //    let parameters = definition.sig.slice(startI, endI).split(","); //why did i use slice and not substring and what's the difference?
-                //    let outstr = definition.sig.slice(endI+1);
-                //
-                //    //print(parameters, out);
-                //    //print(outstr);
-                //    let out = outstr.match(/: *(.+)/)?.[1];
-                //
-                //    if(!Blueprint.paramColors[out]) {
-                //        if(out.includes("void")) {
-                //            out = [];
-                //        /*}else if(out.includes('wstring')) {
-                //            out = out.replaceAll("wstring", "string"); //lol
-                //        */}else {
-                //            const nameandparam = out.split(" |")[0].trimEnd();
-                //            out = [`${nameandparam} : ${nameandparam}`];
-                //            print(definition.name, outstr, "o;", out, out.length);
-                //        }
-                //    }else {
-                //        out = [`${out} : ${out}`]
-                //    }
-                //
-                //    parameters.splice(0, 0, `Target : ${paramtype.toLowerCase()}`); //yeah ok
-                //
-                //    for(let i = 0; i < parameters.length; i++) {
-                //        //oops some parameters are like HWND | number so im stripping the ' |'
-                //        //and also some are just (void)
-                //        if(parameters[i] == "void" || parameters[i] == "") {
-                //            parameters.splice(i, 1);
-                //            i--; //i literally just had this thought that maybe if i decrement i after removing an element we'd be good...
-                //        }else {
-                //            parameters[i] = parameters[i].split(" |")[0].trimEnd(); //just in case
-                //        }
-                //    }
-                //
-                //    BlueprintMenu.commandList.push({name: definition.name, desc: "", parameters, out, parent: paramtype});            
-                //}else {
-                    let targettype = undefined;
-                    if(!definitions.var) {
-                        targettype = "set";
-                    }
-                    registerFunc(definition.name, definition.sig, "", paramtype, targettype);
-                //}
-            }else if(definition.type == "property") {
-                if(!definitions.var) {
-                    const targettype = "get";
-                    //registerFunc(definition.name, , paramtype, targettype);
-                    addFuncToCommandList(definition.name, "", [], `: ${definition.paramtype}`, BPTYPE_PURE, paramtype, false, targettype);
-                    //BlueprintMenu.commandList.push({name: definition.name, desc: "", parameters: [], out: [`${definition.name} : ${definition.paramtype}`], parent: paramtype, targettype});
-                }else {
-                    const constant = true;
-                    BlueprintMenu.commandList.push({name: definition.name, desc: "", parameters: [], out: [`${definition.name} : ${definition.paramtype}`], type: BPTYPE_BARE, parent: paramtype, constant});
-                }
-                //BlueprintMenu.commandList.push({name: definition.name, desc: "", parameters: [], out: [`${definition.name} : ${definition.paramtype}`], type: BPTYPE_BARE, parent: paramtype, constant, targettype});
-            }
-        }
-    }
 
     function iterateThroughTypescriptReferences(file) {
         //print("now reading "+file);
         for(let i = 0; i < file.length; i++) {
             const line = file[i];
             //print(line);
-            if(line.startsWith("/// <reference")) {
+            if(line.startsWith("/// <reference lib")) {
                 const filename = line.match(/\/\/\/ \<reference lib=(["'`])(.+)\1/)[2];
                 if(filename.includes("decorators")) { //im being lazy here but i don't need to read these anyways
                     continue;
                 }
                 let nextfile;
                 if(!offline) {
-                    nextfile = system(`curl ${dir}/${filename}.d.ts`).split("\n");
+                    nextfile = loadfromcacheorinternetandthencacheit(filename); //system(`curl ${dir}/${filename}.d.ts`).split("\n");
                 }else {
                     nextfile = require("fs").read(`${dir}.${filename}.d.ts`).split("\n");
                 }
@@ -3962,8 +4105,8 @@ function generateCommandList() {
 
     iterateThroughTypescriptReferences(jsDocs);
 
-    for(const paramtype in specialTypes) {
-        doSpecialType(paramtype);
+    for(const name in specialTypes) {
+        doSpecialType(name);
     }
 
     //for(const line of jsDocs) {
@@ -4336,7 +4479,7 @@ function executeBlueprints() {
             }
             //return args;
             //if this is a datatype blueprint then don't do this lmao
-            print("exec", source.title);
+            //print("exec", source.title);
             if(source.variableLengthInPins) {
                 //backwards loop to trim trailing undefined
                 for(let i = args.length; i > 0; i--) {
@@ -4347,7 +4490,7 @@ function executeBlueprints() {
                     }
                 }
             }
-            print("args", args);
+            //print("args", args);
             result = source.execute(args);
             /*if(source.variable) {
                 result = Blueprint.meta_functions["SET"].call(source, ...args); //had to do it special bruh
@@ -4398,12 +4541,12 @@ function executeBlueprints() {
         print(current.title);
         interpretParametersAndExecute(current);
 
-        print(!!next ? "cont" : "no futher", loopStack.length);
+        //print(!!next ? "cont" : "no futher", loopStack.length);
         if(!next && loopStack.length != 0) {
             const loop = loopStack.at(-1);
             next = loop.source;
             loop.cache = {}; //clear the cache my boy
-            print("loop");
+            //print("loop");
         }
         
         //damn i am not ready for these meta blueprints how am i gonna make the branch work...
@@ -4442,7 +4585,7 @@ function d2dpaint() {
     for(const obj of throwawayObjects) {
         //print(obj.Release(), "throwaway release");
         if((r = obj.Release()) != 0) {
-            print(r, "throwaway release still has references!!!");
+            print(r, "throwaway release still has references?!!!");
         }
     }
     throwawayObjects = []; //SHOULD be garbage collected
@@ -4837,6 +4980,7 @@ function windowProc(hwnd, msg, wp, lp) {
             dirty = true;
         }
     }else if(msg == WM_KEYDOWN) {
+        const ctrl = GetKey(VK_CONTROL);
         if(wp == "E".charCodeAt(0)) {
             print("e");
             if(GetKey(VK_CONTROL)) {
@@ -4860,7 +5004,7 @@ function windowProc(hwnd, msg, wp, lp) {
             }else {
                 BlueprintMenu.open(hwnd);
             }
-        }else if(wp == "S".charCodeAt(0) && GetKey(VK_CONTROL)) {
+        }else if(wp == "S".charCodeAt(0) && ctrl) {
             //print(saveBlueprintsJSON());
             const paths = showSaveFilePicker({
                 types: [
@@ -4877,7 +5021,7 @@ function windowProc(hwnd, msg, wp, lp) {
             }else {
                 print(saveBlueprintsJSON());
             }
-        }else if(wp == "O".charCodeAt(0) && GetKey(VK_CONTROL)) {
+        }else if(wp == "O".charCodeAt(0) && ctrl) {
             const paths = showOpenFilePicker({
                 multiple: false,
                 types: [
@@ -4894,6 +5038,8 @@ function windowProc(hwnd, msg, wp, lp) {
                 const str = fs.read(paths);
                 loadBlueprintsJSON(str);
             }
+        }else if(wp == "V".charCodeAt(0) && ctrl && Editable.editing) {
+            print("think about pasting but don't actually because idk how to do anything with the clipboard yet...");
         }
 
         if(wp == VK_ESCAPE) {

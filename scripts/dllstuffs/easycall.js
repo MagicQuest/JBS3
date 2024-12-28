@@ -21,7 +21,8 @@ const LoadDll = function() {//function LoadDllClosure() {
                 }
             }
             //print(argTypes);
-            return Call(this.memoized[prop], args.length, args, argTypes, RETURN_NUMBER); //bruhhh there is no easy/good way to infer the return type and whether or not the args are floats or not
+            const mem = this.memoized[prop];
+            return Call(mem.addr, args.length, args, argTypes, mem.returntype ?? RETURN_NUMBER); //bruhhh there is no easy/good way to infer the return type and whether or not the args are floats or not
         }
     }
     
@@ -36,8 +37,13 @@ const LoadDll = function() {//function LoadDllClosure() {
 
             const memo = target.memoized; //since trying to get any property of target will call this get function im gonna make sure that happens as little as possible
 
-            if(memo[prop] == undefined) { //checking if target.memoized[prop] is undefined
-                memo[prop] = GetProcAddress(target.dll, prop); //we assume prop is the name of a function in the dll
+            if(memo[prop]?.addr == undefined) { //checking if target.memoized[prop] is undefined
+                const addr = GetProcAddress(target.dll, prop);
+                if(!memo[prop]) {
+                    memo[prop] = {addr}; //we assume prop is the name of a function in the dll
+                }else {
+                    memo[prop].addr = addr;
+                }
             }
             if(memo[prop]) { //if target.memoized[prop] is valid we return a function so you can call it like dll.Function(...args);
                 //Call(target[prop], )

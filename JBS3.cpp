@@ -2085,11 +2085,33 @@ V8FUNC(FindWindowWrapper) {
     Isolate* isolate = info.GetIsolate();
 
     const wchar_t* className = NULL;
-    if (!info[0]->IsNullOrUndefined() && info[0]->IsString()) {
+    if (info[0]->IsString()) {
         className = WStringFI(info[0]);
     }
 
-    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)FindWindow(className, WStringFI(info[1]))));
+    LPCWSTR title = NULL;
+    if (info[1]->IsString()) {
+        title = WStringFI(info[1]);
+    }
+
+    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)FindWindow(className, title)));
+}
+
+V8FUNC(FindWindowExWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    const wchar_t* className = NULL;
+    if (info[2]->IsString()) {
+        className = WStringFI(info[2]);
+    }
+
+    LPCWSTR title = NULL;
+    if (info[3]->IsString()) {
+        title = WStringFI(info[3]);
+    }
+
+    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)FindWindowEx(HWND(IntegerFI(info[0])), (HWND)IntegerFI(info[1]), className, title)));
 }
 
 V8FUNC(SetTextColorWrapper) {
@@ -5137,7 +5159,7 @@ namespace DIRECT2D {
             return jsGS;//->NewInstance(isolate->GetCurrentContext()).ToLocalChecked();
         }
 
-        Local<ObjectTemplate> createPathGeometryImpl(Isolate* isolate) {
+        Local<ObjectTemplate> createPathGeometryImpl(Isolate* isolate)RestoreDrawingState {
             Local<ObjectTemplate> jsPG = createGeometryImpl(isolate);
             jsPG->Set(isolate, "Open", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
                 Isolate* isolate = info.GetIsolate();
@@ -11093,6 +11115,39 @@ V8FUNC(SendMessageStr) {
     info.GetReturnValue().Set(String::NewFromTwoByte(isolate, (const uint16_t*)type).ToLocalChecked());
 }
 
+V8FUNC(SendMessageTimeoutWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    
+    WPARAM shit = 0;
+    LPARAM shit2 = 0;
+
+    if (info[2]->IsString()) {
+        shit = WPARAM(WStringFI(info[2])); //haha i forgot you could cast like this (and it looks really weird)
+    }
+    else {
+        shit = IntegerFI(info[2]);
+    }
+
+    if (info[3]->IsString()) {
+        shit2 = LPARAM(WStringFI(info[3])); //haha i forgot you could cast like this (and it looks really weird)
+    }
+    else {
+        shit2 = IntegerFI(info[3]);
+    }
+
+    unsigned long long result = NULL;
+
+    LRESULT state = SendMessageTimeout(HWND(IntegerFI(info[0])), IntegerFI(info[1]), shit, shit2, IntegerFI(info[4]), IntegerFI(info[5]), &result);
+    if (state == 0) {
+        info.GetReturnValue().Set(Number::New(isolate, state));
+    }
+    else {
+        info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)result));
+    }
+
+}
+
 V8FUNC(ClientToScreenWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
@@ -14664,7 +14719,7 @@ V8FUNC(RegisterRawInputDevicesWrapper) {
             (HWND)IntegerFI(jsRID->Get(context, LITERAL("hwndTarget")).ToLocalChecked()),
         });
     }
-    info.GetReturnValue().Set(RegisterRawInputDevices(&vrawshits[0], vrawshits.size(), sizeof(RAWINPUTDEVICE)));
+    info.GetReturnValue().Set(Number::New(isolate, RegisterRawInputDevices(&vrawshits[0], vrawshits.size(), sizeof(RAWINPUTDEVICE))));
 }
 
 V8FUNC(GetRawInputDeviceListLength) {
@@ -15503,7 +15558,7 @@ V8FUNC(Shell_NotifyIconWrapper) {
     NOTIFYICONDATA data = jsImpl::fromJSNOTIFYICONDATA(isolate, info[1].As<Object>());
 
     //https://stackoverflow.com/questions/6270539/how-to-shell-notifyicon-without-adding-an-icon-in-the-notification-area
-    info.GetReturnValue().Set(Shell_NotifyIcon(IntegerFI(info[0]), &data));
+    info.GetReturnValue().Set(Number::New(isolate, Shell_NotifyIcon(IntegerFI(info[0]), &data)));
 }
 
 V8FUNC(Shell_NotifyIconGetRectWrapper) {
@@ -18743,6 +18798,7 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
     //setGlobal(GetKeyUp);
 
     setGlobalWrapper(FindWindow);
+    setGlobalWrapper(FindWindowEx);
 
     setGlobalWrapper(SetTextColor);
     setGlobalWrapper(GetTextColor);
@@ -19023,6 +19079,7 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
     setGlobalWrapper(SetStretchBltMode);
     setGlobalWrapper(SendMessage);
     setGlobal(SendMessageStr);
+    setGlobalWrapper(SendMessageTimeout);
 
     setGlobalConst(ICON_BIG);
     setGlobalConst(ICON_SMALL);
@@ -19045,6 +19102,14 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
     global->Set(isolate, "HWND_NOTOPMOST", Number::New(isolate, (LONG_PTR)HWND_NOTOPMOST));
     global->Set(isolate, "HWND_TOP", Number::New(isolate, (LONG_PTR)HWND_TOP));
     global->Set(isolate, "HWND_TOPMOST", Number::New(isolate, (LONG_PTR)HWND_TOPMOST));
+
+    global->Set(isolate, "HWND_BROADCAST", Number::New(isolate, (LONG_PTR)HWND_BROADCAST));
+    global->Set(isolate, "HWND_MESSAGE", Number::New(isolate, (LONG_PTR)HWND_MESSAGE));
+    setGlobalConst(SMTO_NORMAL);
+    setGlobalConst(SMTO_BLOCK);
+    setGlobalConst(SMTO_ABORTIFHUNG);
+    setGlobalConst(SMTO_NOTIMEOUTIFNOTHUNG);
+    setGlobalConst(SMTO_ERRORONEXIT);
 
     setGlobalConst(SWP_ASYNCWINDOWPOS); setGlobalConst(SWP_DEFERERASE); setGlobalConst(SWP_DRAWFRAME); setGlobalConst(SWP_FRAMECHANGED); setGlobalConst(SWP_HIDEWINDOW); setGlobalConst(SWP_NOACTIVATE); setGlobalConst(SWP_NOCOPYBITS); setGlobalConst(SWP_NOMOVE); setGlobalConst(SWP_NOOWNERZORDER); setGlobalConst(SWP_NOREDRAW); setGlobalConst(SWP_NOREPOSITION); setGlobalConst(SWP_NOSENDCHANGING); setGlobalConst(SWP_NOSIZE); setGlobalConst(SWP_NOZORDER); setGlobalConst(SWP_SHOWWINDOW);
 
