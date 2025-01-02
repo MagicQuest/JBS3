@@ -257,7 +257,7 @@ function releaseMyShit(cap, hwnd, dc) {
 
 let wallpaper_hwnd = NULL;
 
-//honestly idk how this be working i found this on the stack:tm: when i made my wallpaper engine
+//honestly idk how this be working i found this on The Stack:tm: when i made my wallpaper engine
 function acquire_wallpaper_window()
 {
     // Fetch the Progman window

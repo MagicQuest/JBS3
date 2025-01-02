@@ -142,6 +142,12 @@
 #define LITERAL(cstr) String::NewFromUtf8Literal(isolate, cstr)
 #define CStringFI(e) *String::Utf8Value(isolate, e)
 #define WStringFI(e) (const wchar_t*)*String::Value(isolate, e)
+//#define WStringOrNULL(type, id, var) if (info[id]->IsString()) {           \
+//                                         var = type(WStringFI(info[id]));  \
+//                                     }                                     \
+//                                     else {                                \
+//                                         var = type(IntegerFI(info[id]));  \
+//                                     }
 #define IntegerFI(e) e/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust()
 #define FloatFI(e) e.As<Number>()->Value()
 
@@ -152,7 +158,12 @@
                                   SetConsoleTextAttribute(console, 7);                                                                                   \
                               }
 
-
+void errprint(const char* str) {
+    HANDLE console = GetStdHandle(STD_OUTPUT_HANDLE);
+    SetConsoleTextAttribute(console, 4);
+    print(str << "\x07");
+    SetConsoleTextAttribute(console, 7);
+}
 
 //#include <map>
 //#include "JSWindow.h"
@@ -165,6 +176,17 @@
 
 
 #include <v8-proxy.h>
+
+template<class T>
+T WStringOrNULL(v8::Isolate* isolate, const v8::Local<v8::Value>& v) {
+    using namespace v8;
+    if (v->IsString()) {
+        return T(*String::Value(isolate, v)); //haha i forgot you could cast like this (and it looks really weird)
+    }
+    else {
+        return T(IntegerFI(v));
+    }
+}
 
 #include "Direct2D.h"
 
@@ -1785,6 +1807,15 @@ V8FUNC(DrawTextWrapper) {
     //const char* text = CStringFI(info[1]);
     RECT r = RECT{ (long)IntegerFI(info[2]) ,(long)IntegerFI(info[3]) ,(long)IntegerFI(info[4]) ,(long)IntegerFI(info[5]) };
     info.GetReturnValue().Set(Number::New(isolate, DrawText((HDC)IntegerFI(info[0]), WStringFI(info[1]), -1, &r, IntegerFI(info[6]))));
+}
+
+V8FUNC(PlayEnhMetaFileWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    RECT r = RECT{ (long)IntegerFI(info[2]) ,(long)IntegerFI(info[3]) ,(long)IntegerFI(info[4]) ,(long)IntegerFI(info[5]) };
+
+    info.GetReturnValue().Set(Number::New(isolate, PlayEnhMetaFile((HDC)IntegerFI(info[0]), (HENHMETAFILE)IntegerFI(info[1]), &r)));
 }
 
 V8FUNC(DrawFrameControlWrapper) {
@@ -5159,7 +5190,7 @@ namespace DIRECT2D {
             return jsGS;//->NewInstance(isolate->GetCurrentContext()).ToLocalChecked();
         }
 
-        Local<ObjectTemplate> createPathGeometryImpl(Isolate* isolate)RestoreDrawingState {
+        Local<ObjectTemplate> createPathGeometryImpl(Isolate* isolate) {
             Local<ObjectTemplate> jsPG = createGeometryImpl(isolate);
             jsPG->Set(isolate, "Open", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
                 Isolate* isolate = info.GetIsolate();
@@ -8475,6 +8506,8 @@ namespace DIRECT2D {
                 //unsigned short Data3;
                 //unsigned char  Data4[8];
 
+                //print(WStringFI(info[0]));
+
                 IWICFormatConverter* wicConverter = WICObj->LoadBitmapFromFilename(WStringFI(info[0]), shit, IntegerFI(info[2]));
 
                 if (wicConverter != nullptr) {
@@ -9995,14 +10028,7 @@ V8FUNC(LoadCursorWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
 
-    LPWSTR shit;
-
-    if (info[1]->IsString()) {
-        shit = LPWSTR(WStringFI(info[1])); //haha i forgot you could cast like this (and it looks really weird)
-    }
-    else {
-        shit = (LPWSTR)IntegerFI(info[1]);
-    }
+    LPWSTR shit = WStringOrNULL<LPWSTR>(isolate, info[1]);
 
     info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)LoadCursor((HINSTANCE)IntegerFI(info[0]), shit)));
 }
@@ -10081,14 +10107,7 @@ V8FUNC(LoadIconWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
 
-    LPWSTR shit;
-
-    if (info[1]->IsString()) {
-        shit = LPWSTR(WStringFI(info[1])); //haha i forgot you could cast like this (and it looks really weird)
-    }
-    else {
-        shit = (LPWSTR)IntegerFI(info[1]);
-    }
+    LPWSTR shit = WStringOrNULL<LPWSTR>(isolate, info[1]);
 
     info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)LoadIcon((HINSTANCE)IntegerFI(info[0]), shit)));
 }
@@ -10200,7 +10219,7 @@ V8FUNC(GetBitmapDimensions) {
     Isolate* isolate = info.GetIsolate();
 
     BITMAP bmp;
-    GetObjectA((HBITMAP)IntegerFI(info[0]), sizeof(BITMAP), &bmp); //oof getobject wrapper gonna be hard (also i usually don't say oof anymore)
+    GetObject((HBITMAP)IntegerFI(info[0]), sizeof(BITMAP), &bmp); //oof getobject wrapper gonna be hard (also i usually don't say oof anymore)
     
     Local<Object> jsSize = Object::New(isolate);
     jsSize->Set(isolate->GetCurrentContext(), LITERAL("width"), Number::New(isolate, bmp.bmWidth));
@@ -11092,14 +11111,8 @@ V8FUNC(SendMessageWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
 
-    LPARAM shit = 0;
-
-    if (info[3]->IsString()) {
-        shit = LPARAM(WStringFI(info[3])); //haha i forgot you could cast like this (and it looks really weird)
-    }
-    else {
-        shit = IntegerFI(info[3]);
-    }
+    LPARAM shit = WStringOrNULL<LPARAM>(isolate, info[3]);
+    //WStringOrInt<LPARAM>()
 
     info.GetReturnValue().Set(Number::New(isolate, SendMessage((HWND)IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), shit)));
 }
@@ -11119,22 +11132,22 @@ V8FUNC(SendMessageTimeoutWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
     
-    WPARAM shit = 0;
-    LPARAM shit2 = 0;
+    WPARAM shit = WStringOrNULL<WPARAM>(isolate, info[2]); //0;
+    LPARAM shit2 = WStringOrNULL<LPARAM>(isolate, info[3]); //0;
 
-    if (info[2]->IsString()) {
-        shit = WPARAM(WStringFI(info[2])); //haha i forgot you could cast like this (and it looks really weird)
-    }
-    else {
-        shit = IntegerFI(info[2]);
-    }
-
-    if (info[3]->IsString()) {
-        shit2 = LPARAM(WStringFI(info[3])); //haha i forgot you could cast like this (and it looks really weird)
-    }
-    else {
-        shit2 = IntegerFI(info[3]);
-    }
+    //if (info[2]->IsString()) {
+    //    shit = WPARAM(WStringFI(info[2])); //haha i forgot you could cast like this (and it looks really weird)
+    //}
+    //else {
+    //    shit = IntegerFI(info[2]);
+    //}
+    //
+    //if (info[3]->IsString()) {
+    //    shit2 = LPARAM(WStringFI(info[3])); //haha i forgot you could cast like this (and it looks really weird)
+    //}
+    //else {
+    //    shit2 = IntegerFI(info[3]);
+    //}
 
     unsigned long long result = NULL;
 
@@ -11145,7 +11158,6 @@ V8FUNC(SendMessageTimeoutWrapper) {
     else {
         info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)result));
     }
-
 }
 
 V8FUNC(ClientToScreenWrapper) {
@@ -11242,12 +11254,341 @@ V8FUNC(DeleteDCWrapper) {
     info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)DeleteDC((HDC)IntegerFI(info[0]))));
 }
 
-//V8FUNC(CreateDCWrapper) {
-//    using namespace v8;
-//    Isolate* isolate = info.GetIsolate();
-//
-//    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)CreateDC((HDC)IntegerFI(info[0]))));
-//}
+V8FUNC(CreateDCWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    LPCWSTR pwszDriver = WStringOrNULL<LPCWSTR>(isolate, info[0]);
+    LPCWSTR pwszDevice = WStringOrNULL<LPCWSTR>(isolate, info[1]);
+    LPCWSTR pszPort = WStringOrNULL<LPCWSTR>(isolate, info[2]);
+
+    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)CreateDC(pwszDriver, pwszDevice, pszPort, (DEVMODE*)IntegerFI(info[3]))));
+}
+
+V8FUNC(EnumDisplayDevicesWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    DISPLAY_DEVICE displayDevice{};
+    displayDevice.cb = sizeof(DISPLAY_DEVICE);
+
+    BOOL result = EnumDisplayDevices(WStringOrNULL<LPCWSTR>(isolate, info[0]), IntegerFI(info[1]), &displayDevice, IntegerFI(info[2]));
+    if (result) {
+        Local<Context> context = isolate->GetCurrentContext();
+        Local<Object> jsDD = Object::New(isolate);
+        jsDD->Set(context, LITERAL("DeviceName"), String::NewFromTwoByte(isolate, (const uint16_t*)displayDevice.DeviceName).ToLocalChecked());
+        jsDD->Set(context, LITERAL("DeviceString"), String::NewFromTwoByte(isolate, (const uint16_t*)displayDevice.DeviceString).ToLocalChecked());
+        jsDD->Set(context, LITERAL("StateFlags"), Number::New(isolate, displayDevice.StateFlags));
+        jsDD->Set(context, LITERAL("DeviceID"), String::NewFromTwoByte(isolate, (const uint16_t*)displayDevice.DeviceID).ToLocalChecked());
+        jsDD->Set(context, LITERAL("DeviceKey"), String::NewFromTwoByte(isolate, (const uint16_t*)displayDevice.DeviceKey).ToLocalChecked());
+        info.GetReturnValue().Set(jsDD);
+    }
+    else {
+        //info.GetReturnValue().Set(Number::New(isolate, result));
+    }
+}
+
+V8FUNC(EnumPrintProcessorsWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    DWORD level = IntegerFI(info[2]);
+    if (level != 1) {
+        errprint("EnumPrintProcessors level cannot be any value other than 1");
+    }
+    BYTE* data;
+    DWORD cbNeeded = 0;
+    DWORD cbReturned = 0;
+
+    BOOL result = EnumPrintProcessors(WStringOrNULL<LPWSTR>(isolate, info[0]), WStringOrNULL<LPWSTR>(isolate, info[1]), level, NULL, NULL, &cbNeeded, &cbReturned);
+
+    print(result << " OG! " << cbNeeded << " " << cbReturned);
+
+    DWORD newneeded = 0; //for some reason you NEED to pass something for cbNeeded and cbReturned
+
+    data = new BYTE[cbNeeded];
+    result = EnumPrintProcessors(WStringOrNULL<LPWSTR>(isolate, info[0]), WStringOrNULL<LPWSTR>(isolate, info[1]), level, data, cbNeeded, &newneeded, &cbReturned);
+
+    if (!result) {
+        return;
+    }
+
+    Local<Context> context = isolate->GetCurrentContext();
+    Local<Array> jsPPI = Array::New(isolate, cbReturned);
+
+    PRINTPROCESSOR_INFO_1* sigma = (PRINTPROCESSOR_INFO_1*)data;
+
+    for (int i = 0; i < cbReturned; i++) {
+        PRINTPROCESSOR_INFO_1 sppi = sigma[i];
+        Local<Object> idkman = Object::New(isolate);
+        idkman->Set(context, LITERAL("pName"), String::NewFromTwoByte(isolate, (const uint16_t*)sppi.pName).ToLocalChecked());
+        jsPPI->Set(context, i, idkman);
+    }
+
+    info.GetReturnValue().Set(jsPPI);
+}
+
+V8FUNC(EnumPrintProcessorDatatypesWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    DWORD level = IntegerFI(info[2]);
+    if (level != 1) {
+        errprint("EnumPrintProcessorDatatypes level cannot be any value other than 1");
+    }
+    BYTE* data;
+    DWORD cbNeeded = 0;
+    DWORD cbReturned = 0;
+
+    BOOL result = EnumPrintProcessorDatatypes(WStringOrNULL<LPWSTR>(isolate, info[0]), WStringOrNULL<LPWSTR>(isolate, info[1]), level, NULL, NULL, &cbNeeded, &cbReturned);
+
+    print(result << " OG! " << cbNeeded << " " << cbReturned);
+
+    DWORD newneeded = 0; //for some reason you NEED to pass something for cbNeeded and cbReturned
+
+    data = new BYTE[cbNeeded];
+    result = EnumPrintProcessorDatatypes(WStringOrNULL<LPWSTR>(isolate, info[0]), WStringOrNULL<LPWSTR>(isolate, info[1]), level, data, cbNeeded, &newneeded, &cbReturned);
+
+    if (!result) {
+        return;
+    }
+
+    Local<Context> context = isolate->GetCurrentContext();
+    Local<Array> jsDT = Array::New(isolate, cbReturned);
+
+    DATATYPES_INFO_1* sigma = (DATATYPES_INFO_1*)data;
+
+    for (int i = 0; i < cbReturned; i++) {
+        DATATYPES_INFO_1 s = sigma[i];
+        Local<Object> idkman = Object::New(isolate);
+        idkman->Set(context, LITERAL("pName"), String::NewFromTwoByte(isolate, (const uint16_t*)s.pName).ToLocalChecked());
+        jsDT->Set(context, i, idkman);
+    }
+
+    info.GetReturnValue().Set(jsDT);
+}
+
+V8FUNC(EnumPrintersWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    DWORD flags = IntegerFI(info[0]);
+    DWORD level = IntegerFI(info[2]);
+    BYTE* data;
+    //DWORD buf = NULL;
+    DWORD cbNeeded = 0;
+    DWORD cbReturned = 0;
+
+    if (level == 3) {
+        errprint("EnumPrinters level cannot be 3.");
+        return;
+    }
+
+    BOOL result = EnumPrinters(flags, WStringOrNULL<LPWSTR>(isolate, info[1]), level, NULL, NULL, &cbNeeded, &cbReturned);
+
+    print(result << " OG! " << cbNeeded << " " << cbReturned);
+
+    DWORD newneeded = 0; //for some reason you NEED to pass something for cbNeeded and cbReturned
+
+    data = new BYTE[cbNeeded];
+    result = EnumPrinters(flags, WStringOrNULL<LPWSTR>(isolate, info[1]), level, data, cbNeeded, &newneeded, &cbReturned);
+
+    if (!result) {
+        return;
+    }
+
+    print(result << " now remixd " << newneeded << " " << cbReturned);
+    //$(ProjectDir)scripts\jbsblueprints\jbsblueprints.js
+    Local<Context> context = isolate->GetCurrentContext();
+    Local<Array> jsPrinters = Array::New(isolate, cbReturned);
+
+    if (level == 1) {
+        PRINTER_INFO_1* printerEnum = (PRINTER_INFO_1*)data;
+        for (int i = 0; i < cbReturned; i++) {
+            PRINTER_INFO_1 p = printerEnum[i];
+            Local<Object> jsPI1 = Object::New(isolate);
+            jsPI1->Set(context, LITERAL("Flags"), Number::New(isolate, p.Flags));
+            jsPI1->Set(context, LITERAL("pDescription"), String::NewFromTwoByte(isolate, (const uint16_t*)p.pDescription).ToLocalChecked());
+            jsPI1->Set(context, LITERAL("pName"), String::NewFromTwoByte(isolate, (const uint16_t*)p.pName).ToLocalChecked());
+            jsPI1->Set(context, LITERAL("pComment"), String::NewFromTwoByte(isolate, (const uint16_t*)p.pComment).ToLocalChecked());
+
+            jsPrinters->Set(context, i, jsPI1);
+        }
+    }
+    else if (level == 2) {
+        PRINTER_INFO_2* printerEnum = (PRINTER_INFO_2*)data;
+        for (int i = 0; i < cbReturned; i++) {
+            PRINTER_INFO_2 p = printerEnum[i];
+            Local<Object> jsPI2 = Object::New(isolate);
+            if (p.pServerName == NULL) {
+                errprint("EnumPrinters returned bad data (level might've been incorrect)");
+                continue;
+            }
+            jsPI2->Set(context, LITERAL("pServerName"), String::NewFromTwoByte(isolate, (const uint16_t*)p.pServerName).ToLocalChecked());
+            jsPI2->Set(context, LITERAL("pPrinterName"), String::NewFromTwoByte(isolate, (const uint16_t*)p.pPrinterName).ToLocalChecked());
+            jsPI2->Set(context, LITERAL("pShareName"), String::NewFromTwoByte(isolate, (const uint16_t*)p.pShareName).ToLocalChecked());
+            jsPI2->Set(context, LITERAL("pPortName"), String::NewFromTwoByte(isolate, (const uint16_t*)p.pPortName).ToLocalChecked());
+            jsPI2->Set(context, LITERAL("pDriverName"), String::NewFromTwoByte(isolate, (const uint16_t*)p.pDriverName).ToLocalChecked());
+            jsPI2->Set(context, LITERAL("pComment"), String::NewFromTwoByte(isolate, (const uint16_t*)p.pComment).ToLocalChecked());
+            jsPI2->Set(context, LITERAL("pLocation"), String::NewFromTwoByte(isolate, (const uint16_t*)p.pLocation).ToLocalChecked());
+
+            //Local<Object> jsDevMode = Object::New(isolate);
+            //p.pDevMode
+            //jsPI2->Set(context, LITERAL("pDevMode"), String::NewFromTwoByte(isolate, (const uint16_t*)p.pDevMode).ToLocalChecked());
+            jsPI2->Set(context, LITERAL("pSepFile"), String::NewFromTwoByte(isolate, (const uint16_t*)p.pSepFile).ToLocalChecked());
+            jsPI2->Set(context, LITERAL("pPrintProcessor"), String::NewFromTwoByte(isolate, (const uint16_t*)p.pPrintProcessor).ToLocalChecked());
+            jsPI2->Set(context, LITERAL("pDatatype"), String::NewFromTwoByte(isolate, (const uint16_t*)p.pDatatype).ToLocalChecked());
+            jsPI2->Set(context, LITERAL("pParameters"), String::NewFromTwoByte(isolate, (const uint16_t*)p.pParameters).ToLocalChecked());
+            //jsPI2->Set(context, LITERAL("pSecurityDescriptor"), String::NewFromTwoByte(isolate, (const uint16_t*)p.pSecurityDescriptor).ToLocalChecked());
+            jsPI2->Set(context, LITERAL("Attributes"), Number::New(isolate, p.Attributes));
+            jsPI2->Set(context, LITERAL("Priority"), Number::New(isolate, p.Priority));
+            jsPI2->Set(context, LITERAL("DefaultPriority"), Number::New(isolate, p.DefaultPriority));
+            jsPI2->Set(context, LITERAL("StartTime"), Number::New(isolate, p.StartTime));
+            jsPI2->Set(context, LITERAL("UntilTime"), Number::New(isolate, p.UntilTime));
+            jsPI2->Set(context, LITERAL("Status"), Number::New(isolate, p.Status));
+            jsPI2->Set(context, LITERAL("cJobs"), Number::New(isolate, p.cJobs));
+            jsPI2->Set(context, LITERAL("AveragePPM"), Number::New(isolate, p.AveragePPM));
+
+            jsPrinters->Set(context, i, jsPI2);
+        }
+    }
+    else if (level == 4) {
+        PRINTER_INFO_4* printerEnum = (PRINTER_INFO_4*)data;
+        for (int i = 0; i < cbReturned; i++) {
+            PRINTER_INFO_4 p = printerEnum[i];
+            Local<Object> jsPI4 = Object::New(isolate);
+            if (p.pPrinterName == NULL || p.pServerName == NULL) {
+                errprint("EnumPrinters returned bad data (level might've been incorrect)");
+                continue;
+            }
+            jsPI4->Set(context, LITERAL("pPrinterName"), String::NewFromTwoByte(isolate, (const uint16_t*)p.pPrinterName).ToLocalChecked());
+            jsPI4->Set(context, LITERAL("pServerName"), String::NewFromTwoByte(isolate, (const uint16_t*)p.pServerName).ToLocalChecked());
+            jsPI4->Set(context, LITERAL("Attributes"), Number::New(isolate, p.Attributes));
+
+            jsPrinters->Set(context, i, jsPI4);
+        }
+    }
+    else if (level == 5) {
+        PRINTER_INFO_5* printerEnum = (PRINTER_INFO_5*)data;
+        for (int i = 0; i < cbReturned; i++) {
+            PRINTER_INFO_5 p = printerEnum[i];
+            Local<Object> jsPI5 = Object::New(isolate);
+            if (p.pPortName == NULL) {
+                errprint("EnumPrinters returned bad data (level might've been incorrect)");
+                continue;
+            }
+            jsPI5->Set(context, LITERAL("pPrinterName"), String::NewFromTwoByte(isolate, (const uint16_t*)p.pPrinterName).ToLocalChecked());
+            jsPI5->Set(context, LITERAL("pPortName"), String::NewFromTwoByte(isolate, (const uint16_t*)p.pPortName).ToLocalChecked());
+            jsPI5->Set(context, LITERAL("Attributes"), Number::New(isolate, p.Attributes));
+            jsPI5->Set(context, LITERAL("DeviceNotSelectedTimeout"), Number::New(isolate, p.DeviceNotSelectedTimeout));
+            jsPI5->Set(context, LITERAL("TransmissionRetryTimeout"), Number::New(isolate, p.TransmissionRetryTimeout));
+
+            jsPrinters->Set(context, i, jsPI5);
+        }
+    }
+
+    info.GetReturnValue().Set(jsPrinters);
+}
+
+V8FUNC(OpenPrinterWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    HANDLE printer;
+
+    //PRINTER_DEFAULTS defaults{};
+
+    print(WStringOrNULL<LPWSTR>(isolate, info[0]));
+
+    BOOL result = OpenPrinter(WStringOrNULL<LPWSTR>(isolate, info[0]), &printer, NULL);//, &defaults);
+    if (result) {
+        info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)printer));
+        //Local<Context> context = isolate->GetCurrentContext();
+        //Local<Object> jsP = Object::New(isolate);
+        //jsP->Set(context, LITERAL("handle"), Number::New(isolate, (LONG_PTR)printer));
+        //
+        //Local<Object> jsPD = Object::New(isolate);
+        //jsPD->Set(context, LITERAL("pDatatype"), String::NewFromTwoByte(isolate, (const uint16_t*)defaults.pDatatype).ToLocalChecked());
+        //jsPD->Set(context, LITERAL("pDevMode"), Number::New(isolate, (LONG_PTR)defaults.pDevMode));
+        //jsPD->Set(context, LITERAL(""))
+        //
+        //jsP->Set(context, LITERAL("defaults"), jsPD);
+        //info.GetReturnValue().Set(jsP);
+    }
+    else {
+
+    }
+}
+
+V8FUNC(ClosePrinterWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, ClosePrinter((HANDLE)IntegerFI(info[0]))));
+}
+
+V8FUNC(DOCINFOWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    Local<Context> context = isolate->GetCurrentContext();
+
+    Local<Object> jsDI = Object::New(isolate);
+
+    if (!info[0]->IsUndefined()) jsDI->Set(context, LITERAL("lpszDocName"), info[0]);
+    if (!info[1]->IsUndefined()) jsDI->Set(context, LITERAL("lpszOutput"), info[1]);
+    if (!info[2]->IsUndefined()) jsDI->Set(context, LITERAL("lpszDatatype"), info[2]);
+    if (!info[3]->IsUndefined()) jsDI->Set(context, LITERAL("fwType"), info[3]);
+
+    info.GetReturnValue().Set(jsDI);
+}
+
+V8FUNC(StartPageWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, StartPage((HDC)IntegerFI(info[0]))));
+}
+
+V8FUNC(EndPageWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, EndPage((HDC)IntegerFI(info[0]))));
+}
+
+V8FUNC(StartDocWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    DOCINFO di{};
+    di.cbSize = sizeof(DOCINFO);
+    if (info[1]->IsObject()) {
+        Local<Context> context = isolate->GetCurrentContext();
+        Local<Object> jsDI = info[1].As<Object>();
+        if (jsDI->Has(context, LITERAL("lpszDocName")).FromJust()) {
+            di.lpszDocName = WStringOrNULL<LPCWSTR>(isolate, jsDI->Get(context, LITERAL("lpszDocName")).ToLocalChecked());
+        }
+        if (jsDI->Has(context, LITERAL("lpszOutput")).FromJust()) {
+            di.lpszOutput = WStringOrNULL<LPCWSTR>(isolate, jsDI->Get(context, LITERAL("lpszOutput")).ToLocalChecked());
+        }
+        if (jsDI->Has(context, LITERAL("lpszDatatype")).FromJust()) {
+            di.lpszDatatype = WStringOrNULL<LPCWSTR>(isolate, jsDI->Get(context, LITERAL("lpszDatatype")).ToLocalChecked());
+        }
+        if (jsDI->Has(context, LITERAL("fwType")).FromJust()) {
+            di.fwType = IntegerFI(jsDI->Get(context, LITERAL("fwType")).ToLocalChecked());
+        }
+    }
+
+    info.GetReturnValue().Set(Number::New(isolate, StartDoc((HDC)IntegerFI(info[0]), &di)));
+}
+
+V8FUNC(EndDocWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, EndDoc((HDC)IntegerFI(info[0]))));
+}
 
 //https://stackoverflow.com/questions/14050919/hbitmap-to-bitmap-converting
 //https://forums.codeguru.com/showthread.php?441251-CBitmap-to-HICON-or-HICON-from-HBITMAP
@@ -11283,13 +11624,16 @@ V8FUNC(CreateBitmapWrapper) {
     Isolate* isolate = info.GetIsolate();
 
     DWORD* data = nullptr;//new DWORD[jsBits->Length()];
-    if (info[3]->BooleanValue(isolate)) {
+    if (info[3]->IsUint32Array()) {
         Local<Uint32Array> jsBits = info[3].As<Uint32Array>();
         data = new DWORD[jsBits->Length()]; //genius code stolen from my StretchDIBits func
         jsBits->CopyContents(data, jsBits->ByteLength()); //hell yeah (i was using jsBits->Length() instead of ByteLength)
     }
 
     info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)CreateBitmap(IntegerFI(info[0]), IntegerFI(info[1]), 1, info[2]->IsNumber() ? IntegerFI(info[2]) : 32, data)));
+    if (data) {
+        delete[] data; //oh snap for some reason i wasn't deleting this data (maybe i assumed the system took over the memory like SetClipboardData does)
+    }
 }
 
 V8FUNC(MAKEROP4Wrapper) {
@@ -12711,24 +13055,25 @@ V8FUNC(SwitchToThisWindowWrapper) {
 void showFilePicker(const v8::FunctionCallbackInfo<v8::Value>& info, bool saveDialog) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
+    Local<Context> context = isolate->GetCurrentContext();
     HandleScope handle_scope(isolate);
     //i could use a promise but idk if i can be bothered
     Local<Object> options = info[0].As<Object>();
 
     bool multiple = false;
     //Local<Value> mult;
-    //options->HasRealNamedProperty(isolate->GetCurrentContext(), LITERAL("multiple")).FromJust();
-    if (options->HasRealNamedProperty(isolate->GetCurrentContext(), LITERAL("multiple")).FromJust()) {
-        multiple = options->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("multiple")).ToLocalChecked()->BooleanValue(isolate); //this seems so weird they gotta have a better way but it kept crashing when i tried to do it
+    //options->HasRealNamedProperty(context, LITERAL("multiple")).FromJust();
+    if (options->HasRealNamedProperty(context, LITERAL("multiple")).FromJust()) {
+        multiple = options->GetRealNamedProperty(context, LITERAL("multiple")).ToLocalChecked()->BooleanValue(isolate); //this seems so weird they gotta have a better way but it kept crashing when i tried to do it
     }
     bool excludeAcceptAll = false;
     //Local<Value> exclude;
-    //options->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("excludeAcceptAllOption")).ToLocal(&exclude);
-    if (options->HasRealNamedProperty(isolate->GetCurrentContext(), LITERAL("excludeAcceptAllOption")).FromJust()) {
-        excludeAcceptAll = options->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("excludeAcceptAllOption")).ToLocalChecked()->BooleanValue(isolate); //this seems so weird they gotta have a better way but it kept crashing when i tried to do it
+    //options->GetRealNamedProperty(context, LITERAL("excludeAcceptAllOption")).ToLocal(&exclude);
+    if (options->HasRealNamedProperty(context, LITERAL("excludeAcceptAllOption")).FromJust()) {
+        excludeAcceptAll = options->GetRealNamedProperty(context, LITERAL("excludeAcceptAllOption")).ToLocalChecked()->BooleanValue(isolate); //this seems so weird they gotta have a better way but it kept crashing when i tried to do it
     }
 
-    bool hasTypes = options->HasRealNamedProperty(isolate->GetCurrentContext(), LITERAL("types")).FromJust();
+    bool hasTypes = options->HasRealNamedProperty(context, LITERAL("types")).FromJust();
 
     IFileDialog* pfd;
 
@@ -12744,6 +13089,9 @@ void showFilePicker(const v8::FunctionCallbackInfo<v8::Value>& info, bool saveDi
         // Specify multiselect.
         hr = pfd->GetOptions(&dwOptions);
 
+        if(options->Has(context, LITERAL("title")).FromJust()) {
+            pfd->SetTitle(WStringFI(options->Get(context, LITERAL("title")).ToLocalChecked()));
+        }
 
         if (SUCCEEDED(hr))
         {
@@ -12754,20 +13102,20 @@ void showFilePicker(const v8::FunctionCallbackInfo<v8::Value>& info, bool saveDi
             int saveTypesCount = excludeAcceptAll ? 0 : 1;
             Local<Array> types;
             if (hasTypes) { //ok bruh i learned a lot about this memory shit trying to make this work but honestly i don't think it's worth it (im actually just gonna use COM)
-                types = options->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("types")).ToLocalChecked().As<Array>();
+                types = options->GetRealNamedProperty(context, LITERAL("types")).ToLocalChecked().As<Array>();
                 saveTypesCount += types->Length();
             }
             COMDLG_FILTERSPEC* c_rgSaveTypes = new COMDLG_FILTERSPEC[saveTypesCount]; //this could be a vector tho
             if(hasTypes) { //this is really ugly but not as ugly as i originally had in mind (having 2 checks for hasTypes)
                 for (int i = 0; i < types->Length(); i++) {
-                    Local<Object> typeInfo = types->Get(isolate->GetCurrentContext(), i).ToLocalChecked().As<Object>();
-                    Local<String> desc = typeInfo->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("description")).ToLocalChecked().As<String>();
-                    Local<Array> acceptTypes = typeInfo->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("accept")).ToLocalChecked().As<Array>();
+                    Local<Object> typeInfo = types->Get(context, i).ToLocalChecked().As<Object>();
+                    Local<String> desc = typeInfo->GetRealNamedProperty(context, LITERAL("description")).ToLocalChecked().As<String>();
+                    Local<Array> acceptTypes = typeInfo->GetRealNamedProperty(context, LITERAL("accept")).ToLocalChecked().As<Array>();
                     
                     std::wstring aTWS = std::wstring();
 
                     for (int j = 0; j < acceptTypes->Length(); j++) {
-                        const wchar_t* aTS = WStringFI(acceptTypes->Get(isolate->GetCurrentContext(), j).ToLocalChecked());
+                        const wchar_t* aTS = WStringFI(acceptTypes->Get(context, j).ToLocalChecked());
                         if (aTS[0] == L'.') { //bruh i accidently went here and just discovered that i was doing a wchar_t to char comparison why didn't anybody tell me
                             aTWS += L'*'; //gotta add the * because .png wont work but *.png will
                         }
@@ -12777,7 +13125,7 @@ void showFilePicker(const v8::FunctionCallbackInfo<v8::Value>& info, bool saveDi
                         //}
                         //else {
                         if(acceptTypes->Length() > 1 && acceptTypes->Length() - 1 != j) {
-                            //aTWS += WStringFI(acceptTypes->Get(isolate->GetCurrentContext(), j).ToLocalChecked());
+                            //aTWS += WStringFI(acceptTypes->Get(context, j).ToLocalChecked());
                             aTWS += L';'; //lmao i remembered that it was a wchar_t here
                         }
                     }
@@ -12839,7 +13187,7 @@ void showFilePicker(const v8::FunctionCallbackInfo<v8::Value>& info, bool saveDi
                                         hr = shellItem->GetDisplayName(SIGDN_FILESYSPATH, &path);
                                         if (SUCCEEDED(hr)) {
                                             //info.GetReturnValue().Set(String::NewFromTwoByte(isolate, (const uint16_t*)path).ToLocalChecked());
-                                            jsArr->Set(isolate->GetCurrentContext(), i, String::NewFromTwoByte(isolate, (const uint16_t*)path).ToLocalChecked());
+                                            jsArr->Set(context, i, String::NewFromTwoByte(isolate, (const uint16_t*)path).ToLocalChecked());
                                         }
                                         else {
                                             PrintIfFailed(hr, "shellItem->GetDisplayName(SIGDN_FILESYSPATH, wchar_t**) failed...");
@@ -16193,6 +16541,346 @@ V8FUNC(OutputDebugStringWrapper) {
     OutputDebugString(L"\n");
 }
 
+V8FUNC(GetPriorityClassWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, GetPriorityClass((HANDLE)IntegerFI(info[0]))));
+}
+
+//V8FUNC(GetEnvironmentStringsWrapper) {
+//    using namespace v8;
+//    Isolate* isolate = info.GetIsolate();
+//
+//    wchar_t* shit = GetEnvironmentStrings();
+//    
+//}
+//
+//V8FUNC(FreeEnvironmentStringsWrapper) {
+//    using namespace v8;
+//    Isolate* isolate = info.GetIsolate();
+//
+//    FreeEnvironmentStrings();
+//}
+
+V8FUNC(GetCommandLineWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(String::NewFromTwoByte(isolate, (const uint16_t*)GetCommandLine()).ToLocalChecked());
+}
+
+V8FUNC(CommandLineToArgvWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    Local<Context> context = isolate->GetCurrentContext();
+
+    int numArgs{};
+
+    LPWSTR* argv = CommandLineToArgvW(WStringOrNULL<LPCWSTR>(isolate, info[0]), &numArgs);
+
+    if (argv != NULL) {
+        Local<Array> jsArr = Array::New(isolate, numArgs);
+        for (int i = 0; i < numArgs; i++) {
+            jsArr->Set(context, i, String::NewFromTwoByte(isolate, (const uint16_t*)argv[i]).ToLocalChecked());
+        }
+
+        LocalFree(argv); //almost didn't know that!
+
+        info.GetReturnValue().Set(jsArr);
+    }
+    else {
+        HANDLE console = GetStdHandle(STD_OUTPUT_HANDLE);
+        SetConsoleTextAttribute(console, 4);
+        print("CommandLineToArgv failed (returned NULL LPWSTR)\x07");
+        SetConsoleTextAttribute(console, 7);
+    }
+}
+
+V8FUNC(STARTUPINFOWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    Local<Context> context = isolate->GetCurrentContext();
+
+    Local<Object> jsSI = Object::New(isolate);
+
+    if (!info[0]->IsUndefined()) jsSI->Set(context, LITERAL("lpDesktop"), info[0]);
+    if (!info[1]->IsUndefined()) jsSI->Set(context, LITERAL("lpTitle"), info[1]);
+    if (!info[2]->IsUndefined()) jsSI->Set(context, LITERAL("dwX"), info[2]);
+    if (!info[3]->IsUndefined()) jsSI->Set(context, LITERAL("dwY"), info[3]);
+    if (!info[4]->IsUndefined()) jsSI->Set(context, LITERAL("dwXSize"), info[4]);
+    if (!info[5]->IsUndefined()) jsSI->Set(context, LITERAL("dwYSize"), info[5]);
+    if (!info[6]->IsUndefined()) jsSI->Set(context, LITERAL("dwXCountChars"), info[6]);
+    if (!info[7]->IsUndefined()) jsSI->Set(context, LITERAL("dwYCountChars"), info[7]);
+    if (!info[8]->IsUndefined()) jsSI->Set(context, LITERAL("dwFillAttribute"), info[8]);
+    if (!info[9]->IsUndefined()) jsSI->Set(context, LITERAL("dwFlags"), info[9]);
+    if (!info[10]->IsUndefined()) jsSI->Set(context, LITERAL("wShowWindow"), info[10]);
+    if (!info[11]->IsUndefined()) jsSI->Set(context, LITERAL("hStdInput"), info[11]);
+    if (!info[12]->IsUndefined()) jsSI->Set(context, LITERAL("hStdOutput"), info[12]);
+    if (!info[13]->IsUndefined()) jsSI->Set(context, LITERAL("hStdError"), info[13]);
+
+    info.GetReturnValue().Set(jsSI);
+}
+
+//V8FUNC(GenericObject) {
+//    using namespace v8;
+//    Isolate* isolate = info.GetIsolate();
+//    Local<Context> context = isolate->GetCurrentContext();
+//
+//    Local<Object> jsSI = Object::New(isolate);
+//    if (!info[0]->IsUndefined()) jsSI->Set(context, LITERAL("lpDesktop"), info[0]);
+//    if (!info[1]->IsUndefined()) jsSI->Set(context, LITERAL("lpTitle"), info[1]);
+//    if (!info[2]->IsUndefined()) jsSI->Set(context, LITERAL("dwX"), info[2]);
+//    if (!info[3]->IsUndefined()) jsSI->Set(context, LITERAL("dwY"), info[3]);
+//    if (!info[4]->IsUndefined()) jsSI->Set(context, LITERAL("dwXSize"), info[4]);
+//    if (!info[5]->IsUndefined()) jsSI->Set(context, LITERAL("dwYSize"), info[5]);
+//    if (!info[6]->IsUndefined()) jsSI->Set(context, LITERAL("dwXCountChars"), info[6]);
+//    if (!info[7]->IsUndefined()) jsSI->Set(context, LITERAL("dwYCountChars"), info[7]);
+//    if (!info[8]->IsUndefined()) jsSI->Set(context, LITERAL("dwFillAttribute"), info[8]);
+//    if (!info[9]->IsUndefined()) jsSI->Set(context, LITERAL("dwFlags"), info[9]);
+//    if (!info[10]->IsUndefined()) jsSI->Set(context, LITERAL("wShowWindow"), info[10]);
+//    if (!info[11]->IsUndefined()) jsSI->Set(context, LITERAL("hStdInput"), info[11]);
+//    if (!info[12]->IsUndefined()) jsSI->Set(context, LITERAL("hStdOutput"), info[12]);
+//    if (!info[13]->IsUndefined()) jsSI->Set(context, LITERAL("hStdError"), info[13]);
+//
+//    info.GetReturnValue().Set(jsSI);
+//}
+
+V8FUNC(CreateProcessWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    Local<Context> context = isolate->GetCurrentContext();
+    
+    LPCWSTR lpApplicationName = WStringOrNULL<LPCWSTR>(isolate, info[0]);
+    //WStringOrNULL(LPCWSTR, 0, lpApplicationName);
+
+    LPWSTR lpCommandLine = WStringOrNULL<LPWSTR>(isolate, info[1]);
+    //WStringOrNULL(LPWSTR, 1, lpCommandLine);
+
+    LPCWSTR lpCurrentDirectory = WStringOrNULL<LPCWSTR>(isolate, info[4]); //4 because uhhh no lpEnvironment
+    
+    STARTUPINFO startupinfo{};
+    startupinfo.cb = sizeof(STARTUPINFO);
+    if (info[5]->IsObject()) {
+        //if(jsSI->Has(context, LITERAL("$1")).FromJust()) {\n    startupinfo.$1 = IntegerFI(jsSI->Get(context, LITERAL("$1")).ToLocalChecked());\n}\n
+        Local<Object> jsSI = info[5].As<Object>();
+        if (jsSI->Has(context, LITERAL("lpDesktop")).FromJust()) {
+            startupinfo.lpDesktop = WStringOrNULL<LPWSTR>(isolate, jsSI->Get(context, LITERAL("lpDesktop")).ToLocalChecked());
+        }
+        if (jsSI->Has(context, LITERAL("lpTitle")).FromJust()) {
+            startupinfo.lpTitle = WStringOrNULL<LPWSTR>(isolate, jsSI->Get(context, LITERAL("lpTitle")).ToLocalChecked());
+        }
+        if (jsSI->Has(context, LITERAL("dwX")).FromJust()) {
+            startupinfo.dwX = IntegerFI(jsSI->Get(context, LITERAL("dwX")).ToLocalChecked());
+        }
+        if (jsSI->Has(context, LITERAL("dwY")).FromJust()) {
+            startupinfo.dwY = IntegerFI(jsSI->Get(context, LITERAL("dwY")).ToLocalChecked());
+        }
+        if (jsSI->Has(context, LITERAL("dwXSize")).FromJust()) {
+            startupinfo.dwXSize = IntegerFI(jsSI->Get(context, LITERAL("dwXSize")).ToLocalChecked());
+        }
+        if (jsSI->Has(context, LITERAL("dwYSize")).FromJust()) {
+            startupinfo.dwYSize = IntegerFI(jsSI->Get(context, LITERAL("dwYSize")).ToLocalChecked());
+        }
+        if (jsSI->Has(context, LITERAL("dwXCountChars")).FromJust()) {
+            startupinfo.dwXCountChars = IntegerFI(jsSI->Get(context, LITERAL("dwXCountChars")).ToLocalChecked());
+        }
+        if (jsSI->Has(context, LITERAL("dwYCountChars")).FromJust()) {
+            startupinfo.dwYCountChars = IntegerFI(jsSI->Get(context, LITERAL("dwYCountChars")).ToLocalChecked());
+        }
+        if (jsSI->Has(context, LITERAL("dwFillAttribute")).FromJust()) {
+            startupinfo.dwFillAttribute = IntegerFI(jsSI->Get(context, LITERAL("dwFillAttribute")).ToLocalChecked());
+        }
+        if (jsSI->Has(context, LITERAL("dwFlags")).FromJust()) {
+            startupinfo.dwFlags = IntegerFI(jsSI->Get(context, LITERAL("dwFlags")).ToLocalChecked());
+        }
+        if (jsSI->Has(context, LITERAL("wShowWindow")).FromJust()) {
+            startupinfo.wShowWindow = IntegerFI(jsSI->Get(context, LITERAL("wShowWindow")).ToLocalChecked());
+        }
+        if (jsSI->Has(context, LITERAL("hStdInput")).FromJust()) {
+            startupinfo.hStdInput = (HANDLE)IntegerFI(jsSI->Get(context, LITERAL("hStdInput")).ToLocalChecked());
+        }
+        if (jsSI->Has(context, LITERAL("hStdOutput")).FromJust()) {
+            startupinfo.hStdOutput = (HANDLE)IntegerFI(jsSI->Get(context, LITERAL("hStdOutput")).ToLocalChecked());
+        }
+        if (jsSI->Has(context, LITERAL("hStdError")).FromJust()) {
+            startupinfo.hStdError = (HANDLE)IntegerFI(jsSI->Get(context, LITERAL("hStdError")).ToLocalChecked());
+        }
+    }
+    PROCESS_INFORMATION pi{};
+
+    /*info.GetReturnValue().Set(Number::New(isolate, */BOOL success = CreateProcess(lpApplicationName, lpCommandLine, NULL, NULL, IntegerFI(info[2]), IntegerFI(info[3]), NULL, lpCurrentDirectory, &startupinfo, &pi);//));
+    if (!success) {
+        info.GetReturnValue().Set(Number::New(isolate, success));
+    }
+    else {
+        Local<Context> context = isolate->GetCurrentContext();
+        Local<Object> jsPI = Object::New(isolate);
+        jsPI->Set(context, LITERAL("hProcess"), Number::New(isolate, (LONG_PTR)pi.hProcess));
+        jsPI->Set(context, LITERAL("hThread"), Number::New(isolate, (LONG_PTR)pi.hThread));
+        jsPI->Set(context, LITERAL("dwProcessId"), Number::New(isolate, pi.dwProcessId));
+        jsPI->Set(context, LITERAL("dwThreadId"), Number::New(isolate, pi.dwThreadId));
+        info.GetReturnValue().Set(jsPI);
+    }
+}
+
+V8FUNC(OpenClipboardWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, OpenClipboard((HWND)IntegerFI(info[0]))));
+}
+
+V8FUNC(GetClipboardOwnerWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)GetClipboardOwner()));
+}
+
+V8FUNC(EnumClipboardFormatsWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, EnumClipboardFormats(IntegerFI(info[0]))));
+}
+
+V8FUNC(CloseClipboardWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, CloseClipboard()));
+}
+
+V8FUNC(IsClipboardFormatAvailableWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, IsClipboardFormatAvailable(IntegerFI(info[0]))));
+}
+
+V8FUNC(GetClipboardDataWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    UINT format = IntegerFI(info[0]);
+
+    HANDLE data = GetClipboardData(format);
+
+    if (data != NULL) {
+        if (format == CF_TEXT || format == CF_OEMTEXT) {
+            info.GetReturnValue().Set(String::NewFromUtf8(isolate, (const char*)data).ToLocalChecked()); //i assume v8 copies the data correctly lol
+        }
+        else if (format == CF_UNICODETEXT) {
+            info.GetReturnValue().Set(String::NewFromTwoByte(isolate, (const uint16_t*)data).ToLocalChecked());
+        }
+        else {
+            info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)data));
+        }
+    }
+}
+
+V8FUNC(EmptyClipboardWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, EmptyClipboard()));
+}
+
+V8FUNC(GetClipboardFormatNameWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    wchar_t formatName[MAX_PATH]{};
+    int result = GetClipboardFormatName(IntegerFI(info[0]), formatName, MAX_PATH);
+    if (result) {
+        info.GetReturnValue().Set(String::NewFromTwoByte(isolate, (const uint16_t*)formatName).ToLocalChecked());
+    }
+    else {
+
+    }
+}
+
+V8FUNC(AddClipboardFormatListenerWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, AddClipboardFormatListener((HWND)IntegerFI(info[0]))));
+}
+
+V8FUNC(RemoveClipboardFormatListenerWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, RemoveClipboardFormatListener((HWND)IntegerFI(info[0]))));
+}
+
+V8FUNC(SetClipboardDataWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    UINT format = IntegerFI(info[0]);
+
+    HGLOBAL data = NULL;
+
+    if (info[1]->IsNumber() && IntegerFI(info[1]) == 0) {
+        //NULL was passed as second parameter so do nothing
+    }
+    else {
+        if (format == CF_TEXT || format == CF_OEMTEXT) {
+            //according to The Stack: https://stackoverflow.com/questions/1264137/how-to-copy-string-to-clipboard-in-c
+            Local<String> jsStr = info[1].As<String>();
+            size_t len = jsStr->Length() + 1; //+1 for the null terminator
+            data = GlobalAlloc(GMEM_MOVEABLE, len);
+            memcpy(GlobalLock(data), *String::Utf8Value(isolate, jsStr), len);
+            GlobalUnlock(data);
+        }
+        else if (format == CF_UNICODETEXT) {
+            Local<String> jsStr = info[1].As<String>();
+            size_t len = (jsStr->Length() + 1) * 2; //+1 for the null terminator and x2 for wide
+            data = GlobalAlloc(GMEM_MOVEABLE, len);
+            memcpy(GlobalLock(data), *String::Value(isolate, jsStr), len);
+            GlobalUnlock(data);
+        }
+        else {
+            data = (HANDLE)IntegerFI(info[1]);
+        }
+    }
+
+    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)SetClipboardData(format, data)));
+}
+
+V8FUNC(GetPriorityClipboardFormatWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    std::vector<UINT> list;
+    if (info[0]->IsArray()) {
+        Local<Context> context = isolate->GetCurrentContext();
+        Local<Array> jsArr = info[0].As<Array>();
+        list = std::vector<UINT>(jsArr->Length());
+        for (int i = 0; i < jsArr->Length(); i++) {
+            list[i] = IntegerFI(jsArr->Get(context, i).ToLocalChecked());
+        }
+    }
+    else {
+        int len = info.Length();
+        list = std::vector<UINT>(len);
+        for (int i = 0; i < len; i++) {
+            list[i] = IntegerFI(info[i]);
+        }
+    }
+
+    info.GetReturnValue().Set(Number::New(isolate, GetPriorityClipboardFormat(list.data(), list.size())));
+}
+
+V8FUNC(CountClipboardFormatsWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, CountClipboardFormats()));
+}
+
 //i think im allowed to use a snapshot thing to load these quicker
 //https://github.com/danbev/learning-v8/blob/master/notes/snapshots.md
 v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const wchar_t* filename, int nCmdShow) {
@@ -16496,6 +17184,86 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const wchar_t* filename
     setGlobalWrapper(ReadFile);
     setGlobalConstLONGPTR(INVALID_HANDLE_VALUE);
     setGlobalConst(MAX_PATH);
+
+    setGlobalWrapper(GetPriorityClass);
+    //setGlobalWrapper(GetEnvironmentStrings);
+    setGlobalWrapper(GetCommandLine);
+    setGlobalWrapper(CommandLineToArgv);
+    setGlobalWrapper(STARTUPINFO);
+    setGlobalWrapper(CreateProcess);
+    //setGlobal(GenericObject);
+    setGlobalConst(DEBUG_PROCESS);
+    setGlobalConst(DEBUG_ONLY_THIS_PROCESS);
+    setGlobalConst(CREATE_SUSPENDED);
+    setGlobalConst(DETACHED_PROCESS);
+    setGlobalConst(CREATE_NEW_CONSOLE);
+    setGlobalConst(NORMAL_PRIORITY_CLASS);
+    setGlobalConst(IDLE_PRIORITY_CLASS);
+    setGlobalConst(HIGH_PRIORITY_CLASS);
+    setGlobalConst(REALTIME_PRIORITY_CLASS);
+    setGlobalConst(CREATE_NEW_PROCESS_GROUP);
+    setGlobalConst(CREATE_UNICODE_ENVIRONMENT);
+    setGlobalConst(CREATE_SEPARATE_WOW_VDM);
+    setGlobalConst(CREATE_SHARED_WOW_VDM);
+    setGlobalConst(CREATE_FORCEDOS);
+    setGlobalConst(BELOW_NORMAL_PRIORITY_CLASS);
+    setGlobalConst(ABOVE_NORMAL_PRIORITY_CLASS);
+    setGlobalConst(INHERIT_PARENT_AFFINITY);
+    setGlobalConst(INHERIT_CALLER_PRIORITY);
+    setGlobalConst(CREATE_PROTECTED_PROCESS);
+    setGlobalConst(EXTENDED_STARTUPINFO_PRESENT);
+    setGlobalConst(PROCESS_MODE_BACKGROUND_BEGIN);
+    setGlobalConst(PROCESS_MODE_BACKGROUND_END);
+    setGlobalConst(CREATE_SECURE_PROCESS);
+    setGlobalConst(CREATE_BREAKAWAY_FROM_JOB);
+    setGlobalConst(CREATE_PRESERVE_CODE_AUTHZ_LEVEL);
+    setGlobalConst(CREATE_DEFAULT_ERROR_MODE);
+    setGlobalConst(CREATE_NO_WINDOW);
+    setGlobalConst(PROFILE_USER);
+    setGlobalConst(PROFILE_KERNEL);
+    setGlobalConst(PROFILE_SERVER);
+    setGlobalConst(CREATE_IGNORE_SYSTEM_DEFAULT);
+
+    setGlobalWrapper(OpenClipboard);
+    setGlobalWrapper(GetClipboardOwner);
+    setGlobalWrapper(EnumClipboardFormats);
+    setGlobalWrapper(CloseClipboard);
+    setGlobalWrapper(IsClipboardFormatAvailable);
+    setGlobalWrapper(GetClipboardData);
+    setGlobalWrapper(EmptyClipboard);
+    setGlobalWrapper(SetClipboardData);
+    setGlobalWrapper(AddClipboardFormatListener);
+    setGlobalWrapper(RemoveClipboardFormatListener);
+    setGlobalWrapper(GetClipboardFormatName);
+    setGlobalWrapper(GetPriorityClipboardFormat);
+    setGlobalWrapper(CountClipboardFormats);
+    setGlobalConst(CF_TEXT);
+    setGlobalConst(CF_BITMAP);
+    setGlobalConst(CF_METAFILEPICT);
+    setGlobalConst(CF_SYLK);
+    setGlobalConst(CF_DIF);
+    setGlobalConst(CF_TIFF);
+    setGlobalConst(CF_OEMTEXT);
+    setGlobalConst(CF_DIB);
+    setGlobalConst(CF_PALETTE);
+    setGlobalConst(CF_PENDATA);
+    setGlobalConst(CF_RIFF);
+    setGlobalConst(CF_WAVE);
+    setGlobalConst(CF_UNICODETEXT);
+    setGlobalConst(CF_ENHMETAFILE);
+    setGlobalConst(CF_HDROP);
+    setGlobalConst(CF_LOCALE);
+    setGlobalConst(CF_DIBV5);
+    setGlobalConst(CF_MAX);
+    setGlobalConst(CF_OWNERDISPLAY);
+    setGlobalConst(CF_DSPTEXT);
+    setGlobalConst(CF_DSPBITMAP);
+    setGlobalConst(CF_DSPMETAFILEPICT);
+    setGlobalConst(CF_DSPENHMETAFILE);
+    setGlobalConst(CF_PRIVATEFIRST);
+    setGlobalConst(CF_PRIVATELAST);
+    setGlobalConst(CF_GDIOBJFIRST);
+    setGlobalConst(CF_GDIOBJLAST);
 
     setGlobalWrapper(OVERLAPPED);
     setGlobalWrapper(CreateFile);
@@ -18686,6 +19454,7 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
     setGlobalWrapper(LineTo);
     setGlobalWrapper(DrawText);
     setGlobalConst(DT_BOTTOM); setGlobalConst(DT_CALCRECT); setGlobalConst(DT_CENTER); setGlobalConst(DT_EDITCONTROL); setGlobalConst(DT_END_ELLIPSIS); setGlobalConst(DT_EXPANDTABS); setGlobalConst(DT_EXTERNALLEADING); setGlobalConst(DT_HIDEPREFIX); setGlobalConst(DT_INTERNAL); setGlobalConst(DT_LEFT); setGlobalConst(DT_MODIFYSTRING); setGlobalConst(DT_NOCLIP); setGlobalConst(DT_NOFULLWIDTHCHARBREAK); setGlobalConst(DT_NOPREFIX); setGlobalConst(DT_PATH_ELLIPSIS); setGlobalConst(DT_PREFIXONLY); setGlobalConst(DT_RIGHT); setGlobalConst(DT_RTLREADING); setGlobalConst(DT_SINGLELINE); setGlobalConst(DT_TABSTOP); setGlobalConst(DT_TOP); setGlobalConst(DT_VCENTER); setGlobalConst(DT_WORDBREAK); setGlobalConst(DT_WORD_ELLIPSIS);
+    setGlobalWrapper(PlayEnhMetaFile);
     setGlobalWrapper(DrawFrameControl);
     setGlobalConst(DFC_CAPTION);
     setGlobalConst(DFC_MENU);
@@ -18736,6 +19505,46 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
     setGlobalWrapper(SaveDC);
     setGlobalWrapper(RestoreDC);
     setGlobalWrapper(DeleteDC);
+    setGlobalWrapper(CreateDC);
+    setGlobalWrapper(EnumDisplayDevices);
+    setGlobalConst(EDD_GET_DEVICE_INTERFACE_NAME);
+    setGlobalWrapper(EnumPrintProcessors);
+    setGlobalWrapper(EnumPrintProcessorDatatypes);
+    setGlobalWrapper(EnumPrinters);
+    setGlobalConst(PRINTER_ENUM_DEFAULT);
+    setGlobalConst(PRINTER_ENUM_LOCAL);
+    setGlobalConst(PRINTER_ENUM_CONNECTIONS);
+    setGlobalConst(PRINTER_ENUM_FAVORITE);
+    setGlobalConst(PRINTER_ENUM_NAME);
+    setGlobalConst(PRINTER_ENUM_REMOTE);
+    setGlobalConst(PRINTER_ENUM_SHARED);
+    setGlobalConst(PRINTER_ENUM_NETWORK);
+    setGlobalConst(PRINTER_ENUM_EXPAND);
+    setGlobalConst(PRINTER_ENUM_CONTAINER);
+    setGlobalConst(PRINTER_ENUM_ICONMASK);
+    setGlobalConst(PRINTER_ENUM_ICON1);
+    setGlobalConst(PRINTER_ENUM_ICON2);
+    setGlobalConst(PRINTER_ENUM_ICON3);
+    setGlobalConst(PRINTER_ENUM_ICON4);
+    setGlobalConst(PRINTER_ENUM_ICON5);
+    setGlobalConst(PRINTER_ENUM_ICON6);
+    setGlobalConst(PRINTER_ENUM_ICON7);
+    setGlobalConst(PRINTER_ENUM_ICON8);
+    setGlobalConst(PRINTER_ENUM_HIDE);
+    setGlobalConst(PRINTER_ENUM_CATEGORY_ALL);
+    setGlobalConst(PRINTER_ENUM_CATEGORY_3D);
+    setGlobalConst(SPOOL_FILE_PERSISTENT);
+    setGlobalConst(SPOOL_FILE_TEMPORARY);
+    setGlobalWrapper(DOCINFO);
+    setGlobalWrapper(StartPage);
+    setGlobalWrapper(EndPage);
+    setGlobalWrapper(StartDoc);
+    setGlobalWrapper(EndDoc);
+    setGlobalConst(DI_APPBANDING);
+    setGlobalConst(DI_ROPS_READ_DESTINATION);
+    setGlobalWrapper(OpenPrinter);
+    setGlobalWrapper(ClosePrinter);
+
     setGlobalWrapper(CreateCompatibleBitmap);
     setGlobalWrapper(CreateCompatibleDC);
     setGlobalWrapper(CreateBitmap);

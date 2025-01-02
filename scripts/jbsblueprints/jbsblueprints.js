@@ -6,6 +6,7 @@
 //i might make BlueprintMenu's scrollBox static but honestly idk if it's THAT important like idk
 //make some animation class or global array like magicquest.github.io/v2 !
 //probably should make a modal class or something like that for BlueprintMenu and DropdownControlMenu (likely so)
+//have a mouseIn and mouseOut event for the hit object 
 
 //regex for json that was saved before i got rid of connections.out.receiver (you gotta format the json tho -> https://regexr.com/8adn0)
 
@@ -13,8 +14,9 @@
 //format string for eval
 //add registerOARFAS for object returning functions
 //set timeout/interval needs to use delegate pin and i gotta make custom events/functions possible
-//also you can't declare classes
+//also you can't declare classes or arrays or objects LOL
 //maybe make a separate script dedicated to running blueprints so you can create a window and draw to it and stuff
+//add meta functions to get/set properties from an objec
 
 //https://www.reddit.com/r/unrealengine/comments/1446vgo/what_exactly_can_and_cannot_be_a_pure_function/
 //oh hell no pure functions are WEIRDER than i thought! https://medium.com/unreal-engine-technical-blog/pure-impure-functions-516367cff14f
@@ -383,10 +385,21 @@ class Editable { //for text :smirk: (unfortunately you must draw the text and ca
         arr.splice(Editable.caret, 0, char);
         Editable.edited.value = arr.join("");
 
-        Editable.caret++;
+        Editable.caret += char.length;
 
         dirty = true;
     }
+
+    //wait writechar literally does this exact thing lemme just modify it
+    //static pasteText(text) {
+    //    const arr = Editable.edited.value.split("");
+    //    arr.splice(Editable.caret, 0, text);
+    //    Editable.edited.value = arr.join("");
+    //
+    //    Editable.caret += text.length;
+    //
+    //    dirty = true;
+    //}
 
     static endInput() {
         Editable.edited.endInput?.();
@@ -948,6 +961,7 @@ const baseTypes = {
     HMENU: "number",
     BOOL: "number",
     HDC: "number",
+    HENHMETAFILE: "number",
     HBITMAP: "number",
     HBRUSH: "number",
     HFONT: "number",
@@ -2318,6 +2332,7 @@ Blueprint.meta_functions["POWER"] = function(base, exponent) {
     return base ** exponent;
 }
 
+
 //Blueprint.meta_functions["FORMAT_STRING"] = function(string, ...args) { //yeah idk this seems like a monster to tackle
 //
 //}
@@ -3276,7 +3291,7 @@ class FunctionDetailDropdownMenu extends DetailDropdownMenu {
             [
                 d2d.CreateTextLayout("Desc", font, w, h),
                 new EditControl(PropertyMenu.instance.width/2, 16, undefined, Blueprint.active.command.desc, function() { //end input
-                    Blueprint.active.command.desc = this.value;
+                    Blueprint.active.command.desc = this.value; //oops! error on this line if you click away from the blueprint while editing its description!
                     //no update because nothing special happens with the description yet...
                 }),
             ],
@@ -3586,6 +3601,7 @@ class PropertyMenu { //lowkey this might be a singleton too because im only goin
             dropdown.height = this.height/this.dropdownMenus.length;
             dropdown.resize?.();
         }
+        BottomCenteredButtonBar.singleton.width = w-this.width;
     }
 
     destroy() {
@@ -3594,6 +3610,216 @@ class PropertyMenu { //lowkey this might be a singleton too because im only goin
             //dropdown.name.Release();
         }
     }
+}
+
+class ImageButtonControl {
+    defaultimg = undefined;
+    mousedownimg = undefined;
+    down = false;
+    
+    //looks for path/imagename.png
+    //looks for path/imagename_mousedown.png
+    //assuming png for imagename
+    constructor(path, imagename, width, height, callback, wic) {
+        if(!wic) {
+            this.wic = InitializeWIC();
+            ScopeGUIDs(this.wic);
+        }else {
+            this.wic = wic;
+        }
+
+        
+        this.defaultimg = d2d.CreateBitmapFromWicBitmap(this.wic.LoadBitmapFromFilename(`${path}/${imagename}.png`, this.wic.GUID_WICPixelFormat32bppPBGRA), true);
+        print(`${path}\\${imagename}.png`);
+        this.mousedownimg = d2d.CreateBitmapFromWicBitmap(this.wic.LoadBitmapFromFilename(`${path}/${imagename}_mousedown.png`, this.wic.GUID_WICPixelFormat32bppPBGRA), true);
+        print(`${path}\\${imagename}_mousedown.png`);
+
+        //print(this.defaultimg.GetSize(), this.defaultimg.GetPixelSize());
+
+        if(!width) {
+            width = this.defaultimg.GetSize().width;
+        }
+        if(!height) {
+            height = this.defaultimg.GetSize().height;
+        }
+
+        this.width = width;
+        this.height = height;
+        
+        if(!wic) { //checking again if wic wasn't passed
+            this.wic.Release();
+        }
+
+        this.callback = callback;
+    }
+
+    buttonDown() {
+        this.down = true;
+        this.callback();
+    }
+
+    buttonUp() {
+        this.down = false;
+    }    
+
+    redraw(x, y) {
+        if(this.down) {
+            d2d.DrawBitmap(this.mousedownimg, x, y, x+this.width, y+this.height);
+        }else {
+            d2d.DrawBitmap(this.defaultimg, x, y, x+this.width, y+this.height);
+        }
+    }
+
+    hittest(mouse, x, y) {
+        return [BUTTON, this];
+    }
+
+    destroy() {
+        this.defaultimg.Release();
+        this.mousedownimg.Release();
+    }
+}
+
+//semi generic class for my custom client drawing stuff
+class BottomCenteredButtonBar {
+    x = 0;
+    y = h-48;
+    width = 800;
+    height = 48;
+    buttons = [];
+    buttonWidth = 0;
+    padding = 4;
+    gradient = undefined;
+    sticky = true; //lowkey GOTTA make a modal class
+    static singleton = undefined;
+
+    static create() {
+        if(!BottomCenteredButtonBar.singleton) {
+            BottomCenteredButtonBar.singleton = new BottomCenteredButtonBar();
+            panes.push(BottomCenteredButtonBar.singleton);
+            return BottomCenteredButtonBar.singleton;
+        }else {
+            print("calling create even thought a CeneteredButtonBar instance already exists");
+        }
+    }
+
+    constructor() {
+        this.gradient = Gradient.LinearGradientBrush(
+            d2d.CreateGradientStopCollection([0.0, 62/255, 62/255, 62/255], [1.0, 30/255, 30/255, 30/255]),
+            0, 0, 0, this.height,
+        );
+    }
+    
+    InsertButton(button, i) {
+        this.buttons.splice(i, 0, button); //undefined in NaN of new class
+        this.UpdateButtonWidth();
+    }
+
+    AppendButton(button) {
+        this.buttons.push(button);
+        this.UpdateButtonWidth();
+    }
+
+    DestroyButton(i) {
+        const [removedbutton] = this.buttons.splice(i, 1);
+        removedbutton.destroy();
+        
+        this.UpdateButtonWidth();
+    }
+
+    UpdateButtonWidth() {
+        this.buttonWidth = 0;
+        for(const button of this.buttons) {
+            this.buttonWidth += button.width+this.padding;
+        }
+        this.buttonWidth -= this.padding; //subtracting the padding from the last button
+    }
+
+    windowResized(oldw, oldh) {
+        //width is calculated in PropertyMenu's windowResized method LOL!
+        this.y = h-this.height;
+    }
+
+    redraw() {
+        d2d.FillRectangle(0, 0, this.width, this.height, this.gradient);
+
+        const startX = this.width/2 - this.buttonWidth/2;
+        let accumbuttonwidth = 0;
+        for(const button of this.buttons) {
+            button.redraw(startX+accumbuttonwidth, (this.height-button.height)/2);
+            accumbuttonwidth += button.width+4;
+        }
+    }
+
+    hittest(mouse) {
+        const startX = this.width/2 - this.buttonWidth/2;
+        let accumbuttonwidth = 0;
+        for(const button of this.buttons) {
+            const x = startX+accumbuttonwidth
+            const y = (this.height-button.height)/2;
+            if(withinBounds({x, y, width: button.width, height: button.height}, mouse)) {
+                const ht = button.hittest(mouse, x, y);
+                if(ht) {
+                    return ht;
+                }
+            }
+            accumbuttonwidth += button.width+4;
+        }
+        return [NULL];
+    }
+
+    destroy() {
+        for(const button of this.buttons) {
+            button.destroy();
+        }
+        this.gradient.Release();
+    }
+}
+
+//jbs specific stuff
+function initcustomstuffforbottomcenteredbuttonbar() {
+    function playButtonCallback() {
+        executeBlueprints();
+    }
+    //aw damn i the stop button and i really liked how it looked but im just now realizing that you wouldn't be able to click it because im not executing the blueprints on another thread...
+    /*function stopButtonCallback() {
+        
+    }*/
+    function playStandaloneButtonCallback() {
+        const title = "you lowkey gotta save the blueprints first before you can run them standalone";
+        print(title);
+        const path = showSaveFilePicker({ //i think i was gonna add the title property to the file picker family of functions but i think since the browser version doesn't have it i couldn't be bothered
+            title,
+            types: [
+                {
+                    description: "JSON files",
+                    accept: [".json"] //i can't be bothered to implement the mime types :sob:
+                }
+            ],
+        });
+        if(path) {
+            require("fs").write(path, saveBlueprintsJSON());
+            //don't wanna use system here because i think it creates a child process and i want to spawn an entirely new one
+            //const argv = CommandLineToArgv(GetCommandLine());
+            //print(argv);
+            const processinfo = CreateProcess(/*argv[0]*/ NULL, `jbs3.exe "${__dirname}/jbsblueprintsexec.js"`, false, 0, undefined, undefined, NULL);
+            print(processinfo);
+        }else {
+            printNoHighlight(title);
+        }
+    }
+    
+    const wic = InitializeWIC();
+    ScopeGUIDs(wic);
+    
+    const play = new ImageButtonControl(__dirname+"/imgs", "play", undefined, undefined, playButtonCallback, wic);
+    //const stop = new ImageButtonControl(__dirname+"/imgs", "stop", undefined, undefined, stopButtonCallback, wic);
+    const playstandalone = new ImageButtonControl(__dirname+"/imgs", "playstandalone", undefined, undefined, playStandaloneButtonCallback, wic);
+
+    wic.Release();
+
+    BottomCenteredButtonBar.singleton.buttons = [play, playstandalone];
+    BottomCenteredButtonBar.singleton.UpdateButtonWidth();
 }
 
 function generateCommandList() {
@@ -4639,6 +4865,8 @@ function windowProc(hwnd, msg, wp, lp) {
         //panes.push(new Blueprint(/*hwnd, */"print", [95/255, 150/255, 187/255], 500, 500, 150, 90, ["In String : string"], [], BPTYPE_NOTPURE));
         //panes.push(new Blueprint(/*hwnd, */"Beep", [120/255, 168/255, 115/255], 100, 500, 200, 130, ["frequency : number", "durationMs : number", "nonblocking? : boolean"], ["success : BOOL"], BPTYPE_NOTPURE));
         PropertyMenu.create();
+        BottomCenteredButtonBar.create(); //lol creating this after so i can change the width of it and have it update on the same frame
+        initcustomstuffforbottomcenteredbuttonbar();
         d2dpaint();
         SetTimer(hwnd, 0, 16); //lowkey this is only for BlueprintMenu smooth scrolling lmao
     }else if(msg == WM_PAINT) {
@@ -5006,7 +5234,7 @@ function windowProc(hwnd, msg, wp, lp) {
             }
         }else if(wp == "S".charCodeAt(0) && ctrl) {
             //print(saveBlueprintsJSON());
-            const paths = showSaveFilePicker({
+            const path = showSaveFilePicker({
                 types: [
                     {
                         description: "JSON files",
@@ -5014,10 +5242,10 @@ function windowProc(hwnd, msg, wp, lp) {
                     }
                 ],
             });
-            if(paths) {
-                const fs = require("fs");
-                print(paths); //wait i thought paths was an array (maybe it's not when im using the save picker idk)
-                fs.write(paths, saveBlueprintsJSON());
+            if(path) {
+                const fs = require("fs"); //lol i wrote const fs here because i forgot what its methods were
+                print(path); //wait i thought paths was an array (maybe it's not when im using the save picker idk)
+                fs.write(path, saveBlueprintsJSON());
             }else {
                 print(saveBlueprintsJSON());
             }
@@ -5040,6 +5268,36 @@ function windowProc(hwnd, msg, wp, lp) {
             }
         }else if(wp == "V".charCodeAt(0) && ctrl && Editable.editing) {
             print("think about pasting but don't actually because idk how to do anything with the clipboard yet...");
+            //i've since learned...
+            let success = OpenClipboard(hwnd);
+
+            if(success) {
+                let text;
+                //if(IsClipboardFormatAvailable(CF_TEXT)) {
+                //    text = GetClipboardData(CF_TEXT);
+                //}else if(IsClipboardFormatAvailable(CF_UNICODETEXT)) {
+                //    text = GetClipboardData(CF_UNICODETEXT);
+                //}else if(IsClipboardFormatAvailable(49301)) { //if an image is copied from a chromium browser im assuming they all add the UniformResourceLocatorW format (49301)
+                //    const ptr = GetClipboardData(49301);
+                //    if(ptr) {
+                //        text = WStringFromPointer(ptr); //well hopefully this doesn't cause any crashes
+                //    }
+                //}
+                let format = GetPriorityClipboardFormat([CF_UNICODETEXT, CF_TEXT, 49301]); //oh yeah (this function checks to see if any of these formats are currently in the clipboard and chooses the first one that works)
+                if(format == 49301) { //if an image is copied from a chromium browser im assuming they all add the UniformResourceLocatorW format (49301)
+                    const ptr = GetClipboardData(format);
+                    if(ptr) {
+                        text = WStringFromPointer(ptr); //well hopefully this doesn't cause any crashes
+                    }
+                }else {
+                    text = GetClipboardData(format);
+                }
+                Editable.writechar(text);
+
+                CloseClipboard();
+            }else {
+                print(`OpenClipboard failded for some reason (maybe because a window (${c=GetClipboardOwner()} - ${GetWindowText(c) }) already had it open)`, g=GetLastError(), _com_error(g));
+            }
         }
 
         if(wp == VK_ESCAPE) {

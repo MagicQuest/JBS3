@@ -342,7 +342,7 @@ function windowProc(hwnd, msg, wp, lp) {
                     const video = {bitmaps: [], width: dim.width, height: dim.height, type: "video", x: pt.x+addx, y: pt.y+addy, fps: cap.get(cv.CAP_PROP_FPS), totalFrames: frames};
 
                     for(let frame = 0; frame < frames; frame++) {
-                        print(frame, GetGuiResources(GetCurrentProcess(), GR_GDIOBJECTS)); //https://stackoverflow.com/questions/868490/what-are-windows-user-objects
+                        print(frame, GetGuiResources(GetCurrentProcess(), GR_GDIOBJECTS)); //https://stackoverflow.com/questions/868490/what-are-windows-user-objects    https://learn.microsoft.com/en-us/previous-versions/ms810501(v=msdn.10)?redirectedfrom=MSDN
                         //oh i guess here i could just use get next frame
                         const mat = cap.getMatForNextFrame();
                         //const dim = {height: mat.getRows(), width: mat.getCols()};

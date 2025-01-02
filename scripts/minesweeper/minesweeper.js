@@ -221,6 +221,7 @@ function windowProc(hwnd, msg, wp, lp) {
             }
         }else if(wp == "V".charCodeAt(0) && GetKey(VK_CONTROL)) {
             //i had to upgrade the system function for this one
+            //lmao why didn't i just add win32 clipboard related functions
             const clipboard = system("powershell -command \"Get-Clipboard\"", "rt"); //rt for read text (rt is implied)
             print(`curl "${clipboard.replaceAll("\n", "")}" -o "${__dirname}/gyatt"`);
                                     //idk how but there must have been a newline right at the end causing this to not work
