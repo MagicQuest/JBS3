@@ -83,8 +83,8 @@ const changeEndianness = (string) => { //https://stackoverflow.com/questions/532
     const result = [];
     let len = string.length - 2;
     while (len >= 0) {
-      result.push(string.substr(len, 2));
-      len -= 2;
+        result.push(string.substr(len, 2));
+        len -= 2;
     }
     return result.join('');
 }
@@ -113,7 +113,7 @@ print(__asm([
 print(__asm([
     0x48, 0x89, 0xc8,                                             //mov rax, rcx
     0xc3,                                                         //ret
-], 1, [0xdeadbeef21B1], [VAR_INT], RETURN_NUMBER), "passing int64 as the first parameter (should return and print", 0xdeadbeef21B1, ")"); //lowkey you don't have to do it this way because you could pass it as a variable
+], 1, [0xdeadbeef21B1], [VAR_INT], RETURN_NUMBER), "passing int64 as the first parameter (should return and print", 0xdeadbeef21B1, ")");
 
 const jmpasm = new Uint8Array([
     0x89, 0xc8,     //mov eax, ecx (ecx is the first integer argument (32 bit))

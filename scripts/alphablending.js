@@ -66,6 +66,9 @@ function DrawAlphaBlend (hwnd, dc)
     // create our DIB section and select the bitmap into the dc 
     hbitmap = CreateDIBSection(dc, bmi, DIB_RGB_COLORS); //, &pvBits, NULL, 0x0);
     pvBits = hbitmap.GetBits(); //well instead of using pvBits you could just use hbitmap.SetBit() individually in each for loop but im just gonna follow it how they do it (hold on soon im about to proxy max and you'll be able to directly set pixel values like a pointer)
+    //ok GetBits returns a Uint8Array now so to keep this file the same im just gonna "cast" it to an Uint32Array
+    pvBits = new Uint32Array(pvBits.buffer.transfer()); //ok perfect. (oh wait i guess you don't have to transfer it but whatever)
+    
     SelectObject(memDC, hbitmap);
 
     // in top window area, constant alpha = 50%, but no source alpha 

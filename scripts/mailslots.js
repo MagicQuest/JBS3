@@ -113,6 +113,8 @@ let realprint = print;
 
 function windowProc(hwnd, msg, wp, lp) {
     if(msg == WM_CREATE) {
+        print("open mailslots.js first then writetomailslot.js");
+
         mailslot = CreateMailslot(path, NULL, MAILSLOT_WAIT_FOREVER);
         if(mailslot == INVALID_HANDLE_VALUE) {
             print("failed to create mailslot for some reason ", g=GetLastError(), _com_error(g));

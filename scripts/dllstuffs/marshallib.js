@@ -1,110 +1,242 @@
 //well since i want to use this js file with other files i gotta eval it but since you can't declare new variables with eval im using globalThis
 globalThis.sizeof = {
     CHAR : 1,
+    BYTE : 1,
     UCHAR : 1, //BYTE is UCHAR
+    WORD : 2, //WORD is unsigned short
+    USHORT: 2,
     UINT : 4,
     INT : 4,
+    FLOAT : 4,
     DWORD : 4,
     COLORREF : 4, //same as DWORD
     LONG : 4,
     ULONG : 4,
+    ULONGLONG: 8,
     UINT_PTR: 8,
     ULONG_PTR : 8,
     LONG_PTR : 8,
+    DOUBLE: 8,
     HANDLE : 8,
     HWND : 8,
 };
 
+globalThis.additionaltypedata = {
+    BYTE: {unsigned: true},
+    UCHAR: {unsigned: true},
+    WORD: {unsigned: true},
+    USHORT: {unsigned: true},
+    UINT: {unsigned: true},
+    ULONG: {unsigned: true},
+    ULONGLONG: {unsigned: true},
+    UINT_PTR: {unsigned: true},
+    ULONG_PTR: {unsigned: true},
+    DWORD: {unsigned: true},
+    FLOAT: {floating: true},
+    DOUBLE: {floating: true},
+}
+
 function defineProps(obj, data, key, i, datatype, bytes) {
     const reg = /([A-Za-z0-9]{2})/g;
-    Object.defineProperty(obj, key, {
-        get() { //THIS SHIT IS LITTLE ENDIAN!
-            let fulltype = 0n;
-            //wait i can automate all this
-            for(let j = 0; j < bytes; j++){
-                //print(i, j, bytes, data[i+j], key, datatype);
-                //oh windows is little esndian
-                //fulltype |= data[i+j] << (bytes-1-j)*8; //oh hell yeah this shit looks good :drooling: (whatchu you know about rolling dowjn in the deep when your brain goes numb (another medium: https://www.youtube.com/watch?v=DXuOAWnuMVY))
-                fulltype |= BigInt(data[i+j]) << BigInt(j)*8n; //ok here we go (oops when the numbers go too big js couldn't keep up and would fuck em up i gotta use bigint)
-            }
+    if(datatype.prototype instanceof memoobjectidk) {
+        let none = {constructor: datatype};
+        Object.defineProperty(obj, key, {
+            get() {
+                return none;
+            },
+            set(newvalue) {
+                print("no setting yet lol")
+            },
+            enumerable: true,
+            configurable: true,
+        });
+        objFromTypes(none, data, i);
+        delete none.constructor; //lol objFromTypes checks the obj's constructor (and i don't want to make an instance of datatype)
+        return; //i think
+    }
+    
+    Object.defineProperty(obj, key, { //windows is little endian!!!
+        get() {
+            const dataview = new DataView(data.buffer, i, bytes);
 
-            fulltype = Number(fulltype);
-
-            if(datatype[0] == "U") {
-                return fulltype < 0 ? (2**(bytes*8))-fulltype : fulltype; //checking if it's unsigned and flipping it 
+            if(additionaltypedata[datatype]) {
+                if(additionaltypedata[datatype].floating) {
+                    if(bytes == 4) {
+                        return dataview.getFloat32(0, true);
+                    }else if(bytes == 8) {
+                        return dataview.getFloat64(0, true);
+                    }
+                }else if(additionaltypedata[datatype].unsigned) {
+                    if(bytes == 1) {
+                        return dataview.getUint8(0, true);
+                    }else if(bytes == 2) {
+                        return dataview.getUint16(0, true);
+                    }else if(bytes == 4) {
+                        return dataview.getUint32(0, true);
+                    }else if(bytes == 8) {
+                        const v = dataview.getBigUint64(0, true);
+                        if(v > 2n**53n) {
+                            print(`lowkey casting bigint back to js number which will lose precision if bigger than 2**53 (${2**53})`);
+                            print(`your value is`, v);
+                        }
+                        return Number(v); //sorry lol but not being able to mix bigint and int is a dealbreaker for bigint
+                    }
+                }
             }else {
-                //print(fulltype, (2**(bytes*8-1)));
-                return fulltype >= (2**(bytes*8-1)) ? fulltype-(2**(bytes*8)) : fulltype;
+                if(bytes == 1) {
+                    return dataview.getInt8(0, true);
+                }else if(bytes == 2) {
+                    return dataview.getInt16(0, true);
+                }else if(bytes == 4) {
+                    return dataview.getInt32(0, true);
+                }else if(bytes == 8) {
+                    const v = dataview.getBigInt64(0, true);
+                    if(v > 2n**53n) {
+                        print(`lowkey casting bigint back to js number which will lose precision if bigger than 2**53 (${2**53})`);
+                        print(`your value is`, v);
+                    }
+                    return Number(v); //sorry lol but not being able to mix bigint and int is a dealbreaker for bigint
+                }
             }
         },
-        set(newValue) { //oops idk if i wrote the get part wrong or you aren't allowed to set signed correctly (going over doesn't flip to negative) (hey look at that i fixed it)
-            /*
-            if(datatype[0] == "U") {
-                //newValue = newValue < 0 ? (2**(bytes*8))-newValue : newValue;
-                if(newValue < 0) {
-                    newValue += (2**(bytes*8));
-                }else if(newValue >= 2**(bytes*8)) {
-                    newValue -= (2**(bytes*8));
+        set(newValue) {
+            const dataview = new DataView(data.buffer, i, bytes);
+
+            if(additionaltypedata[datatype]) {
+                if(additionaltypedata[datatype].floating) {
+                    if(bytes == 4) {
+                        dataview.setFloat32(0, newValue, true);
+                    }else if(bytes == 8) {
+                        dataview.setFloat64(0, newValue, true);
+                    }
+                }else if(additionaltypedata[datatype].unsigned) {
+                    if(bytes == 1) {
+                        dataview.setUint8(0, newValue, true);
+                    }else if(bytes == 2) {
+                        dataview.setUint16(0, newValue, true);
+                    }else if(bytes == 4) {
+                        dataview.setUint32(0, newValue, true);
+                    }else if(bytes == 8) {
+                        dataview.setBigUint64(0, BigInt(newValue)), true;
+                    }
                 }
             }else {
-                if(newValue < 0) {
-                    newValue += (2**(bytes*8));
-                }else if(newValue >= 2**(bytes*8-1)) {
-                    newValue -= (2**(bytes*8));
+                if(bytes == 1) {
+                    dataview.setInt8(0, newValue, true);
+                }else if(bytes == 2) {
+                    dataview.setInt16(0, newValue, true);
+                }else if(bytes == 4) {
+                    dataview.setInt32(0, newValue, true);
+                }else if(bytes == 8) {
+                    dataview.setBigInt64(0, BigInt(newValue), true);
                 }
-            }
-            */
-            //if(newValue < 0) {
-            //    newValue += 2**(bytes*8);
-            //}else if(datatype[0] == "U" && newValue >= 2**(bytes*8)) {
-            //    //newValue = newValue < 0 ? (2**(bytes*8))-newValue : newValue;
-            //    newValue -= 2**(bytes*8);
-            //}else if(newValue >= 2**(bytes*8-1)) { //oops i had it 2**(bytes*8-1) but it wasn't working 100% of the time and i actually didn't even need this branch...
-            //    newValue -= 2**(bytes*8);
-            //}
-            if(newValue < 0) {
-                newValue += 2**(bytes*8);
-            }else if(newValue >= 2**(bytes*8)) {
-                newValue -= 2**(bytes*8);
-            }
-            let hex = newValue.toString(16);
-            //for(let j = 0; j < hex.length; j++) { //bruh i accidently was creating an infinite loop here but for some reason v8 would instantly crash (i had to test this hoe on another website bruh)
-            //    hex = "00"+hex;
-            //}
-            if(hex.length % 2 == 1) {
-                hex = "0"+hex;
-            }
-            const hl = hex.length;
-            for(let j = 0; j < bytes-(hl/2); j++) {
-                hex = "00"+hex;
-            }
-            //console.log(hex.length, bytes*2);
-            //if(hex.length > bytes*2) {
-            //    console.log("too large nigga");
-            //    hex = Object.keys(new Array(bytes*2).toString()+1).map(e => "00").join(""); //bruh i KNOW i had some bullshit like this somewhere and i spent like 20 minutes trying to find it and i couldn't :(   (where would i have possibly put a function like this (equivalent to python's range or something idk))
-            //}
-            //print(bytes, hex, i);
-
-            const hexBytes = hex.match(reg);
-            for(let j = 0; j < bytes; j++) {
-                //data[i+j] = parseInt(hexBytes[j], 16);
-                //console.log(i, j, hexBytes[bytes-1-j])
-                data[i+j] = parseInt(hexBytes[bytes-1-j], 16); //swizzle
             }
         },
         enumerable: true,
         configurable: true,
     });
+
+    //i sat here and reinvented the wheel and you're telling me that a DataView object could already do this?!!!
+    //Object.defineProperty(obj, key, {
+    //    get() { //THIS SHIT IS LITTLE ENDIAN!
+    //        //if(datatype instanceof memoobjectidk) {
+    //        //    //uhhh i guess don't really do anything special
+    //        //    return datatype;
+    //        //}else {
+    //            let fulltype = 0n;
+    //            //wait i can automate all this
+    //            for(let j = 0; j < bytes; j++){
+    //                //print(i, j, bytes, data[i+j], key, datatype);
+    //                //oh windows is little esndian
+    //                //fulltype |= data[i+j] << (bytes-1-j)*8; //oh hell yeah this shit looks good :drooling: (whatchu you know about rolling dowjn in the deep when your brain goes numb (another medium: https://www.youtube.com/watch?v=DXuOAWnuMVY))
+    //                fulltype |= BigInt(data[i+j]) << BigInt(j)*8n; //ok here we go (oops when the numbers go too big js couldn't keep up and would fuck em up i gotta use bigint)
+    //            }
+    //
+    //            fulltype = Number(fulltype);
+    //
+    //            //if(datatype[0] == "U") {
+    //            if(additionaltypedata[datatype]?.unsigned || datatype[0] == "U") {
+    //                return fulltype < 0 ? (2**(bytes*8))-fulltype : fulltype; //checking if it's unsigned and flipping it 
+    //            }else {
+    //                //print(fulltype, (2**(bytes*8-1)));
+    //                return fulltype >= (2**(bytes*8-1)) ? fulltype-(2**(bytes*8)) : fulltype;
+    //            }
+    //        //}
+    //    },
+    //    set(newValue) { //oops idk if i wrote the get part wrong or you aren't allowed to set signed correctly (going over doesn't flip to negative) (hey look at that i fixed it)
+    //        /*
+    //        if(datatype[0] == "U") {
+    //            //newValue = newValue < 0 ? (2**(bytes*8))-newValue : newValue;
+    //            if(newValue < 0) {
+    //                newValue += (2**(bytes*8));
+    //            }else if(newValue >= 2**(bytes*8)) {
+    //                newValue -= (2**(bytes*8));
+    //            }
+    //        }else {
+    //            if(newValue < 0) {
+    //                newValue += (2**(bytes*8));
+    //            }else if(newValue >= 2**(bytes*8-1)) {
+    //                newValue -= (2**(bytes*8));
+    //            }
+    //        }
+    //        */
+    //        //if(newValue < 0) {
+    //        //    newValue += 2**(bytes*8);
+    //        //}else if(datatype[0] == "U" && newValue >= 2**(bytes*8)) {
+    //        //    //newValue = newValue < 0 ? (2**(bytes*8))-newValue : newValue;
+    //        //    newValue -= 2**(bytes*8);
+    //        //}else if(newValue >= 2**(bytes*8-1)) { //oops i had it 2**(bytes*8-1) but it wasn't working 100% of the time and i actually didn't even need this branch...
+    //        //    newValue -= 2**(bytes*8);
+    //        //}
+    //        if(newValue < 0) {
+    //            newValue += 2**(bytes*8);
+    //        }else if(newValue >= 2**(bytes*8)) {
+    //            newValue -= 2**(bytes*8);
+    //        }
+    //        let hex = newValue.toString(16);
+    //        //for(let j = 0; j < hex.length; j++) { //bruh i accidently was creating an infinite loop here but for some reason v8 would instantly crash (i had to test this hoe on another website bruh)
+    //        //    hex = "00"+hex;
+    //        //}
+    //        if(hex.length % 2 == 1) {
+    //            hex = "0"+hex;
+    //        }
+    //        const hl = hex.length;
+    //        for(let j = 0; j < bytes-(hl/2); j++) {
+    //            hex = "00"+hex;
+    //        }
+    //        //console.log(hex.length, bytes*2);
+    //        //if(hex.length > bytes*2) {
+    //        //    console.log("too large nigga");
+    //        //    hex = Object.keys(new Array(bytes*2).toString()+1).map(e => "00").join(""); //bruh i KNOW i had some bullshit like this somewhere and i spent like 20 minutes trying to find it and i couldn't :(   (where would i have possibly put a function like this (equivalent to python's range or something idk))
+    //        //}
+    //        //print(bytes, hex, i);
+    //
+    //        const hexBytes = hex.match(reg);
+    //        for(let j = 0; j < bytes; j++) {
+    //            //data[i+j] = parseInt(hexBytes[j], 16);
+    //            //console.log(i, j, hexBytes[bytes-1-j])
+    //            data[i+j] = parseInt(hexBytes[bytes-1-j], 16); //swizzle
+    //        }
+    //    },
+    //    enumerable: true,
+    //    configurable: true,
+    //});
 }
 
 //class memoobjectidk { //i was really trying to make this inheritance work but i just can't seem to modify the child and read this.types from it
-globalThis.objFromTypes = (obj, data) => { //replacing every this. with obj.
+globalThis.objFromTypes = (obj, data, offset=0) => { //replacing every this. with obj.
     //types = {};
     //constructor(data) {
-        let i = 0;
+        let addr = offset;
         for(const key in obj.constructor.types) { //using constructor now because types is static
             const datatype = obj.constructor.types[key];
-            const bytes = sizeof[datatype];
+            let bytes;
+            const arrlength = obj.constructor.arrayLengths?.[key] ?? 1;
+            if(datatype.prototype instanceof memoobjectidk) {
+                bytes = datatype.sizeof()*arrlength;
+            }else {
+                bytes = sizeof[datatype]*arrlength;
+            }
             if(bytes == undefined) {
                 print(key, datatype, ":fucked up");
             }
@@ -125,8 +257,19 @@ globalThis.objFromTypes = (obj, data) => { //replacing every this. with obj.
             //}else {
             //    obj[key] = fulltype >= (2**(bytes*8)) ? fulltype-(2**(bytes*8)) : fulltype;
             //}
-            defineProps(obj, data, key, i, datatype, bytes);
-            i += bytes; //i guess you could call this addr too
+            if(obj.constructor.arrayLengths?.[key]) {
+                let arr = [];
+                let offset = 0;
+                const amount = datatype.sizeof?.() ?? sizeof[datatype];
+                for(let i = 0; i < obj.constructor.arrayLengths[key]; i++) {
+                    defineProps(arr, data, i, addr+offset, datatype, amount); //haha lol i accidently left bytes here instead of amount and i was getting totally weird errors (jbs would crash when printing IMAGE_DOS_HEADERS!)
+                    offset += amount;
+                }
+                obj[key] = arr;
+            }else {
+                defineProps(obj, data, key, addr, datatype, bytes);
+            }
+            addr += bytes; //i guess you could call this addr too
         }
     //}
     //obj.sizeof = (function() {
@@ -154,10 +297,40 @@ globalThis.__asm = function(arr, argc = 0, argv = [], argtypev = [], returntype 
     return res;
 }
 
+const changeEndianness = (string) => { //https://stackoverflow.com/questions/5320439/how-do-i-swap-endian-ness-byte-order-of-a-variable-in-javascript
+    const result = [];
+    let len = string.length - 2;
+    while (len >= 0) {
+      result.push(string.substr(len, 2));
+      len -= 2;
+    }
+    return result.join('');
+}
+
+globalThis.int64_to_little_endian_hex = function(int) {
+    let hex = int.toString(16);
+    if(hex.length % 2 == 1) {
+        hex = "0"+hex;
+    }
+    const len = hex.length;
+    for(let i = len; i < 16; i++) {
+        hex = "0"+hex;
+    }
+    //print(hex);
+    return changeEndianness(hex).match(/([a-z0-9]{2})/g).map(e => parseInt(e, 16));
+}
+
 //here we go this is a nice compromise
 class memoobjectidk {
     static sizeof() {
-        return Object.values(this.types).reduce((a, b) => a+sizeof[b], 0); //oh yeah
+        return Object.entries(this.types).reduce((a, [key, b]) => {
+            const arrlength = this.arrayLengths?.[key] ?? 1;
+            if(b.prototype instanceof memoobjectidk) {
+                return a+b.sizeof()*arrlength;
+            }else {
+                return a+sizeof[b]*arrlength;
+            }
+        }, 0); //oh yeah
     }
 }
 class CString {

@@ -58,7 +58,7 @@ caption = /*new WString*/("phonk trollface (using asm to call)");
 //https://medium.com/@sruthk/cracking-assembly-stack-frame-layout-in-x64-75eb862dde08
 
 print(__asm([ //oops i was having an error here and it was because i didn't include the standard push rbp, mov rbp<-rsp, and pop rbp (oops) (i think MessageBoxW changes rbp and i have to make sure i preserve its value!)
-    //rcx, rdx, r8, r9
+    //rcx, rdx, r8, r9                             //(first 4 integer parameters in windows)
     //0x58,                                        //pop rax    (since i'm taking the pointer to MessageBoxW as a 5th argument, i must pop it from the stack type shit (for the 5th parameter and higher the values are pushed onto the stack)) (ok everything i said was true BUT i don't think you are supposed to pop it from the stack (and it didn't work lmao) )
     
     0x48, 0x8b, 0x44, 0x24, 0x28,                  //mov rax, QWORD PTR [rbp+0x28] (chatgpt's solution for accessing the 5th parameter (since each parameter is an integer (assumed to be 64 bit) each parameter is taking 8 bytes so 8*5 == 40 (or 0x28)))     if i wanted to be more efficient i would directly call QWORD PTR [rbp+0x30] instead of moving it to rax (which i think you can do) (mind the 0x30 change because after pushing rbp the stack changes)

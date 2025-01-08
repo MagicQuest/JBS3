@@ -5,7 +5,7 @@
 //https://stackoverflow.com/questions/30883102/why-does-windows-gdi-use-rgba-format-for-colorref-instead-of-bgra
 //https://cplusplus.com/forum/general/283044/
 
-class Bitmap { //i kinda like this system but i worry that it might be a little confusing
+class Bitmap { //i kinda like this system but i worry that it might be a little confusing (maybe i should see how gdi+ does it)
     constructor(dc, bmp) {
         this.dc = dc;
         this.bmp = bmp;

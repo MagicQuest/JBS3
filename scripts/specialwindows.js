@@ -1,3 +1,5 @@
+//i think this one lags because i use WM_PAINT and RedrawWindow
+
 const font = CreateFontSimple("impact", 20, 40);
 
 let window;
@@ -24,7 +26,11 @@ function windowProc(hwnd, msg, wp, lp) {
         }else if(wp == VK_BACK) {
             text = text.substring(0, text.length-1);
             if(GetKey(VK_LCONTROL)) {
-                text = text.split(" ").map((str, i) => i < text.split(" ").length-1 ? str+" " : []).join("");
+                //"what the sigma"
+                //["what", "the", "sigma"]
+                //["what", "the", undefined]
+                //"what the "
+                text = text.split(" ").map((str, i) => i < text.split(" ").length-1 ? str+" " : undefined).join(""); //what the hell was i doing dawg
             }
             x = (1920/2)-(8*text.length);
         }//else if(wp > 65 && wp < 91) { //all lower case characters (hold alt and press numpad 100 then let go of alt)

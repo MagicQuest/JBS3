@@ -15,7 +15,7 @@ function random(max) {
 }
 
 function blurHBM(blurSize) {
-    const bits = hbm.GetBits();
+    const bits = hbm.GetBits(); //oh hell yeah even though GetBits now returns a Uint8Array, blurRGBA internally promotes it to Uint32Array and keeps working
     blurRGBA(bits, hbm.width, hbm.height, blurSize); //NAH NO WAY THIS IS INSANE (it's at least 500x faster than my convolution average blur)
     //print(bits);
     hbm.SetBits(bits);

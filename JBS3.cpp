@@ -178,13 +178,36 @@ void errprint(const char* str) {
 #include <v8-proxy.h>
 
 template<class T>
-T WStringOrNULL(v8::Isolate* isolate, const v8::Local<v8::Value>& v) {
+T WStringOrNULL(v8::Isolate* isolate, const v8::Local<v8::Value>& v) {//, T* out) {
     using namespace v8;
     if (v->IsString()) {
         return T(*String::Value(isolate, v)); //haha i forgot you could cast like this (and it looks really weird)
+        //std::wstring wstr(*String::Value(isolate, v));
+        //copy to out because i think v8 moves the data around and i lose the *String::Value pointer
+        
+        //example:
+        //LPWSTR str; WStringOrNULL(isolate, info[0], &str);
+        //oouuuuuuhhhhhhh it's looking hard
+        //ok nevermind i was gonna try to rewrite WStringOrNULL because for some reason OpenPrinter sometimes doesn't work and tells me the printer name is invalid
+        //i can't really fix this without using the new keyword and OpenPrinterWrapper is the only function that has had this problem with WStringOrNULL
+        //so im just gonna write it myself in OpenPrinterWrapper
     }
     else {
         return T(IntegerFI(v));
+    }
+}
+
+template<class T>
+T* NewWStringOrNULL(v8::Isolate* isolate, const v8::Local<v8::Value>& v) {
+    using namespace v8;
+    if (v->IsString()) {
+        Local<String> jsStr = v.As<String>();
+        T* wt = new T[jsStr->Length()];
+        jsStr->Write(isolate, (uint16_t*)wt);
+        return wt;
+    }
+    else {
+        return (T*)IntegerFI(v);
     }
 }
 
@@ -536,7 +559,8 @@ namespace jsImpl {
             Local<ArrayBuffer> ab = ArrayBuffer::New(isolate, height*stride); //honestly this math is a guess especially the sizeof part
             memcpy(ab->Data(), bits, height*stride); //GULP
             //delete[] bits;
-            Local<Uint32Array> arr = Uint32Array::New(ab, 0, width*height); //weird if i multiply this one by sizeof(DWORD) v8 spits out garbage and crashes bad
+            //Local<Uint32Array> arr = Uint32Array::New(ab, 0, width*height); //weird if i multiply this one by sizeof(DWORD) v8 spits out garbage and crashes bad
+            Local<Uint8Array> arr = Uint8Array::New(ab, 0, height * stride);
             info.GetReturnValue().Set(arr);
             //bits[IntegerFI(info[0])] = info[1].As<Uint32>()->Value();//IntegerFI(info[1]);
         }));
@@ -548,10 +572,14 @@ namespace jsImpl {
             auto stride = ((((width * bitCount) + 31) & ~31) >> 3);
             
             //print(IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("bits")).ToLocalChecked()));
-            DWORD* bits = (DWORD*)IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("_bits")).ToLocalChecked()); // -///-
-            Local<Uint32Array> jsBits = info[0].As<Uint32Array>();
-            jsBits->CopyContents(bits, height * stride);
+            //DWORD* bits = (DWORD*)IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("_bits")).ToLocalChecked()); // -///-
+            //Local<Uint32Array> jsBits = info[0].As<Uint32Array>();
+            //jsBits->CopyContents(bits, height * stride);
             //bits[IntegerFI(info[0])] = info[1].As<Uint32>()->Value();//IntegerFI(info[1]);
+            
+            BYTE* bits = (BYTE*)IntegerFI(info.This()->Get(isolate->GetCurrentContext(), LITERAL("_bits")).ToLocalChecked()); // -///-
+            Local<ArrayBufferView> jsBits = info[0].As<ArrayBufferView>();
+            jsBits->CopyContents(bits, height * stride);
         }));
 
         MeasureItemHandler = ObjectTemplate::New(isolate); //welcome back MeasureItemHandler
@@ -1073,43 +1101,68 @@ namespace fs {
         using namespace v8;
         Isolate* isolate = info.GetIsolate();
 
-        std::wstringstream buffer;
+        std::ifstream input((wchar_t*)*String::Value(isolate, info[0]), std::ios::binary);
 
-        std::wstring shit;
+        print(input.good() << " g");
 
-        std::wifstream file((wchar_t*)*String::Value(info.GetIsolate(), info[0]), std::ios::binary);
+        if (input.is_open()) {
+            std::vector<unsigned char> buffer(std::istreambuf_iterator<char>(input), {}); //https://stackoverflow.com/questions/5420317/reading-and-writing-binary-file
 
-        if (file.is_open()) {
+            Local<ArrayBuffer> ab = ArrayBuffer::New(isolate, buffer.size()); //honestly this math is a guess especially the sizeof part
+            memcpy(ab->Data(), buffer.data(), buffer.size()); //GULP
 
-            buffer << file.rdbuf();
-            shit = buffer.str();
+            Local<Uint8Array> arr = Uint8Array::New(ab, 0, buffer.size()); //(size.width*size.height)*4);//size.width*size.height*4); //weird if i multiply this one by sizeof(DWORD) v8 spits out garbage and crashes bad
 
-            Local<ArrayBuffer> jsArrayBuffer = ArrayBuffer::New(isolate, shit.size());
+            info.GetReturnValue().Set(arr);
 
-            //Local<Array> jsArray = Array::New(isolate, shit.size());
-            for (int i = 0; i < shit.size(); i++) {
-                jsArrayBuffer->Set(isolate->GetCurrentContext(), i, Number::New(isolate, shit[i]));
-            }
-
-            //std::string* fuck = new std::string(shit); //it's giving undefined behavior (what the hgell was i doing)
-
-            //ok i works but i could just pass an array of chars (ints) //probably use arraybuffer because i think thats what browsers do for files maybe idk (yeah so the documentation for arraybuffer literally says a buffer full of bytes)
-
-            //char* stringPtr = new char[shit.size()]; //uh oh
-            //strcpy(stringPtr, shit.c_str());
-            //strncpy(stringPtr, shit.c_str(), shit.size());
-            //memcpy(stringPtr, shit.c_str(), shit.size()); //shit.c_str() gets cut off!
-            //print(stringPtr << " shit->" << shit.c_str() << " " << shit);
-
-            //info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)fuck/*stringPtr*/));//String::NewFromUtf8(info.GetIsolate(), shit.c_str()).ToLocalChecked());
-            info.GetReturnValue().Set(jsArrayBuffer);
-            //print(shit << " youcanstandundermyinbrelela" << shit.size());
+            input.close();
         }
         else {
             info.GetReturnValue().SetUndefined();
         }
 
-        file.close();
+        //std::wstringstream buffer;
+        //
+        //std::wstring shit;
+        //
+        //std::wifstream file((wchar_t*)*String::Value(info.GetIsolate(), info[0]), std::ios::binary);
+        //
+        //if (file.is_open()) {
+        //
+        //    buffer << file.rdbuf();
+        //    shit = buffer.str();
+        //
+        //    Local<ArrayBuffer> ab = ArrayBuffer::New(isolate, shit.size()); //honestly this math is a guess especially the sizeof part
+        //    memcpy(ab->Data(), shit.data(), shit.size()); //GULP
+        //    
+        //    Local<Uint8Array> arr = Uint8Array::New(ab, 0, shit.size()); //(size.width*size.height)*4);//size.width*size.height*4); //weird if i multiply this one by sizeof(DWORD) v8 spits out garbage and crashes bad
+        //
+        //    //Local<ArrayBuffer> jsArrayBuffer = ArrayBuffer::New(isolate, shit.size());
+        //    //
+        //    ////Local<Array> jsArray = Array::New(isolate, shit.size());
+        //    //for (int i = 0; i < shit.size(); i++) {
+        //    //    jsArrayBuffer->Set(isolate->GetCurrentContext(), i, Number::New(isolate, shit[i]));
+        //    //}
+        //
+        //    //std::string* fuck = new std::string(shit); //it's giving undefined behavior (what the hgell was i doing)
+        //
+        //    //ok i works but i could just pass an array of chars (ints) //probably use arraybuffer because i think thats what browsers do for files maybe idk (yeah so the documentation for arraybuffer literally says a buffer full of bytes)
+        //
+        //    //char* stringPtr = new char[shit.size()]; //uh oh
+        //    //strcpy(stringPtr, shit.c_str());
+        //    //strncpy(stringPtr, shit.c_str(), shit.size());
+        //    //memcpy(stringPtr, shit.c_str(), shit.size()); //shit.c_str() gets cut off!
+        //    //print(stringPtr << " shit->" << shit.c_str() << " " << shit);
+        //
+        //    //info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)fuck/*stringPtr*/));//String::NewFromUtf8(info.GetIsolate(), shit.c_str()).ToLocalChecked());
+        //    info.GetReturnValue().Set(arr);
+        //    //print(shit << " youcanstandundermyinbrelela" << shit.size());
+        //}
+        //else {
+        //    info.GetReturnValue().SetUndefined();
+        //}
+        //
+        //file.close();
     }
 
     void write(const v8::FunctionCallbackInfo<v8::Value>& info) {
@@ -2282,12 +2335,13 @@ V8FUNC(_com_errorWrapper) {
 
     //Local<Object> jsErr = Object::New(isolate);
     wchar_t* errMsg = (wchar_t*)err.ErrorMessage();
-    const char* errMsgCStr = _bstr_t(errMsg);
+    //const char* errMsgCStr = _bstr_t(errMsg); //what's with this useless conversion (i must've written this before i knew how to send wchar_t*s)
+    info.GetReturnValue().Set(String::NewFromTwoByte(isolate, (const uint16_t*)errMsg).ToLocalChecked());
 
     //jsErr->Set(isolate->GetCurrentContext(), LITERAL("ErrorMessage"), String::NewFromUtf8(isolate, errMsgCStr).ToLocalChecked());
     //jsErr->Set(isolate->GetCurrentContext(), LITERAL("Description"), String::NewFromUtf8(isolate, err.Description()).ToLocalChecked());
 
-    info.GetReturnValue().Set(String::NewFromUtf8(isolate, errMsgCStr).ToLocalChecked());//jsErr);
+    //info.GetReturnValue().Set(String::NewFromUtf8(isolate, errMsgCStr).ToLocalChecked());//jsErr);
 }
 
 #include <thread>
@@ -3563,15 +3617,17 @@ namespace DIRECT2D {
                 }
 
                 auto stride = ((((width * bitCount) + 31) & ~31) >> 3);
-                DWORD* bits = new DWORD[width * height]; //bruh i just had to initialize it with a chunk of mem
+                DWORD totalbytelength = height * stride;
+                BYTE* bits = new BYTE[totalbytelength]; //bruh i just had to initialize it with a chunk of mem
 
-                RetIfFailed(wicConverter->CopyPixels(NULL, width * 4, width * height * 4, (BYTE*)bits), "CopyPixels failed bruh what happened"); //ok i know this sounds bad BUT IDC
+                RetIfFailed(wicConverter->CopyPixels(NULL, stride, totalbytelength, (BYTE*)bits), "CopyPixels failed bruh what happened"); //ok i know this sounds bad BUT IDC
 
                 //print(bits[0]);
-                Local<ArrayBuffer> ab = ArrayBuffer::New(isolate, height * stride); //honestly this math is a guess especially the sizeof part
-                memcpy(ab->Data(), bits, height * stride); //GULP
+                Local<ArrayBuffer> ab = ArrayBuffer::New(isolate, totalbytelength); //honestly this math is a guess especially the sizeof part
+                memcpy(ab->Data(), bits, totalbytelength); //GULP
                 delete[] bits;
-                Local<Uint32Array> arr = Uint32Array::New(ab, 0, width * height); //weird if i multiply this one by sizeof(DWORD) v8 spits out garbage and crashes bad
+                //Local<Uint32Array> arr = Uint32Array::New(ab, 0, width * height); //weird if i multiply this one by sizeof(DWORD) v8 spits out garbage and crashes bad
+                Local<Uint8Array> arr = Uint8Array::New(ab, 0, totalbytelength);
                 info.GetReturnValue().Set(arr);
                 if (info[1]->BooleanValue(isolate)) {
                     wicConverter->Release(); //release the internal pIFlipRotator
@@ -4234,12 +4290,15 @@ namespace DIRECT2D {
                 //D2D1_POINT_2U point = D2D1::Point2U(IntegerFI(info[0]), IntegerFI(info[1]));
                 D2D1_RECT_U rect = D2D1::RectU(IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]));
 
-                DWORD* data = nullptr;//new DWORD[jsBits->Length()];
-                Local<Uint32Array> jsBits = info[4].As<Uint32Array>();
-                data = new DWORD[jsBits->Length()]; //genius code stolen from my StretchDIBits func
-                jsBits->CopyContents(data, jsBits->ByteLength()); //hell yeah (i was using jsBits->Length() instead of ByteLength)
-
-
+                //DWORD* data = nullptr;//new DWORD[jsBits->Length()];
+                //Local<Uint32Array> jsBits = info[4].As<Uint32Array>();
+                //data = new DWORD[jsBits->Length()]; //genius code stolen from my StretchDIBits func
+                //jsBits->CopyContents(data, jsBits->ByteLength()); //hell yeah (i was using jsBits->Length() instead of ByteLength)
+                BYTE* data = nullptr;
+                Local<ArrayBufferView> jsBits = info[4].As<ArrayBufferView>();
+                data = new BYTE[jsBits->ByteLength()];
+                jsBits->CopyContents(data, jsBits->ByteLength());
+                                                             //yeah this is kinda bad lol
                 RetIfFailed(bmp->CopyFromMemory(&rect, data, sizeof(DWORD) * (rect.right - rect.left)), "CopyFromMemory failed!");
             }));
             jsBitmap->Set(isolate, "Map", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) { //oops i made this because i wanted to convert HICON to ID2D1Bitmap BUT wic can already basically do that with CreateBitmapFromHICON
@@ -6604,7 +6663,7 @@ namespace DIRECT2D {
                 float* dash = nullptr;//info[8].As<Array>()
                 UINT32 count = 0;
                 if (!info[8]->IsNullOrUndefined() && !info[8]->IsNumber()) {
-                    //since i\m not getting a vector out of this scope like rthat im gonna use new
+                    //since i\m not getting a vector out of this scope like rthat im gonna use new (honestly this might've been wrong actually im not sure)
                     Local<Context> context = isolate->GetCurrentContext();
                     Local<Array> jsArr = info[8].As<Array>();
                     count = jsArr->Length();
@@ -7598,9 +7657,12 @@ namespace DIRECT2D {
 
                     void* src = nullptr;
         
-                    if (info[5]->IsUint8Array()) {
-                        //#error oops i forgot to implement this hoe
-                        src = info[5].As<Uint8Array>()->Buffer()->Data(); //ok this is really sketchy idk man i might have to make a copy
+                    //if (info[5]->IsUint8Array()) {
+                    //    //#error oops i forgot to implement this hoe
+                    //    src = info[5].As<Uint8Array>()->Buffer()->Data(); //ok this is really sketchy idk man i might have to make a copy
+                    //}
+                    if (info[5]->IsArrayBufferView()) {
+                        src = info[5].As<ArrayBufferView>()->Buffer()->Data();
                     }
         
                     /*HRESULT shit = */RetIfFailed(d2d11->d2dcontext->CreateBitmap(D2D1::SizeU(IntegerFI(info[0]), IntegerFI(info[1])), src, IntegerFI(info[6]), &bitmapProperties, &target), "CreateBitmap1 (ID2D1DeviceContext->CreateBitmap) failed big dawg");
@@ -8051,6 +8113,7 @@ namespace DIRECT2D {
             V8GLFUNC("shaderSource")
                 //const char* source = CStringFI(info[1]);
                 std::string source = std::string(CStringFI(info[1]));
+                //info[1].As<String>()->WriteUtf8(isolate, (char*)source.data()); //i guess you could do this too (gotta initialize source tho)
                 const char* lemmeputitinalanguageytoucanunderstand = source.c_str(); //this weird ass technique stopped the weird corruption garbage issue
                 //GLint len = info[1].As<String>()->Utf8Length(isolate);
                 glShaderSource(IntegerFI(info[0]), 1, &lemmeputitinalanguageytoucanunderstand, NULL);//&len);//NULL);
@@ -8176,9 +8239,12 @@ namespace DIRECT2D {
             }));
             V8GLFUNC("texImage2D")
                 void* data = nullptr;
-                if (info[8]->BooleanValue(isolate)) {
-                    Local<Float32Array> jsData = info[8].As<Float32Array>();
-                    data = new void*[jsData->Length()]; //i swear earlier it told me that you couldn't do this
+                //if (info[8]->IsFloat32Array()) {
+                //    Local<Float32Array> jsData = info[8].As<Float32Array>();
+                if(info[8]->IsArrayBufferView()) {
+                    Local<ArrayBufferView> jsData = info[8].As<ArrayBufferView>();
+
+                    data = new void*[jsData->ByteLength()]; //i swear earlier it told me that you couldn't do this
                     jsData->CopyContents(data, jsData->ByteLength());
                 }
                 glTexImage2D(IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]), IntegerFI(info[4]), IntegerFI(info[5]), IntegerFI(info[6]), IntegerFI(info[7]), data);
@@ -8211,7 +8277,8 @@ namespace DIRECT2D {
                 Local<ArrayBuffer> ab = ArrayBuffer::New(isolate, height * stride); //honestly this math is a guess especially the sizeof part
                 memcpy(ab->Data(), bits, height* stride); //GULP
                 delete[] bits;
-                Local<Uint32Array> arr = Uint32Array::New(ab, 0, width * height); //weird if i multiply this one by sizeof(DWORD) v8 spits out garbage and crashes bad (it wants the number of elements not byte length)
+                //Local<Uint32Array> arr = Uint32Array::New(ab, 0, width * height); //weird if i multiply this one by sizeof(DWORD) v8 spits out garbage and crashes bad (it wants the number of elements not byte length)
+                Local<Uint8Array> arr = Uint8Array::New(ab, 0, height * stride);
                 info.GetReturnValue().Set(arr);
             }));
             V8GLFUNC("readBuffer")
@@ -9389,6 +9456,12 @@ V8FUNC(createCanvas) {
             d2d = new Direct2D();
         }
         d2d->Init((HWND)IntegerFI(info[2]), IntegerFI(info[1]));
+        //print(&d2d->factory);
+        ////print();
+        //HRESULT(ID2D1Factory7::*p)(IStream*, ID2D1GdiMetafile**) = &ID2D1Factory7::CreateGdiMetafile;
+        //print(p << " realptr?"); //how the hell is this value one hold on
+        //print(&d2d->factory->CreateDevice);
+        //print(&d2d->factory->Release);
         if (!info[3]->IsNullOrUndefined() && info[3]->BooleanValue(isolate)) {
             d2d->wicFactory = ((WICHelper*)IntegerFI(info[3].As<Object>()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked()))->wicFactory;
         }
@@ -9858,14 +9931,14 @@ V8FUNC(PrintWindowWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
 
-    PrintWindow((HWND)IntegerFI(info[0]), (HDC)IntegerFI(info[1]), IntegerFI(info[2]));
+    info.GetReturnValue().Set(Number::New(isolate, PrintWindow((HWND)IntegerFI(info[0]), (HDC)IntegerFI(info[1]), IntegerFI(info[2]))));
 }
 
 V8FUNC(SetWindowPosWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
     
-    SetWindowPos((HWND)IntegerFI(info[0]), (HWND)IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]), IntegerFI(info[4]), IntegerFI(info[5]), IntegerFI(info[6]));
+    info.GetReturnValue().Set(Number::New(isolate, SetWindowPos((HWND)IntegerFI(info[0]), (HWND)IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]), IntegerFI(info[4]), IntegerFI(info[5]), IntegerFI(info[6]))));
 }
 
 V8FUNC(WindowFromDCWrapper) {
@@ -10817,7 +10890,7 @@ V8FUNC(CreateWindowWrapper) {
             Local<Function> looper = GetProperty("loop").As<Function>();
             print(looper.IsEmpty() << " " << looper->IsUndefined());
 
-            //std::thread f([=] { //well shit if i actually use a new thread nothing is blocking v8 and jbs from just reaching the end of the program
+            //std::thread f([=] { //well shit if i actually use a new thread nothing is blocking v8 and jbs from just reaching the end of the program (maybe i should try some waitforsingleobject)
             MSG Message{};
             Message.message = ~WM_QUIT;
 
@@ -11010,9 +11083,9 @@ V8FUNC(GetMenuItemInfoWrapper) {
     }
     GetMenuItemInfoW((HMENU)IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), &pmi);
     Local<Object> jsMII = jsImpl::createWinMENUITEMINFOW(isolate, pmi);
-    if (tacobell != nullptr) {
-        delete[] tacobell;
-    }
+    //if (tacobell != nullptr) {
+        delete[] tacobell; //apparently  I  don't have to check if it's null
+    //}
     info.GetReturnValue().Set(jsMII);
 }
 
@@ -11258,11 +11331,19 @@ V8FUNC(CreateDCWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
 
-    LPCWSTR pwszDriver = WStringOrNULL<LPCWSTR>(isolate, info[0]);
-    LPCWSTR pwszDevice = WStringOrNULL<LPCWSTR>(isolate, info[1]);
-    LPCWSTR pszPort = WStringOrNULL<LPCWSTR>(isolate, info[2]);
+    //LPCWSTR pwszDriver = WStringOrNULL<LPCWSTR>(isolate, info[0]);
+    //LPCWSTR pwszDevice = WStringOrNULL<LPCWSTR>(isolate, info[1]);
+    //LPCWSTR pszPort = WStringOrNULL<LPCWSTR>(isolate, info[2]);
+
+    LPCWSTR pwszDriver = (LPCWSTR)NewWStringOrNULL<wchar_t>(isolate, info[0]);
+    LPCWSTR pwszDevice = (LPCWSTR)NewWStringOrNULL<wchar_t>(isolate, info[1]);
+    LPCWSTR pszPort = (LPCWSTR)NewWStringOrNULL<wchar_t>(isolate, info[2]);
 
     info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)CreateDC(pwszDriver, pwszDevice, pszPort, (DEVMODE*)IntegerFI(info[3]))));
+    
+    delete[] pwszDriver;
+    delete[] pwszDevice;
+    delete[] pszPort;
 }
 
 V8FUNC(EnumDisplayDevicesWrapper) {
@@ -11300,14 +11381,20 @@ V8FUNC(EnumPrintProcessorsWrapper) {
     DWORD cbNeeded = 0;
     DWORD cbReturned = 0;
 
-    BOOL result = EnumPrintProcessors(WStringOrNULL<LPWSTR>(isolate, info[0]), WStringOrNULL<LPWSTR>(isolate, info[1]), level, NULL, NULL, &cbNeeded, &cbReturned);
+    wchar_t* name = NewWStringOrNULL<wchar_t>(isolate, info[0]);
+    wchar_t* environment = NewWStringOrNULL<wchar_t>(isolate, info[1]);
+
+    BOOL result = EnumPrintProcessors(name, environment, level, NULL, NULL, &cbNeeded, &cbReturned);
 
     print(result << " OG! " << cbNeeded << " " << cbReturned);
 
     DWORD newneeded = 0; //for some reason you NEED to pass something for cbNeeded and cbReturned
 
     data = new BYTE[cbNeeded];
-    result = EnumPrintProcessors(WStringOrNULL<LPWSTR>(isolate, info[0]), WStringOrNULL<LPWSTR>(isolate, info[1]), level, data, cbNeeded, &newneeded, &cbReturned);
+    result = EnumPrintProcessors(name, environment, level, data, cbNeeded, &newneeded, &cbReturned);
+
+    delete[] name;
+    delete[] environment;
 
     if (!result) {
         return;
@@ -11325,6 +11412,8 @@ V8FUNC(EnumPrintProcessorsWrapper) {
         jsPPI->Set(context, i, idkman);
     }
 
+    delete[] data; //oh damn
+
     info.GetReturnValue().Set(jsPPI);
 }
 
@@ -11340,14 +11429,31 @@ V8FUNC(EnumPrintProcessorDatatypesWrapper) {
     DWORD cbNeeded = 0;
     DWORD cbReturned = 0;
 
-    BOOL result = EnumPrintProcessorDatatypes(WStringOrNULL<LPWSTR>(isolate, info[0]), WStringOrNULL<LPWSTR>(isolate, info[1]), level, NULL, NULL, &cbNeeded, &cbReturned);
+    wchar_t* name = NewWStringOrNULL<wchar_t>(isolate, info[0]); //NULL;
+    wchar_t* ppname = NewWStringOrNULL<wchar_t>(isolate, info[1]); //NULL;
+
+    //if (info[0]->IsString()) {
+    //    Local<String> jsStr = info[0].As<String>();
+    //    name = new wchar_t[(jsStr->Length()+1)*2];
+    //    jsStr->Write(isolate, (uint16_t*)name);
+    //}
+    //if (info[1]->IsString()) {
+    //    Local<String> jsStr = info[1].As<String>();
+    //    ppname = new wchar_t[(jsStr->Length() + 1) * 2];
+    //    jsStr->Write(isolate, (uint16_t*)ppname);
+    //}
+
+    BOOL result = EnumPrintProcessorDatatypes(name, ppname, level, NULL, NULL, &cbNeeded, &cbReturned);
 
     print(result << " OG! " << cbNeeded << " " << cbReturned);
 
     DWORD newneeded = 0; //for some reason you NEED to pass something for cbNeeded and cbReturned
 
     data = new BYTE[cbNeeded];
-    result = EnumPrintProcessorDatatypes(WStringOrNULL<LPWSTR>(isolate, info[0]), WStringOrNULL<LPWSTR>(isolate, info[1]), level, data, cbNeeded, &newneeded, &cbReturned);
+    result = EnumPrintProcessorDatatypes(name, ppname, level, data, cbNeeded, &newneeded, &cbReturned);
+
+    delete[] name;
+    delete[] ppname;
 
     if (!result) {
         return;
@@ -11364,6 +11470,8 @@ V8FUNC(EnumPrintProcessorDatatypesWrapper) {
         idkman->Set(context, LITERAL("pName"), String::NewFromTwoByte(isolate, (const uint16_t*)s.pName).ToLocalChecked());
         jsDT->Set(context, i, idkman);
     }
+
+    delete[] data; //oh damne
 
     info.GetReturnValue().Set(jsDT);
 }
@@ -11384,14 +11492,18 @@ V8FUNC(EnumPrintersWrapper) {
         return;
     }
 
-    BOOL result = EnumPrinters(flags, WStringOrNULL<LPWSTR>(isolate, info[1]), level, NULL, NULL, &cbNeeded, &cbReturned);
+    wchar_t* name = NewWStringOrNULL<wchar_t>(isolate, info[1]);
+
+    BOOL result = EnumPrinters(flags, name, level, NULL, NULL, &cbNeeded, &cbReturned);
 
     print(result << " OG! " << cbNeeded << " " << cbReturned);
 
     DWORD newneeded = 0; //for some reason you NEED to pass something for cbNeeded and cbReturned
 
     data = new BYTE[cbNeeded];
-    result = EnumPrinters(flags, WStringOrNULL<LPWSTR>(isolate, info[1]), level, data, cbNeeded, &newneeded, &cbReturned);
+    result = EnumPrinters(flags, name, level, data, cbNeeded, &newneeded, &cbReturned);
+
+    delete[] name;
 
     if (!result) {
         return;
@@ -11487,6 +11599,8 @@ V8FUNC(EnumPrintersWrapper) {
         }
     }
 
+    delete[] data;
+
     info.GetReturnValue().Set(jsPrinters);
 }
 
@@ -11498,9 +11612,19 @@ V8FUNC(OpenPrinterWrapper) {
 
     //PRINTER_DEFAULTS defaults{};
 
-    print(WStringOrNULL<LPWSTR>(isolate, info[0]));
 
-    BOOL result = OpenPrinter(WStringOrNULL<LPWSTR>(isolate, info[0]), &printer, NULL);//, &defaults);
+    wchar_t* printerName = NULL;
+
+    if (info[0]->IsString()) {
+        Local<String> jsStr = info[0].As<String>();
+        printerName = new wchar_t[(jsStr->Length() + 1) * 2];
+        jsStr->Write(isolate, (uint16_t*)printerName);
+    }
+
+
+    //print(WStringOrNULL<LPWSTR>(isolate, info[0]));
+
+    BOOL result = OpenPrinter(printerName, &printer, NULL);//, &defaults);
     if (result) {
         info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)printer));
         //Local<Context> context = isolate->GetCurrentContext();
@@ -11518,6 +11642,7 @@ V8FUNC(OpenPrinterWrapper) {
     else {
 
     }
+    delete[] printerName;
 }
 
 V8FUNC(ClosePrinterWrapper) {
@@ -11525,6 +11650,28 @@ V8FUNC(ClosePrinterWrapper) {
     Isolate* isolate = info.GetIsolate();
 
     info.GetReturnValue().Set(Number::New(isolate, ClosePrinter((HANDLE)IntegerFI(info[0]))));
+}
+
+V8FUNC(GetDefaultPrinterWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    DWORD cchPrinter = IntegerFI(info[0]);
+    if (cchPrinter == NULL) {
+        cchPrinter = MAX_PATH;
+    }
+    
+    wchar_t* szPrinter = new wchar_t[cchPrinter];
+    BOOL success = GetDefaultPrinter(szPrinter, &cchPrinter);
+
+    if (success) {
+        info.GetReturnValue().Set(String::NewFromTwoByte(isolate, (const uint16_t*)szPrinter).ToLocalChecked());
+    }
+    else {
+
+    }
+
+    delete[] szPrinter;
 }
 
 V8FUNC(DOCINFOWrapper) {
@@ -11580,7 +11727,7 @@ V8FUNC(StartDocWrapper) {
         }
     }
 
-    info.GetReturnValue().Set(Number::New(isolate, StartDoc((HDC)IntegerFI(info[0]), &di)));
+    info.GetReturnValue().Set(Number::New(isolate, StartDoc((HDC)IntegerFI(info[0]), &di))); //random hresult exception bruh shut up
 }
 
 V8FUNC(EndDocWrapper) {
@@ -11623,17 +11770,40 @@ V8FUNC(CreateBitmapWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
 
-    DWORD* data = nullptr;//new DWORD[jsBits->Length()];
-    if (info[3]->IsUint32Array()) {
-        Local<Uint32Array> jsBits = info[3].As<Uint32Array>();
-        data = new DWORD[jsBits->Length()]; //genius code stolen from my StretchDIBits func
-        jsBits->CopyContents(data, jsBits->ByteLength()); //hell yeah (i was using jsBits->Length() instead of ByteLength)
+    BYTE* bits = nullptr;//new DWORD[jsBits->Length()];
+    //if (info[3]->IsUint32Array()) {
+    //    Local<Uint32Array> jsBits = info[3].As<Uint32Array>();
+    //    data = new DWORD[jsBits->Length()]; //genius code stolen from my StretchDIBits func
+    //    jsBits->CopyContents(data, jsBits->ByteLength()); //hell yeah (i was using jsBits->Length() instead of ByteLength)
+    //}
+    //if (info[3]->IsArrayBufferView()) {
+    //    Local<ArrayBufferView> jsBits = info[3].As<ArrayBufferView>();
+    //    //data = new BYTE[jsBits->ByteLength()];
+    //    //jsBits->CopyContents(data, jsBits->ByteLength());
+    //    data = (BYTE*)jsBits->Buffer()->Data(); //i mean... the data doesn't move until the array buffer is destroyed so...
+    //}
+    if (info[3]->IsNumber()) {
+        bits = (BYTE*)IntegerFI(info[3]);
+    }
+    else if (info[3]->IsArrayBufferView()) {
+        //print("isarraybufferview");
+        Local<ArrayBufferView> jsBits = info[3].As<ArrayBufferView>();
+        bits = (BYTE*)jsBits->Buffer()->Data(); //lol kinda dangerous ok but i mean... the data doesn't move until the array buffer is destroyed so...
+    }
+    else if (info[3]->IsObject()) {
+        Local<Object> JSDIBSection = info[3].As<Object>();
+        if (JSDIBSection->Has(isolate->GetCurrentContext(), LITERAL("_bits")).FromJust()) {
+            bits = (BYTE*)IntegerFI(JSDIBSection->Get(isolate->GetCurrentContext(), LITERAL("_bits")).ToLocalChecked());
+        }
+        else {
+            errprint("CreateBitmap passed object doesn't have _bits (im leaving this here because im not totally sure what object you'd be passing here lmao)");
+        }
     }
 
-    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)CreateBitmap(IntegerFI(info[0]), IntegerFI(info[1]), 1, info[2]->IsNumber() ? IntegerFI(info[2]) : 32, data)));
-    if (data) {
-        delete[] data; //oh snap for some reason i wasn't deleting this data (maybe i assumed the system took over the memory like SetClipboardData does)
-    }
+    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)CreateBitmap(IntegerFI(info[0]), IntegerFI(info[1]), 1, info[2]->IsNumber() ? IntegerFI(info[2]) : 32, bits)));
+    //if (data) {
+        //delete[] data; //oh snap for some reason i wasn't deleting this data (maybe i assumed the system took over the memory like SetClipboardData does)
+    //}
 }
 
 V8FUNC(MAKEROP4Wrapper) {
@@ -11650,9 +11820,33 @@ V8FUNC(StretchDIBitsWrapper) {
     //std::string bits;
     //Local<Array> jsBits = info[9].As<Array>(); //hold on Array has an Iterate method that is allegedly faster than repeated Get()s
     //before i do that weird array thing i FEEL like something like Uint32Array can just copy the data over
-    Local<Uint32Array> jsBits = info[9].As<Uint32Array>();
-    DWORD* data = new DWORD[jsBits->Length()];
-    jsBits->CopyContents(data, jsBits->ByteLength()); //hell yeah (i was using jsBits->Length() instead of ByteLength)
+    
+    //Local<Uint32Array> jsBits = info[9].As<Uint32Array>();
+    //DWORD* data = new DWORD[jsBits->Length()];
+    //Local<ArrayBufferView> jsBits = info[9].As<ArrayBufferView>();
+    //BYTE* data = new BYTE[jsBits->ByteLength()];
+    //jsBits->CopyContents(data, jsBits->ByteLength()); //hell yeah (i was using jsBits->Length() instead of ByteLength)
+
+    BYTE* bits = NULL;
+
+    if (info[9]->IsNumber()) {
+        bits = (BYTE*)IntegerFI(info[9]);
+    }
+    else if (info[9]->IsArrayBufferView()) {
+        //print("isarraybufferview");
+        Local<ArrayBufferView> jsBits = info[9].As<ArrayBufferView>();
+        bits = (BYTE*)jsBits->Buffer()->Data(); //lol kinda dangerous ok
+    }
+    else if (info[9]->IsObject()) {
+        Local<Object> JSDIBSection = info[9].As<Object>();
+        if (JSDIBSection->Has(isolate->GetCurrentContext(), LITERAL("_bits")).FromJust()) {
+            bits = (BYTE*)IntegerFI(JSDIBSection->Get(isolate->GetCurrentContext(), LITERAL("_bits")).ToLocalChecked());
+        }
+        else {
+            errprint("StretchDIBits passed object doesn't have _bits (im leaving this here because im not totally sure what object you'd be passing here lmao)");
+        }
+    }
+
 
     //for (int i = 0; i < jsBits->Length(); i++) { //could lowkey be a bottleneck
     //    //bits.push_back((char)jsBits->Get(isolate->GetCurrentContext(), i).ToLocalChecked()->IntegerValue(isolate->GetCurrentContext()).FromJust());
@@ -11691,10 +11885,10 @@ V8FUNC(StretchDIBitsWrapper) {
     bmi.bmiHeader.biPlanes = 1;
     bmi.bmiHeader.biBitCount = IntegerFI(info[12]); //?????
     bmi.bmiHeader.biCompression = IntegerFI(info[13]);
-    bmi.bmiHeader.biSizeImage = 0; //bits.length(); //IntegerFI(info[10])*IntegerFI(info[11]);
+    bmi.bmiHeader.biSizeImage = IntegerFI(info[15]); //bits.length(); //IntegerFI(info[10])*IntegerFI(info[11]);
     
-    info.GetReturnValue().Set(Number::New(isolate, StretchDIBits((HDC)IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]), IntegerFI(info[4]), IntegerFI(info[5]), IntegerFI(info[6]), IntegerFI(info[7]), IntegerFI(info[8]), data/*&bits[0]*/, &bmi, DIB_RGB_COLORS, IntegerFI(info[14]))));
-    delete[] data; //my fault og
+    info.GetReturnValue().Set(Number::New(isolate, StretchDIBits((HDC)IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]), IntegerFI(info[4]), IntegerFI(info[5]), IntegerFI(info[6]), IntegerFI(info[7]), IntegerFI(info[8]), bits/*&bits[0]*/, &bmi, DIB_RGB_COLORS, IntegerFI(info[14]))));
+    //delete[] bits; //my fault og
 }
 
 //https://forums.codeguru.com/showthread.php?487633-32-bit-DIB-from-24-bit-bitmap
@@ -11726,8 +11920,9 @@ V8FUNC(GetDIBitsWrapper) {
         //print(bits[0]);
         Local<ArrayBuffer> ab = ArrayBuffer::New(isolate, height*stride); //honestly this math is a guess especially the sizeof part
         memcpy(ab->Data(), bits, height*stride); //GULP
-        delete[] bits;
-        Local<Uint32Array> arr = Uint32Array::New(ab, 0, width*height); //weird if i multiply this one by sizeof(DWORD) v8 spits out garbage and crashes bad
+        //delete[] bits;
+        //Local<Uint32Array> arr = Uint32Array::New(ab, 0, width*height); //weird if i multiply this one by sizeof(DWORD) v8 spits out garbage and crashes bad
+        Local<Uint8Array> arr = Uint8Array::New(ab, 0, height * stride);
         info.GetReturnValue().Set(arr);
     }
     else {
@@ -11735,6 +11930,7 @@ V8FUNC(GetDIBitsWrapper) {
         Local<Value> shit = Exception::Error(String::NewFromUtf8(isolate, str.c_str(), NewStringType::kNormal, str.length()).ToLocalChecked());
         info.GetReturnValue().Set(shit);
     }
+    delete[] bits;
 }
 
 V8FUNC(PatBltWrapper) {
@@ -11788,14 +11984,17 @@ V8FUNC(GetObjectHBITMAP) {
     if (bmp.bmBits != NULL) {
         LONG_PTR count = msnformula(bmp.bmWidth, bmp.bmHeight, bmp.bmPlanes, bmp.bmBitsPixel);
         print(count);
-        Local<ArrayBuffer> jsBits = ArrayBuffer::New(isolate, count);
-        for (LONG_PTR i = 0; i < count; i++) {
-            jsBits->Set(isolate->GetCurrentContext(), i, Number::New(isolate, ((BYTE*)bmp.bmBits)[i]));
-        }
+        Local<ArrayBuffer> ab = ArrayBuffer::New(isolate, count);
+        memcpy(ab->Data(), bmp.bmBits, count);
+        Local<Uint8Array> jsBits = Uint8Array::New(ab, 0, count);
+        //Local<ArrayBuffer> jsBits = ArrayBuffer::New(isolate, count);
+        //for (LONG_PTR i = 0; i < count; i++) {
+        //    jsBits->Set(isolate->GetCurrentContext(), i, Number::New(isolate, ((BYTE*)bmp.bmBits)[i]));
+        //}
         jsBITMAP->Set(isolate->GetCurrentContext(), LITERAL("bmBits"), jsBits);
     }
     else {
-        jsBITMAP->Set(isolate->GetCurrentContext(), LITERAL("bmBits"),       Number::New(isolate, (LONG_PTR)bmp.bmBits));
+        jsBITMAP->Set(isolate->GetCurrentContext(), LITERAL("bmBits"),   Number::New(isolate, (LONG_PTR)bmp.bmBits));
     }
 
     //print(bmp.bmBits);
@@ -11824,16 +12023,23 @@ V8FUNC(CreateBitmapIndirectWrapper) {
     print(bmp.bmWidth << " CreateBitmap " << bmp.bmHeight);
 
     if (GetProperty("bmBits")->IsNumber()) {
-        bmp.bmBits = (LPVOID)GetIntProperty("bmBits");
+        bmp.bmBits = (LPVOID)GetIntProperty("bmBits"); //prolly NULL lol
     }
     else {
-        Local<ArrayBuffer> jsBits = GetProperty("bmBits").As<ArrayBuffer>();
-        bmp.bmBits = new BYTE[jsBits->ByteLength()];
+        //Local<ArrayBuffer> jsAB = GetProperty("bmBits").As<ArrayBuffer>(); //oops, for some reason this cast worked but the ByteLength was 0!
+        Local<ArrayBufferView> jsBits = GetProperty("bmBits").As<ArrayBufferView>();
+
+        //print(jsAB->ByteLength() << " " << jsBits->ByteLength());
+        bmp.bmBits = new BYTE[jsBits->ByteLength()]; //wait what the hell?
+        //memcpy(bmp.bmBits, jsBits->Buffer()->Data(), jsBits->ByteLength()); //this has got to be right AND quicker
+        jsBits->CopyContents(bmp.bmBits, jsBits->ByteLength());
+
         //memset(bmp.bmBits, 0, jsBits->ByteLength()); //sure? (this memset was FOR SURE causing access violations and i realized it before i ran it)
-        print(bmp.bmBits << " e " << jsBits->ByteLength());
-        for (size_t i = 0; i < jsBits->ByteLength(); i++) {
+        //what the hell was i mem setting dawg (also what am i doing down here)
+        //print(bmp.bmBits << " e " << jsBits->ByteLength());
+        /*for (size_t i = 0; i < jsBits->ByteLength(); i++) {
             ((BYTE*)bmp.bmBits)[i] = IntegerFI(jsBits->Get(isolate->GetCurrentContext(), i).ToLocalChecked());
-        }
+        }*/
     }
 
     info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)CreateBitmapIndirect(&bmp)));
@@ -11860,10 +12066,14 @@ V8FUNC(GetObjectDIBITMAP) {
     if (dib.dsBm.bmBits != NULL) {
         LONG_PTR count = msnformula(dib.dsBm.bmWidth, dib.dsBm.bmHeight, dib.dsBm.bmPlanes, dib.dsBm.bmBitsPixel);
         //print(count << " " << dib.dsBmih.biSizeImage << " " << dib.dsBmih.biSize << " " << dib.dsBm.bmWidth << " " << dib.dsBm.bmHeight << " " << dib.dsBm.bmPlanes << " " << dib.dsBm.bmBitsPixel);
-        Local<ArrayBuffer> jsBits = ArrayBuffer::New(isolate, count);//dib.dsBmih.biSizeImage);
-        for (LONG_PTR i = 0; i < count; i++) {
-            jsBits->Set(isolate->GetCurrentContext(), i, Number::New(isolate, ((BYTE*)dib.dsBm.bmBits)[i]));
-        }
+        //Local<ArrayBuffer> jsBits = ArrayBuffer::New(isolate, count);//dib.dsBmih.biSizeImage);
+        //for (LONG_PTR i = 0; i < count; i++) {
+        //    jsBits->Set(isolate->GetCurrentContext(), i, Number::New(isolate, ((BYTE*)dib.dsBm.bmBits)[i]));
+        //}
+        Local<ArrayBuffer> ab = ArrayBuffer::New(isolate, count);
+        memcpy(ab->Data(), dib.dsBm.bmBits, count);
+        Local<Uint8Array> jsBits = Uint8Array::New(ab, 0, count);
+
         jsBITMAP->Set(isolate->GetCurrentContext(), LITERAL("bmBits"), jsBits);
     }
     else {
@@ -11985,12 +12195,42 @@ V8FUNC(CreateDIBSectionWrapper) {
     }
 }
 
-//V8FUNC(SetDIBitsToDeviceWrapper) { //nah nevermind i can't be bothered to add this one because it's literally BitBlt for DIBits (and we already got StretchDIBits)
-//    using namespace v8;
-//    Isolate* isolate = info.GetIsolate();
-//
-//    SetDIBitsToDevice;
-//}
+V8FUNC(SetDIBitsToDeviceWrapper) { //nah nevermind i can't be bothered to add this one because it's literally BitBlt for DIBits (and we already got StretchDIBits)
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    BYTE* bits = NULL;
+
+    if (info[9]->IsNumber()) {
+        bits = (BYTE*)IntegerFI(info[9]);
+    }
+    else if (info[9]->IsArrayBufferView()) {
+        //print("isarraybufferview");
+        Local<ArrayBufferView> jsBits = info[9].As<ArrayBufferView>();
+        bits = (BYTE*)jsBits->Buffer()->Data(); //lol kinda dangerous ok
+    }
+    else if (info[9]->IsObject()) {
+        Local<Object> JSDIBSection = info[9].As<Object>();
+        if (JSDIBSection->Has(isolate->GetCurrentContext(), LITERAL("_bits")).FromJust()) {
+            bits = (BYTE*)IntegerFI(JSDIBSection->Get(isolate->GetCurrentContext(), LITERAL("_bits")).ToLocalChecked());
+        }
+        else {
+            errprint("SetDIBitsToDevice passed object doesn't have _bits (im leaving this here because im not totally sure what object you'd be passing here lmao)");
+        }
+    }
+
+    BITMAPINFO bmi;//{0};
+    memset(&bmi, 0, sizeof(bmi));
+    bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+    bmi.bmiHeader.biWidth = IntegerFI(info[10]);
+    bmi.bmiHeader.biHeight = -IntegerFI(info[11]); // top-down image 
+    bmi.bmiHeader.biPlanes = 1;
+    bmi.bmiHeader.biBitCount = IntegerFI(info[12]); //?????
+    bmi.bmiHeader.biCompression = IntegerFI(info[13]);
+    bmi.bmiHeader.biSizeImage = IntegerFI(info[14]); //bits.length(); //IntegerFI(info[10])*IntegerFI(info[11]);
+
+    info.GetReturnValue().Set(Number::New(isolate, SetDIBitsToDevice((HDC)IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]), IntegerFI(info[4]), IntegerFI(info[5]), IntegerFI(info[6]), IntegerFI(info[7]), IntegerFI(info[8]), bits/*&bits[0]*/, &bmi, DIB_RGB_COLORS)));
+}
 
 V8FUNC(GetSysColorWrapper) {
     using namespace v8;
@@ -12108,7 +12348,7 @@ V8FUNC(SetDIBitsWrapper) { //i wonder why i haven't done SetDIBits yet maybe i f
     else if (info[4]->IsArrayBufferView()) {
         //print("isarraybufferview");
         Local<ArrayBufferView> jsBits = info[4].As<ArrayBufferView>();
-        bits = jsBits->Buffer()->Data();
+        bits = jsBits->Buffer()->Data(); //lol kinda dangerous ok
     }
     else if (info[4]->IsObject()) {
         Local<Object> JSDIBSection = info[4].As<Object>();
@@ -13423,10 +13663,11 @@ V8FUNC(DragDetectWrapper) {
 V8FUNC(GetClassNameWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
-    wchar_t* className = new wchar_t[256];
-    int length = GetClassNameW((HWND)IntegerFI(info[0]), className, 256);
-    info.GetReturnValue().Set(String::NewFromTwoByte(isolate, (const uint16_t*)className, NewStringType::kNormal, length).ToLocalChecked());
-    delete[] className;
+    //wchar_t* className = new wchar_t[256]; //why did i use new?
+    wchar_t className[MAX_PATH];
+    GetClassNameW((HWND)IntegerFI(info[0]), className, MAX_PATH);
+    info.GetReturnValue().Set(String::NewFromTwoByte(isolate, (const uint16_t*)className).ToLocalChecked());
+    //delete[] className;
 }
 
 V8FUNC(AddDllDirectoryWrapper) {
@@ -14498,8 +14739,13 @@ void hid_send_feature_reportWrapper(const v8::FunctionCallbackInfo<v8::Value>& i
 
     unsigned char buf[HID_BUFFER_SIZE]{0};
     size_t length = IntegerFI(info[2]); //i've been a size_t hater ever since i was using it with a for loop and didn't realize it was unsigned so when the range was -1 to 1, size_t spat out garbage and i was geeking (plus i already thought it was stupid and didn't know why i should use it)
+    if (length > HID_BUFFER_SIZE) {
+        length = HID_BUFFER_SIZE;
+        errprint("(hid_send_feature_report) yoooo the number you passed as the second parameter was TOO big and we gotta cap that off at 512 you know what i mean (if you have this problem feel free to tell me about it on github or something because idk what i was doing around this part)");
+    }
     Local<Uint32Array> jsArr = info[1].As<Uint32Array>();
-    memcpy(buf, jsArr->Buffer()->Data(), length-1);
+    //memcpy(buf, jsArr->Buffer()->Data(), length-1);
+    jsArr->CopyContents(buf, length - 1);
     int bytes_wrote = hid_send_feature_report((hid_device*)IntegerFI(info[0]), buf, length);
 
     //memcpy(jsArr->Buffer()->Data(), buf, sizeof(buf));
@@ -14521,7 +14767,13 @@ void hid_get_feature_reportWrapper(const v8::FunctionCallbackInfo<v8::Value>& in
 
     unsigned char buf[HID_BUFFER_SIZE]{ 0 };
     Local<Uint32Array> jsArr = info[1].As<Uint32Array>();
-    memcpy(buf, jsArr->Buffer()->Data(), jsArr->Length());//jsArr->ByteLength());
+    size_t length = jsArr->ByteLength();
+    if (length > HID_BUFFER_SIZE) {
+        length = HID_BUFFER_SIZE;
+        errprint("(hid_get_feature_report) yoooo the array you passed as the second parameter had TOO much data in it and we gotta chop that off at 512 you know what i mean (if you have this problem feel free to tell me about it on github or something because idk what i was doing around this part)");
+    }
+    //memcpy(buf, jsArr->Buffer()->Data(), jsArr->Length());//jsArr->ByteLength());
+    jsArr->CopyContents(buf, length); //hmm...
 
     int bytes_wrote = hid_get_feature_report((hid_device*)IntegerFI(info[0]), buf, sizeof(buf));
 
@@ -14542,8 +14794,9 @@ void hid_writeWrapper(const v8::FunctionCallbackInfo<v8::Value>& info) {
 
     unsigned char buf[HID_BUFFER_SIZE]{ 0 };
     size_t length = IntegerFI(info[2]); //i've been a size_t hater ever since i was using it with a for loop and didn't realize it was unsigned so when the range was -1 to 1, size_t spat out garbage and i was geeking (plus i already thought it was stupid and didn't know why i should use it)
+    //if(length > )
     Local<Uint32Array> jsArr = info[1].As<Uint32Array>();
-    memcpy(buf, jsArr->Buffer()->Data(), length - 1);
+    //memcpy(buf, jsArr->Buffer()->Data(), length - 1);
     int bytes_wrote = hid_write((hid_device*)IntegerFI(info[0]), buf, length);
 
     //memcpy(jsArr->Buffer()->Data(), buf, sizeof(buf));
@@ -14554,7 +14807,7 @@ void hid_writeWrapper(const v8::FunctionCallbackInfo<v8::Value>& info) {
     }
 
     Local<ArrayBuffer> ab = ArrayBuffer::New(isolate, sizeof(buf));
-    memcpy(ab->Data(), buf, sizeof(buf)); //GULP
+    memcpy(ab->Data(), buf, sizeof(buf)); //GULP (WTF IS THIS?)
     Local<Uint32Array> arr = Uint32Array::New(ab, 0, bytes_wrote);
     info.GetReturnValue().Set(arr);
 }
@@ -15242,7 +15495,7 @@ V8FUNC(GetRawInputDataWrapper) {
             print("oopsie poopsie GetRawInputData (uiCommand was " << command << ") didn't work for some reason (returned " << res << ") GetLastError says: (" << GetLastError() << ")");
             SetConsoleTextAttribute(console, 7);
 
-            delete[] lpb; //OOPS!
+            //delete[] lpb; //OOPS! (yo i have no idea why i put delete here if i just delete it anyways outside of this if)
         }
         else {
             Local<Context> context = isolate->GetCurrentContext();
@@ -15285,7 +15538,7 @@ V8FUNC(GetRawInputDataWrapper) {
                     //memcpy(realdata, input->data.hid.bRawData, rawsize);
 
                     Local<ArrayBuffer> ab = ArrayBuffer::New(isolate, rawsize);
-                    memcpy(ab->Data(), input->data.hid.bRawData, rawsize);
+                    memcpy(ab->Data(), input->data.hid.bRawData, rawsize); //still kinda mad bruh why is it BYTE[1] and not just a pointer BYTE*
 
                     Local<Int8Array> arr = Int8Array::New(ab, 0, rawsize);
 
@@ -16523,6 +16776,15 @@ V8FUNC(mt_makeobject) {
     info.GetReturnValue().Set(handle_scope.Escape(object));
 }
 
+V8FUNC(numbertest) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    long long value = info[0].As<Number>()->IntegerValue(isolate->GetCurrentContext()).FromJust();
+    print(&value);
+    print(value); //ok so undefined and NaN are 0 while Infinity is 2**(64-1)
+}
+
 //lol i couldn't remember what the name of this function was
 //well it was worth a shot, while i couldn't remember the name of the function i did remember that you could only use it when making drivers (it's written in wdm.h)
 //V8FUNC(DbgPrintWrapper) {
@@ -16881,6 +17143,13 @@ V8FUNC(CountClipboardFormatsWrapper) {
     info.GetReturnValue().Set(Number::New(isolate, CountClipboardFormats()));
 }
 
+V8FUNC(RegisterClipboardFormatWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, RegisterClipboardFormat(WStringFI(info[0]))));
+}
+
 //i think im allowed to use a snapshot thing to load these quicker
 //https://github.com/danbev/learning-v8/blob/master/notes/snapshots.md
 v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const wchar_t* filename, int nCmdShow) {
@@ -16898,6 +17167,7 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const wchar_t* filename
     //
     //global->Set(isolate, "console", console);
 
+    //global->Set(isolate, "numbertest", FunctionTemplate::New(isolate, numbertest));
 
     global->Set(isolate, "print", FunctionTemplate::New(isolate, Print));
     global->Set(isolate, "printNoHighlight", FunctionTemplate::New(isolate, RawPrint));
@@ -16956,6 +17226,8 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const wchar_t* filename
 #define setGlobalConst(g) global->Set(isolate, #g, Number::New(isolate, g))
 #define setGlobalConstLONGPTR(g) global->Set(isolate, #g, Number::New(isolate, (LONG_PTR)g))
 
+    setGlobalConst(S_OK);
+
     setGlobal(NewCharStrPtr);
     setGlobal(NewWCharStrPtr);
     setGlobal(DeletePtr);
@@ -16963,6 +17235,7 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const wchar_t* filename
 
     setGlobal(mt_incremento);
     setGlobal(mt_makeobject);
+    setGlobal(numbertest);
 
     setGlobalWrapper(OutputDebugString);
 
@@ -17165,7 +17438,7 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const wchar_t* filename
     setGlobalWrapper(SetSysColors);
     setGlobalWrapper(GetSysColor);
     setGlobalWrapper(GetTextExtentPoint32);
-    //setGlobalWrapper(SetDIBitsToDevice);
+    setGlobalWrapper(SetDIBitsToDevice);
     setGlobalWrapper(CreateFontIndirect); //bruh i forgot this line and V8 didn't say SHIT   it just started gaining a ton memory and stopped running (ok wait i don't think i was error checking correctly)
     //next update (tomorrow) im adding all indirect funcs
     
@@ -17237,6 +17510,7 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const wchar_t* filename
     setGlobalWrapper(GetClipboardFormatName);
     setGlobalWrapper(GetPriorityClipboardFormat);
     setGlobalWrapper(CountClipboardFormats);
+    setGlobalWrapper(RegisterClipboardFormat);
     setGlobalConst(CF_TEXT);
     setGlobalConst(CF_BITMAP);
     setGlobalConst(CF_METAFILEPICT);
@@ -19544,6 +19818,7 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
     setGlobalConst(DI_ROPS_READ_DESTINATION);
     setGlobalWrapper(OpenPrinter);
     setGlobalWrapper(ClosePrinter);
+    setGlobalWrapper(GetDefaultPrinter);
 
     setGlobalWrapper(CreateCompatibleBitmap);
     setGlobalWrapper(CreateCompatibleDC);
@@ -20123,6 +20398,9 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrevInstance, PWSTR nCmdList, in
     //print("JUST LEARNED THAT I'VE BEEN USING OBJECT TEMPLATES WRONG AND IT'S BEEN SLOWING DOWN JBS3 THIS ENTIRE TIME CHECK jsEffectOT!!!"); //i had no idea the actual problem with my use of object templates was the memory
     //print("finish CreateTableTransferEffect when i feel like it");
     print("make effects take an animation parameters because idk how that works yet");
+    print("oh my GOD i GOTTA retest all the hid functions because the way i wrote some of those there's actually no way they work");
+    print("also i ramble on about dibits being flips but idk if gdi does that or javascript so investigatw!."); //big fan of balatro flush 5 hand
+    print("watch out for ID2D1Bitmap CopyFromMemory because the pitch might be wrong if the bitmap isn't 32 bit count/depth");
     //print("oh yeah i don't have to use GetRealNamedProperty and i can just use Get instead (my bad)"); //nah idk if i should switch because what if get is slower or something idk...
 
     SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), 7);
@@ -20144,7 +20422,8 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrevInstance, PWSTR nCmdList, in
     //1.5.90 fixed every DIRECT2D get#Impl function from returning a NEW object template every time (JBSBLUEPRINTS NOW STAYS AT LESS THAN 100MB!!!!)
     //1.6.0 fixed EVERY object template that was created in a FunctionTemplate!!
     //1.6.01 i changed ColorF to be inside of D2D1
-    print("JBS3 -> Version 1.6.01"); //so idk how normal version things work so the first number will probably stay one --- i will increment the second number if i change an existing function like when i remade the CreateWindowClass and CreateWindow functions --- i might random increment the third number if i feel like it
+    //1.6.02 i changed every function that returned any type of ArrayBuffer to return a Uint8Array instead (beside hid functions)
+    print("JBS3 -> Version 1.6.02"); //so idk how normal version things work so the first number will probably stay one --- i will increment the second number if i change an existing function like when i remade the CreateWindowClass and CreateWindow functions --- i might random increment the third number if i feel like it
     print(screenWidth << "x" << screenHeight);
     
 

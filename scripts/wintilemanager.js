@@ -115,7 +115,8 @@ function randomcolorandd2dbitmapfromHICON(icon) {
     //apps[path].d2dicon = d2d.CreateBitmapFromWicBitmap(wicbmp, true); //why ain't this working (bruh im mad)
     let dim = wicbmp.GetSize();
     let d2dicon = d2d.CreateBitmap(dim.width, dim.height);
-    let pixels = wicbmp.GetPixels(wic);
+    let pixels = wicbmp.GetPixels(wic); //GetPixels now returns a Uint8Array so to keep this code the same imma promote it to a Uint32Array
+    pixels = new Uint32Array(pixels.buffer.transfer());
     d2dicon.CopyFromMemory(0, 0, dim.width, dim.height, pixels);
     //[dim.width/2, dim.height/2]
     blurRGBA(pixels, dim.width, dim.height, 3); //blur because i wanted like an "average" of all the colors but since it;s "transparent" it just blurs to black so idgaf anymore and im just gonna keep this line anyways

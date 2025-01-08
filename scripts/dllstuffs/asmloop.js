@@ -26,7 +26,7 @@ function strmanipoutjs(str, out) { //in js you lowkey can't change a direct stri
     //str_out is rdx
     let str_out = "";//Object.keys(new Array(str.length).toString()+1).map(e => "#").join("");
     const r8 = str.length;
-    for(let r9 = 0; r9 < r8; r9++) { //i use r9 as the count register (because it's volatile and i don't have to preserve its original value)
+    for(let r9 = 0; r9 < r8; r9++) { //i use r9 as the count register (because it's volatile and i don't have to preserve its original value (keep in mind though that its value is the fourth integer parameter (for windows)))
         //oh wait i guess i've never tried to set an individual character
         //since strings are immutable i don't think you can...
         //out.str_out[r9] = String.fromCharCode(str[r9].charCodeAt(0)+1);

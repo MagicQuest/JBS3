@@ -32,8 +32,8 @@ function windowProc(hwnd, msg, wp, lp) {
         print("WM_RENDERALLFORMATS called!");
         if (OpenClipboard(hwnd)) {
             if (GetClipboardOwner() == hwnd) {
-                SetClipboardData(CF_TEXT, "WM_RENDERFORMAT DELAYED RENDERING!");
-                SetClipboardData(CF_UNICODETEXT, "WM_RENDERFORMAT DELAYED RENDERING! (CF_UNICODETEXT)");
+                SetClipboardData(CF_TEXT, "WM_RENDERALLFORMATS DELAYED RENDERING!");
+                SetClipboardData(CF_UNICODETEXT, "WM_RENDERALLFORMATS DELAYED RENDERING! (CF_UNICODETEXT)");
             }
             CloseClipboard();
         }

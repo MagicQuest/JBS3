@@ -47,6 +47,10 @@
 
     function elapse(time) {
         elapsedTime += (parseInt(time, 16)/divisions)*(60/tempo)*(1000); //deltatime in milliseconds
+        //if(tempos?.length && elapsedTime > tempos[0][1]) {
+        //    tempo = tempos[0][0];
+        //    tempos.splice(0, 1);
+        //}
         funprints && print("elapsed", (parseInt(time, 16)/divisions)*(60/tempo)*(1000), "ms");
     }
 
@@ -61,6 +65,8 @@
             }
             //print(str, parseInt(str, 16));
             tempo = (1000000*60)/parseInt(str, 16); //https://people.carleton.edu/~jellinge/m108f13/pages/04/04StandardMIDIFiles.html#:~:text=0%20%3D%20major%20key-,Tempo%20Meta%20Event,-Byte%201
+            //tempos.push([tempo, elapsedTime]);
+            //temposCopy.push([tempo, elapsedTime]);
             print(`tempo now ${tempo} at ${elapsedTime} ms in`);
         } //handle FF 03 event because it's fucking up on the beach at night (i'd include the midi file im talking about in jbs but im not gonna lie i have no idea where i got it (maybe i converted the starbound *.abc to midi somehow but that was a long time ago (apparently august 28th 2022))) (NOPE WHAT ACTUALLY HAPPENED IS I FOUND IT IN THE DESCRIPTION OF A RANDOM VIDEO! https://www.youtube.com/watch?v=cyxmIXhihg8) 
         else if(event[2] == "01" || event[2] == "02" || event[2] == "03") {
@@ -76,6 +82,7 @@
             print(`reached track end event of track ${currentTrackNumber}`);
             readingTrack = false;
             elapsedTime = 0;
+            //tempos = Array.from(temposCopy); //i think Array.from is shallow but im not modifying the lower arrays lol
         }
     }
 
@@ -152,6 +159,8 @@
 
     let divisions;
     let tempo = 60;
+    //let tempos;
+    //let temposCopy = [];
     let realNotes = [];
     //let readNotes = false;
     let readingTrack = false;

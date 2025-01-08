@@ -1,3 +1,5 @@
+//wic to DIBits
+
 const fs = require("fs");
 //let png = fs.read(file.name);//fs.read(__dirname+"/msnexample.png");
 //print("EYESAREGREENIEATMYVEGTABLES",png.length, png);

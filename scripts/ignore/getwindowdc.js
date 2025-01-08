@@ -84,7 +84,7 @@ wc.hbrBackground   = COLOR_BACKGROUND;
 wc.DefWindowProc   = false; //important!
 
 hWnd = CreateWindow(NULL, wc,
-                    "GetDC() and GetWindowDC()",
+                    "GetDC() and GetWindowDC() - click on the window",
                     WS_OVERLAPPEDWINDOW,
                     CW_USEDEFAULT,
                     0,

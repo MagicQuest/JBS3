@@ -11,6 +11,7 @@ let scrollWidth = 10000;
 let scrollPosX = 0;
 let i = 1;
 let tempo = 130;
+let playTempo = [];
 let playStart = 0;
 let playing = false;
 let playJ = 0;
@@ -366,7 +367,7 @@ function DrawPianoKeys(mouse) {
 
 function GetClientCursorPos(rect) {
     let mouse = GetCursorPos();
-    return {x: mouse.x-rect.left-8, y: mouse.y-rect.top-33/*-20*/}; //uh oh the menu bar is messing up my calculations!
+    return {x: mouse.x-rect.left-8, y: mouse.y-rect.top-33/*-20*/}; //uh oh the menu bar is messing up my calculations! (for some reason)
 }
 
 const tones = [
@@ -496,7 +497,7 @@ function windowProc(hwnd, msg, wp, lp) {
         font = d2d.CreateFont("arial", 12);
         biggerfont = d2d.CreateFont("arial", 30);
         
-        print(d2d.backBitmap, d2d.targetBitmap);
+        print(d2d.backBitmap, d2d.targetBitmap); //ID2D1DeviceContext and up!
 
         //testBmp = d2d.CreateBitmapFromDxgiSurface(D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW);
         
@@ -565,6 +566,7 @@ function windowProc(hwnd, msg, wp, lp) {
         AppendMenu(hMenu, MF_POPUP, hInstrumentMenu, "Select Instrument");
 
         fluidsynthinst = new fluidsynth(__dirname+"\\fluidsynth\\TimGM6mb.sf2"); //i gotta create this shit here so i can change hBankMenu and hProgMenu
+        //fluidsynthinst.valid = false;
 
         SetMenu(hwnd, hMenu);
 
