@@ -1,10 +1,17 @@
 //ok lmao i made this file then immediately realized that idk how i'll actually do this
 //i wanted to use ffi to make a d2d1 factory but im not sure HOW i'll actually execute the functions of the pointer to an ID2D1Factory7 object
 //lets try anyways
-//when i started making this i actually thought it was impossible but im pretty surprised i was able to make it work
+//when i started making this i actually thought it was impossible but im pretty surprised i was able to make it work  https://blog.holbertonschool.com/hack-virtual-memory-stack-registers-assembly-code/    https://stackoverflow.com/questions/22263890/virtual-table-layout-on-msvc-wheres-the-type-info
+
+//what i use to generate the assembly bytes is: https://defuse.ca/online-x86-assembler.htm#disassembly (make sure to use x64 tho)
+
 //im including a test file i made in c++ to figure how exactly i could call an object's method in asm (inheritanceandthevtptr.cpp)
 
 //one problem with the GenericPtrObject is that you can't call specific overloaded versions of a method you can only call the latest overload (i guess it wouldn't be that hard to change that but it wouldn't be that intuahtive)
+
+//it seems like im really lucky that (most?) COM objects don't use multiple inheritance because it starts getting weird -> https://www.openrce.org/articles/full_view/23
+
+//just in case i want to get a little more serious... https://blog.quarkslab.com/visual-c-rtti-inspection.html    https://www.blackhat.com/presentations/bh-dc-07/Sabanal_Yason/Presentation/bh-dc-07-Sabanal_Yason.pdf    https://www.openrce.org/articles/full_view/23    https://devblogs.microsoft.com/oldnewthing/20150320-00/?p=44423    https://blog.quarkslab.com/resources/2013-07-12_visualcpp-rtti-inspection/scripts/parse-rtti.zip
 
 eval(require("fs").read(__dirname+"/marshallib.js"));
 eval(require("fs").read(__dirname+"/ffigetexportedfunctions.js")); //for some reason if i want this one to work i gotta "import" it after marshallib.js
@@ -342,7 +349,7 @@ const __vtptr_ID2D1SolidColorBrush = [ //d2d1.h (line 1279)
 //}
 
 //ooooooouuuuuhhhh we might have to do some asm dereference
-function dereferenceULONG_PTR(ptr, index = 0) {
+function dereferenceULONG_PTR(ptr, index = 0) { //returns *(ULONG_PTR*)ptr
     print("dereferencing", ptr+(index*sizeof["ULONG_PTR"]));
     if(ptr == 0) {
         print("dereferencing NULL ptr!\x07");
@@ -386,11 +393,12 @@ class GenericPtrObject { //lowkey i guess there's really no need to extend this 
         //ok this asm code was written for my test project in c++ (inheritanceandthevtptr.cpp) and the method i was calling was void but this time it could be anything so im MOVABS-ing the method pointer as an immediate value to be passed into CALL because you can't CALL an absolute immediate 64 bit value
         //ok a HUGE problem i've been having is that for some reason when you try to call a method with parameters it works but the RBP register is messed up once you leave the function (the pop doesn't return the same value) so we get an access violation like just after the method is called
         //so to fix this problem im gonna actually write down what rbp was before and then get it again
-        //ok ANOTHER thing that's going wrong is that for some reason rsp keeps pointing to 0 (which could mean rsp gets changed or something keeps clearing the top of the stack) and so when i use RET, it dereferences rsp to transfer control back to the caller (libffi's ffi_call_win64 (because i use JBS' Call function to run the asm code)) and i get an access violation
+        //ok ANOTHER thing that's going wrong is that for some reason right after the call instruction rsp+8 keeps pointing to 0 (which could mean rsp gets changed or something keeps clearing it) and so after the leave instruction (leave pops rbp which adds 8 to rsp) when i use RET, it dereferences rsp to transfer control back to the caller (libffi's ffi_call_win64 (because i use JBS' Call function to run the asm code)) and i get an access violation
+        //https://stackoverflow.com/questions/20129107/what-is-the-x86-ret-instruction-equivalent-to    https://stackoverflow.com/questions/62364368/what-is-the-difference-between-the-ret-instruction-in-x86-and-x64?rq=3
         //ok i might have to copy what rsp points to too
         //ngl this solution took like 2 days to cook up
         return __asm([ //im not gonna lie i don't think i know enough about asm to solve this in the "correct" way so im just doing what i think is gonna work
-            //0xcc,                                                                               //interrupt (dbugbreak for testing)
+            //0xcc,                                                                             //interrupt (dbugbreak for testing)
 
             //store the value of rbp since for some reason this technique doesn't pop the correct value at the end...
             0x48, 0xb8, ...int64_to_little_endian_hex(PointerFromArrayBuffer(RBPHOLDER.data)),  //movabs rax, imm64 (pointer to RBPHOLDER)
@@ -400,7 +408,7 @@ class GenericPtrObject { //lowkey i guess there's really no need to extend this 
             0x4c, 0x8b, 0x14, 0x24,                                                             //mov r10, QWORD PTR [rsp]
             0x4c, 0x89, 0x10,                                                                   //mov QWORD PTR [rax], r10
             
-            0xc8, 0x00, 0x00, 0x00,                                                             //enter 0, 0
+            0xc8, 0x00, 0x00, 0x00,                                                             //enter 0, 0 (https://stackoverflow.com/questions/5858996/enter-and-leave-in-assembly)
             0x48, 0xb8, ...int64_to_little_endian_hex(methodptr),                               //movabs rax, ...imm64 (https://www.reddit.com/r/Assembly_language/comments/141bi1i/comment/jmz6z2y/?utm_source=share&utm_medium=web3x&utm_name=web3xcss&utm_term=1&utm_content=share_button)
             0xff, 0xd0,                                                                         //call rax
             //for some reason after calling rax it clears the top of the stack ([rsp])

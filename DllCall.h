@@ -9,6 +9,8 @@
 //just learned about std::variant so lets see? (oh wait im not using c++17)
 //ok nah lets see if i can't get these unions to work... (nevermind)
 
+//honestly if i ever try to do this again i'd definitely have to go the asm route like libffi does (but probably a lot simpler)
+
 typedef void* (__stdcall* g_func_ptr_0)();
 typedef void* (__stdcall* g_func_ptr_1)(void*); //generic function pointer 1
 typedef void* (__stdcall* g_func_ptr_2)(void*, void*);
