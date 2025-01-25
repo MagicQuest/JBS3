@@ -4630,308 +4630,319 @@ E:\Users\megal\source\repos\JBS3\JBS3.cpp(15961,82): warning C4244:         with
 E:\Users\megal\source\repos\JBS3\JBS3.cpp(15961,82): warning C4244:         [
 E:\Users\megal\source\repos\JBS3\JBS3.cpp(15961,82): warning C4244:             T=int64_t
 E:\Users\megal\source\repos\JBS3\JBS3.cpp(15961,82): warning C4244:         ]
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(15977,17): warning C4244: 'initializing': conversion from 'T' to 'DWORD', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(15977,17): warning C4244:         with
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(15977,17): warning C4244:         [
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(15977,17): warning C4244:             T=int64_t
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(15977,17): warning C4244:         ]
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(15983,30): warning C4244: '=': conversion from 'T' to 'DWORD', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(15983,30): warning C4244:         with
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(15983,30): warning C4244:         [
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(15983,30): warning C4244:             T=int64_t
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(15983,30): warning C4244:         ]
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(15991,90): warning C4244: 'argument': conversion from 'LONG_PTR' to 'double', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16005,117): warning C4244: 'argument': conversion from 'T' to 'DWORD', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16005,117): warning C4244:         with
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16005,117): warning C4244:         [
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16005,117): warning C4244:             T=int64_t
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16005,117): warning C4244:         ]
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16005,97): warning C4244: 'argument': conversion from 'T' to 'DWORD', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16005,97): warning C4244:         with
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16005,97): warning C4244:         [
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16005,97): warning C4244:             T=int64_t
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16005,97): warning C4244:         ]
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16005,76): warning C4244: 'argument': conversion from 'LONG_PTR' to 'double', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16055,33): warning C4244: '=': conversion from 'T' to 'DWORD', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16055,33): warning C4244:         with
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16055,33): warning C4244:         [
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16055,33): warning C4244:             T=int64_t
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16055,33): warning C4244:         ]
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16058,37): warning C4244: '=': conversion from 'T' to 'DWORD', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16058,37): warning C4244:         with
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16058,37): warning C4244:         [
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16058,37): warning C4244:             T=int64_t
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16058,37): warning C4244:         ]
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16082,41): warning C4267: '=': conversion from 'size_t' to 'DWORD', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16088,33): warning C4267: '=': conversion from 'size_t' to 'DWORD', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16099,100): warning C4244: 'argument': conversion from 'T' to 'BOOL', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16099,100): warning C4244:         with
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16099,100): warning C4244:         [
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16099,100): warning C4244:             T=int64_t
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16099,100): warning C4244:         ]
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16099,80): warning C4244: 'argument': conversion from 'T' to 'BOOL', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16099,80): warning C4244:         with
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16099,80): warning C4244:         [
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16099,80): warning C4244:             T=int64_t
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16099,80): warning C4244:         ]
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16099,73): warning C4244: 'argument': conversion from 'LONG_PTR' to 'double', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16134,33): warning C4244: '=': conversion from 'T' to 'DWORD', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16134,33): warning C4244:         with
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16134,33): warning C4244:         [
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16134,33): warning C4244:             T=int64_t
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16134,33): warning C4244:         ]
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16137,37): warning C4244: '=': conversion from 'T' to 'DWORD', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16137,37): warning C4244:         with
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16137,37): warning C4244:         [
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16137,37): warning C4244:             T=int64_t
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16137,37): warning C4244:         ]
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16144,78): warning C4267: 'argument': conversion from 'size_t' to 'DWORD', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16162,69): warning C4244: 'argument': conversion from 'T' to 'DWORD', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16162,69): warning C4244:         with
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16162,69): warning C4244:         [
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16162,69): warning C4244:             T=int64_t
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16162,69): warning C4244:         ]
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16177,26): warning C4244: '=': conversion from 'T' to 'UINT', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16177,26): warning C4244:         with
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16177,26): warning C4244:         [
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16177,26): warning C4244:             T=int64_t
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16177,26): warning C4244:         ]
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16308,18): warning C4244: 'initializing': conversion from 'T' to 'DWORD', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16308,18): warning C4244:         with
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16308,18): warning C4244:         [
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16308,18): warning C4244:             T=int64_t
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16308,18): warning C4244:         ]
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16360,22): warning C4244: 'initializing': conversion from 'T' to 'DWORD', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16360,22): warning C4244:         with
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16360,22): warning C4244:         [
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16360,22): warning C4244:             T=int64_t
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16360,22): warning C4244:         ]
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16363,100): warning C4244: 'argument': conversion from 'T' to 'DWORD', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16363,100): warning C4244:         with
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16363,100): warning C4244:         [
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16363,100): warning C4244:             T=int64_t
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16363,100): warning C4244:         ]
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16384,43): warning C4244: 'argument': conversion from 'int64_t' to 'double', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16408,150): warning C4244: 'argument': conversion from 'T' to 'REGSAM', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16408,150): warning C4244:         with
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16408,150): warning C4244:         [
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16408,150): warning C4244:             T=int64_t
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16408,150): warning C4244:         ]
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16408,130): warning C4244: 'argument': conversion from 'T' to 'DWORD', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16408,130): warning C4244:         with
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16408,130): warning C4244:         [
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16408,130): warning C4244:             T=int64_t
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16408,130): warning C4244:         ]
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16419,66): warning C4244: 'argument': conversion from 'LONG_PTR' to 'double', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16429,101): warning C4244: 'argument': conversion from 'T' to 'REGSAM', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16429,101): warning C4244:         with
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16429,101): warning C4244:         [
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16429,101): warning C4244:             T=int64_t
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16429,101): warning C4244:         ]
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16429,81): warning C4244: 'argument': conversion from 'T' to 'DWORD', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16429,81): warning C4244:         with
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16429,81): warning C4244:         [
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16429,81): warning C4244:             T=int64_t
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16429,81): warning C4244:         ]
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16435,66): warning C4244: 'argument': conversion from 'LONG_PTR' to 'double', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16458,18): warning C4244: 'initializing': conversion from 'T' to 'DWORD', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16458,18): warning C4244:         with
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16458,18): warning C4244:         [
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16458,18): warning C4244:             T=int64_t
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16458,18): warning C4244:         ]
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16470,61): warning C4244: 'argument': conversion from 'T' to 'DWORD', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16470,61): warning C4244:         with
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16470,61): warning C4244:         [
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16470,61): warning C4244:             T=int64_t
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16470,61): warning C4244:         ]
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16497,18): warning C4244: 'initializing': conversion from 'T' to 'DWORD', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16497,18): warning C4244:         with
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16497,18): warning C4244:         [
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16497,18): warning C4244:             T=int64_t
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16497,18): warning C4244:         ]
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16509,22): warning C4244: 'initializing': conversion from 'T' to 'DWORD', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16509,22): warning C4244:         with
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16509,22): warning C4244:         [
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16509,22): warning C4244:             T=int64_t
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16509,22): warning C4244:         ]
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16516,57): warning C4244: 'argument': conversion from 'T' to 'DWORD', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16516,57): warning C4244:         with
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16516,57): warning C4244:         [
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16516,57): warning C4244:             T=int64_t
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16516,57): warning C4244:         ]
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16520,57): warning C4244: 'argument': conversion from 'T' to 'DWORD', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16520,57): warning C4244:         with
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16520,57): warning C4244:         [
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16520,57): warning C4244:             T=int64_t
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16520,57): warning C4244:         ]
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16527,56): warning C4244: 'argument': conversion from 'LRESULT' to 'double', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16547,47): warning C4244: 'argument': conversion from 'int64_t' to 'double', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16570,18): warning C4244: 'initializing': conversion from 'T' to 'DWORD', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16570,18): warning C4244:         with
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16570,18): warning C4244:         [
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16570,18): warning C4244:             T=int64_t
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16570,18): warning C4244:         ]
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16591,21): warning C4244: 'initializing': conversion from 'T' to 'DWORD', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16591,21): warning C4244:         with
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16591,21): warning C4244:         [
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16591,21): warning C4244:             T=int64_t
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16591,21): warning C4244:         ]
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16603,40): warning C4267: '=': conversion from 'size_t' to 'UINT', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16692,35): warning C4018: '<': signed/unsigned mismatch
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16746,57): warning C4244: 'argument': conversion from '__int64' to 'double', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16936,31): warning C4244: '=': conversion from 'T' to 'DWORD', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16936,31): warning C4244:         with
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16936,31): warning C4244:         [
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16936,31): warning C4244:             T=int64_t
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16936,31): warning C4244:         ]
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16939,31): warning C4244: '=': conversion from 'T' to 'DWORD', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16939,31): warning C4244:         with
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16939,31): warning C4244:         [
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16939,31): warning C4244:             T=int64_t
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16939,31): warning C4244:         ]
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16942,35): warning C4244: '=': conversion from 'T' to 'DWORD', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16942,35): warning C4244:         with
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16942,35): warning C4244:         [
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16942,35): warning C4244:             T=int64_t
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16942,35): warning C4244:         ]
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16945,35): warning C4244: '=': conversion from 'T' to 'DWORD', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16945,35): warning C4244:         with
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16945,35): warning C4244:         [
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16945,35): warning C4244:             T=int64_t
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16945,35): warning C4244:         ]
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16948,41): warning C4244: '=': conversion from 'T' to 'DWORD', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16948,41): warning C4244:         with
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16948,41): warning C4244:         [
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16948,41): warning C4244:             T=int64_t
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16948,41): warning C4244:         ]
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16951,41): warning C4244: '=': conversion from 'T' to 'DWORD', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16951,41): warning C4244:         with
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16951,41): warning C4244:         [
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16951,41): warning C4244:             T=int64_t
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16951,41): warning C4244:         ]
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16954,43): warning C4244: '=': conversion from 'T' to 'DWORD', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16954,43): warning C4244:         with
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16954,43): warning C4244:         [
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16954,43): warning C4244:             T=int64_t
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16954,43): warning C4244:         ]
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16957,35): warning C4244: '=': conversion from 'T' to 'DWORD', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16957,35): warning C4244:         with
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16957,35): warning C4244:         [
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16957,35): warning C4244:             T=int64_t
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16957,35): warning C4244:         ]
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16960,39): warning C4244: '=': conversion from 'T' to 'WORD', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16960,39): warning C4244:         with
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16960,39): warning C4244:         [
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16960,39): warning C4244:             T=int64_t
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16960,39): warning C4244:         ]
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16974,151): warning C4244: 'argument': conversion from 'T' to 'DWORD', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16974,151): warning C4244:         with
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16974,151): warning C4244:         [
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16974,151): warning C4244:             T=int64_t
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16974,151): warning C4244:         ]
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16974,131): warning C4244: 'argument': conversion from 'T' to 'BOOL', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16974,131): warning C4244:         with
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16974,131): warning C4244:         [
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16974,131): warning C4244:             T=int64_t
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16974,131): warning C4244:         ]
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16981,82): warning C4244: 'argument': conversion from 'LONG_PTR' to 'double', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(16982,81): warning C4244: 'argument': conversion from 'LONG_PTR' to 'double', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(17000,79): warning C4244: 'argument': conversion from 'LONG_PTR' to 'double', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(17007,73): warning C4244: 'argument': conversion from 'T' to 'UINT', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(17007,73): warning C4244:         with
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(17007,73): warning C4244:         [
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(17007,73): warning C4244:             T=int64_t
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(17007,73): warning C4244:         ]
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(17021,79): warning C4244: 'argument': conversion from 'T' to 'UINT', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(17021,79): warning C4244:         with
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(17021,79): warning C4244:         [
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(17021,79): warning C4244:             T=int64_t
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(17021,79): warning C4244:         ]
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(17028,17): warning C4244: 'initializing': conversion from 'T' to 'UINT', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(17028,17): warning C4244:         with
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(17028,17): warning C4244:         [
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(17028,17): warning C4244:             T=int64_t
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(17028,17): warning C4244:         ]
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(17040,70): warning C4244: 'argument': conversion from 'LONG_PTR' to 'double', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(17057,41): warning C4244: 'argument': conversion from 'T' to 'UINT', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(17057,41): warning C4244:         with
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(17057,41): warning C4244:         [
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(17057,41): warning C4244:             T=int64_t
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(17057,41): warning C4244:         ]
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(17084,17): warning C4244: 'initializing': conversion from 'T' to 'UINT', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(17084,17): warning C4244:         with
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(17084,17): warning C4244:         [
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(17084,17): warning C4244:             T=int64_t
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(17084,17): warning C4244:         ]
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(17112,78): warning C4244: 'argument': conversion from 'LONG_PTR' to 'double', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(17124,27): warning C4018: '<': signed/unsigned mismatch
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(17125,23): warning C4244: '=': conversion from 'T' to '_Ty', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(17125,23): warning C4244:         with
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(17125,23): warning C4244:         [
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(17125,23): warning C4244:             T=int64_t
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(17125,23): warning C4244:         ]
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(17125,23): warning C4244:         and
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(17125,23): warning C4244:         [
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(17125,23): warning C4244:             _Ty=std::_Vbase
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(17125,23): warning C4244:         ]
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(17132,23): warning C4244: '=': conversion from 'T' to '_Ty', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(17132,23): warning C4244:         with
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(17132,23): warning C4244:         [
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(17132,23): warning C4244:             T=int64_t
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(17132,23): warning C4244:         ]
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(17132,23): warning C4244:         and
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(17132,23): warning C4244:         [
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(17132,23): warning C4244:             _Ty=std::_Vbase
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(17132,23): warning C4244:         ]
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(17136,101): warning C4267: 'argument': conversion from 'size_t' to 'int', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(17186,70): warning C4244: 'argument': conversion from 'LONG_PTR' to 'double', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(18442,164): warning C4244: 'argument': conversion from 'double' to 'FLOAT', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(18442,146): warning C4244: 'argument': conversion from 'double' to 'FLOAT', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(18442,114): warning C4244: 'argument': conversion from 'double' to 'FLOAT', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(18442,96): warning C4244: 'argument': conversion from 'double' to 'FLOAT', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(18446,163): warning C4244: 'argument': conversion from 'double' to 'FLOAT', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(18446,145): warning C4244: 'argument': conversion from 'double' to 'FLOAT', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(18446,113): warning C4244: 'argument': conversion from 'double' to 'FLOAT', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(18446,95): warning C4244: 'argument': conversion from 'double' to 'FLOAT', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(18456,149): warning C4244: 'argument': conversion from 'double' to 'FLOAT', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(18456,131): warning C4244: 'argument': conversion from 'double' to 'FLOAT', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(18456,99): warning C4244: 'argument': conversion from 'double' to 'FLOAT', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(18460,120): warning C4244: 'argument': conversion from 'double' to 'FLOAT', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(18460,102): warning C4244: 'argument': conversion from 'double' to 'FLOAT', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(18476,472): warning C4244: 'argument': conversion from 'double' to 'FLOAT', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(18476,389): warning C4244: 'argument': conversion from 'double' to 'FLOAT', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(18476,306): warning C4244: 'argument': conversion from 'double' to 'FLOAT', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(18476,223): warning C4244: 'argument': conversion from 'double' to 'FLOAT', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(18476,140): warning C4244: 'argument': conversion from 'double' to 'FLOAT', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(18476,57): warning C4244: 'argument': conversion from 'double' to 'FLOAT', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(18477,66): warning C4244: 'argument': conversion from 'LONG_PTR' to 'double', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(18484,66): warning C4244: 'argument': conversion from 'LONG_PTR' to 'double', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(18506,132): warning C4244: 'argument': conversion from 'double' to 'FLOAT', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(18506,114): warning C4244: 'argument': conversion from 'double' to 'FLOAT', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(18506,96): warning C4244: 'argument': conversion from 'double' to 'FLOAT', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(18510,96): warning C4244: 'argument': conversion from 'double' to 'FLOAT', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(18514,96): warning C4244: 'argument': conversion from 'double' to 'FLOAT', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(18518,166): warning C4244: 'argument': conversion from 'double' to 'FLOAT', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(18518,148): warning C4244: 'argument': conversion from 'double' to 'FLOAT', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(18518,130): warning C4244: 'argument': conversion from 'double' to 'FLOAT', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(18518,112): warning C4244: 'argument': conversion from 'double' to 'FLOAT', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(18522,100): warning C4244: 'argument': conversion from 'double' to 'FLOAT', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(18526,100): warning C4244: 'argument': conversion from 'double' to 'FLOAT', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(18530,100): warning C4244: 'argument': conversion from 'double' to 'FLOAT', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(18534,138): warning C4244: 'argument': conversion from 'double' to 'FLOAT', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(18534,120): warning C4244: 'argument': conversion from 'double' to 'FLOAT', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(18534,102): warning C4244: 'argument': conversion from 'double' to 'FLOAT', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(18538,112): warning C4244: 'argument': conversion from 'double' to 'FLOAT', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(19680,9): warning C4005: 'MAKEINTRESOURCE': macro redefinition
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(15987,84): warning C4244: 'argument': conversion from 'ULONG_PTR' to 'double', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(15988,87): warning C4244: 'argument': conversion from 'ULONG_PTR' to 'double', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(15991,72): warning C4244: 'argument': conversion from 'SIZE_T' to 'double', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16037,17): warning C4244: 'initializing': conversion from 'T' to 'DWORD', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16037,17): warning C4244:         with
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16037,17): warning C4244:         [
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16037,17): warning C4244:             T=int64_t
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16037,17): warning C4244:         ]
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16043,30): warning C4244: '=': conversion from 'T' to 'DWORD', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16043,30): warning C4244:         with
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16043,30): warning C4244:         [
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16043,30): warning C4244:             T=int64_t
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16043,30): warning C4244:         ]
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16051,90): warning C4244: 'argument': conversion from 'LONG_PTR' to 'double', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16065,117): warning C4244: 'argument': conversion from 'T' to 'DWORD', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16065,117): warning C4244:         with
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16065,117): warning C4244:         [
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16065,117): warning C4244:             T=int64_t
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16065,117): warning C4244:         ]
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16065,97): warning C4244: 'argument': conversion from 'T' to 'DWORD', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16065,97): warning C4244:         with
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16065,97): warning C4244:         [
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16065,97): warning C4244:             T=int64_t
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16065,97): warning C4244:         ]
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16065,76): warning C4244: 'argument': conversion from 'LONG_PTR' to 'double', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16115,33): warning C4244: '=': conversion from 'T' to 'DWORD', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16115,33): warning C4244:         with
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16115,33): warning C4244:         [
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16115,33): warning C4244:             T=int64_t
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16115,33): warning C4244:         ]
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16118,37): warning C4244: '=': conversion from 'T' to 'DWORD', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16118,37): warning C4244:         with
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16118,37): warning C4244:         [
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16118,37): warning C4244:             T=int64_t
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16118,37): warning C4244:         ]
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16142,41): warning C4267: '=': conversion from 'size_t' to 'DWORD', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16148,33): warning C4267: '=': conversion from 'size_t' to 'DWORD', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16159,100): warning C4244: 'argument': conversion from 'T' to 'BOOL', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16159,100): warning C4244:         with
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16159,100): warning C4244:         [
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16159,100): warning C4244:             T=int64_t
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16159,100): warning C4244:         ]
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16159,80): warning C4244: 'argument': conversion from 'T' to 'BOOL', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16159,80): warning C4244:         with
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16159,80): warning C4244:         [
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16159,80): warning C4244:             T=int64_t
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16159,80): warning C4244:         ]
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16159,73): warning C4244: 'argument': conversion from 'LONG_PTR' to 'double', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16194,33): warning C4244: '=': conversion from 'T' to 'DWORD', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16194,33): warning C4244:         with
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16194,33): warning C4244:         [
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16194,33): warning C4244:             T=int64_t
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16194,33): warning C4244:         ]
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16197,37): warning C4244: '=': conversion from 'T' to 'DWORD', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16197,37): warning C4244:         with
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16197,37): warning C4244:         [
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16197,37): warning C4244:             T=int64_t
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16197,37): warning C4244:         ]
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16204,78): warning C4267: 'argument': conversion from 'size_t' to 'DWORD', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16222,69): warning C4244: 'argument': conversion from 'T' to 'DWORD', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16222,69): warning C4244:         with
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16222,69): warning C4244:         [
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16222,69): warning C4244:             T=int64_t
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16222,69): warning C4244:         ]
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16237,26): warning C4244: '=': conversion from 'T' to 'UINT', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16237,26): warning C4244:         with
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16237,26): warning C4244:         [
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16237,26): warning C4244:             T=int64_t
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16237,26): warning C4244:         ]
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16368,18): warning C4244: 'initializing': conversion from 'T' to 'DWORD', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16368,18): warning C4244:         with
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16368,18): warning C4244:         [
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16368,18): warning C4244:             T=int64_t
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16368,18): warning C4244:         ]
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16420,22): warning C4244: 'initializing': conversion from 'T' to 'DWORD', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16420,22): warning C4244:         with
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16420,22): warning C4244:         [
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16420,22): warning C4244:             T=int64_t
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16420,22): warning C4244:         ]
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16423,100): warning C4244: 'argument': conversion from 'T' to 'DWORD', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16423,100): warning C4244:         with
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16423,100): warning C4244:         [
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16423,100): warning C4244:             T=int64_t
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16423,100): warning C4244:         ]
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16444,43): warning C4244: 'argument': conversion from 'int64_t' to 'double', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16468,150): warning C4244: 'argument': conversion from 'T' to 'REGSAM', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16468,150): warning C4244:         with
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16468,150): warning C4244:         [
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16468,150): warning C4244:             T=int64_t
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16468,150): warning C4244:         ]
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16468,130): warning C4244: 'argument': conversion from 'T' to 'DWORD', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16468,130): warning C4244:         with
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16468,130): warning C4244:         [
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16468,130): warning C4244:             T=int64_t
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16468,130): warning C4244:         ]
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16479,66): warning C4244: 'argument': conversion from 'LONG_PTR' to 'double', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16489,101): warning C4244: 'argument': conversion from 'T' to 'REGSAM', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16489,101): warning C4244:         with
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16489,101): warning C4244:         [
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16489,101): warning C4244:             T=int64_t
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16489,101): warning C4244:         ]
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16489,81): warning C4244: 'argument': conversion from 'T' to 'DWORD', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16489,81): warning C4244:         with
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16489,81): warning C4244:         [
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16489,81): warning C4244:             T=int64_t
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16489,81): warning C4244:         ]
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16495,66): warning C4244: 'argument': conversion from 'LONG_PTR' to 'double', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16518,18): warning C4244: 'initializing': conversion from 'T' to 'DWORD', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16518,18): warning C4244:         with
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16518,18): warning C4244:         [
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16518,18): warning C4244:             T=int64_t
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16518,18): warning C4244:         ]
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16530,61): warning C4244: 'argument': conversion from 'T' to 'DWORD', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16530,61): warning C4244:         with
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16530,61): warning C4244:         [
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16530,61): warning C4244:             T=int64_t
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16530,61): warning C4244:         ]
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16557,18): warning C4244: 'initializing': conversion from 'T' to 'DWORD', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16557,18): warning C4244:         with
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16557,18): warning C4244:         [
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16557,18): warning C4244:             T=int64_t
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16557,18): warning C4244:         ]
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16569,22): warning C4244: 'initializing': conversion from 'T' to 'DWORD', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16569,22): warning C4244:         with
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16569,22): warning C4244:         [
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16569,22): warning C4244:             T=int64_t
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16569,22): warning C4244:         ]
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16576,57): warning C4244: 'argument': conversion from 'T' to 'DWORD', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16576,57): warning C4244:         with
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16576,57): warning C4244:         [
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16576,57): warning C4244:             T=int64_t
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16576,57): warning C4244:         ]
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16580,57): warning C4244: 'argument': conversion from 'T' to 'DWORD', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16580,57): warning C4244:         with
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16580,57): warning C4244:         [
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16580,57): warning C4244:             T=int64_t
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16580,57): warning C4244:         ]
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16587,56): warning C4244: 'argument': conversion from 'LRESULT' to 'double', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16607,47): warning C4244: 'argument': conversion from 'int64_t' to 'double', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16630,18): warning C4244: 'initializing': conversion from 'T' to 'DWORD', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16630,18): warning C4244:         with
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16630,18): warning C4244:         [
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16630,18): warning C4244:             T=int64_t
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16630,18): warning C4244:         ]
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16651,21): warning C4244: 'initializing': conversion from 'T' to 'DWORD', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16651,21): warning C4244:         with
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16651,21): warning C4244:         [
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16651,21): warning C4244:             T=int64_t
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16651,21): warning C4244:         ]
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16663,40): warning C4267: '=': conversion from 'size_t' to 'UINT', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16752,35): warning C4018: '<': signed/unsigned mismatch
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16806,57): warning C4244: 'argument': conversion from '__int64' to 'double', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(16856,63): warning C4244: 'argument': conversion from 'ULONG_PTR' to 'double', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17006,31): warning C4244: '=': conversion from 'T' to 'DWORD', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17006,31): warning C4244:         with
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17006,31): warning C4244:         [
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17006,31): warning C4244:             T=int64_t
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17006,31): warning C4244:         ]
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17009,31): warning C4244: '=': conversion from 'T' to 'DWORD', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17009,31): warning C4244:         with
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17009,31): warning C4244:         [
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17009,31): warning C4244:             T=int64_t
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17009,31): warning C4244:         ]
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17012,35): warning C4244: '=': conversion from 'T' to 'DWORD', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17012,35): warning C4244:         with
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17012,35): warning C4244:         [
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17012,35): warning C4244:             T=int64_t
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17012,35): warning C4244:         ]
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17015,35): warning C4244: '=': conversion from 'T' to 'DWORD', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17015,35): warning C4244:         with
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17015,35): warning C4244:         [
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17015,35): warning C4244:             T=int64_t
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17015,35): warning C4244:         ]
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17018,41): warning C4244: '=': conversion from 'T' to 'DWORD', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17018,41): warning C4244:         with
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17018,41): warning C4244:         [
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17018,41): warning C4244:             T=int64_t
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17018,41): warning C4244:         ]
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17021,41): warning C4244: '=': conversion from 'T' to 'DWORD', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17021,41): warning C4244:         with
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17021,41): warning C4244:         [
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17021,41): warning C4244:             T=int64_t
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17021,41): warning C4244:         ]
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17024,43): warning C4244: '=': conversion from 'T' to 'DWORD', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17024,43): warning C4244:         with
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17024,43): warning C4244:         [
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17024,43): warning C4244:             T=int64_t
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17024,43): warning C4244:         ]
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17027,35): warning C4244: '=': conversion from 'T' to 'DWORD', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17027,35): warning C4244:         with
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17027,35): warning C4244:         [
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17027,35): warning C4244:             T=int64_t
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17027,35): warning C4244:         ]
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17030,39): warning C4244: '=': conversion from 'T' to 'WORD', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17030,39): warning C4244:         with
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17030,39): warning C4244:         [
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17030,39): warning C4244:             T=int64_t
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17030,39): warning C4244:         ]
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17044,151): warning C4244: 'argument': conversion from 'T' to 'DWORD', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17044,151): warning C4244:         with
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17044,151): warning C4244:         [
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17044,151): warning C4244:             T=int64_t
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17044,151): warning C4244:         ]
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17044,131): warning C4244: 'argument': conversion from 'T' to 'BOOL', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17044,131): warning C4244:         with
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17044,131): warning C4244:         [
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17044,131): warning C4244:             T=int64_t
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17044,131): warning C4244:         ]
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17051,82): warning C4244: 'argument': conversion from 'LONG_PTR' to 'double', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17052,81): warning C4244: 'argument': conversion from 'LONG_PTR' to 'double', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17070,79): warning C4244: 'argument': conversion from 'LONG_PTR' to 'double', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17077,73): warning C4244: 'argument': conversion from 'T' to 'UINT', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17077,73): warning C4244:         with
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17077,73): warning C4244:         [
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17077,73): warning C4244:             T=int64_t
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17077,73): warning C4244:         ]
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17091,79): warning C4244: 'argument': conversion from 'T' to 'UINT', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17091,79): warning C4244:         with
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17091,79): warning C4244:         [
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17091,79): warning C4244:             T=int64_t
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17091,79): warning C4244:         ]
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17098,17): warning C4244: 'initializing': conversion from 'T' to 'UINT', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17098,17): warning C4244:         with
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17098,17): warning C4244:         [
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17098,17): warning C4244:             T=int64_t
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17098,17): warning C4244:         ]
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17110,70): warning C4244: 'argument': conversion from 'LONG_PTR' to 'double', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17127,41): warning C4244: 'argument': conversion from 'T' to 'UINT', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17127,41): warning C4244:         with
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17127,41): warning C4244:         [
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17127,41): warning C4244:             T=int64_t
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17127,41): warning C4244:         ]
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17154,17): warning C4244: 'initializing': conversion from 'T' to 'UINT', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17154,17): warning C4244:         with
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17154,17): warning C4244:         [
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17154,17): warning C4244:             T=int64_t
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17154,17): warning C4244:         ]
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17182,78): warning C4244: 'argument': conversion from 'LONG_PTR' to 'double', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17194,27): warning C4018: '<': signed/unsigned mismatch
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17195,23): warning C4244: '=': conversion from 'T' to '_Ty', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17195,23): warning C4244:         with
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17195,23): warning C4244:         [
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17195,23): warning C4244:             T=int64_t
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17195,23): warning C4244:         ]
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17195,23): warning C4244:         and
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17195,23): warning C4244:         [
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17195,23): warning C4244:             _Ty=std::_Vbase
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17195,23): warning C4244:         ]
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17202,23): warning C4244: '=': conversion from 'T' to '_Ty', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17202,23): warning C4244:         with
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17202,23): warning C4244:         [
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17202,23): warning C4244:             T=int64_t
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17202,23): warning C4244:         ]
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17202,23): warning C4244:         and
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17202,23): warning C4244:         [
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17202,23): warning C4244:             _Ty=std::_Vbase
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17202,23): warning C4244:         ]
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17206,101): warning C4267: 'argument': conversion from 'size_t' to 'int', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17231,73): warning C4244: 'argument': conversion from 'T' to 'UINT', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17231,73): warning C4244:         with
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17231,73): warning C4244:         [
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17231,73): warning C4244:             T=int64_t
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17231,73): warning C4244:         ]
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17235,79): warning C4244: 'argument': conversion from 'LONG_PTR' to 'double', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17249,77): warning C4244: 'argument': conversion from 'LONG_PTR' to 'double', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(17287,70): warning C4244: 'argument': conversion from 'LONG_PTR' to 'double', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(18554,164): warning C4244: 'argument': conversion from 'double' to 'FLOAT', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(18554,146): warning C4244: 'argument': conversion from 'double' to 'FLOAT', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(18554,114): warning C4244: 'argument': conversion from 'double' to 'FLOAT', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(18554,96): warning C4244: 'argument': conversion from 'double' to 'FLOAT', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(18558,163): warning C4244: 'argument': conversion from 'double' to 'FLOAT', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(18558,145): warning C4244: 'argument': conversion from 'double' to 'FLOAT', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(18558,113): warning C4244: 'argument': conversion from 'double' to 'FLOAT', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(18558,95): warning C4244: 'argument': conversion from 'double' to 'FLOAT', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(18568,149): warning C4244: 'argument': conversion from 'double' to 'FLOAT', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(18568,131): warning C4244: 'argument': conversion from 'double' to 'FLOAT', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(18568,99): warning C4244: 'argument': conversion from 'double' to 'FLOAT', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(18572,120): warning C4244: 'argument': conversion from 'double' to 'FLOAT', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(18572,102): warning C4244: 'argument': conversion from 'double' to 'FLOAT', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(18588,472): warning C4244: 'argument': conversion from 'double' to 'FLOAT', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(18588,389): warning C4244: 'argument': conversion from 'double' to 'FLOAT', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(18588,306): warning C4244: 'argument': conversion from 'double' to 'FLOAT', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(18588,223): warning C4244: 'argument': conversion from 'double' to 'FLOAT', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(18588,140): warning C4244: 'argument': conversion from 'double' to 'FLOAT', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(18588,57): warning C4244: 'argument': conversion from 'double' to 'FLOAT', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(18589,66): warning C4244: 'argument': conversion from 'LONG_PTR' to 'double', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(18596,66): warning C4244: 'argument': conversion from 'LONG_PTR' to 'double', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(18618,132): warning C4244: 'argument': conversion from 'double' to 'FLOAT', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(18618,114): warning C4244: 'argument': conversion from 'double' to 'FLOAT', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(18618,96): warning C4244: 'argument': conversion from 'double' to 'FLOAT', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(18622,96): warning C4244: 'argument': conversion from 'double' to 'FLOAT', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(18626,96): warning C4244: 'argument': conversion from 'double' to 'FLOAT', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(18630,166): warning C4244: 'argument': conversion from 'double' to 'FLOAT', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(18630,148): warning C4244: 'argument': conversion from 'double' to 'FLOAT', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(18630,130): warning C4244: 'argument': conversion from 'double' to 'FLOAT', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(18630,112): warning C4244: 'argument': conversion from 'double' to 'FLOAT', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(18634,100): warning C4244: 'argument': conversion from 'double' to 'FLOAT', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(18638,100): warning C4244: 'argument': conversion from 'double' to 'FLOAT', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(18642,100): warning C4244: 'argument': conversion from 'double' to 'FLOAT', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(18646,138): warning C4244: 'argument': conversion from 'double' to 'FLOAT', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(18646,120): warning C4244: 'argument': conversion from 'double' to 'FLOAT', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(18646,102): warning C4244: 'argument': conversion from 'double' to 'FLOAT', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(18650,112): warning C4244: 'argument': conversion from 'double' to 'FLOAT', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(19792,9): warning C4005: 'MAKEINTRESOURCE': macro redefinition
       D:\Windows Kits\10\Include\10.0.26100.0\um\winuser.h(238,9):
       see previous definition of 'MAKEINTRESOURCE'
   
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(19681,9): warning C4005: 'MAKEINTRESOURCEW': macro redefinition
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(19793,9): warning C4005: 'MAKEINTRESOURCEW': macro redefinition
       D:\Windows Kits\10\Include\10.0.26100.0\um\winuser.h(236,9):
       see previous definition of 'MAKEINTRESOURCEW'
   
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(19856,77): warning C4244: 'argument': conversion from '__int64' to 'double', possible loss of data
-E:\Users\megal\source\repos\JBS3\JBS3.cpp(20442,1): warning C4102: 'https': unreferenced label
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(19968,77): warning C4244: 'argument': conversion from '__int64' to 'double', possible loss of data
+E:\Users\megal\source\repos\JBS3\JBS3.cpp(20678,1): warning C4102: 'https': unreferenced label
 E:\Users\megal\source\repos\JBS3\JBS3.cpp(381,28): warning C4267: 'argument': conversion from 'size_t' to 'uint32_t', possible loss of data
       E:\Users\megal\source\repos\JBS3\JBS3.cpp(381,28):
       the template instantiation context (the oldest one first) is
@@ -4957,16 +4968,15 @@ E:\Users\megal\source\repos\JBS3\JBS3.cpp(261,19): warning C4244:         with
 E:\Users\megal\source\repos\JBS3\JBS3.cpp(261,19): warning C4244:         [
 E:\Users\megal\source\repos\JBS3\JBS3.cpp(261,19): warning C4244:             T=int64_t
 E:\Users\megal\source\repos\JBS3\JBS3.cpp(261,19): warning C4244:         ]
-  goodmacrosfordirect2dandwichelper.h
      Creating library E:\Users\megal\source\repos\JBS3\x64\Release\JBS3.lib and object E:\Users\megal\source\repos\JBS3\x64\Release\JBS3.exp
   Generating code
   Previous IPDB and IOBJ mismatch, fall back to full compilation.
 E:\Users\megal\source\repos\JBS3\Direct2D.h(86): warning C4715: 'Direct2D::Resize': not all control paths return a value
-E:\Users\megal\source\repos\JBS3\Direct2D11.cpp(269): warning C4715: 'Direct2D11::ConvertID3D11Texture2DToID2D1Bitmap': not all control paths return a value
 E:\Users\megal\source\repos\JBS3\Direct2D11.cpp(253): warning C4715: 'Direct2D11::CreateAndSetDrawingBitmaps': not all control paths return a value
+E:\Users\megal\source\repos\JBS3\Direct2D11.cpp(269): warning C4715: 'Direct2D11::ConvertID3D11Texture2DToID2D1Bitmap': not all control paths return a value
 E:\Users\megal\source\repos\JBS3\Direct2D11.cpp(210): warning C4715: 'Direct2D11::Init': not all control paths return a value
 E:\Users\megal\source\repos\JBS3\Canvas2DRenderingContext.cpp(12): warning C4715: 'Canvas2DRenderingContext::Init': not all control paths return a value
 E:\Users\megal\source\repos\JBS3\JBS3.cpp(10677): warning C4715: 'WinProc': not all control paths return a value
-  All 6163 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
+  All 6169 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
   Finished generating code
   JBS3.vcxproj -> E:\Users\megal\source\repos\JBS3\x64\Release\JBS3.exe

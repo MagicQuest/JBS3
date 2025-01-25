@@ -79,7 +79,7 @@ bool Direct2D11::Init(HWND window, int type) {
     swapChainDesc.BufferCount = 2;                     // use double buffering to enable flip
     swapChainDesc.Scaling = DXGI_SCALING_STRETCH;
     swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL; // all apps must use this SwapEffect
-    swapChainDesc.Flags = 0; //DXGI_SWAP_CHAIN_FLAG_GDI_COMPATIBLE (OOOOOOOOOOUH)
+    swapChainDesc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH; //DXGI_SWAP_CHAIN_FLAG_GDI_COMPATIBLE (OOOOOOOOOOUH)
     if (type == 3) {
         swapChainDesc.AlphaMode = DXGI_ALPHA_MODE_PREMULTIPLIED; // <--
     }

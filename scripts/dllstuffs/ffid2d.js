@@ -2,6 +2,7 @@
 //i wanted to use ffi to make a d2d1 factory but im not sure HOW i'll actually execute the functions of the pointer to an ID2D1Factory7 object
 //lets try anyways
 //when i started making this i actually thought it was impossible but im pretty surprised i was able to make it work  https://blog.holbertonschool.com/hack-virtual-memory-stack-registers-assembly-code/    https://stackoverflow.com/questions/22263890/virtual-table-layout-on-msvc-wheres-the-type-info
+//i would've done this kind of thing sooner if i had thought this was possible because i didn't want to make the opencvhelper dll (seriously i genuinely thought there was no way because it SEEMED like objects didn't even store methods on them (we outa methods) (i guess i was slacking on my vtable knowledge idk))
 
 //what i use to generate the assembly bytes is: https://defuse.ca/online-x86-assembler.htm#disassembly (make sure to use x64 tho)
 
@@ -29,10 +30,8 @@ class GUID extends memoobjectidk {
     static arrayLengths = {
         Data4: 8,
     };
-    constructor(data) { //data must be a Uint8Array
-        super();
-        objFromTypes(this, data);
-        this.data = data;
+    constructor(data, ...vargs) { //data must be a Uint8Array
+        super(data, ...vargs);
     }
 }
 
@@ -40,10 +39,8 @@ class ULONG_PTR extends memoobjectidk {
     static types = {
         value: "ULONG_PTR",
     };
-    constructor(data) { //data must be a Uint8Array
-        super();
-        objFromTypes(this, data);
-        this.data = data;
+    constructor(data, ...vargs) { //data must be a Uint8Array
+        super(data, ...vargs);
     }
 }
 
@@ -71,10 +68,8 @@ class D2D1_PIXEL_FORMAT extends memoobjectidk {
         format: "DWORD", //DXGI_FORMAT enum
         alphaMode: "DWORD", //D2D1_ALPHA_MODE enum
     };
-    constructor(data) { //data must be a Uint8Array
-        super();
-        objFromTypes(this, data);
-        this.data = data;
+    constructor(data, ...vargs) { //data must be a Uint8Array
+        super(data, ...vargs);
     }
 }
 
@@ -87,10 +82,8 @@ class D2D1_RENDER_TARGET_PROPERTIES extends memoobjectidk {
         usage: "DWORD", //D2D1_RENDER_TARGET_USAGE enum
         minLevel: "DWORD", //D2D1_FEATURE_LEVEL enum
     };
-    constructor(data) { //data must be a Uint8Array
-        super();
-        objFromTypes(this, data);
-        this.data = data;
+    constructor(data, ...vargs) { //data must be a Uint8Array
+        super(data, ...vargs);
     }
 }
 
@@ -99,10 +92,8 @@ class D2D1_SIZE_U extends memoobjectidk {
         width: "UINT",
         height: "UINT",
     };
-    constructor(data) { //data must be a Uint8Array
-        super();
-        objFromTypes(this, data);
-        this.data = data;
+    constructor(data, ...vargs) { //data must be a Uint8Array
+        super(data, ...vargs);
     }
 }
 
@@ -112,10 +103,8 @@ class D2D1_HWND_RENDER_TARGET_PROPERTIES extends memoobjectidk {
         pixelSize: D2D1_SIZE_U,
         presentOptions: "DWORD", //D2D1_PRESENT_OPTIONS enum
     }
-    constructor(data) { //data must be a Uint8Array
-        super();
-        objFromTypes(this, data);
-        this.data = data;
+    constructor(data, ...vargs) { //data must be a Uint8Array
+        super(data, ...vargs);
     }
 }
 
@@ -126,10 +115,8 @@ class D2D1_COLOR_F extends memoobjectidk {
         b: "FLOAT",
         a: "FLOAT",
     };
-    constructor(data) { //data must be a Uint8Array
-        super();
-        objFromTypes(this, data);
-        this.data = data;
+    constructor(data, ...vargs) { //data must be a Uint8Array
+        super(data, ...vargs);
     }
 }
 
@@ -140,25 +127,27 @@ class D2D1_RECT_F extends memoobjectidk {
         right: "FLOAT",
         bottom: "FLOAT",
     }
-    constructor(data) { //data must be a Uint8Array
-        super();
-        objFromTypes(this, data);
-        this.data = data;
+    constructor(data, ...vargs) { //data must be a Uint8Array
+        super(data, ...vargs);
     }
 }
 
-const IID_ID2D1Factory7 = new GUID(new Uint8Array(GUID.sizeof())); //bdc2bdd3-b96c-4de6-bdf7-99d4745454de (line 1765 of d2d1_3.h)
-IID_ID2D1Factory7.Data1 = 0xbdc2bdd3;
-IID_ID2D1Factory7.Data2 = 0xb96c;
-IID_ID2D1Factory7.Data3 = 0x4de6;
-IID_ID2D1Factory7.Data4[0] = 0xbd;
-IID_ID2D1Factory7.Data4[1] = 0xf7;
-IID_ID2D1Factory7.Data4[2] = 0x99;
-IID_ID2D1Factory7.Data4[3] = 0xd4;
-IID_ID2D1Factory7.Data4[4] = 0x74;
-IID_ID2D1Factory7.Data4[5] = 0x54;
-IID_ID2D1Factory7.Data4[6] = 0x54;
-IID_ID2D1Factory7.Data4[7] = 0xde;
+//const IID_ID2D1Factory7 = new GUID(new Uint8Array(GUID.sizeof())); //bdc2bdd3-b96c-4de6-bdf7-99d4745454de (line 1765 of d2d1_3.h)
+//IID_ID2D1Factory7.Data1 = 0xbdc2bdd3;
+//IID_ID2D1Factory7.Data2 = 0xb96c;
+//IID_ID2D1Factory7.Data3 = 0x4de6;
+//IID_ID2D1Factory7.Data4[0] = 0xbd;
+//IID_ID2D1Factory7.Data4[1] = 0xf7;
+//IID_ID2D1Factory7.Data4[2] = 0x99;
+//IID_ID2D1Factory7.Data4[3] = 0xd4;
+//IID_ID2D1Factory7.Data4[4] = 0x74;
+//IID_ID2D1Factory7.Data4[5] = 0x54;
+//IID_ID2D1Factory7.Data4[6] = 0x54;
+//IID_ID2D1Factory7.Data4[7] = 0xde;
+
+//now you can do it all in one line!
+const IID_ID2D1Factory7 = new GUID(0xbdc2bdd3, 0xb96c, 0x4de6, 0xbd, 0xf7, 0x99, 0xd4, 0x74, 0x54, 0x54, 0xde); //basically equivalent to the above code but maybe 1% faster?
+
 print(IID_ID2D1Factory7);
 
 let w = 500;
@@ -367,7 +356,7 @@ class GenericPtrObject { //lowkey i guess there's really no need to extend this 
         this.__vtptr = dereferenceULONG_PTR(ptr, 0);
     }
 
-    findMethodPtrByName(vtablenames, name) {
+    findMethodAddressByName(vtablenames, name) {
         //well since this is an ID2D1Factory7 we'll (obviously) use that vtable array
         //to find the pointer to the specific method we'll iterate backwards through __vtptr_ID2D1Factory7 until we find the method name we're looking for
         //with the index of the found method name we'll dereference __vtptr at that index (i guess idk how to explain it you'll see)
@@ -383,12 +372,13 @@ class GenericPtrObject { //lowkey i guess there's really no need to extend this 
     }
 
     callMethodByName(methodptr, argc = 0, argv = [], argtypev = [], returntype = RETURN_NUMBER) {
-        //const methodptr = this.findMethodPtrByName(vtablenames, name);
+        //const methodptr = this.findMethodAddressByName(vtablenames, name);
 
-        const RBPHOLDER = new ULONG_PTR(new Uint8Array(ULONG_PTR.sizeof())); //unsigned long long
-        const RSPPOINTERHOLDER = new ULONG_PTR(new Uint8Array(ULONG_PTR.sizeof())); //unsigned long long
+        //const RBPHOLDER = new ULONG_PTR(); //unsigned long long
+        //const RSPPOINTERHOLDER = new ULONG_PTR(); //unsigned long long
 
         //hmmm d2d functions use __stdcall...
+        //hmmmm https://learn.microsoft.com/en-us/windows-hardware/drivers/debugger/x64-architecture#calling-conventions
 
         //ok this asm code was written for my test project in c++ (inheritanceandthevtptr.cpp) and the method i was calling was void but this time it could be anything so im MOVABS-ing the method pointer as an immediate value to be passed into CALL because you can't CALL an absolute immediate 64 bit value
         //ok a HUGE problem i've been having is that for some reason when you try to call a method with parameters it works but the RBP register is messed up once you leave the function (the pop doesn't return the same value) so we get an access violation like just after the method is called
@@ -397,7 +387,9 @@ class GenericPtrObject { //lowkey i guess there's really no need to extend this 
         //https://stackoverflow.com/questions/20129107/what-is-the-x86-ret-instruction-equivalent-to    https://stackoverflow.com/questions/62364368/what-is-the-difference-between-the-ret-instruction-in-x86-and-x64?rq=3
         //ok i might have to copy what rsp points to too
         //ngl this solution took like 2 days to cook up
-        return __asm([ //im not gonna lie i don't think i know enough about asm to solve this in the "correct" way so im just doing what i think is gonna work
+        //ok i 100% comprehend the issue now i swear: for some reason after i call the method, the values at rsp through rsp+8
+        //i think the fact that i have to call my asm code makes this a little more complicated
+        /*return __asm([ //im not gonna lie i don't think i know enough about asm to solve this in the "correct" way so im just doing what i think is gonna work
             //0xcc,                                                                             //interrupt (dbugbreak for testing)
 
             //store the value of rbp since for some reason this technique doesn't pop the correct value at the end...
@@ -409,6 +401,7 @@ class GenericPtrObject { //lowkey i guess there's really no need to extend this 
             0x4c, 0x89, 0x10,                                                                   //mov QWORD PTR [rax], r10
             
             0xc8, 0x00, 0x00, 0x00,                                                             //enter 0, 0 (https://stackoverflow.com/questions/5858996/enter-and-leave-in-assembly)
+            0x48, 0x83, 0xec, 0x20,                                                             //sub rsp, 0x20 (32) 
             0x48, 0xb8, ...int64_to_little_endian_hex(methodptr),                               //movabs rax, ...imm64 (https://www.reddit.com/r/Assembly_language/comments/141bi1i/comment/jmz6z2y/?utm_source=share&utm_medium=web3x&utm_name=web3xcss&utm_term=1&utm_content=share_button)
             0xff, 0xd0,                                                                         //call rax
             //for some reason after calling rax it clears the top of the stack ([rsp])
@@ -423,6 +416,42 @@ class GenericPtrObject { //lowkey i guess there's really no need to extend this 
             0x48, 0xb9, ...int64_to_little_endian_hex(PointerFromArrayBuffer(RBPHOLDER.data)),  //movabs rcx, imm64 (pointer to RBPHOLDER)
             0x48, 0x8b, 0x29, //movabs rbp, QWORD PTR [rcx] (dereference rcx and place the QWORD (long long 8 byte) value into rbp)
             0xc3,                                                                               //ret
+        ], argc+1, [this.ptr, ...argv], [VAR_INT, ...argtypev], returntype);*/
+        //return __asm([ //for some reason this worked in inheritanceandthevtptr but it's NOT working here...
+        //    0xcc,                                                                             //interrupt (dbugbreak for testing)
+        //    0x48, 0xb8, ...int64_to_little_endian_hex(methodptr),                             //movabs rax, ...imm64 (https://www.reddit.com/r/Assembly_language/comments/141bi1i/comment/jmz6z2y/?utm_source=share&utm_medium=web3x&utm_name=web3xcss&utm_term=1&utm_content=share_button)
+        //    0xff, 0xe0,                                                                       //jmp rax
+        //]);
+        
+        //I SEE WITH THE EYES WIDE OPEN (i've actually taken the time to understand the stack and the x64 calling convention)
+        //i think all of my problems were caused by not knowing that the default calling convention for x64 on windows is entirely described at https://learn.microsoft.com/en-us/cpp/build/x64-calling-convention?view=msvc-170 (this page confused me because it doesn't seem to give this convention a name and i thought when the docs said __cdecl was the default, it was the default for x64 too!)
+        //infact, almost every calling convention is just ignored on x64!
+        //this page describes the shadow space (which would have solved my stack issues and would\ve eliminate the need for the RBP & RSPPOINTER HOLDER js variables) and the fact that rsp MUST be on a 16 byte boundary (which i also had 0 idea about)
+        //so lets try to rewrite this so it actually works like normal code
+        return __asm([ //im not gonna lie i can't believe it was this easy (this literally took only took 5 minutes to write)
+            //0xcc,                                                                             //int 3
+
+            //standard prolog you already know
+            0x55,                                                                               //push rbp      //rsp now aligned to 16 byte boundary (https://www.reddit.com/r/Assembly_language/comments/10zpojy/comment/j851mbv/)
+            0x48, 0x89, 0xe5,                                                                   //mov rbp, rsp
+            
+            //shadow space for the call (stated on the x64 calling convention page but it was kinda vague so im assuming it's 32 bytes)
+            //not allocating the shadow space was 99% of the reason why i had to store rbp and rsp in custom js object lmao
+            //https://sonictk.github.io/asm_tutorial/#windows:thewindowtothehardware/themicrosoftx64callingconvention/theshadowspace (this section also mentions rsp alignment)
+            0x48, 0x83, 0xec, 0x20,                                                             //sub rsp, 0x20 (32)            //rsp still aligned because 32%16 == 0
+            
+            //using movabs to put the pointer to the method into the asm code (so i don't have to pass it as a parameter)
+            0x48, 0xb8, ...int64_to_little_endian_hex(methodptr),                               //movabs rax, ...imm64 (https://www.reddit.com/r/Assembly_language/comments/141bi1i/comment/jmz6z2y/?utm_source=share&utm_medium=web3x&utm_name=web3xcss&utm_term=1&utm_content=share_button)
+            
+            //call 
+            0xff, 0xd0,                                                                         //call rax
+
+            //epilog
+            0x48, 0x83, 0xc4, 0x20,                                                             //add rsp, 0x20 (32)
+            0x5d,                                                                               //pop rbp
+            
+            //return :)
+            0xc3,                                                                               //ret
         ], argc+1, [this.ptr, ...argv], [VAR_INT, ...argtypev], returntype);
     }
 }
@@ -433,15 +462,15 @@ class ID2D1Factory7 extends GenericPtrObject {
         super(ptr);
     }
 
-    findMethodPtrByName(name) {
-        return super.findMethodPtrByName(__vtptr_ID2D1Factory7, name);
+    findMethodAddressByName(name) {
+        return super.findMethodAddressByName(__vtptr_ID2D1Factory7, name);
     }
 
     callMethodByName(name, ...args) {
-        const methodptr = this.findMethodPtrByName(name);
+        const methodptr = this.findMethodAddressByName(name);
         return super.callMethodByName(methodptr, ...args);
     }
-    /*findMethodPtrByName(name) {
+    /*findMethodAddressByName(name) {
         //well since this is an ID2D1Factory7 we'll (obviously) use that vtable array
         //to find the pointer to the specific method we'll iterate backwards through __vtptr_ID2D1Factory7 until we find the method name we're looking for
         //with the index of the found method name we'll dereference __vtptr at that index (i guess idk how to explain it you'll see)
@@ -456,7 +485,7 @@ class ID2D1Factory7 extends GenericPtrObject {
     }
 
     callMethodByName(name, argc = 0, argv = [], argtypev = [], returntype = RETURN_NUMBER) {
-        const methodptr = this.findMethodPtrByName(name);
+        const methodptr = this.findMethodAddressByName(name);
 
         //ok this asm code was written for my test project in c++ (inheritanceandthevtptr.cpp) and the method i was calling was void but this time it could be anything so im MOVABS-ing the method pointer as an immediate value to be passed into CALL because you can't CALL an absolute immediate 64 bit value
         return __asm([
@@ -477,12 +506,12 @@ class ID2D1HwndRenderTarget extends GenericPtrObject {
         super(ptr);
     }
 
-    findMethodPtrByName(name) {
-        return super.findMethodPtrByName(__vtptr_ID2D1HwndRenderTarget, name);
+    findMethodAddressByName(name) {
+        return super.findMethodAddressByName(__vtptr_ID2D1HwndRenderTarget, name);
     }
 
     callMethodByName(name, ...args) {
-        const methodptr = this.findMethodPtrByName(name);
+        const methodptr = this.findMethodAddressByName(name);
         return super.callMethodByName(methodptr, ...args);
     }
 }
@@ -492,12 +521,12 @@ class ID2D1SolidColorBrush extends GenericPtrObject {
         super(ptr);
     }
 
-    findMethodPtrByName(name) {
-        return super.findMethodPtrByName(__vtptr_ID2D1SolidColorBrush, name);
+    findMethodAddressByName(name) {
+        return super.findMethodAddressByName(__vtptr_ID2D1SolidColorBrush, name);
     }
 
     callMethodByName(name, ...args) {
-        const methodptr = this.findMethodPtrByName(name);
+        const methodptr = this.findMethodAddressByName(name);
         return super.callMethodByName(methodptr, ...args);
     }
 }
@@ -510,7 +539,7 @@ function windowProc(hwnd, msg, wp, lp) {
         print(GetExportedFunctions(lib));
         const cfpa = GetProcAddress(lib, "D2D1CreateFactory");
 
-        let factoryptr = new ULONG_PTR(new Uint8Array(ULONG_PTR.sizeof())); //IID_ID2D1Factory7 is bdc2bdd3-b96c-4de6-bdf7-99d4745454de
+        let factoryptr = new ULONG_PTR(); //IID_ID2D1Factory7 is bdc2bdd3-b96c-4de6-bdf7-99d4745454de
         
         print(D2D1_FACTORY_TYPE_SINGLE_THREADED, PointerFromArrayBuffer(IID_ID2D1Factory7.data), NULL, PointerFromArrayBuffer(factoryptr.data));
 
@@ -541,12 +570,12 @@ function windowProc(hwnd, msg, wp, lp) {
 
         factory = new ID2D1Factory7(factoryptr.value);
         //print(factory, __vtptr_ID2D1Factory7);
-        //print(factory.findMethodPtrByName("QueryInterface")); //CORRECT~!
+        //print(factory.findMethodAddressByName("QueryInterface")); //CORRECT~!
         
         //ok now all that's left between us and drawing is calling CreateHwndRenderTarget and making a brush (renderTarget->CreateSolidColorBrush)
-        let rendertargetptr = new ULONG_PTR(new Uint8Array(ULONG_PTR.sizeof()));
+        let rendertargetptr = new ULONG_PTR();
 
-        let properties = new D2D1_RENDER_TARGET_PROPERTIES(new Uint8Array(D2D1_RENDER_TARGET_PROPERTIES.sizeof()));
+        let properties = new D2D1_RENDER_TARGET_PROPERTIES();
         //default properties
         properties.type = D2D1_RENDER_TARGET_TYPE_DEFAULT;
         properties.pixelFormat.format = DXGI_FORMAT_UNKNOWN; //already defined in jbs
@@ -557,7 +586,7 @@ function windowProc(hwnd, msg, wp, lp) {
         properties.minLevel = D2D1_FEATURE_LEVEL_DEFAULT;
         print(properties);
 
-        let hwndproperties = new D2D1_HWND_RENDER_TARGET_PROPERTIES(new Uint8Array(D2D1_HWND_RENDER_TARGET_PROPERTIES.sizeof()));
+        let hwndproperties = new D2D1_HWND_RENDER_TARGET_PROPERTIES();
         hwndproperties.hwnd = hwnd;
         hwndproperties.pixelSize.width = w;
         hwndproperties.pixelSize.height = h;
@@ -574,13 +603,13 @@ function windowProc(hwnd, msg, wp, lp) {
         
         hwndRenderTarget = new ID2D1HwndRenderTarget(rendertargetptr.value);
 
-        let colorbrushptr = new ULONG_PTR(new Uint8Array(ULONG_PTR.sizeof()));
+        let colorbrushptr = new ULONG_PTR();
         
-        let color = new D2D1_COLOR_F(new Uint8Array(D2D1_COLOR_F.sizeof()));
-        color.r = 1.0;
-        color.g = 0.0;
-        color.b = 1.0;
-        color.a = 1.0;
+        let color = new D2D1_COLOR_F(1.0, 0.0, 1.0, 1.0);
+        //color.r = 1.0;
+        //color.g = 0.0;
+        //color.b = 1.0;
+        //color.a = 1.0;
         print(color);
 
         //oops! the legit CreateSolidColorBrush has 3 parameters (d2d1.h line 2439)!
@@ -602,7 +631,7 @@ function windowProc(hwnd, msg, wp, lp) {
 
         hwndRenderTarget.callMethodByName("BeginDraw", 0, [], [], RETURN_VOID);
 
-        const rect = new D2D1_RECT_F(new Uint8Array(D2D1_RECT_F.sizeof()));
+        const rect = new D2D1_RECT_F();
         rect.left = 100;
         rect.top = 100;
         rect.right = rect.left+100;

@@ -117,7 +117,8 @@ function defineProps(obj, data, key, i, datatype, bytes) {
                     }else if(bytes == 4) {
                         dataview.setUint32(0, newValue, true);
                     }else if(bytes == 8) {
-                        dataview.setBigUint64(0, BigInt(newValue)), true;
+                        //dataview.setBigUint64(0, BigInt(newValue)), true; //how tf did i make this mistake LMAO vscode wasn't saying ANYTHING
+                        dataview.setBigUint64(0, BigInt(newValue), true);
                     }
                 }
             }else {
@@ -223,11 +224,13 @@ function defineProps(obj, data, key, i, datatype, bytes) {
     //});
 }
 
-//class memoobjectidk { //i was really trying to make this inheritance work but i just can't seem to modify the child and read this.types from it
-globalThis.objFromTypes = (obj, data, offset=0) => { //replacing every this. with obj.
+//class memoobjectidk { //i was really trying to make this inheritance work but i just can't seem to modify the child and read this.types from it (i was doin' it wrong)
+//ok lowkey if you try to initialize an object and it has a special type (another memoobjectidk class) it won't set it the way it should (it will tell you that you can't set it like that yet lol)
+globalThis.objFromTypes = (obj, data, offset=0, listinit=false, vargs) => { //replacing every this. with obj.
     //types = {};
     //constructor(data) {
         let addr = offset;
+        let indexforlistinit = 0; //for listinit
         for(const key in obj.constructor.types) { //using constructor now because types is static
             const datatype = obj.constructor.types[key];
             let bytes;
@@ -263,13 +266,21 @@ globalThis.objFromTypes = (obj, data, offset=0) => { //replacing every this. wit
                 const amount = datatype.sizeof?.() ?? sizeof[datatype];
                 for(let i = 0; i < obj.constructor.arrayLengths[key]; i++) {
                     defineProps(arr, data, i, addr+offset, datatype, amount); //haha lol i accidently left bytes here instead of amount and i was getting totally weird errors (jbs would crash when printing IMAGE_DOS_HEADERS!)
+                    if(listinit && vargs[indexforlistinit]) {
+                        arr[i] = vargs[indexforlistinit]; //yeah probably
+                    }
+                    indexforlistinit++;
                     offset += amount;
                 }
                 obj[key] = arr;
             }else {
                 defineProps(obj, data, key, addr, datatype, bytes);
             }
+            if(listinit && arrlength == 1 && vargs[indexforlistinit]) {
+                obj[key] = vargs[indexforlistinit];
+            }
             addr += bytes; //i guess you could call this addr too
+            indexforlistinit++; //for listinit
         }
     //}
     //obj.sizeof = (function() {
@@ -307,6 +318,19 @@ const changeEndianness = (string) => { //https://stackoverflow.com/questions/532
     return result.join('');
 }
 
+globalThis.int32_to_little_endian_hex = function(int32) {
+    let hex = int32.toString(16);
+    if(hex.length % 2 == 1) {
+        hex = "0"+hex;
+    }
+    const len = hex.length;
+    for(let i = len; i < 8; i++) {
+        hex = "0"+hex;
+    }
+    //print(hex);
+    return changeEndianness(hex).match(/([a-z0-9]{2})/g).map(e => parseInt(e, 16));
+}
+
 globalThis.int64_to_little_endian_hex = function(int) {
     let hex = int.toString(16);
     if(hex.length % 2 == 1) {
@@ -320,7 +344,54 @@ globalThis.int64_to_little_endian_hex = function(int) {
     return changeEndianness(hex).match(/([a-z0-9]{2})/g).map(e => parseInt(e, 16));
 }
 
-//here we go this is a nice compromise
+//boy i feel like this would be a great time to use a template if this were c++
+//also this function is a more general version of dllstuffs/ffid2d.js's dereferenceULONG_PTR function
+globalThis.dereference = function(ptr, datatype, index = 0) { //returns *(ULONG_PTR*)ptr
+    const special = datatype.prototype instanceof memoobjectidk;
+    let size = special ? datatype.sizeof() : sizeof[datatype];
+    print("dereferencing", ptr+(index*size));
+    if(ptr == 0) {
+        print("dereferencing NULL ptr!\x07");
+        return 0;
+    }
+    if(additionaltypedata[datatype]?.floating) { //ouuuuhh we gotta use the xmm0 register to return a float!
+        //do i gotta clear xmm0 first or do they both clear the whole thing? (ok im gonna assume i should clear it)
+        const opcodes = [
+            0x0f, 0x57, 0xc0, //xorps xmm0, xmm0    ;clear xmm0 and set it to 0
+        ];
+        if(datatype == "FLOAT") { //4
+            opcodes.push(0xf3, 0x0f, 0x10, 0x01); //movss xmm0, DWORD PTR [rcx]    ;yo i had no idea how to do any floating point bullshit (look i tried to figure it out myself but in the end i had to open godbolt)
+        }else if(datatype == "DOUBLE") { //8
+            opcodes.push(0xf2, 0x0f, 0x10, 0x01); //movsd xmm0, QWORD PTR [rcx]    ;mov double precision floating-point value
+        }
+        opcodes.push(0xc3); //ret
+        return __asm(opcodes, 1, [ptr+(index*size)], [VAR_INT], RETURN_DOUBLE);
+    }else if(special) {
+        const dereferencedPtr = dereference(ptr+(index*size), "ULONGLONG");
+        const typeinstance = new datatype();
+        memcpy(PointerFromArrayBuffer(typeinstance.data), dereferencedPtr, size);
+        return typeinstance;
+    }else {
+        const opcodes = [
+            0x31, 0xc0, //xor eax, eax (just in case)
+        ];
+        if(size == 1) {
+            opcodes.push(0x8a, 0x01); //mov al, BYTE PTR [rcx]
+        }else if(size == 2) {
+            opcodes.push(0x66, 0x8b, 0x01); //mov ax, WORD PTR [rcx]
+        }else if(size == 4) {
+            opcodes.push(0x8b, 0x01); //mov eax, DWORD PTR [rcx]
+        }else if(size == 8) {
+            opcodes.push(0x48, 0x8b, 0x01); //mov rax, QWORD PTR [rcx];
+        }
+        opcodes.push(0xc3); //ret
+        return __asm(opcodes, 1, [ptr+(index*size)], [VAR_INT], RETURN_NUMBER);
+    }
+}
+
+//say goodbye to weird constructors like
+//new ULONG_PTR(new Uint8Array(ULONG_PTR.sizeof()));
+//memoobjectidk will do that for you if is not a Uint8Array and you can now initialize properties!
 class memoobjectidk {
     static sizeof() {
         return Object.entries(this.types).reduce((a, [key, b]) => {
@@ -331,6 +402,15 @@ class memoobjectidk {
                 return a+sizeof[b]*arrlength;
             }
         }, 0); //oh yeah
+    }
+    constructor(maybedata, ...vargs) {
+        let data = maybedata;
+        let listinit = !(maybedata instanceof Uint8Array); //if you pass something other than a Uint8Array for data i will assume you are trying to emulate list initialization
+        if(listinit) {
+            data = new Uint8Array(this.constructor.sizeof()); //this is valid? calling constructor.sizeof still returns the right values and not just undefined?
+        }
+        objFromTypes(this, data, 0, listinit, [maybedata, ...vargs]);
+        this.data = data;
     }
 }
 class CString {
@@ -389,7 +469,7 @@ class WString {
             //too big and i gotta make a new array
             print("too big", newValue.length, ">=", this._data.length/2);
             this._data = new Uint8Array([...newValue.split("").map(e => e+"\0").join("").split("").map(e => e.charCodeAt(0)), 0x00, 0x00]);
-            this.ptr = PointerFromArrayBuffer(this._data);;
+            this.ptr = PointerFromArrayBuffer(this._data);
         }else {
             for(let i = 0; i < this._data.length; i++) {
                 if(i % 2 == 1 || newValue.length*2 <= i) {

@@ -5267,7 +5267,7 @@ function windowProc(hwnd, msg, wp, lp) {
                 loadBlueprintsJSON(str);
             }
         }else if(wp == "V".charCodeAt(0) && ctrl && Editable.editing) {
-            print("think about pasting but don't actually because idk how to do anything with the clipboard yet...");
+            //print("think about pasting but don't actually because idk how to do anything with the clipboard yet...");
             //i've since learned...
             let success = OpenClipboard(hwnd);
 

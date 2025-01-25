@@ -2,6 +2,13 @@
 //https://learn.microsoft.com/en-us/windows/win32/dwm/dwm-sample-customizethumbnail
 //https://www.youtube.com/watch?v=4sUsZlN_qZM
 
+//also some random tabs i've had open this whole time:
+//https://stackoverflow.com/questions/32335945/blur-behind-window-with-titlebar-in-windows-10-stopped-working-after-windows-up
+//https://learn.microsoft.com/en-us/answers/questions/1123887/setwindowcompositionattribute-after-setting-transp
+//https://stackoverflow.com/questions/63426740/what-are-the-requirements-for-window-to-be-blurred-except-setwindowcompositiona
+//https://www.reddit.com/r/AutoHotkey/comments/125b120/set_window_aero_translucentblur_effects_win_10/
+//
+
 //DwmSetWindowAttribute(GetConsoleWindow(), DWMWA_USE_IMMERSIVE_DARK_MODE, false); //haha
 //DwmSetWindowAttribute(GetConsoleWindow(), DWMWA_SYSTEMBACKDROP_TYPE, DWMSBT_TRANSIENTWINDOW); //YO ACRYLIC BACKGROUND???? (i have no idea why but this line by itself make the title bar for the console acrylic and idk why)
 SetWindowCompositionAttribute(GetConsoleWindow(), ACCENT_ENABLE_BLURBEHIND, NULL, 0, NULL); //GOOD GOD DON'T RESIZE THE WINDOW (adds the acrylic affect without needing transparency???)

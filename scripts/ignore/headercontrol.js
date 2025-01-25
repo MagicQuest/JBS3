@@ -4,28 +4,22 @@ eval(require("fs").read(__dirname+"/../dllstuffs/marshallib.js")); //damn this m
 class Rect extends memoobjectidk {
                 //oh shoot these types have to be in the right order
     static types = {left: "LONG", top: "LONG", right: "LONG", bottom: "LONG"}; //strings because i want to know if they are unsigned (when the first letter is U (i can't be bothered to make each key in sizeof an object))
-    constructor(data) { //data must be a Uint8Array
-        super();
-        objFromTypes(this, data);
-        this.data = data;
+    constructor(data, ...vargs) { //data must be a Uint8Array
+        super(data, ...vargs);
     }
 }
 
 class WINDOWPOS extends memoobjectidk {
     static types = {hwnd: "HWND", hwndInsertAfter: "HWND", x: "INT", y: "INT", cx: "INT", cy: "INT", flags: "UINT"};
-    constructor(data) {
-        super();
-        objFromTypes(this, data);
-        this.data = data;
+    constructor(data, ...vargs) { //data must be a Uint8Array
+        super(data, ...vargs);
     }
 }
 
 class HDLAYOUT extends memoobjectidk {
     static types = {prc: "LONG_PTR", pwpos: "LONG_PTR"};
-    constructor(data) {
-        super();
-        objFromTypes(this, data);
-        this.data = data;
+    constructor(data, ...vargs) { //data must be a Uint8Array
+        super(data, ...vargs);
     }
 }
 
@@ -47,10 +41,8 @@ class HDLAYOUT extends memoobjectidk {
 */
 class HDITEM extends memoobjectidk {
     static types = {mask: "UINT", cxy: "INT", pszText: "LONG_PTR", hbm: "HANDLE", cchTextMax: "INT", fmt: "INT", lParam: "LONG_PTR", iImage: "INT", iOrder: "INT", type: "UINT", pvFilter: "HANDLE", state: "UINT"}
-    constructor(data) {
-        super();
-        objFromTypes(this, data);
-        this.data = data;
+    constructor(data, ...vargs) { //data must be a Uint8Array
+        super(data, ...vargs);
     }
 }
 
@@ -62,10 +54,8 @@ class HDITEM extends memoobjectidk {
 */
 class NMHEADER extends memoobjectidk { //YO BECAUSE THIS STRUCT USES THE NMHDR STRUCT AS A MEMBER THERE IS A 4 BYTE PADDING BETWEEN hdr AND iItem!!!!!!!!!
     static types = {hwndFrom: "HWND", idFrom: "UINT_PTR", code: "UINT", PADDING: "INT", iItem: "INT", iButton: "INT", pitem: "HANDLE"};
-    constructor(data) {
-        super();
-        objFromTypes(this, data);
-        this.data = data;
+    constructor(data, ...vargs) { //data must be a Uint8Array
+        super(data, ...vargs);
     }
 }
 
@@ -80,7 +70,7 @@ function CreateHeader(hwndParent) {
         return NULL;
     }
     for(const [prop, key] of Object.entries(GetClientRect(hwndParent))) {
-        rcParent[prop] = key;
+        rcParent[prop] = key; //oh wow
     }
     hdl.prc = PointerFromArrayBuffer(rcParent.data);
     hdl.pwpos = PointerFromArrayBuffer(wp.data);

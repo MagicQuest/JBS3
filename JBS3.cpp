@@ -10935,6 +10935,7 @@ V8FUNC(CreateWindowWrapper) {
         //uh->Resolve(isolate->GetCurrentContext(), Undefined(isolate)); //https://gist.github.com/jupp0r/5f11c0ee2b046b0ab89660ce85ea480e
     }
     else {
+        WS_EX_OVERLAPPEDWINDOW
         //newWindow = CreateWindowA(CStringFI(info[0]), CStringFI(info[1]), IntegerFI(info[2]), x, y, width, height, (HWND)IntegerFI(info[7]), NULL, hInstance, NULL);
         newWindow = CreateWindowExW(IntegerFI(info[0]), WStringFI(info[1]), WStringFI(info[2]), IntegerFI(info[3]), x, y, width, height, (HWND)IntegerFI(info[8]), (HMENU)IntegerFI(info[9]), (HINSTANCE)IntegerFI(info[10]), NULL);
         info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)newWindow));
@@ -15963,6 +15964,66 @@ V8FUNC(VirtualProtectWrapper) {
     info.GetReturnValue().Set(Number::New(isolate, old));
 }
 
+//V8FUNC(VirtualQueryWrapper) {
+//    using namespace v8;
+//    Isolate* isolate = info.GetIsolate();
+//
+//    MEMORY_BASIC_INFORMATION mbi{};
+//
+//    size_t whatever = VirtualQuery((void*)IntegerFI(info[0]), &mbi, sizeof(mbi));
+//
+//    info.GetReturnValue().Set(Number::New(isolate, old));
+//}
+
+V8FUNC(VirtualQueryExWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    Local<Context> context = isolate->GetCurrentContext();
+
+    MEMORY_BASIC_INFORMATION mbi{};
+
+    size_t whatever = VirtualQueryEx((HANDLE)IntegerFI(info[0]), (void*)IntegerFI(info[1]), &mbi, sizeof(mbi));
+
+    Local<Object> jsMBI = Object::New(isolate);
+    jsMBI->Set(context, LITERAL("BaseAddress"), Number::New(isolate, (ULONG_PTR)mbi.BaseAddress));
+    jsMBI->Set(context, LITERAL("AllocationBase"), Number::New(isolate, (ULONG_PTR)mbi.AllocationBase));
+    jsMBI->Set(context, LITERAL("AllocationProtect"), Number::New(isolate, mbi.AllocationProtect));
+    jsMBI->Set(context, LITERAL("PartitionId"), Number::New(isolate, mbi.PartitionId));
+    jsMBI->Set(context, LITERAL("RegionSize"), Number::New(isolate, mbi.RegionSize));
+    jsMBI->Set(context, LITERAL("State"), Number::New(isolate, mbi.State));
+    jsMBI->Set(context, LITERAL("Protect"), Number::New(isolate, mbi.Protect));
+    jsMBI->Set(context, LITERAL("Type"), Number::New(isolate, mbi.Type));
+
+    info.GetReturnValue().Set(jsMBI);
+}
+
+V8FUNC(ReadProcessMemoryWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    size_t length = IntegerFI(info[2]);
+    void* buffer = malloc(length); //hell yeah brpther
+    ZeroMemory(buffer, length);
+
+    size_t numberOfBytesRead{};
+
+    BOOL success = ReadProcessMemory((HANDLE)IntegerFI(info[0]), (void*)IntegerFI(info[1]), buffer, length, &numberOfBytesRead);
+
+    if (success || numberOfBytesRead) {
+        Local<ArrayBuffer> ab = ArrayBuffer::New(isolate, numberOfBytesRead);
+        memcpy(ab->Data(), buffer, numberOfBytesRead); //GULP
+
+        Local<Uint8Array> jsData = Uint8Array::New(ab, 0, numberOfBytesRead);
+
+        info.GetReturnValue().Set(jsData);
+    }
+    else {
+
+    }
+
+    free(buffer);
+}
+
 V8FUNC(FlushInstructionCacheWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
@@ -16785,6 +16846,16 @@ V8FUNC(numbertest) {
     print(value); //ok so undefined and NaN are 0 while Infinity is 2**(64-1)
 }
 
+V8FUNC(get_location_) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    Local<Object> param = info[0].As<Object>();
+    ULONG_PTR private_location_ = *(ULONG_PTR*) &param;
+    print(&param);
+    print(private_location_);
+    info.GetReturnValue().Set(Number::New(isolate, (ULONG_PTR)private_location_));
+}
 //lol i couldn't remember what the name of this function was
 //well it was worth a shot, while i couldn't remember the name of the function i did remember that you could only use it when making drivers (it's written in wdm.h)
 //V8FUNC(DbgPrintWrapper) {
@@ -17150,6 +17221,37 @@ V8FUNC(RegisterClipboardFormatWrapper) {
     info.GetReturnValue().Set(Number::New(isolate, RegisterClipboardFormat(WStringFI(info[0]))));
 }
 
+V8FUNC(SHGetStockIconInfoWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    Local<Context> context = isolate->GetCurrentContext();
+
+    SHSTOCKICONINFO psii; //usually on the msdn docs it will tell you that you need to initialize cbSize at the top of the page but for some reason for SHGetStockIconInfo it was at the bottom and i didn't read that far lol
+    psii.cbSize = sizeof(psii); //oh for a second i thought that sizeof must look for the RTTI somewhere for the object you want the size of but nah the __vtptr only shows up for objects that inherit virtual functions (and apparently windows shoves a pointer to the RTTICompleteObjectLocator RIGHT behind the vtable) and this object doesn't extend any class so then i realized sizeof is compile-0time
+
+    HRESULT res = SHGetStockIconInfo(SHSTOCKICONID(IntegerFI(info[0])), IntegerFI(info[1]), &psii);
+    
+    Local<Object> jsPSII = Object::New(isolate);
+    jsPSII->Set(context, LITERAL("cbSize"), Number::New(isolate, psii.cbSize));
+    jsPSII->Set(context, LITERAL("hIcon"), Number::New(isolate, (LONG_PTR)psii.hIcon));
+    jsPSII->Set(context, LITERAL("iSysImageIndex"), Number::New(isolate, psii.iSysImageIndex));
+    jsPSII->Set(context, LITERAL("iIcon"), Number::New(isolate, psii.iIcon));
+    jsPSII->Set(context, LITERAL("szPath"), String::NewFromTwoByte(isolate, (const uint16_t*)psii.szPath).ToLocalChecked());
+
+    info.GetReturnValue().Set(jsPSII);
+}
+
+V8FUNC(GetModuleHandleWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    LPCWSTR moduleName = (LPCWSTR)NewWStringOrNULL<wchar_t>(isolate, info[0]);
+
+    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)GetModuleHandle(moduleName)));
+
+    delete[] moduleName;
+}
+
 //i think im allowed to use a snapshot thing to load these quicker
 //https://github.com/danbev/learning-v8/blob/master/notes/snapshots.md
 v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const wchar_t* filename, int nCmdShow) {
@@ -17236,12 +17338,15 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const wchar_t* filename
     setGlobal(mt_incremento);
     setGlobal(mt_makeobject);
     setGlobal(numbertest);
+    setGlobal(get_location_);
 
     setGlobalWrapper(OutputDebugString);
 
     //setGlobalWrapper(SystemParametersInfo);
     
     setGlobalWrapper(VirtualProtect);
+    setGlobalWrapper(VirtualQueryEx);
+    setGlobalWrapper(ReadProcessMemory);
     setGlobalConst(PAGE_NOACCESS);
     setGlobalConst(PAGE_READONLY);
     setGlobalConst(PAGE_READWRITE);
@@ -17298,6 +17403,14 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const wchar_t* filename
     setGlobalConst(MEM_EXTENDED_PARAMETER_SOFT_FAULT_PAGES);
     setGlobalConst(MEM_EXTENDED_PARAMETER_EC_CODE);
     setGlobalConst(MEM_EXTENDED_PARAMETER_NUMA_NODE_MANDATORY);
+
+    setGlobalConst(MEM_PRIVATE);
+    setGlobalConst(MEM_MAPPED);
+    setGlobalConst(MEM_IMAGE);
+    setGlobalConst(WRITE_WATCH_FLAG_RESET);
+    setGlobalConst(VM_PREFETCH_TO_WORKING_SET);
+    setGlobalConst(ENCLAVE_TYPE_SGX);
+    setGlobalConst(ENCLAVE_TYPE_SGX2);
 
     setGlobalWrapper(memcpy);
     setGlobalWrapper(RegQueryInfoKey);
@@ -20288,6 +20401,130 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
     setGlobalConst(ARW_DOWN); setGlobalConst(ARW_HIDE); setGlobalConst(ARW_LEFT); setGlobalConst(ARW_RIGHT); setGlobalConst(ARW_UP);
 
     setGlobalConst(HS_BDIAGONAL); setGlobalConst(HS_CROSS); setGlobalConst(HS_DIAGCROSS); setGlobalConst(HS_FDIAGONAL); setGlobalConst(HS_HORIZONTAL); setGlobalConst(HS_VERTICAL);
+
+    setGlobalWrapper(SHGetStockIconInfo);
+    setGlobalConst(SIID_DOCNOASSOC);
+    setGlobalConst(SIID_DOCASSOC);
+    setGlobalConst(SIID_APPLICATION);
+    setGlobalConst(SIID_FOLDER);
+    setGlobalConst(SIID_FOLDEROPEN);
+    setGlobalConst(SIID_DRIVE525);
+    setGlobalConst(SIID_DRIVE35);
+    setGlobalConst(SIID_DRIVEREMOVE);
+    setGlobalConst(SIID_DRIVEFIXED);
+    setGlobalConst(SIID_DRIVENET);
+    setGlobalConst(SIID_DRIVENETDISABLED);
+    setGlobalConst(SIID_DRIVECD);
+    setGlobalConst(SIID_DRIVERAM);
+    setGlobalConst(SIID_WORLD);
+    setGlobalConst(SIID_SERVER);
+    setGlobalConst(SIID_PRINTER);
+    setGlobalConst(SIID_MYNETWORK);
+    setGlobalConst(SIID_FIND);
+    setGlobalConst(SIID_HELP);
+    setGlobalConst(SIID_SHARE);
+    setGlobalConst(SIID_LINK);
+    setGlobalConst(SIID_SLOWFILE);
+    setGlobalConst(SIID_RECYCLER);
+    setGlobalConst(SIID_RECYCLERFULL);
+    setGlobalConst(SIID_MEDIACDAUDIO);
+    setGlobalConst(SIID_LOCK);
+    setGlobalConst(SIID_AUTOLIST);
+    setGlobalConst(SIID_PRINTERNET);
+    setGlobalConst(SIID_SERVERSHARE);
+    setGlobalConst(SIID_PRINTERFAX);
+    setGlobalConst(SIID_PRINTERFAXNET);
+    setGlobalConst(SIID_PRINTERFILE);
+    setGlobalConst(SIID_STACK);
+    setGlobalConst(SIID_MEDIASVCD);
+    setGlobalConst(SIID_STUFFEDFOLDER);
+    setGlobalConst(SIID_DRIVEUNKNOWN);
+    setGlobalConst(SIID_DRIVEDVD);
+    setGlobalConst(SIID_MEDIADVD);
+    setGlobalConst(SIID_MEDIADVDRAM);
+    setGlobalConst(SIID_MEDIADVDRW);
+    setGlobalConst(SIID_MEDIADVDR);
+    setGlobalConst(SIID_MEDIADVDROM);
+    setGlobalConst(SIID_MEDIACDAUDIOPLUS);
+    setGlobalConst(SIID_MEDIACDRW);
+    setGlobalConst(SIID_MEDIACDR);
+    setGlobalConst(SIID_MEDIACDBURN);
+    setGlobalConst(SIID_MEDIABLANKCD);
+    setGlobalConst(SIID_MEDIACDROM);
+    setGlobalConst(SIID_AUDIOFILES);
+    setGlobalConst(SIID_IMAGEFILES);
+    setGlobalConst(SIID_VIDEOFILES);
+    setGlobalConst(SIID_MIXEDFILES);
+    setGlobalConst(SIID_FOLDERBACK);
+    setGlobalConst(SIID_FOLDERFRONT);
+    setGlobalConst(SIID_SHIELD);
+    setGlobalConst(SIID_WARNING);
+    setGlobalConst(SIID_INFO);
+    setGlobalConst(SIID_ERROR);
+    setGlobalConst(SIID_KEY);
+    setGlobalConst(SIID_SOFTWARE);
+    setGlobalConst(SIID_RENAME);
+    setGlobalConst(SIID_DELETE);
+    setGlobalConst(SIID_MEDIAAUDIODVD);
+    setGlobalConst(SIID_MEDIAMOVIEDVD);
+    setGlobalConst(SIID_MEDIAENHANCEDCD);
+    setGlobalConst(SIID_MEDIAENHANCEDDVD);
+    setGlobalConst(SIID_MEDIAHDDVD);
+    setGlobalConst(SIID_MEDIABLURAY);
+    setGlobalConst(SIID_MEDIAVCD);
+    setGlobalConst(SIID_MEDIADVDPLUSR);
+    setGlobalConst(SIID_MEDIADVDPLUSRW);
+    setGlobalConst(SIID_DESKTOPPC);
+    setGlobalConst(SIID_MOBILEPC);
+    setGlobalConst(SIID_USERS);
+    setGlobalConst(SIID_MEDIASMARTMEDIA);
+    setGlobalConst(SIID_MEDIACOMPACTFLASH);
+    setGlobalConst(SIID_DEVICECELLPHONE);
+    setGlobalConst(SIID_DEVICECAMERA);
+    setGlobalConst(SIID_DEVICEVIDEOCAMERA);
+    setGlobalConst(SIID_DEVICEAUDIOPLAYER);
+    setGlobalConst(SIID_NETWORKCONNECT);
+    setGlobalConst(SIID_INTERNET);
+    setGlobalConst(SIID_ZIPFILE);
+    setGlobalConst(SIID_SETTINGS);
+    setGlobalConst(SIID_DRIVEHDDVD);
+    setGlobalConst(SIID_DRIVEBD);
+    setGlobalConst(SIID_MEDIAHDDVDROM);
+    setGlobalConst(SIID_MEDIAHDDVDR);
+    setGlobalConst(SIID_MEDIAHDDVDRAM);
+    setGlobalConst(SIID_MEDIABDROM);
+    setGlobalConst(SIID_MEDIABDR);
+    setGlobalConst(SIID_MEDIABDRE);
+    setGlobalConst(SIID_CLUSTEREDDRIVE);
+    setGlobalConst(SIID_MAX_ICONS);
+    setGlobalConst(SHGFI_ICON);
+    setGlobalConst(SHGFI_DISPLAYNAME);
+    setGlobalConst(SHGFI_TYPENAME);
+    setGlobalConst(SHGFI_ATTRIBUTES);
+    setGlobalConst(SHGFI_ICONLOCATION);
+    setGlobalConst(SHGFI_EXETYPE);
+    setGlobalConst(SHGFI_SYSICONINDEX);
+    setGlobalConst(SHGFI_LINKOVERLAY);
+    setGlobalConst(SHGFI_SELECTED);
+    setGlobalConst(SHGFI_ATTR_SPECIFIED);
+    setGlobalConst(SHGFI_LARGEICON);
+    setGlobalConst(SHGFI_SMALLICON);
+    setGlobalConst(SHGFI_OPENICON);
+    setGlobalConst(SHGFI_SHELLICONSIZE);
+    setGlobalConst(SHGFI_PIDL);
+    setGlobalConst(SHGFI_USEFILEATTRIBUTES);
+    setGlobalConst(SHGFI_ADDOVERLAYS);
+    setGlobalConst(SHGFI_OVERLAYINDEX);
+    setGlobalConst(SHGSI_ICONLOCATION);
+    setGlobalConst(SHGSI_ICON);
+    setGlobalConst(SHGSI_SYSICONINDEX);
+    setGlobalConst(SHGSI_LINKOVERLAY);
+    setGlobalConst(SHGSI_SELECTED);
+    setGlobalConst(SHGSI_LARGEICON);
+    setGlobalConst(SHGSI_SMALLICON);
+    setGlobalConst(SHGSI_SHELLICONSIZE);
+
+    setGlobalWrapper(GetModuleHandle);
 
     //global->Set(isolate, "HELP", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
     //    using namespace v8;

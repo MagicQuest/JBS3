@@ -38,6 +38,11 @@ public:
     ComPtr<IDXGIResource> pDesktopResource;
     //ComPtr<ID2D1Bitmap1> pDesktopBitmap;
 
+    ~Direct2D11() {
+        //oh you aren't supposed to call bass class destructors!
+        swapChain->SetFullscreenState(FALSE, NULL); //apparently d3d wont shut down if we're in fullscreen (http://www.directxtutorial.com/Lesson.aspx?lessonid=11-4-4)
+    }
+
     bool Init(HWND window, int type);
 
     int Resize(UINT width, UINT height);

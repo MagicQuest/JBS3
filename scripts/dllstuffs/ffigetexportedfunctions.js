@@ -46,10 +46,8 @@ globalThis.GetExportedFunctions = (function() {
             e_res: 4,
             e_res2: 10,
         }
-        constructor(data) { //data must be a Uint8Array
-            super();
-            objFromTypes(this, data);
-            this.data = data;
+        constructor(data, ...vargs) { //data must be a Uint8Array
+            super(data, ...vargs);
         }
     }
 
@@ -63,10 +61,8 @@ globalThis.GetExportedFunctions = (function() {
             SizeOfOptionalHeader: "WORD",
             Characteristics: "WORD",
         };
-        constructor(data) { //data must be a Uint8Array
-            super();
-            objFromTypes(this, data);
-            this.data = data;
+        constructor(data, ...vargs) { //data must be a Uint8Array
+            super(data, ...vargs);
         }
     }
 
@@ -75,10 +71,8 @@ globalThis.GetExportedFunctions = (function() {
             VirtualAddress: "DWORD",
             Size: "DWORD",
         }
-        constructor(data) { //data must be a Uint8Array
-            super();
-            objFromTypes(this, data);
-            this.data = data;
+        constructor(data, ...vargs) { //data must be a Uint8Array
+            super(data, ...vargs);
         }
     }
 
@@ -134,10 +128,8 @@ globalThis.GetExportedFunctions = (function() {
         static arrayLengths = {
             DataDirectory: IMAGE_NUMBEROF_DIRECTORY_ENTRIES,
         }
-        constructor(data) { //data must be a Uint8Array
-            super();
-            objFromTypes(this, data);
-            this.data = data;
+        constructor(data, ...vargs) { //data must be a Uint8Array
+            super(data, ...vargs);
         }
     }
 
@@ -150,10 +142,8 @@ globalThis.GetExportedFunctions = (function() {
             //IMAGE_OPTIONAL_HEADER64
             OptionalHeader: IMAGE_OPTIONAL_HEADER64,
         };
-        constructor(data) { //data must be a Uint8Array
-            super();
-            objFromTypes(this, data);
-            this.data = data;
+        constructor(data, ...vargs) { //data must be a Uint8Array
+            super(data, ...vargs);
         }
     }
 
@@ -171,10 +161,8 @@ globalThis.GetExportedFunctions = (function() {
             AddressOfNames: "DWORD",         // RVA from base of image
             AddressOfNameOrdinals: "DWORD",  // RVA from base of image
         };
-        constructor(data) { //data must be a Uint8Array
-            super();
-            objFromTypes(this, data);
-            this.data = data;
+        constructor(data, ...vargs) { //data must be a Uint8Array
+            super(data, ...vargs);
         }
     }
 
@@ -187,13 +175,11 @@ globalThis.GetExportedFunctions = (function() {
             static arrayLengths = {
                 values: length,
             };
-            constructor(data) { //data must be a Uint8Array
-                super();
-                objFromTypes(this, data);
-                this.data = data;
+            constructor(data, ...vargs) { //data must be a Uint8Array
+                super(data, ...vargs);
             }
         }
-        return new PtrArray(new Uint8Array(PtrArray.sizeof()));
+        return new PtrArray(new Uint8Array(PtrArray.sizeof())); //you don't have to initialize a memoobjectidk like this anymore because if data is undefined it will do it for you!
     }
 
     function readThroughStringAtPtr(ptr) { //https://defuse.ca/online-x86-assembler.htm#disassembly (x64)
@@ -235,13 +221,13 @@ globalThis.GetExportedFunctions = (function() {
     return function(lib) {
         //technique snatched from The Stack: https://stackoverflow.com/questions/1128150/win32-api-to-enumerate-dll-export-functions
         print("lib:",lib);
-        const dosHeader = new IMAGE_DOS_HEADER(new Uint8Array(IMAGE_DOS_HEADER.sizeof()));
+        const dosHeader = new IMAGE_DOS_HEADER();
         memcpy(PointerFromArrayBuffer(dosHeader.data), lib, IMAGE_DOS_HEADER.sizeof()); //this shit LMAO
         //print("dosHeader:",dosHeader);
-        const imageHeaders = new IMAGE_NT_HEADERS64(new Uint8Array(IMAGE_NT_HEADERS64.sizeof()));
+        const imageHeaders = new IMAGE_NT_HEADERS64();
         memcpy(PointerFromArrayBuffer(imageHeaders.data), lib+dosHeader.e_lfanew, IMAGE_NT_HEADERS64.sizeof());
         //print("imageHeaders:",imageHeaders);
-        const exportDirectory = new IMAGE_EXPORT_DIRECTORY(new Uint8Array(IMAGE_EXPORT_DIRECTORY.sizeof()));
+        const exportDirectory = new IMAGE_EXPORT_DIRECTORY();
         memcpy(PointerFromArrayBuffer(exportDirectory.data), lib+imageHeaders.OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress, IMAGE_EXPORT_DIRECTORY.sizeof());
         //print("exportDirectory:",exportDirectory);
         const namesdoublepointer = lib+exportDirectory.AddressOfNames;

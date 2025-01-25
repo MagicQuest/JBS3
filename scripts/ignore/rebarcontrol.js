@@ -8,6 +8,14 @@ const ID_BUTTON = 2000
 const ID_EDIT = 2001
 
 
+class RECT extends memoobjectidk {
+    //oh shoot these types have to be in the right order
+    static types = {left: "LONG", top: "LONG", right: "LONG", bottom: "LONG"}; //strings because i want to know if they are unsigned (when the first letter is U (i can't be bothered to make each key in sizeof an object))
+    constructor(data, ...vargs) { //data must be a Uint8Array
+        super(data, ...vargs);
+    }
+}
+
 /*
     UINT        cbSize;
     UINT        fMask;
@@ -15,10 +23,8 @@ const ID_EDIT = 2001
 */
 class REBARINFO extends memoobjectidk {
     static types = {cbSize: "UINT", fMask: "UINT", himl: "HANDLE"};
-    constructor(data) {
-        super();
-        objFromTypes(this, data);
-        this.data = data;
+    constructor(data, ...vargs) { //data must be a Uint8Array
+        super(data, ...vargs);
     }
 }
 
@@ -75,17 +81,15 @@ class REBARBANDINFO extends memoobjectidk {
         "padding3": "INT", //PADDING 3
         "lParam": "LONG_PTR",
         "cxHeader": "UINT",
-        //"rcChevronLocation": "RECT",
-        "left": "LONG",
-        "top": "LONG",
-        "right": "LONG",
-        "bottom": "LONG",
+        "rcChevronLocation": RECT,
+        //"left": "LONG",
+        //"top": "LONG",
+        //"right": "LONG",
+        //"bottom": "LONG",
         "uChevronState": "UINT"
     };
-    constructor(data) {
-        super();
-        objFromTypes(this, data);
-        this.data = data;
+    constructor(data, ...vargs) { //data must be a Uint8Array
+        super(data, ...vargs);
     }
 }
 

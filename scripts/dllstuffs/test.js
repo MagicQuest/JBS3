@@ -2,28 +2,22 @@ eval(require("fs").read(__dirname+"/marshallib.js")); //damn this marshalling go
 
 class __int32 extends memoobjectidk {
     static types = {value: "INT"};
-    constructor(data) { //data must be a Uint8Array
-        super()
-        objFromTypes(this, data);
-        this.data = data;
+    constructor(data, ...vargs) { //data must be a Uint8Array
+        super(data, ...vargs);
     }
 }
 
 class __uint32 extends memoobjectidk {
     static types = {value: "UINT"};
-    constructor(data) { //data must be a Uint8Array
-        super()
-        objFromTypes(this, data);
-        this.data = data;
+    constructor(data, ...vargs) { //data must be a Uint8Array
+        super(data, ...vargs);
     }
 }
 
 class char_t extends memoobjectidk {
     static types = {value: "CHAR"};
-    constructor(data) { //data must be a Uint8Array
-        super()
-        objFromTypes(this, data);
-        this.data = data;
+    constructor(data, ...vargs) { //data must be a Uint8Array
+        super(data, ...vargs);
     }
 }
 

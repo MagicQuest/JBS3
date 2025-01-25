@@ -21,3 +21,8 @@ gcc -g -o output.obj -fno-verbose-asm -c -fdiagnostics-color=always test.cpp
 
                 decom[p]
 objdump -S -Mintel --disassemble output.obj > helloworld.dump
+
+
+if i wanted to do x64 asm to bytes i could do 
+ml64 /c masmtest.asm
+objdump -d masmtest.obj -Mintel

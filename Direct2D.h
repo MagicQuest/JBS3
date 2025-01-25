@@ -44,7 +44,7 @@ public:
 		//textFormat = nullptr;
 	}
 
-	~Direct2D() {
+	virtual ~Direct2D() {
 		//std::cout << "d2d -> " << factory << " " << renderTarget << " " << textfactory << " " << clearBrush << " " << drawingStateBlock << std::endl;
 		if (factory != nullptr) {
 			factory->Release();
