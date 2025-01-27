@@ -325,14 +325,19 @@ function windowProc(hwnd, msg, wp, lp) {
                 0x48, 0x83, 0xec, 0x20,                                 //sub rsp, 0x20 (32) im assuming that when MSDN says that the caller function must allocate space for 4 register parameters (), the size of each parameter would be 8 so 4*8=32
                                                                         //rsp is still 16 byte aligned because 32%16 is 0 (and it was already aligned before we did this)
                 
-                0x48, 0xb9, ...int64_to_little_endian_hex(hijackstr.ptr),     //movabs rcx, imm64
-                0x48, 0x89, 0x4c, 0x24, 0x18,                           //mov QWORD PTR [rsp+0x18], rcx     ("pushing" rcx into rsp + 24 because the last parameter is pushed first (for __cdecl)) (instead of doing it like this, i could just push rcx after i changed it and then subtracted 24 from rsp)
+                0x48, 0xb9, ...int64_to_little_endian_hex(hijackstr.ptr),//movabs rcx, imm64
+                
+                //um... why did i do this? (did i forget that i pushed all the parameters earlier?)
+                //0x48, 0x89, 0x4c, 0x24, 0x18,                           //mov QWORD PTR [rsp+0x18], rcx     ("pushing" rcx into rsp + 24 because the last parameter is pushed first (for __cdecl)) (instead of doing it like this, i could just push rcx after i changed it and then subtracted 24 from rsp)
+                
                 0x48, 0xb8, ...int64_to_little_endian_hex(OutputDebugStringWPtr),   //movabs rax, imm64
                 0xff, 0xd0,                                             //call rax
 
                 //wait how can i be sure that after i call OutputDebugStringW the parameters are still preserved... (by pushing and popping them)
                 0x48, 0x83, 0xc4, 0x20,                                 //add rsp, 0x20 (32)
-                0x5d,                                                   //pop rbp
+
+                //haha oops i left pop rbp on!
+                //0x5d,                                                   //pop rbp
                 //0x41, 0x59,                                             //pop r9
                 0x41, 0x58,                                             //pop r8
                 0x5a,                                                   //pop rdx
@@ -342,6 +347,8 @@ function windowProc(hwnd, msg, wp, lp) {
                 //lets modify the D2D1_RECT_F rect struct passed as a pointer through rdx
                 //lets loop 4 times so we can add 10 to each float in the struct (for the lolz)
                 //im gonna use r10 to hold how many times we've looped
+                //NOTE: i'm actually directly modifying the D2D1_RECT_F that's been passed so if you use the same rect again with FillRectangle/the function you want to call it will be changed, again!
+                //i could allocate a copy on the stack (and pass it into FillRectangle/the function you want to call) but i don't feel like it since jbs will create the rect when you call d2d.FillRectangle so it doesn't matter
                 0x4d, 0x31, 0xd2,                                       //xor r10, r10
                 0x49, 0xc7, 0xc3, ...int32_to_little_endian_hex(50),    //mov r11, imm32           ;lol im using int32 to little endian so i can change the number easily
                 0xf3, 0x49, 0x0f, 0x2a, 0xcb,                           //cvtsi2ss xmm1, r11       ;convert r11 to a float and store it in xmm1
@@ -356,7 +363,7 @@ function windowProc(hwnd, msg, wp, lp) {
 
                 //0x5d,                                                   //pop rbp
                 0x48, 0xb8, ...int64_to_little_endian_hex(methodAddress),   //movabs rax, imm64        //oops i wrote methodptr instead here and didn't realize why it wasn't working lmao
-                0xff, 0xe0,                                             //jmp rax (we're jumping here because im assuming that when this asm code is called, everything is already setup to call the original d2d function so instead of calling it myself, i'll just jmp there like i didn't hijack it)
+                0xff, 0xe0,                                             //jmp rax (we're jumping here because im assuming that when this asm code is called, everything is already setup to call the original d2d function so instead of calling it myself, i'll just jmp there as if i didn't hijack it)
             ]);
             //OHHHHH it was crashing because i forgot to change the protection of hijackasmcode's data!
             PrintFormattedVirtualQuery(GetCurrentProcess(), PointerFromArrayBuffer(hijackasmcode)); //ouuuhhh yeah the protection is writeread only

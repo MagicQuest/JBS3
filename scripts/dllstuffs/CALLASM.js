@@ -138,7 +138,7 @@ print(__asm(
 ]
 ), "might crash?"); //might crash (nothing happened)
 
-const squareasm = new Uint8Array([ //squares the first integer parameter
+const squareasm = new Uint8Array([ //squares the first int32 parameter
     0x89, 0xc8,           //mov eax, ecx (ecx holds the leftmost integer parameter https://learn.microsoft.com/en-us/cpp/build/x64-calling-convention?view=msvc-170#example-of-argument-passing-1---all-integers)
     0x0f, 0xaf, 0xc0,     //imul eax, eax
     0xc3,                 //ret

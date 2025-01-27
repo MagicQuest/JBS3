@@ -436,9 +436,9 @@ class GenericPtrObject { //lowkey i guess there's really no need to extend this 
             0x48, 0x89, 0xe5,                                                                   //mov rbp, rsp
             
             //shadow space for the call (stated on the x64 calling convention page but it was kinda vague so im assuming it's 32 bytes)
-            //not allocating the shadow space was 99% of the reason why i had to store rbp and rsp in custom js object lmao
+            //not allocating the shadow space was 99% of the reason why i had to store rbp and rsp in my custom js objects lmao
             //https://sonictk.github.io/asm_tutorial/#windows:thewindowtothehardware/themicrosoftx64callingconvention/theshadowspace (this section also mentions rsp alignment)
-            0x48, 0x83, 0xec, 0x20,                                                             //sub rsp, 0x20 (32)            //rsp still aligned because 32%16 == 0
+            0x48, 0x83, 0xec, 0x20,                                                             //sub rsp, 0x20 (32)            //rsp still aligned because 32%16 == 0 (or something)
             
             //using movabs to put the pointer to the method into the asm code (so i don't have to pass it as a parameter)
             0x48, 0xb8, ...int64_to_little_endian_hex(methodptr),                               //movabs rax, ...imm64 (https://www.reddit.com/r/Assembly_language/comments/141bi1i/comment/jmz6z2y/?utm_source=share&utm_medium=web3x&utm_name=web3xcss&utm_term=1&utm_content=share_button)

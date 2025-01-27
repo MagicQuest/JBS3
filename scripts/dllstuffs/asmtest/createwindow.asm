@@ -5,6 +5,9 @@
 ;despite glancing at this banger i've had open in another tab: https://www.davidgrantham.com/nasm-basicwindow64/
 ;i still had my fair share of random problems though like when i allocated the msg struct (for the event loop) on the stack and forgot to leave shadow space so it was overwriting the first 32 bytes of msg struct... (i couldn't interact with my window the entire time)
 
+;also i've had this video saved to a random playlist for like a year: https://www.youtube.com/watch?v=Wz_xJPN7lAY
+;rdseed sounds tuff
+
 bits 64
 default rel
 
@@ -163,7 +166,7 @@ windowProc:
         mov rcx, QWORD [rbp+16]
         call GetDC
 
-        %define dc RSP + 32
+        %define dc       RSP + 32
         %define screenDC RSP + 40
 
         mov QWORD [dc], rax ;immediately store the dc at rsp+32
@@ -188,9 +191,15 @@ windowProc:
 
         mov DWORD [rsp+4*8], WINDOW_HEIGHT ;4*8 = 32 so we are above the shadow space
         ;mov QWORD [rsp+5*8], QWORD [screenDC]
-        ;OH NO! i sub rsp by 56 so when i try to use screenDC i'm off by 64!!!!!
-        mov r10, QWORD [screenDC+56] ;sadly r10 is gonna have to be our fallguy )lol()
-        mov QWORD [rsp+5*8], r10
+        ;OH NO! i sub rsp by 56 so when i try to use screenDC i'm off by 56!!!!!
+        ;mov r10, QWORD [screenDC+56] ;sadly r10 is gonna have to be our fallguy )lol()
+        ;mov QWORD [rsp+5*8], r10
+        
+        ;oh wait a second bruh
+        ;rax STILL holds the screenDC!
+        ;i totally forgot!
+        mov QWORD [rsp+5*8], rax
+
         mov DWORD [rsp+6*8], 0
         mov DWORD [rsp+7*8], 0
         lea r11, [screenWidth]
@@ -211,7 +220,11 @@ windowProc:
         ;int3
         call StretchBlt ;damn it bruh bitblt has so many arguments
 
-        add rsp, 56+16 ;aw shit forgot + 16
+        ;OH NO AGAIN!
+        ;I'VE ADDED +16 AND THEREFORE RSP+32 AND RSP+40 DON'T POINT TO DC AND SCREENDC!!!!!!
+        ;i knew something was going wrong because my ENTIRE computer would start lagging if i left it on too long (and also task manager would start turning black which is a weird sign of something gdi related going wrong)
+        add rsp, 56;+16 ;aw shit forgot + 16
+        ;i was just dereferencing bullshit bruh
 
         mov rcx, QWORD [rbp+16]
         mov rdx, QWORD [dc]
@@ -220,6 +233,8 @@ windowProc:
         xor ecx, ecx
         mov rdx, QWORD [screenDC]
         call ReleaseDC ;release the screen's dc
+
+        add rsp, 16 ;NOW we can add 16!!!
 
         jmp defwindowproc
 

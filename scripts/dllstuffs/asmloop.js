@@ -88,6 +88,8 @@ const str_out = NewCharStrPtr(Object.keys(new Array(str.length).toString()+1).ma
 //i increment r9 and check if it's greater than r8 (string length)
 //if it's less than r8 then loop back to the mov instruction (-24 bytes)
 
+//apparently there are some weird string manipulation operations you can use that could probably do this (like rep)
+
 print(__asm([ //i didn't include the standard push rbp, mov, and pop rbp because i don't change rbp so i don't think it's required (i think idk it works fine without it)
     0x4d, 0x31, 0xc9,                    //xor r9, r9     ;set r9 to 0 (because im using it to could how many times it has looped)
     0x31, 0xc0,                          //xor eax, eax (set the eax register to 0 just in case because im moving [rcx] into eax's lower 16's lower byte al)

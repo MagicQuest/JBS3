@@ -14,6 +14,7 @@ function windowProc(hwnd, msg, wp, lp) {
         const screenDC = GetDC(NULL);
 
         SetStretchBltMode(dc, HALFTONE);
+                                                 //screenWidth, and screenHeight already defined
         StretchBlt(dc, 0, 0, w, h, screenDC, 0, 0, screenWidth, screenHeight, SRCCOPY);
 
         ReleaseDC(hwnd, dc);
