@@ -1611,7 +1611,7 @@ V8FUNC(SetConsoleTextAttributeWrapper) {
 V8FUNC(BeginPaintWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
-    LPPAINTSTRUCT lps = new PAINTSTRUCT{0}; //oh god
+    LPPAINTSTRUCT lps = new PAINTSTRUCT{}; //oh god
     HWND window = NULL;
     if (info[0]->IsNumber()) {
         window = (HWND)info[0].As<Number>()->IntegerValue(isolate->GetCurrentContext()).FromJust();
@@ -1633,12 +1633,12 @@ V8FUNC(BeginPaintWrapper) {
 
     jsps->Set(isolate->GetCurrentContext(), LITERAL("rcPaint"), rcPaintRect);
     //jsps->Set(isolate->GetCurrentContext(), LITERAL("hdc"), Number::New(isolate, lps->rgbReserved));
-    jsps->Set(isolate->GetCurrentContext(), LITERAL("ps"), Number::New(isolate, (long long)lps));
+    jsps->Set(isolate->GetCurrentContext(), LITERAL("internalPtr"), Number::New(isolate, (long long)lps));
 
     info.GetReturnValue().Set(jsps);
 }
 
-V8FUNC(EndPaintWrapper) {
+V8FUNC(EndPaintWrapper) { //this function has been wrong since i published jbs3 to github
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
     LPPAINTSTRUCT lps;
@@ -1646,13 +1646,19 @@ V8FUNC(EndPaintWrapper) {
     if (info[0]->IsNumber()) {
         window = (HWND)info[0].As<Number>()->IntegerValue(isolate->GetCurrentContext()).FromJust();
     }
-    lps = (LPPAINTSTRUCT)info[1].As<Number>()->IntegerValue(isolate->GetCurrentContext()).FromJust();
+    //lps = (LPPAINTSTRUCT)info[1].As<Number>()->IntegerValue(isolate->GetCurrentContext()).FromJust();
+    //no way bros...
+    //EndPaint hasn't worked this ENTIRE time and that's why i thought using RedrawWindow and WM_PAINT was laggy...
+    //i wasn't actually releasing the hdc
+    lps = (LPPAINTSTRUCT)IntegerFI(info[1].As<Object>()->Get(isolate->GetCurrentContext(), LITERAL("internalPtr")).ToLocalChecked());
 
-    EndPaint(window, lps);
+    BOOL success = EndPaint(window, lps); //i should've error checked this bro
 
     //print("deleting lps");
 
     delete lps; //phew
+
+    info.GetReturnValue().Set(Number::New(isolate, success));
 }
 
 V8FUNC(CreateRectRgnWrapper) {

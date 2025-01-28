@@ -1,4 +1,4 @@
-//i think this one lags because i use WM_PAINT and RedrawWindow
+//no way i thought this script lagged because i used RedrawWindow and WM_PAINT but it actually lagged because my EndPaint hasn't worked since the biden administration (and wasn't freeing the DC)
 
 const font = CreateFontSimple("impact", 20, 40);
 
@@ -57,9 +57,12 @@ function windowProc(hwnd, msg, wp, lp) {
         //interesting i might have to do some fake 3d stuff with this but i need to find out the formulas (exactly what im talking about https://www.desmos.com/calculator/vahnkqibew)
         //PlgBlt(screen, [{x: 0, y: 0}, {x:1920, y: 0}, {x:10,y:64}], ps.hdc, 0, 0, 1920, 64, NULL, 0, 0);
 
-        print("DRAW", x);
+        //no way this is how i find out EndPaint hasn't been working THIS WHOLE TIME
+        // print("DRAW", x, GetGuiResources(GetCurrentProcess(), GR_GDIOBJECTS), GetGuiResources(GetCurrentProcess(), GR_USEROBJECTS));
+        
+        const success = EndPaint(hwnd, ps);
 
-        EndPaint(hwnd, ps);
+        print("DRAW", x, success, GetGuiResources(GetCurrentProcess(), GR_GDIOBJECTS), GetGuiResources(GetCurrentProcess(), GR_USEROBJECTS));
     }else if(msg == WM_TIMER) {
         x += 2; //scroll speed
         if(x % 1920 == 0 && x != 0) {
