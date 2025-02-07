@@ -135,12 +135,64 @@ function SearchForNLengthStringsInVirtualMemory(process, n) {
     return occurences;
 }
 
+//function cmpmyshit(a,b){const r=[];for(const c of a){if(b.includes(c)){r.push(c);}}return r;}
+function cmpmyshit(a, b) {
+    const r = [];
+    for(const a1 of a) {
+        if(b.includes(a1)) {
+            r.push(a1);
+        }
+    }
+    return r;
+}
+
+function StringToHexArr(str, towstring) {
+    if (towstring) {
+        value = value.split("").map(e => e + "\0").join("").split("").map(e => e.charCodeAt(0));
+    } else {
+        value = value.split("").map(c => c.charCodeAt(0));
+    }
+    return value;
+}
+
+function WatchForAllOccurencesOfValue(process, value, string) {
+    const first = FindAllOccurrencesOfValueInVirtualMemory(process, value, string);
+    const results = [];
+
+    return function(newvalue, string) {
+        //TOP (tuff)
+        if (string) {
+            newvalue = StringToHexArr(newvalue, string-1);
+        }
+        const res = [];
+        //const second = FindAllOccurrencesOfValueInVirtualMemory(process, newvalue, string);
+        //const res = cmpmyshit(first, second);
+        //let's try to read all the things from before
+        //globalThis.watchdog = WatchForAllOccurencesOfValue(panes[0].hProcess, [9, 0, 0, 0], false);
+        for (const addr of first) {
+            const mbi = VirtualQueryEx(process, addr);
+            if (ReadableQuery(mbi)) {
+                const region = ReadProcessMemory(process, addr, newvalue.length);
+                if (!region) {
+                    print("err that shouldnb't really happen unless newvalue.length is bigger than le page/whatever");
+                }
+                //print(addr, region[0], newvalue[0]);
+                if (region.reduce((acc, val, i) => acc + (val == newvalue[i]), 0) == newvalue.length) {
+                    res.push(addr);
+                }
+            } else {
+                print("can't read this address anymore", addr);
+            }
+        }
+        print(res);
+        //results.push(res);
+    }
+}
+
 function FindAllOccurrencesOfValueInVirtualMemory(process, value, string) { //wait this works way quicker than i expected B)
     const basembi = VirtualQueryEx(process, 0);
-    if(string == 1) {
-        value = value.split("").map(c=>c.charCodeAt(0));
-    }else if(string == 2) {
-        value = value.split("").map(e => e+"\0").join("").split("").map(e => e.charCodeAt(0));
+    if (string) {
+        value = StringToHexArr(value, string - 1);
     }
     let i = basembi.BaseAddress;
     let success = true;

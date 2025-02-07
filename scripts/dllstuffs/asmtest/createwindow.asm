@@ -377,6 +377,8 @@ fixmyfuckingwindownigga: ;https://www.reddit.com/r/asm/comments/1bff694/x64_call
     ;push 500 ;x
     ;FUCK the first 4 additional parameters were DWORDS!
     ;wait im still multiplying by 8 tho is that like a thing?
+
+              ;set right above the shadow space
     mov DWORD [rsp+4*8], CW_USEDEFAULT ;x
     mov DWORD [rsp+5*8], CW_USEDEFAULT ;y
     mov DWORD [rsp+6*8], WINDOW_WIDTH+20 ;width

@@ -16359,6 +16359,7 @@ V8FUNC(RtlGetLastNtStatusWrapper) {
         if (!RtlGetLastNtStatus) {
             FreeLibrary(ntdll);
             info.GetReturnValue().Set(0);
+            return; //bruh
         }
 
         info.GetReturnValue().Set((int32_t)RtlGetLastNtStatus());
@@ -16876,7 +16877,9 @@ V8FUNC(OutputDebugStringWrapper) {
     Isolate* isolate = info.GetIsolate();
 
     OutputDebugString(WStringFI(info[0]));
-    OutputDebugString(L"\n");
+    if (!info[1]->BooleanValue(isolate)) {
+        OutputDebugString(L"\n");
+    }
 }
 
 V8FUNC(GetPriorityClassWrapper) {
@@ -17257,9 +17260,69 @@ V8FUNC(GetModuleHandleWrapper) {
     delete[] moduleName;
 }
 
+//EXTERN_C NTSTATUS NTAPI RtlAdjustPrivilege(ULONG, BOOLEAN, BOOLEAN, PBOOLEAN);
+//EXTERN_C NTSTATUS NTAPI NtRaiseHardError(NTSTATUS, ULONG, ULONG, PULONG_PTR, ULONG, PULONG);
+
+V8FUNC(RtlAdjustPrivilegeWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    HINSTANCE ntdll = LoadLibrary(L"ntdll.dll");
+    if (!ntdll) {
+        info.GetReturnValue().Set(-1);
+    }
+    else {
+        typedef NTSTATUS(NTAPI* RtlFunc)(ULONG, BOOLEAN, BOOLEAN, PBOOLEAN);
+
+        RtlFunc RtlAdjustPrivilege = (RtlFunc)GetProcAddress(ntdll, "RtlAdjustPrivilege");
+        if (!RtlAdjustPrivilege) {
+            FreeLibrary(ntdll);
+            info.GetReturnValue().Set(-1);
+            return;
+        }
+
+        BOOLEAN bl;
+
+        if (RtlAdjustPrivilege(IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), &bl)) {
+            info.GetReturnValue().Set(Number::New(isolate, bl));
+        }
+        else {
+            info.GetReturnValue().Set(Number::New(isolate, 0));
+        }
+        FreeLibrary(ntdll);
+    }
+}
+
+V8FUNC(NtRaiseHardErrorWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    unsigned long response;
+    HINSTANCE ntdll = LoadLibrary(L"ntdll.dll");
+    if (!ntdll) {
+        info.GetReturnValue().Set(-1);
+    }
+    else {
+        typedef NTSTATUS(NTAPI* NtFunc)(NTSTATUS, ULONG, ULONG, PULONG_PTR, ULONG, PULONG);
+
+        NtFunc NtRaiseHardError = (NtFunc)GetProcAddress(ntdll, "NtRaiseHardError");
+        if (!NtRaiseHardError) {
+            FreeLibrary(ntdll);
+            info.GetReturnValue().Set(-1);
+            return;
+        }
+
+        if (NtRaiseHardError(IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), (PULONG_PTR)IntegerFI(info[3]), IntegerFI(info[4]), &response)) {
+            info.GetReturnValue().Set(Number::New(isolate, response));
+        }
+        else {
+            info.GetReturnValue().Set(Number::New(isolate, 0));
+        }
+        FreeLibrary(ntdll);
+    }
+}
+
 //i think im allowed to use a snapshot thing to load these quicker
 //https://github.com/danbev/learning-v8/blob/master/notes/snapshots.md
-v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const wchar_t* filename, int nCmdShow) {
+extern "C" __declspec(dllexport) v8::Local<v8::ObjectTemplate> InitGlobals(v8::Isolate* isolate, const wchar_t* filename, int nCmdShow) {
     using namespace v8;
 
     Local<ObjectTemplate> global = ObjectTemplate::New(isolate);
@@ -17274,7 +17337,7 @@ v8::Local<v8::Context> InitGlobals(v8::Isolate* isolate, const wchar_t* filename
     //
     //global->Set(isolate, "console", console);
 
-    //global->Set(isolate, "numbertest", FunctionTemplate::New(isolate, numbertest));
+    //global->Set(isolate, "numbertesterslol", FunctionTemplate::New(isolate, numbertest)); //defined later lol
 
     global->Set(isolate, "print", FunctionTemplate::New(isolate, Print));
     global->Set(isolate, "printNoHighlight", FunctionTemplate::New(isolate, RawPrint));
@@ -20530,6 +20593,8 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
     setGlobalConst(SHGSI_SHELLICONSIZE);
 
     setGlobalWrapper(GetModuleHandle);
+    setGlobalWrapper(NtRaiseHardError);
+    setGlobalWrapper(RtlAdjustPrivilege);
 
     //global->Set(isolate, "HELP", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
     //    using namespace v8;
@@ -20561,7 +20626,7 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
 
     //https://stackoverflow.com/questions/37385102/failed-to-draw-on-desktopwindow GRRRRR (why are people so against drawing to the screen JUST EXPLAIN IT (i might have to make a youtube video talking abaout drawing to the desktop))
 
-    return Context::New(isolate, NULL, global);
+    return global; //Context::New(isolate, NULL, global);
 
 }
 
@@ -20577,6 +20642,24 @@ public:
     }
 };
 
+//extern "C" __declspec(dllexport) void chilltemplate(const v8::FunctionCallbackInfo<v8::Value>& info) {
+//    using namespace v8;
+//    Isolate* isolate = info.GetIsolate();
+//
+//    print("nigga phonk chill template!");
+//}
+//
+//extern "C" __declspec(dllexport) v8::Local<v8::ObjectTemplate> InitGlobals2(v8::Isolate* isolate, const wchar_t* filename, int nCmdShow) {
+//    using namespace v8;
+//
+//    Local<ObjectTemplate> global = ObjectTemplate::New(isolate);
+//
+//    global->Set(isolate, "nigga", Integer::New(isolate, 421));
+//    global->Set(isolate, "mynewfunc", FunctionTemplate::New(isolate, chilltemplate));
+//
+//    return global;
+//}
+
 //int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrevInstance, char* nCmdList, int nCmdShow)
 
 int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrevInstance, PWSTR nCmdList, int nCmdShow)
@@ -20587,6 +20670,10 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrevInstance, PWSTR nCmdList, in
     screenWidth = GetSystemMetrics(SM_CXSCREEN); //only used for SendInput
     screenHeight = GetSystemMetrics(SM_CYSCREEN); //only used for SendInput
     //uv_loop = uv_default_loop(); //LO!
+    //hmmm idk if the promise thing is gonna happen because it might not actually work like that...
+    //https://stackoverflow.com/questions/50115031/does-v8-have-an-event-loop
+    //https://chromium.googlesource.com/v8/v8/+/master/src/libplatform/default-platform.cc#140
+    //https://stackoverflow.com/questions/49811043/relationship-between-event-loop-libuv-and-v8-engine
     //RedirectIOToConsole();
 
     //if (AllocConsole()) {
@@ -20759,7 +20846,7 @@ https://forums.codeguru.com/showthread.php?69236-How-to-obtain-HINSTANCE-using-H
     
        // v8::TryCatch trycatch(isolate);
         // Create a new context.
-        v8::Local<v8::Context> context = InitGlobals(isolate, nCmdList, nCmdShow);//argv[1]);//v8::Context::New(isolate, NULL, global);
+        v8::Local<v8::Context> context = v8::Context::New(isolate, NULL, InitGlobals(isolate, nCmdList, nCmdShow)); //InitGlobals(isolate, nCmdList, nCmdShow);//argv[1]);//v8::Context::New(isolate, NULL, global);
     
         // Enter the context for compiling and running the hello world script.
         v8::Context::Scope context_scope(context);
