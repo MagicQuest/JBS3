@@ -4,6 +4,8 @@ let prog;
 
 function windowProc(hwnd, msg, wp, lp) {
     if(msg == WM_CREATE) {
+        //EnableVisualStyles();
+        //InitCommonControlsEx(ICC_WIN95_CLASSES);
                         //oopsie i was missing the progress related macros/consts
         prog = CreateWindow(NULL, PROGRESS_CLASS, "", WS_VISIBLE | WS_CHILD | PBS_SMOOTH | PBS_MARQUEE, 0, 256, 512, 64, hwnd, 0, hInstance);
         SendMessage(prog, PBM_SETRANGE, 0, MAKELPARAM(0, 100));

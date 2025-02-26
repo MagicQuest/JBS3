@@ -403,6 +403,14 @@ class memoobjectidk {
             }
         }, 0); //oh yeah
     }
+    setData(maybedata) {
+        let data = maybedata;
+        if(!data) {
+            data = new Uint8Array(this.constructor.sizeof()); //this is valid? calling constructor.sizeof still returns the right values and not just undefined?
+        }
+        objFromTypes(this, data, 0);
+        this.data = data;
+    }
     constructor(maybedata, ...vargs) {
         let data = maybedata;
         let listinit = !(maybedata instanceof Uint8Array); //if you pass something other than a Uint8Array for data i will assume you are trying to emulate list initialization

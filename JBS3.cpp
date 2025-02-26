@@ -137,6 +137,8 @@
 #include <shobjidl_core.h> //for showOpenFilePicker (IFileDialog)
 //#include <wincodec.h> //wait why did i include this? (it was for Direct2D)
 
+#include <tlhelp32.h> //for CreateToolhelp32Snapshot
+
 #pragma comment(lib, "windowscodecs.lib")
 
 #define LITERAL(cstr) String::NewFromUtf8Literal(isolate, cstr)
@@ -298,6 +300,44 @@ namespace jsImpl {
         jsMII->Set(context, LITERAL("hbmpItem"), Number::New(isolate, (LONG_PTR)menuiinfo.hbmpItem));
         
         return jsMII;
+    }
+
+    MODULEENTRY32 fromMODULEENTRY32(Isolate* isolate, const Local<Object>& jsME32) {
+        Local<Context> context = isolate->GetCurrentContext();
+        
+        MODULEENTRY32 me32{};
+        me32.dwSize = sizeof(me32);
+        me32.th32ModuleID = IntegerFI(jsME32->Get(context, LITERAL("th32ModuleID")).ToLocalChecked());
+        me32.th32ProcessID = IntegerFI(jsME32->Get(context, LITERAL("th32ProcessID")).ToLocalChecked());
+        me32.GlblcntUsage = IntegerFI(jsME32->Get(context, LITERAL("GlblcntUsage")).ToLocalChecked());
+        me32.ProccntUsage = IntegerFI(jsME32->Get(context, LITERAL("ProccntUsage")).ToLocalChecked());
+        me32.modBaseAddr = (BYTE*)IntegerFI(jsME32->Get(context, LITERAL("modBaseAddr")).ToLocalChecked());
+        me32.modBaseSize = IntegerFI(jsME32->Get(context, LITERAL("modBaseSize")).ToLocalChecked());
+        me32.hModule = (HMODULE)IntegerFI(jsME32->Get(context, LITERAL("hModule")).ToLocalChecked());
+        //me32.szModule = WStringFI(jsME32->Get(context, LITERAL("szModule")).ToLocalChecked());
+        //me32.szExePath = WStringFI(jsME32->Get(context, LITERAL("szExePath")).ToLocalChecked());
+        wcscpy_s(me32.szModule, WStringFI(jsME32->Get(context, LITERAL("szModule")).ToLocalChecked()));
+        wcscpy_s(me32.szExePath, WStringFI(jsME32->Get(context, LITERAL("szExePath")).ToLocalChecked()));
+        
+        return me32;
+    }
+
+    const Local<Object>& createMODULEENTRY32(Isolate* isolate, MODULEENTRY32 me32, const Local<Object>& jsME32) {
+        Local<Context> context = isolate->GetCurrentContext();
+
+        //Local<Object> jsME32 = Object::New(isolate);
+
+        jsME32->Set(context, LITERAL("th32ModuleID"), Number::New(isolate, me32.th32ModuleID));
+        jsME32->Set(context, LITERAL("th32ProcessID"), Number::New(isolate, me32.th32ProcessID));
+        jsME32->Set(context, LITERAL("GlblcntUsage"), Number::New(isolate, me32.GlblcntUsage));
+        jsME32->Set(context, LITERAL("ProccntUsage"), Number::New(isolate, me32.ProccntUsage));
+        jsME32->Set(context, LITERAL("modBaseAddr"), Number::New(isolate, (ULONG_PTR)me32.modBaseAddr));
+        jsME32->Set(context, LITERAL("modBaseSize"), Number::New(isolate, me32.modBaseSize));
+        jsME32->Set(context, LITERAL("hModule"), Number::New(isolate, (ULONG_PTR)me32.hModule));
+        jsME32->Set(context, LITERAL("szModule"), String::NewFromTwoByte(isolate, (const uint16_t*)me32.szModule).ToLocalChecked());
+        jsME32->Set(context, LITERAL("szExePath"), String::NewFromTwoByte(isolate, (const uint16_t*)me32.szExePath).ToLocalChecked());
+        
+        return jsME32;
     }
 
     MENUITEMINFOW fromJSMENUITEMINFOW(Isolate* isolate, Local<Object> jsMII) {
@@ -2361,14 +2401,98 @@ V8FUNC(BeepWrapper) { //https://stackoverflow.com/questions/5814869/playing-an-a
         int freq = IntegerFI(info[0]);
         int ms = IntegerFI(info[1]);
 
+        //this is what inspired me to come back to Beep :)
+        //https://chaudharypulkit93.medium.com/how-does-nodejs-work-beginner-to-advanced-event-loop-v8-engine-libuv-threadpool-bbe9b41b5bdd
+
         Persistent<Promise::Resolver>* pp = new Persistent<Promise::Resolver>(isolate, v8::Promise::Resolver::New(isolate->GetCurrentContext()).ToLocalChecked()); //ok so i think this should be persistent then instaed of local
+        //Persistent<Function>* pf = new Persistent<Function>(isolate, info[2].As<Function>());
         std::thread f([=] { //uhoh something keeps crashing around here
-            print(&pp << " " << isolate << " " << freq << " FREQ " << ms);
+            print(pp << " " << isolate << " " << freq << " FREQ " << ms << " thread began!");
+            //__debugbreak();
             BOOL val = Beep(freq, ms);
-            pp->Get(isolate)->Resolve(isolate->GetCurrentContext(), Number::New(isolate, val)); //hmm it only crashes when i include this line so idk where in v8 this is failing
+            struct {
+                Persistent<Promise::Resolver>* pp; //8 bytes
+                BOOL val; //uhhh like 4 or something (let's just assume the padding is after this property)
+                void* lambda;
+            } tempstructformicrotask{pp, val, 0};
+            void* data = malloc(sizeof(tempstructformicrotask));
+            if (data) {
+                memcpy(data, &tempstructformicrotask, sizeof(tempstructformicrotask));
+                //v8::Isolate::GetCurrent()
+                //isolate->Enter();
+                //ummm... is this lambda function getting overwritten in the stack or something?
+                //std::function<void(void*)> sigma([](void* data) {
+
+                //});
+                //bruhhhh i thought this wasn't working and i had to allocate the lambda on the heap but
+                //1. it didn't work
+                //2. it wasn't even the problem
+                //it turns out the jbstudio3 was trying to release the fluidsynth dll even though i set valid to false
+                auto lambda = /*new auto*/ ([](void* data) { //oh right this is putting my task on the queue therefore we leave this scope and my tempstruct pointer is bad lol
+                    //honestly idk if this will come through right
+                    //__debugbreak();
+                    Isolate* isolate = v8::Isolate::GetCurrent();
+                    //print(data << " " << isolate << " " << isolate->IsCurrent() << " " << isolate->IsDead());
+                    //__debugbreak();
+                    Local<Context> context = isolate->GetCurrentContext();
+
+                    //lol everything is in its own line here because it was crashing and i didn't know what step was the problem
+                    Persistent<Promise::Resolver>* pp = *(Persistent<Promise::Resolver>**)data; //damn i think it was crashing this whole time because i forgot to dereference data like *(**)
+                    Local<Promise::Resolver> ppresolver = pp->Get(isolate);
+                    BOOL val = *(BOOL*)((ULONG_PTR)data + 8);
+                    Local<Number> returnval = Number::New(isolate, val);
+                    ppresolver->Resolve(context, returnval);
+                    delete pp;
+                    //delete (void*)(ULONG_PTR(data) + 16); //yeah this is actually insane (delete doesn't immediately free the memory does it...)
+                    free(data);
+                    //((Persistent<Promise::Resolver>*)data)->Get(isolate)->Resolve(isolate->GetCurrentContext(), Number::New(isolate, *((BOOL*)((ULONG_PTR)data + 8))));
+                });
+                //ULONG_PTR lambdaAddress = (ULONG_PTR)lambda;
+                //memcpy((void*)(ULONG_PTR(data) + (ULONG_PTR(&tempstructformicrotask.lambda) - ULONG_PTR(&tempstructformicrotask))), &lambdaAddress, sizeof(lambdaAddress));
+                //print(data << " FUCK bro jeez " << lambda << " " << lambdaAddress);
+                //__debugbreak();
+                isolate->EnqueueMicrotask((v8::MicrotaskCallback)lambda, data);
+            }
+            print("thread over");
+            //isolate->Exit();
+            //pp->Get(isolate)->Resolve(isolate->GetCurrentContext(), Number::New(isolate, val)); //hmm it only crashes when i include this line so idk where in v8 this is failing
             //print("promise should'v ereturned with " << val << " (but didn't?)");
-            delete pp;
+            //delete pp;
         });
+        //std::thread f([=] {
+        //    print(pf << " " << isolate << " " << freq << " FREQ " << ms << " thread began!");
+        //    BOOL val = Beep(freq, ms);
+        //    struct {
+        //        Persistent<Function>* pf; //8 bytes
+        //        BOOL val; //uhhh like 4 or something (let's just assume the padding is after this property)
+        //    } tempstructformicrotask{ pf, val };
+        //    void* tsfmdm = malloc(sizeof(tempstructformicrotask));
+        //    if (tsfmdm) {
+        //        __debugbreak();
+        //        memcpy(tsfmdm, &tempstructformicrotask, sizeof(tempstructformicrotask));
+        //        //isolate->Enter();
+        //        isolate->EnqueueMicrotask([](void* data) {
+        //            print("entering microtask! " << data);
+        //            Isolate* isolate = v8::Isolate::GetCurrent();
+        //            Local<Context> context = isolate->GetCurrentContext();
+        //            Persistent<Function>* pf = *(Persistent<Function>**)data;
+        //            print(pf->Get(isolate)->IsFunction() << " RIGHT?");
+        //            __debugbreak();
+        //            TryCatch shit(isolate);
+        //            //Local<Value> argv[] = {
+        //            //    Number::New(isolate, *(BOOL*)((ULONG_PTR)data + 8)),
+        //            //};
+        //            Local<Value> arg = Number::New(isolate, *(BOOL*)((ULONG_PTR)data + 8));
+        //            pf->Get(isolate)->Call(context, context->Global(), 1, &arg);
+        //            CHECKEXCEPTIONS(shit);
+        //            print("called!");
+        //            delete pf;
+        //            free(data);
+        //        }, tsfmdm);//pf->Get(isolate));
+        //        //isolate->Exit();
+        //    }
+        //    print("thread ended and microtask queued!");
+        //});
         //std::thread thread_object(f);//, info, isolate, notify, wait, pp);
         info.GetReturnValue().Set(pp->Get(isolate)->GetPromise());
         f.detach();
@@ -10930,6 +11054,7 @@ V8FUNC(CreateWindowWrapper) {
                         //print("wajt");
                         TranslateMessage(&Message);
                         DispatchMessage(&Message);
+                        isolate->PerformMicrotaskCheckpoint();
                     }
                 }
             }
@@ -14917,21 +15042,25 @@ V8FUNC(spawn) {
     Isolate* isolate = info.GetIsolate();
     //HandleScope handle_scope(isolate);
 
-    Persistent<Function> func = Persistent<Function>(isolate, info[0].As<Function>());
+    Persistent<Function>* func = new Persistent<Function>(isolate, info[0].As<Function>());
     std::thread f([=] { //
         //Isolate::Scope isolate_scope(isolate);
+        print("wait im sorry does func even still work?");
+        print(func->IsEmpty());
         isolate->Enter();
         //Locker locker_(isolate);
         //print(isolate << " " << Isolate::GetCurrent() << " president");
         //Isolate* i = Isolate::GetCurrent();
         Local<Context> context = isolate->GetCurrentContext();
         //func.Get(isolate)->Call(context, context->Global(), 0, nullptr);
-        Local<Function> callable = func.Get(isolate);
+        Local<Function> callable = func->Get(isolate);
         Local<Object> globalThis = context->Global(); //it does not like Global here... (it works when i use isolate->Enter() but again stops working when i use Locker)
         callable->Call(context, globalThis, 0, nullptr);
         //isolate->EnqueueMicrotask(callable); //im tryna get my knowledge of v8 up so hopefully i've learned enough here
         //isolate->PerformMicrotaskCheckpoint();
         isolate->Exit();
+
+        delete func;
     });
     f.detach();
 }
@@ -15057,6 +15186,13 @@ V8FUNC(GetCurrentProcessWrapper) {
     info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)GetCurrentProcess()));
 }
 
+V8FUNC(GetCurrentProcessIdWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, GetCurrentProcessId()));
+}
+
 V8FUNC(EnumProcessModulesWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
@@ -15144,6 +15280,13 @@ V8FUNC(GetProcessMemoryInfoWrapper) {
     obj->Set(context, LITERAL("PeakPagefileUsage"), Number::New(isolate, pmc.PeakPagefileUsage));
     obj->Set(context, LITERAL("PrivateUsage"), Number::New(isolate, pmc.PrivateUsage));
     info.GetReturnValue().Set(obj);
+}
+
+V8FUNC(GetProcessIdWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, GetProcessId((HANDLE)IntegerFI(info[0]))));
 }
 
 V8FUNC(CloseHandleWrapper) {
@@ -15544,7 +15687,7 @@ V8FUNC(GetRawInputDataWrapper) {
                     //memcpy(realdata, input->data.hid.bRawData, rawsize);
 
                     Local<ArrayBuffer> ab = ArrayBuffer::New(isolate, rawsize);
-                    memcpy(ab->Data(), input->data.hid.bRawData, rawsize); //still kinda mad bruh why is it BYTE[1] and not just a pointer BYTE*
+                    memcpy(ab->Data(), input->data.hid.bRawData, rawsize); //still kinda mad bruh why is it BYTE[1] and not just a pointer BYTE* (so that the struct itself could contain the bytes instead of pointing to another location that had them)
 
                     Local<Int8Array> arr = Int8Array::New(ab, 0, rawsize);
 
@@ -15969,6 +16112,15 @@ V8FUNC(VirtualProtectWrapper) {
     info.GetReturnValue().Set(Number::New(isolate, old));
 }
 
+V8FUNC(VirtualProtectExWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    DWORD old = 0; VirtualProtectEx((HANDLE)IntegerFI(info[0]), (void*)IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]), &old);
+
+    info.GetReturnValue().Set(Number::New(isolate, old));
+}
+
 //V8FUNC(VirtualQueryWrapper) {
 //    using namespace v8;
 //    Isolate* isolate = info.GetIsolate();
@@ -16002,6 +16154,22 @@ V8FUNC(VirtualQueryExWrapper) {
     info.GetReturnValue().Set(jsMBI);
 }
 
+V8FUNC(VirtualAllocExWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    LPVOID allocatedmem = VirtualAllocEx((HANDLE)IntegerFI(info[0]), (void*)IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]), IntegerFI(info[4]));
+
+    info.GetReturnValue().Set(Number::New(isolate, (ULONG_PTR)allocatedmem));
+}
+
+V8FUNC(VirtualFreeExWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, VirtualFreeEx((HANDLE)IntegerFI(info[0]), (void*)IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]))));
+}
+
 V8FUNC(ReadProcessMemoryWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
@@ -16027,6 +16195,48 @@ V8FUNC(ReadProcessMemoryWrapper) {
     }
 
     free(buffer);
+}
+
+V8FUNC(WriteProcessMemoryWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    size_t length = 0;//IntegerFI(info[2]);
+    void* buffer = nullptr;
+    Local<Value> data = info[2];
+    if (data->IsNumber() || data->IsBoolean()) { //oh snap instead of doing this potential access violation of a move, i could use a union!
+        //long long tempshit = IntegerFI(data);
+        //buffer = &tempshit; //don't do this kids...
+        ////mangounion.number = tempshit;
+        //length = sizeof(long long);
+        buffer = (void*)IntegerFI(data);
+    }
+    else if (data->IsString()) {
+        buffer = (void*)WStringFI(data);
+        //mangounion.wstring = WStringFI(data); //aw man this ain't working (prolly because v8 moves the shitss around and i lose this pointer data)
+        length = wcslen(WStringFI(data)) * sizeof(wchar_t);
+    }
+    else if (data->IsArrayBufferView()) {
+        Local<ArrayBufferView> abv = data.As<ArrayBufferView>();
+        buffer = abv->Buffer()->Data();
+        //mangounion.idk = abv->Buffer()->Data();
+        length = abv->ByteLength();
+    }
+    if (info[3]->IsNumber()) {
+        length = IntegerFI(info[3]);
+    }
+
+    size_t numberOfBytesWritten{};
+
+    BOOL success = WriteProcessMemory((HANDLE)IntegerFI(info[0]), (void*)IntegerFI(info[1]), buffer, length, &numberOfBytesWritten);
+
+    if (success) {
+        info.GetReturnValue().Set(Number::New(isolate, numberOfBytesWritten));
+    }
+    else {
+        info.GetReturnValue().Set(Number::New(isolate, success));
+    }
+
 }
 
 V8FUNC(FlushInstructionCacheWrapper) {
@@ -17310,18 +17520,182 @@ V8FUNC(NtRaiseHardErrorWrapper) {
             return;
         }
 
-        if (NtRaiseHardError(IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), (PULONG_PTR)IntegerFI(info[3]), IntegerFI(info[4]), &response)) {
-            info.GetReturnValue().Set(Number::New(isolate, response));
+        NTSTATUS result = NtRaiseHardError(IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), (PULONG_PTR)IntegerFI(info[3]), IntegerFI(info[4]), &response);
+
+        if (result != 0) {
+            print("NtRaiseHardError returned NTSTATUS " << result);
+            info.GetReturnValue().Set(Number::New(isolate, result));
         }
         else {
-            info.GetReturnValue().Set(Number::New(isolate, 0));
+            info.GetReturnValue().Set(Number::New(isolate, response));
         }
         FreeLibrary(ntdll);
     }
 }
 
+//ive had this tab open for at least like 6 months and now i can finally retire it
+//https://web.archive.org/web/20220602112019/https://securityxploded.com/ntcreatethreadex.php
+//lol wait why is it an archive.org link, the website still works
+//also see: https://ntdoc.m417z.com/ntcreatethreadex
+
+//struct NtCreateThreadExBuffer
+//{
+//    ULONG Size;
+//    ULONG Unknown1;
+//    ULONG Unknown2;
+//    PULONG Unknown3;
+//    ULONG Unknown4;
+//    ULONG Unknown5;
+//    ULONG Unknown6;
+//    PULONG Unknown7;
+//    ULONG Unknown8;
+//};
+
+V8FUNC(NtCreateThreadExWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    HINSTANCE ntdll = LoadLibrary(L"ntdll.dll");
+    if (!ntdll) {
+        info.GetReturnValue().Set(-1);
+    }
+    else {
+        typedef NTSTATUS(WINAPI* LPFUN_NtCreateThreadEx)(OUT PHANDLE, IN ACCESS_MASK, _In_opt_ LPVOID, IN HANDLE, IN LPTHREAD_START_ROUTINE, IN PVOID, IN ULONG, IN SIZE_T, IN SIZE_T, IN SIZE_T, _In_opt_ LPVOID);
+
+        LPFUN_NtCreateThreadEx NtCreateThreadEx = (LPFUN_NtCreateThreadEx)GetProcAddress(ntdll, "NtCreateThreadEx");
+        if (!NtCreateThreadEx) {
+            FreeLibrary(ntdll);
+            info.GetReturnValue().Set(-1);
+            return;
+        }
+
+        //DWORD temp1 = 0;
+        //DWORD temp2 = 0;
+        //
+        //NtCreateThreadExBuffer ntbuffer{};
+        //
+        //ntbuffer.Size = sizeof(NtCreateThreadExBuffer);
+        //ntbuffer.Unknown1 = 0x10003;
+        //ntbuffer.Unknown2 = 0x8;
+        //ntbuffer.Unknown3 = &temp2;
+        //ntbuffer.Unknown4 = 0;
+        //ntbuffer.Unknown5 = 0x10004;
+        //ntbuffer.Unknown6 = 4;    
+        //ntbuffer.Unknown7 = &temp1;
+        //ntbuffer.Unknown8 = 0;
+
+        HANDLE hThread{};
+        NTSTATUS result = NtCreateThreadEx(&hThread, IntegerFI(info[0]), (void*)IntegerFI(info[1]), (HANDLE)IntegerFI(info[2]), (LPTHREAD_START_ROUTINE)IntegerFI(info[3]), (void*)IntegerFI(info[4]), IntegerFI(info[5]), IntegerFI(info[6]), IntegerFI(info[7]), IntegerFI(info[8]), NULL/*&ntbuffer*/);
+        
+        if (result != 0) {
+            print("NtCreateThreadEx returned NTSTATUS " << result);
+            info.GetReturnValue().Set(Number::New(isolate, result));
+        }
+        else {
+            info.GetReturnValue().Set(Number::New(isolate, (ULONG_PTR)hThread));
+        }
+        FreeLibrary(ntdll);
+    }
+}
+
+V8FUNC(CreateToolhelp32SnapshotWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    
+    info.GetReturnValue().Set(Number::New(isolate, (ULONG_PTR)CreateToolhelp32Snapshot(IntegerFI(info[0]), IntegerFI(info[1]))));
+}
+
+V8FUNC(Module32FirstWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    
+    MODULEENTRY32 me32{};
+    me32.dwSize = sizeof(me32);
+
+    BOOL success = Module32First((HANDLE)IntegerFI(info[0]), &me32);
+    
+    if (success) {
+        Local<Context> context = isolate->GetCurrentContext();
+        Local<Object> jsME32 = Object::New(isolate);
+        //jsME32->Set(context, LITERAL("dwSize"), Number::New(isolate, me32.dwSize));
+
+        info.GetReturnValue().Set(jsImpl::createMODULEENTRY32(isolate, me32, jsME32));
+    }
+    else {
+        info.GetReturnValue().Set(Number::New(isolate, success));
+    }
+}
+
+V8FUNC(Module32NextWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    Local<Context> context = isolate->GetCurrentContext();
+
+    MODULEENTRY32 me32{};
+    me32.dwSize = sizeof(me32);
+    Local<Object> jsME32 = info[1].As<Object>();
+    jsImpl::fromMODULEENTRY32(isolate, jsME32);
+    BOOL success = Module32Next((HANDLE)IntegerFI(info[0]), &me32);
+    jsImpl::createMODULEENTRY32(isolate, me32, jsME32);
+    info.GetReturnValue().Set(success);
+}
+
+V8FUNC(GetExitCodeThreadWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    DWORD exitCode{};
+
+    BOOL success = GetExitCodeThread((HANDLE)IntegerFI(info[0]), &exitCode);
+
+    if (success) {
+        info.GetReturnValue().Set(Number::New(isolate, exitCode));
+    }
+    else {
+        print("GetExitCodeThread failed so maybe i should be throw an error or just do the by reference object thing");
+        info.GetReturnValue().Set(0);
+    }
+}
+
+V8FUNC(NtCloseWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    
+    HINSTANCE ntdll = LoadLibrary(L"ntdll.dll");
+    if (!ntdll) {
+        info.GetReturnValue().Set(-1);
+    }
+    else {
+        typedef NTSTATUS(* LPFUN_NtClose)(IN HANDLE);
+
+        LPFUN_NtClose NtClose = (LPFUN_NtClose)GetProcAddress(ntdll, "NtClose");
+        if (!NtClose) {
+            FreeLibrary(ntdll);
+            info.GetReturnValue().Set(-1);
+            return;
+        }
+
+        info.GetReturnValue().Set(Number::New(isolate, NtClose(HANDLE(IntegerFI(info[0])))));
+        FreeLibrary(ntdll);
+    }
+}
+
+V8FUNC(queueMicrotask) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    isolate->EnqueueMicrotask(info[0].As<Function>());
+}
+
+V8FUNC(PerformMicrotaskCheckpointWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    isolate->PerformMicrotaskCheckpoint();
+}
+
 //i think im allowed to use a snapshot thing to load these quicker
 //https://github.com/danbev/learning-v8/blob/master/notes/snapshots.md
+//OHHH my extern "C" __declspec(dllexport) kept crashing when i used LoadLibrary because there is no DllMain and (i guess) stuff isn't initialized (so i gotta call crtmain myself?)
 extern "C" __declspec(dllexport) v8::Local<v8::ObjectTemplate> InitGlobals(v8::Isolate* isolate, const wchar_t* filename, int nCmdShow) {
     using namespace v8;
 
@@ -17413,8 +17787,12 @@ extern "C" __declspec(dllexport) v8::Local<v8::ObjectTemplate> InitGlobals(v8::I
     //setGlobalWrapper(SystemParametersInfo);
     
     setGlobalWrapper(VirtualProtect);
+    setGlobalWrapper(VirtualProtectEx);
     setGlobalWrapper(VirtualQueryEx);
+    setGlobalWrapper(VirtualAllocEx);
+    setGlobalWrapper(VirtualFreeEx);
     setGlobalWrapper(ReadProcessMemory);
+    setGlobalWrapper(WriteProcessMemory);
     setGlobalConst(PAGE_NOACCESS);
     setGlobalConst(PAGE_READONLY);
     setGlobalConst(PAGE_READWRITE);
@@ -18421,10 +18799,12 @@ extern "C" __declspec(dllexport) v8::Local<v8::ObjectTemplate> InitGlobals(v8::I
     setGlobalWrapper(GetWindowThreadProcessId);
 
     setGlobalWrapper(GetProcessMemoryInfo);
+    setGlobalWrapper(GetProcessId);
 
     setGlobalWrapper(EnumProcesses);
     setGlobalWrapper(OpenProcess);
     setGlobalWrapper(GetCurrentProcess);
+    setGlobalWrapper(GetCurrentProcessId);
     setGlobalWrapper(EnumProcessModules);
     setGlobalWrapper(EnumProcessModulesEx);
     setGlobalWrapper(GetModuleBaseName);
@@ -19815,6 +20195,8 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
     setGlobal(clearInterval);
     //global->Set(isolate, "clearTimeout", FunctionTemplate::New(isolate, clearTimerYKYKYK));
     //global->Set(isolate, "clearInterval", FunctionTemplate::New(isolate, clearTimerYKYKYK));
+    setGlobal(queueMicrotask);
+    setGlobalWrapper(PerformMicrotaskCheckpoint);
 
     setGlobalWrapper(PostQuitMessage);
 
@@ -20595,6 +20977,53 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
     setGlobalWrapper(GetModuleHandle);
     setGlobalWrapper(NtRaiseHardError);
     setGlobalWrapper(RtlAdjustPrivilege);
+    setGlobalWrapper(NtCreateThreadEx);
+    setGlobalConst(THREAD_TERMINATE);
+    setGlobalConst(THREAD_SUSPEND_RESUME);
+    setGlobalConst(THREAD_GET_CONTEXT);
+    setGlobalConst(THREAD_SET_CONTEXT);
+    setGlobalConst(THREAD_QUERY_INFORMATION);
+    setGlobalConst(THREAD_SET_INFORMATION);
+    setGlobalConst(THREAD_SET_THREAD_TOKEN);
+    setGlobalConst(THREAD_IMPERSONATE);
+    setGlobalConst(THREAD_DIRECT_IMPERSONATION);
+    setGlobalConst(THREAD_SET_LIMITED_INFORMATION);
+    setGlobalConst(THREAD_QUERY_LIMITED_INFORMATION);
+    setGlobalConst(THREAD_RESUME);
+    setGlobalConst(THREAD_ALL_ACCESS);
+
+    //https://ntdoc.m417z.com/ntcreatethreadex
+#define THREAD_CREATE_FLAGS_NONE 0x00000000
+#define THREAD_CREATE_FLAGS_CREATE_SUSPENDED 0x00000001 // NtCreateUserProcess & NtCreateThreadEx (https://ntdoc.m417z.com/thread_create_flags_create_suspended)
+#define THREAD_CREATE_FLAGS_SKIP_THREAD_ATTACH 0x00000002 // NtCreateThreadEx only
+#define THREAD_CREATE_FLAGS_HIDE_FROM_DEBUGGER 0x00000004 // NtCreateThreadEx only
+#define THREAD_CREATE_FLAGS_LOADER_WORKER 0x00000010 // NtCreateThreadEx only // since THRESHOLD
+#define THREAD_CREATE_FLAGS_SKIP_LOADER_INIT 0x00000020 // NtCreateThreadEx only // since REDSTONE2
+#define THREAD_CREATE_FLAGS_BYPASS_PROCESS_FREEZE 0x00000040 // NtCreateThreadEx only // since 19H1
+
+    setGlobalConst(THREAD_CREATE_FLAGS_NONE);
+    setGlobalConst(THREAD_CREATE_FLAGS_CREATE_SUSPENDED);
+    setGlobalConst(THREAD_CREATE_FLAGS_SKIP_THREAD_ATTACH);
+    setGlobalConst(THREAD_CREATE_FLAGS_HIDE_FROM_DEBUGGER);
+    setGlobalConst(THREAD_CREATE_FLAGS_LOADER_WORKER);
+    setGlobalConst(THREAD_CREATE_FLAGS_SKIP_LOADER_INIT);
+    setGlobalConst(THREAD_CREATE_FLAGS_BYPASS_PROCESS_FREEZE);
+
+    setGlobalWrapper(CreateToolhelp32Snapshot);
+    setGlobalConst(TH32CS_SNAPHEAPLIST);
+    setGlobalConst(TH32CS_SNAPPROCESS);
+    setGlobalConst(TH32CS_SNAPTHREAD);
+    setGlobalConst(TH32CS_SNAPMODULE);
+    setGlobalConst(TH32CS_SNAPMODULE32);
+    setGlobalConst(TH32CS_SNAPALL);
+    setGlobalConst(TH32CS_INHERIT);
+    setGlobalWrapper(Module32First);
+    setGlobalWrapper(Module32Next);
+
+    setGlobalWrapper(GetExitCodeThread);
+    setGlobalWrapper(NtClose);
+
+
 
     //global->Set(isolate, "HELP", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
     //    using namespace v8;
@@ -20671,6 +21100,7 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrevInstance, PWSTR nCmdList, in
     screenHeight = GetSystemMetrics(SM_CYSCREEN); //only used for SendInput
     //uv_loop = uv_default_loop(); //LO!
     //hmmm idk if the promise thing is gonna happen because it might not actually work like that...
+    //hold on i just had a brain blast that might make create window stop blocking the thread anyways...
     //https://stackoverflow.com/questions/50115031/does-v8-have-an-event-loop
     //https://chromium.googlesource.com/v8/v8/+/master/src/libplatform/default-platform.cc#140
     //https://stackoverflow.com/questions/49811043/relationship-between-event-loop-libuv-and-v8-engine
@@ -20706,6 +21136,10 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrevInstance, PWSTR nCmdList, in
     //SetStdHandle(STD_INPUT_HANDLE, hPipeOut);
     //SetStdHandle(STD_OUTPUT_HANDLE, hPipeIn);
     
+    //honestly idk what this function does because it's as simple as these 3 calls to make the console work with cout
+    //freopen("CONIN$", "r", stdin);
+    //freopen("CONOUT$", "w", stdout);
+    //freopen("CONOUT$", "w", stderr);
     BindCrtHandlesToStdHandles(true, true, true); //redirrect console output?!
     
     //WriteFile(hPipeOut, "what OUTthe sigma mangos!", 20, NULL, NULL);
@@ -20826,13 +21260,13 @@ https://forums.codeguru.com/showthread.php?69236-How-to-obtain-HINSTANCE-using-H
 
     char exe[MAX_PATH]; GetModuleFileNameA(NULL, exe, MAX_PATH);
     print(exe);
-
+    
     v8::V8::InitializeICUDefaultLocation(exe);//argv[0]); //is this even doing anything ???
     v8::V8::InitializeExternalStartupData(exe);//argv[0]);
     std::unique_ptr<v8::Platform> platform = v8::platform::NewDefaultPlatform();
     v8::V8::InitializePlatform(platform.get());
     v8::V8::Initialize();
-    
+
     // Create a new Isolate and make it the current one.
     v8::Isolate::CreateParams create_params;
     create_params.array_buffer_allocator =
@@ -20847,7 +21281,7 @@ https://forums.codeguru.com/showthread.php?69236-How-to-obtain-HINSTANCE-using-H
        // v8::TryCatch trycatch(isolate);
         // Create a new context.
         v8::Local<v8::Context> context = v8::Context::New(isolate, NULL, InitGlobals(isolate, nCmdList, nCmdShow)); //InitGlobals(isolate, nCmdList, nCmdShow);//argv[1]);//v8::Context::New(isolate, NULL, global);
-    
+        //context->GetMicrotaskQueue();
         // Enter the context for compiling and running the hello world script.
         v8::Context::Scope context_scope(context);
     

@@ -30,6 +30,7 @@ function toHexPadded(number) {
     return hex;
 }
 
+//making sure the memory we're about to read is committed, accessable, and not a guard page
 function ReadableQuery(mbi) {
     return mbi.State != MEM_FREE && mbi.AllocationProtect != PAGE_NOACCESS && mbi.Protect > PAGE_NOACCESS && (mbi.Protect & PAGE_GUARD) != PAGE_GUARD;
 }
@@ -155,7 +156,7 @@ function StringToHexArr(str, towstring) {
     return value;
 }
 
-function WatchForAllOccurencesOfValue(process, value, string) {
+function WatchForAllOccurrencesOfValue(process, value, string) {
     const first = FindAllOccurrencesOfValueInVirtualMemory(process, value, string);
     const results = [];
 
@@ -189,11 +190,109 @@ function WatchForAllOccurencesOfValue(process, value, string) {
     }
 }
 
+function get_dword_bytes(number) { //little endian
+    //i'm using [... & 0b11111111] so i only get the first 8 bytes
+    //0b11111111 == 255 
+    return [(number) & 255, (number >> 8) & 255, (number >> 16) & 255, (number >> 24) & 255];
+}
+
+function* getValuesInArrayAtIndex(arr, i) { //actually my first time using a generator function!!!
+    for(let j = i; j < arr.length; j++) {
+        yield arr[j];
+    }
+}
+
+function SetPeggleBallCount(peggleProcess, newBallCount, ballCountAddress, currentBallCount, profileName) {
+    if (ballCountAddress == 0) {
+        ballCountAddress = FindPeggleBallsAddress(peggleProcess, currentBallCount, profileName);
+    }
+    //well i would write process memory here but i don't think i added it yet...
+    if(WriteProcessMemory(peggleProcess, ballCountAddress, new Uint8Array(get_dword_bytes(newBallCount)))) {
+        
+    }else {
+        const g = GetLastError();
+        print("WriteProcessMemory failed (SetPeggleBallCount)!", g, _com_error(g));
+    }
+}
+
+//aw this one doesn't work straight up you have to activate the ability first by hitting one of  the green ones (until i find out what it changes)
+//also abilities are weird and this only works for renfield
+function SetPeggleSpecialAbilityCount(peggleProcess, newAbilityCount, ballCountAddress, currentBallCount, profileName) {
+    if (ballCountAddress == 0) {
+        ballCountAddress = FindPeggleBallsAddress(peggleProcess, currentBallCount, profileName);
+    }
+                          //relative to the ball count address, the address of the special ability counter is 136 bytes away lol
+    if (WriteProcessMemory(peggleProcess, ballCountAddress+136, new Uint8Array(get_dword_bytes(newAbilityCount)))) {
+
+    } else {
+        const g = GetLastError();
+        print("WriteProcessMemory failed (SetPeggleSpecialAbilityCount)!", g, _com_error(g));
+    }
+}
+
+//function FindPeggleBallsAddress(peggleProcess, currentBallCount, profileName) { //hell yeah brother this might be fool proof
+//    //the ball count during a peggle game is stored at some random place in the heap (i think?)
+//    //and it's near your profile name (+20 bytes)
+//
+//    const DWORD_BYTES = get_dword_bytes(currentBallCount); //little endian
+//
+//    const addrawrr = FindAllOccurrencesOfValueInVirtualMemory(peggleProcess, DWORD_BYTES, false);
+//    for(const address of addrawrr) {
+//        //technically they should all still be readable right?
+//        const region = ReadProcessMemory(peggleProcess, address, 20 + profileName.length); //reading 24 because the name is stored at +20 and the length of the name is 4 (i think?)
+//        if(region) {
+//            //let's get the last few bytes of the region and see if they equal our name
+//            // let readName = "";
+//            /*for(let i = 24-profileName.length; i < 24; i++) { //hold on let's do something cool instead
+//                readName += String.fromCharCode();
+//            }*/
+//            const readName = String.fromCharCode(...getValuesInArrayAtIndex(region, 24-profileName.length)); //yooooo this is lit
+//            //print(address, readName, profileName);
+//            if(readName == profileName) {
+//                print("FOUND!", address);
+//                return address;
+//                // break;
+//            }
+//        }else {
+//            print(`couldn't read memory at address ${address} but the ball count probably wasn't there anyways?`);
+//        }
+//    }
+//
+//    print("well we tried :(");
+//}
+
+function FindPeggleBallsAddress(peggleProcess) { //nah we don't even need this extra information, i've spent the last like 10 days cracking peggle and now i know how to get the ball count EFFICIENTLY
+    //0x687394 holds a pointer to the "ThunderballApp" object which then also holds a pointer to a "Board" object which THEN holds a pointer to a "LogicMgr" object
+    //this LogicMgr object holds the amount of balls we have in the game
+    let uint8address = ReadProcessMemory(peggleProcess, 0x687394, 4);
+    const ThunderballApp = new DataView(uint8address.buffer).getInt32(0, true); //little endian
+
+    uint8address = ReadProcessMemory(peggleProcess, ThunderballApp+0x7B8, 4);
+    const Board = new DataView(uint8address.buffer).getInt32(0, true);
+
+    uint8address = ReadProcessMemory(peggleProcess, Board+0x154, 4);
+    const LogicMgr = new DataView(uint8address.buffer).getInt32(0, true);
+
+    print(ThunderballApp, Board, LogicMgr);
+
+    //now normally this is 0 and i have yet to see what it does
+    uint8address = ReadProcessMemory(peggleProcess, LogicMgr+0x128, 4);
+    const eax = new DataView(uint8address.buffer).getInt32(0, true);
+
+    //esi is LogicMgr
+    //add dword ptr [esi+eax*4+0x17C], ecx
+    return LogicMgr+(eax*4)+0x17C;
+}
+
+//faster speeds could likely be achieved if i translated the bytes to a number by bit shifting and comparing the bit shifted values of those shits too so it was be O(n) instead of like O(n*value_length)
+//wait nevermind that would only work if i knew the size of the value at "compile" time
+//let's see tomorrow if the benchmark says strings or number comparisons are faster this way (so compare the current way with the bitshift method :eyes:)
 function FindAllOccurrencesOfValueInVirtualMemory(process, value, string) { //wait this works way quicker than i expected B)
     const basembi = VirtualQueryEx(process, 0);
     if (string) {
         value = StringToHexArr(value, string - 1);
     }
+    //convert value to big int
     let i = basembi.BaseAddress;
     let success = true;
     let occurences = [];
@@ -460,26 +559,28 @@ function IsAcceptableTitle(t) {
     return true;
 }
 
-class MemoryPane {
-    x = 0;
-    y = 0;
-    width = w;
-    height = h;
+class MemoryPane extends Parent {
+    // x = 0;
+    // y = 0;
+    // width = w;
+    // height = h;
 
     //addressBox = undefined;
     //windowBox = undefined;
     //nextPageButton = undefined;
-    childcontrols = [];
+    //children = []; //now in basepane
     memory = undefined;
 
     constructor(hwnd) {
-        const addressBox = new EditControl(w, 18, undefined, GetModuleHandle(NULL), function(textbox) {
+        super(0, 0, w, h, undefined);
+        this.defaultHT = [WHEEL, this];
+        const addressBox = new EditControl(0, 0, w, 18, undefined, GetModuleHandle(NULL), function(textbox) {
             //this.verifyInput();
-            textbox.value = new Function(`return (${textbox.value})`)();
+            textbox.value = new Function(`return (${textbox.value})`)(); //lmao that's that fancy eval
             print("looking around:",textbox.value);
             this.readMemory();
         }, this);
-        const windowBox = new EditDropdownControl(w, 18, [], "memoview.js", function(windowBox) {
+        const windowBox = new EditDropdownControl(0, addressBox.height, w, 18, [], "memoview.js", function(windowBox) {
             //ppsspp
             const hwnd = FindWindow(NULL, windowBox.value);
             const newProcess = hProcessFromHWND(hwnd);
@@ -504,23 +605,25 @@ class MemoryPane {
             });
             return titles;
         }, this);
-        const buttonList = new HorizontalListBox(w, 18, []);
-        //width and height for the children of button list are 0 because they are initialized when addChild/resize is called
-        const nextPageButton = new TextButtonControl(0, 0, "Skip to next page", [0.0, 0.0, 0.0], [.8, .8, .8], function(button, mouse) {
+        const buttonList = new HorizontalListBox(0, windowBox.y+windowBox.height, w, 18, []);
+        //width and height for the children of button list are 0 because they are initialized when appendChild/resize is called
+        const nextPageButton = new TextButtonControl(0, 0, 0, 0, "Skip to next page", [0.0, 0.0, 0.0], [.8, .8, .8], function(button, mouse) {
             const mbi = VirtualQueryEx(this.hProcess, addressBox.value);
             //const rs = mbi.RegionSize-(this.addressBox.value-mbi.BaseAddress);
             addressBox.value = mbi.BaseAddress+mbi.RegionSize; //this.addressBox.value+rs;
             this.readMemory();
         }, this);
-        const nextRegionButton = new TextButtonControl(0, 0, "Skip through whole region", [0.0, 0.0, 0.0], [.8, .8, .8], function(button, mouse) {
+        const nextRegionButton = new TextButtonControl(0, 0, 0, 0, "Skip through whole region", [0.0, 0.0, 0.0], [.8, .8, .8], function(button, mouse) { //i could've sworn this worked better before i rewrote mastercontrols but how could that have possible changed anything?
             const mbi = VirtualQueryEx(this.hProcess, addressBox.value);
+            // PrintFormattedVirtualQuery(mbi);
+            // print(addressBox.value);
             addressBox.value = mbi.BaseAddress+GetFullSizeOfPageRegionAtAddress(this.hProcess, addressBox.value);
             this.readMemory();
         }, this);
 
-        const checkboxLabelList = new HorizontalListBox(0, 0, []);
-        const checkboxlabel = new StaticControl(0, 0, "constant:");
-        const realtimeCheckbox = new CheckboxControl(0, 0, false, function(checkbox) {
+        const checkboxLabelList = new HorizontalListBox(0, 0, 0, 0, []);
+        const checkboxlabel = new StaticControl(0, 0, 0, 0, "constant:");
+        const realtimeCheckbox = new CheckboxControl(0, 0, 0, 0, false, function(checkbox) {
             const randomtimerid = 21; //can't be 0 lol
             if(checkbox.value) {
                 SetTimer(hwnd, randomtimerid, 100);
@@ -528,18 +631,18 @@ class MemoryPane {
                 KillTimer(hwnd, randomtimerid);
             }
         }, this);
-        checkboxLabelList.addChild(checkboxlabel);
-        checkboxLabelList.addChild(realtimeCheckbox);
+        checkboxLabelList.appendChild(checkboxlabel);
+        checkboxLabelList.appendChild(realtimeCheckbox);
 
         //buttonList.list.push(nextPageButton);
-        buttonList.addChild(nextPageButton);
-        buttonList.addChild(nextRegionButton);
-        buttonList.addChild(checkboxLabelList);
+        buttonList.appendChild(nextPageButton);
+        buttonList.appendChild(nextRegionButton);
+        buttonList.appendChild(checkboxLabelList);
 
-        const searchBox = new HorizontalListBox(w, 18, []);
-        const searchEdit = new EditControl(0, 0, "string", "", undefined, undefined);
-        const innerListBox = new HorizontalListBox(0, 0, []);
-        const searchStringButton = new TextButtonControl(0, 0, "Search for string occurence", [0.0, 0.0, 0.0], [.8, .8, .8], function(button, mouse) {
+        const searchBox = new HorizontalListBox(0, buttonList.y+buttonList.height, w, 18, []);
+        const searchEdit = new EditControl(0, 0, 0, 0, "string", "", undefined, undefined);
+        const innerListBox = new HorizontalListBox(0, searchBox.y, 0, 0, []);
+        const searchStringButton = new TextButtonControl(0, 0, 0, 0, "Search for string occurence", [0.0, 0.0, 0.0], [.8, .8, .8], function(button, mouse) {
             const addr = FindValueInWholeRegion(this.hProcess, addressBox.value, searchEdit.value, true);
             if(addr) {
                 addressBox.value = addr;
@@ -548,7 +651,7 @@ class MemoryPane {
                 print("couldn't find",searchEdit.value);
             }
         }, this);
-        const searchHexButton = new TextButtonControl(0, 0, "Search for hex occurence", [0.0, 0.0, 0.0], [.8, .8, .8], function(button, mouse) {
+        const searchHexButton = new TextButtonControl(0, 0, 0, 0, "Search for hex occurence", [0.0, 0.0, 0.0], [.8, .8, .8], function(button, mouse) {
             //aw man i was trying to do this BANGER one liner but i think techinically we're in strict mode or something because it tells me hex is not defined
             //const addr = FindValueInWholeRegion(this.hProcess, addressBox.value, (hex=Number(searchEdit.value).toString(16),hex=hex.length%2==1?"0"+hex:hex,hex.match(/[A-z0-9]{2}/g)), false);
             let hex = Number(searchEdit.value).toString(16);
@@ -566,23 +669,27 @@ class MemoryPane {
             }
         }, this);
         
-        innerListBox.addChild(searchStringButton);
-        innerListBox.addChild(searchHexButton);
-        searchBox.addChild(searchEdit);
-        searchBox.addChild(innerListBox);
+        innerListBox.appendChild(searchStringButton);
+        innerListBox.appendChild(searchHexButton);
+        searchBox.appendChild(searchEdit);
+        searchBox.appendChild(innerListBox);
 
-        //since i know where i want it im just gonna set the x and y myself
-        addressBox.x = 0;
-        addressBox.y = 0;
-        windowBox.x = 0;
-        windowBox.y = addressBox.height;
-        //nextPageButton.x = 0;
-        //nextPageButton.y = this.windowBox.y+this.windowBox.height;
-        buttonList.x = 0;
-        buttonList.y = windowBox.y+windowBox.height;
-        searchBox.x = 0;
-        searchBox.y = buttonList.y+buttonList.height;
-        this.childcontrols.push(addressBox, windowBox, buttonList, searchBox);
+        //since i know where i want it im just gonna set the x and y myself (yeah i honestly don't really know why i did it like that ever...)
+        //addressBox.x = 0;
+        //addressBox.y = 0;
+        //windowBox.x = 0;
+        //windowBox.y = addressBox.height;
+        ////nextPageButton.x = 0;
+        ////nextPageButton.y = this.windowBox.y+this.windowBox.height;
+        //buttonList.x = 0;
+        //buttonList.y = windowBox.y+windowBox.height;
+        //searchBox.x = 0;
+        //searchBox.y = buttonList.y+buttonList.height;
+        //this.children.push(addressBox, windowBox, buttonList, searchBox);
+        this.appendChild(addressBox);
+        this.appendChild(windowBox);
+        this.appendChild(buttonList);
+        this.appendChild(searchBox);
         this.hProcess = GetCurrentProcess(); //-1
         //const sumn = FindWindow(NULL, "Command Prompt");
         //print(sumn, GetWindowThreadProcessId(sumn));
@@ -632,7 +739,7 @@ class MemoryPane {
     }
 
     readMemory() {
-        const [memory, offset, offsetEnd, pageIndices] = ReadCheckedMemory(this.hProcess, this.childcontrols[0].value, Math.ceil(this.calculateAmountOfHexThatCanFitOnScreen().amountthatcanfitonleftsideofscreen));
+        const [memory, offset, offsetEnd, pageIndices] = ReadCheckedMemory(this.hProcess, this.children[0].value, Math.ceil(this.calculateAmountOfHexThatCanFitOnScreen().amountthatcanfitonleftsideofscreen));
         this.memory = memory;
         this.memOffset = offset;
         this.memOffsetEnd = offsetEnd;
@@ -647,7 +754,7 @@ class MemoryPane {
         //OHHHHH to snap it's
         const maxwidth = Math.floor((this.width/1.5)/widthoftext)*widthoftext;
         //print(this.width, maxwidth);
-        const actualheightminuscontrols = this.height-(this.childcontrols.length*18);
+        const actualheightminuscontrols = this.height-(this.children.length*18);
         const height = monofont.GetFontSize();
         const amountthatcanfitonleftsideofscreen = ((maxwidth)/(widthoftext))*(actualheightminuscontrols/height);
         return {amountthatcanfitonleftsideofscreen, widthoftext, maxwidth, height};
@@ -658,14 +765,16 @@ class MemoryPane {
         //this.addressBox.redraw(this.addressBox.x, this.addressBox.y);
         //this.windowBox.redraw(this.windowBox.x, this.windowBox.y);
         //this.nextPageButton.redraw(this.nextPageButton.x, this.nextPageButton.y);
-        this.childcontrols.forEach(c=>c.redraw(c.x, c.y));
+        this.children.forEach(c=>c.redraw(c.x, c.y));
+        //forAllArrays((c)=>c.redraw(), this.children, this.children_always_check);
+        //this.forEach(c=>c.redraw());
         colorBrush.SetColor(255, 255, 255);
         const {amountthatcanfitonleftsideofscreen, widthoftext, maxwidth, height} = this.calculateAmountOfHexThatCanFitOnScreen();
         //print(amountthatcanfitonleftsideofscreen);
         for(let i = 0; i < amountthatcanfitonleftsideofscreen; i++) {
             const x = i*widthoftext;
             const left = (x)%maxwidth;
-            const top = this.childcontrols.length*18+(Math.floor(x/maxwidth)*height);
+            const top = this.children.length*18+(Math.floor(x/maxwidth)*height);
             let hex = "??";
             let str = ".";
             if(i >= this.memOffset && i < amountthatcanfitonleftsideofscreen-this.memOffsetEnd) {
@@ -700,7 +809,7 @@ class MemoryPane {
         this.nextPageButton.width = this.width;*/
         
         //i was gonna have it weirdl ike this but i decided that it was a bad idea
-        //this.childcontrols.forEach(c => {
+        //this.children.forEach(c => {
         //    if(c instanceof HorizontalListBox) {
         //        c.resize(this.width, c.height);
         //    }else {
@@ -708,7 +817,8 @@ class MemoryPane {
         //    }
         //});
 
-        this.childcontrols.forEach(c=>c.resize(this.width, c.height));
+        this.children.forEach(c=>c.resize(this.width, c.height));
+        //this.forEach(c=>c.resize(this.width, c.height));
         this.readMemory();
     }
 
@@ -719,7 +829,7 @@ class MemoryPane {
         const {widthoftext, maxwidth} = this.calculateAmountOfHexThatCanFitOnScreen();
         print(maxwidth/widthoftext);
         const bytesPerRow = Math.round(maxwidth/widthoftext);
-        const addressBox = this.childcontrols[0];
+        const addressBox = this.children[0];
         addressBox.value += bytesPerRow*scrollY;
         addressBox.updateText();
         //this.readPartialMemory(scrollY);
@@ -727,34 +837,35 @@ class MemoryPane {
         //dirty = true;
     }
 
-    hittest(mouse) {
-        /*let ht = this.addressBox.hittest(mouse, this.addressBox.x, this.addressBox.y);
-        if(ht) {
-            return ht;
-        }
-        ht = this.windowBox.hittest(mouse, this.windowBox.x, this.windowBox.y);
-        if(ht) {
-            return ht;
-        }
-        ht = this.nextPageButton.hittest(mouse, this.nextPageButton.x, this.nextPageButton.y);
-        if(ht) {
-            return ht;
-        }*/
-        for(const control of this.childcontrols) {
-            let ht;
-            if(ht = control.hittest(mouse, control.x, control.y)) {//assuming i write the position of each control
-                return ht; //hell yeah
-            }
-        }
-        return [WHEEL, this];
-    }
+    //hittest(mouse) {
+    //    /*let ht = this.addressBox.hittest(mouse, this.addressBox.x, this.addressBox.y);
+    //    if(ht) {
+    //        return ht;
+    //    }
+    //    ht = this.windowBox.hittest(mouse, this.windowBox.x, this.windowBox.y);
+    //    if(ht) {
+    //        return ht;
+    //    }
+    //    ht = this.nextPageButton.hittest(mouse, this.nextPageButton.x, this.nextPageButton.y);
+    //    if(ht) {
+    //        return ht;
+    //    }*/
+    //    //for(const control of this.children) {
+    //    //    let ht;
+    //    //    if(ht = control.hittest(mouse, control.x, control.y)) {//assuming i write the position of each control
+    //    //        return ht; //hell yeah
+    //    //    }
+    //    //}
+    //    //return [WHEEL, this];
+    //    super.hittest(mouse);
+    //}
 
-    destroy() {
-        //this.addressBox.destroy();
-        for(const control of this.childcontrols) {
-            control.destroy();
-        }
-    }
+    //destroy() {
+    //    //this.addressBox.destroy();
+    //    for(const control of this.children) {
+    //        control.destroy();
+    //    }
+    //}
 }
 
 function drawBackground() {

@@ -377,7 +377,7 @@ class GenericPtrObject { //lowkey i guess there's really no need to extend this 
         //const RBPHOLDER = new ULONG_PTR(); //unsigned long long
         //const RSPPOINTERHOLDER = new ULONG_PTR(); //unsigned long long
 
-        //hmmm d2d functions use __stdcall...
+        //hmmm d2d functions use __stdcall... (this doesn't matter on x64!!!!! read the link below!!!!)
         //hmmmm https://learn.microsoft.com/en-us/windows-hardware/drivers/debugger/x64-architecture#calling-conventions
 
         //ok this asm code was written for my test project in c++ (inheritanceandthevtptr.cpp) and the method i was calling was void but this time it could be anything so im MOVABS-ing the method pointer as an immediate value to be passed into CALL because you can't CALL an absolute immediate 64 bit value
@@ -387,7 +387,7 @@ class GenericPtrObject { //lowkey i guess there's really no need to extend this 
         //https://stackoverflow.com/questions/20129107/what-is-the-x86-ret-instruction-equivalent-to    https://stackoverflow.com/questions/62364368/what-is-the-difference-between-the-ret-instruction-in-x86-and-x64?rq=3
         //ok i might have to copy what rsp points to too
         //ngl this solution took like 2 days to cook up
-        //ok i 100% comprehend the issue now i swear: for some reason after i call the method, the values at rsp through rsp+8
+        //ok i 100% comprehend the issue now i swear: for some reason after i call the method, the values at rsp through rsp+8 are erased (and i didn't know at the time but it was because i wasn't allocating shadow space for the function https://learn.microsoft.com/en-us/cpp/build/x64-calling-convention?view=msvc-170#calling-convention-defaults)
         //i think the fact that i have to call my asm code makes this a little more complicated
         /*return __asm([ //im not gonna lie i don't think i know enough about asm to solve this in the "correct" way so im just doing what i think is gonna work
             //0xcc,                                                                             //interrupt (dbugbreak for testing)

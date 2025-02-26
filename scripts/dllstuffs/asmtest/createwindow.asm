@@ -86,6 +86,7 @@ extern DispatchMessageA
 extern OutputDebugStringA
 extern SetTimer
 
+;bangers from gdi32
 extern GetDC
 extern Rectangle
 ;extern BitBlt

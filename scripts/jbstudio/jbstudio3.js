@@ -390,7 +390,7 @@ function playTone(key, pitch, up = false) {
     //print(key, pitch);
     if(!fluidsynthinst.valid && !up) {
         let tone = tones[key]*(2**pitch);
-        Beep(tone, 500);//.then(any => console.log("promise: ", any)); //ok for some reason it keeps randomly crashing and idk what the error is saying
+        Beep(tone, 500, true).then(any => print("promise: ", any)); //ok for some reason it keeps randomly crashing and idk what the error is saying
     }else {
         const note = pitch*12 + key;
         if(!up) {
@@ -666,7 +666,7 @@ function windowProc(hwnd, msg, wp, lp) {
             //if(time > sortedNotes[playJ].timing) { //this system can't do more than one note at a time so if there are 4 notes on a beat that shit is getting rolled out with AT LEAST an 16 ms delay! (SetTimer is set to 16ms!) 1st note: 0ms, 2nd note: ~16ms, 3rd note: ~32ms, 4th note: ~48ms!!!
             while(playJ < sortedNotes.length && time > sortedNotes[playJ].timing) { //damn im a genius!
                 if(!fluidsynthinst.valid) {
-                    Beep(tones[sortedNotes[playJ].key%12]*(2**Math.floor(sortedNotes[playJ].key/12)), sortedNotes[playJ].beats*(60/tempo)*(1000), true); //ok for some reason the thread created by beep crashes randomly
+                    Beep(tones[sortedNotes[playJ].key%12]*(2**Math.floor(sortedNotes[playJ].key/12)), sortedNotes[playJ].beats*(60/tempo)*(1000), true).then(p=>print("beep promise?",p)); //ok for some reason the thread created by beep crashes randomly
                 }else {
                     fluidsynthinst.noteon(sortedNotes[playJ].channel, sortedNotes[playJ].key, sortedNotes[playJ].vel);
                 }
@@ -979,9 +979,10 @@ function windowProc(hwnd, msg, wp, lp) {
         d2d.Release();
         if(fluidsynthinst.valid) {
             fluidsynthinst.cleanup();
+            print(fluidsynthinst.fsdll("__FREE"), "== 1 (FREE)");
         }
-        print(fluidsynthinst.fsdll("__FREE"), "== 1 (FREE)");
     }
+    //PerformMicrotaskCheckpoint();
 }
 
 const wc = CreateWindowClass("jbstudio", windowProc);
