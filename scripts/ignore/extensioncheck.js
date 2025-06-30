@@ -34,7 +34,11 @@ function registerGlobalObjectSignature(name, signature, desc) {
     }
 }
 
-const extension = system("curl -i https://raw.githubusercontent.com/MagicQuest/JBS3Extension/refs/heads/main/src/extension.ts").split("\n"); //well i would use fetch but right now it only works with HTTP bruh
+//const extension = system("curl -i https://raw.githubusercontent.com/MagicQuest/JBS3Extension/refs/heads/main/src/extension.ts").split("\n"); //well i would use fetch but right now it only works with HTTP bruh
+let extension = require("fs").read("D:\\scripts\\vs-extensim\\src\\extension.ts").split("\n");
+if(!extension) {
+    extension = system("curl -i https://raw.githubusercontent.com/MagicQuest/JBS3Extension/refs/heads/main/src/extension.ts").split("\n");
+}
 let i = 0;
 for(let line of extension) {
     if(line.includes("register") || i > 1894) {

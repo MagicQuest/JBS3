@@ -1,7 +1,9 @@
 {"nx": 1550, "ny": 450, "nw": 512, "nh": 300, "b": false}
 SetBkColor(memDC, RGB(255, 255, 255)); CreateFontSimple("burbank big cd bd", 10/1.25, 20/1.25); //haha fortnite font burbank big cd bd
 
-collect rare or better weapons
+search golden llamas
+use common outlaw card to access backrooms
+kill niggas EXOTICally
 
 //(<b>shit i need to use a text layout for special effects like</b>)
 //wait nevermind im using gdi to draw this shit aren't i

@@ -275,7 +275,7 @@ function FindPeggleBallsAddress(peggleProcess) { //nah we don't even need this e
 
     print(ThunderballApp, Board, LogicMgr);
 
-    //now normally this is 0 and i have yet to see what it does
+    //now normally this is 0 and i have yet to see what it does (i think that when you are playing against a bot, this value is 1 when it's the bot's turn (but for some reason i haven't actually tested this theory lol))
     uint8address = ReadProcessMemory(peggleProcess, LogicMgr+0x128, 4);
     const eax = new DataView(uint8address.buffer).getInt32(0, true);
 
@@ -550,8 +550,8 @@ function hProcessFromHWND(hwnd) {
 }
 
 function IsAcceptableTitle(t) {
-    const list = ["amd dvr overlay", "GDI+ Window", "DesktopWindowXamlSource", ".NET-BroadcastEventWindow", "GlobalHiddenWindow", "WUIconWindow", "MediaContextNotificationWindow", "SystemResourceNotifyWindow", "WISPTIS", "DDE Server Window", "Default IME", "MSCTFIME UI", "CiceroUIWndFrame", "HiddenWindow", "PopupHost"];
-    for(let title of list) {
+    const badlist = ["amd dvr overlay", "GDI+ Window", "DesktopWindowXamlSource", ".NET-BroadcastEventWindow", "GlobalHiddenWindow", "WUIconWindow", "MediaContextNotificationWindow", "SystemResourceNotifyWindow", "WISPTIS", "DDE Server Window", "Default IME", "MSCTFIME UI", "CiceroUIWndFrame", "HiddenWindow", "PopupHost"];
+    for(let title of badlist) {
         if(t.includes(title)) {
             return false;
         }

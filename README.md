@@ -25,7 +25,7 @@ JBS3 uses google's V8 engine which was HARD to setup but now im 1 step closer to
 speaking of node.js maybe i should just make a node.js library instead
 
 ### Examples
-In the scripts folder there are a few examples like minesweeper and msnexample while the rest of the scripts folder are completely random tests or funny things I wanted to do that and they should all work (including some of the ones in the ignore folder except most of them don't really do anything (that's why they are in the ignore folder))
+In the scripts folder there are a few examples like minesweeper and msnexample while the rest of the scripts folder holds completely random tests or funny things I wanted to do that  should all work (including some of the ones in the ignore folder)
 
 ### Yapping
 Can you believe that I started making JBS3 because I was learning about Direct2D then remembered about JBS2, fiddled with V8 for a day, and then made JBS3 with Direct2D and MANY drawing type functions  

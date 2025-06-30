@@ -33,8 +33,12 @@ function windowProc(hwnd, msg, wp, lp) {
         BitBlt(memDC, 0, 0, tobject.bmWidth, tobject.bmHeight, trollDC, 0, 0, SRCCOPY);
         
         //print(GetDIBits(dc, ddb, 0, 183, 220, 183, 32, BI_RGB));
-        
-        trollDIBits = GetDIBits(dc, ddb, 0, tobject.bmHeight, tobject.bmWidth, tobject.bmHeight, 32, BI_RGB);
+
+        //GetDIBits and all other functions that returned Uint32Arrays now return Uint8Arrays (because it wasn't that big of a deal)
+        trollDIBits = GetDIBits(dc, ddb, 0, tobject.bmHeight, tobject.bmWidth, tobject.bmHeight, 32, BI_RGB); //GetDIBits now always returns a Uint8Array!!!
+        //since in this code i expect it to be a uint32array lets just "cast" it the same way i did in wintilemanager.js
+        trollDIBits = new Uint32Array(trollDIBits.buffer.transfer());
+
         
         DeleteObject(ddb);
         DeleteDC(trollDC);
@@ -84,6 +88,8 @@ function windowProc(hwnd, msg, wp, lp) {
                 continue;
             }
             trollDIBits[point.x+point.y*tobject.bmWidth] = RGB(0, 255, 0);
+
+
             //lastSpreading.push(i);
             for(const cp of checks) {
                 const nx = Math.max(0, Math.min(point.x+cp[0], tobject.bmWidth)); //i had to clamp it because it would start going insane (idk what was happening)

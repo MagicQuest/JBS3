@@ -2,11 +2,11 @@
 
 class Operator {
     constructor() {
-
+        
     }
 
-    exec(code) {
-        const [_, op1, op2] = code.match(RegExp(`/(\\w+) *${this.operator} *(\\w+)/`));
+    exec(line) {
+        const [_, op1, op2] = line.match(RegExp(`/(\\w+) *${this.operator} *(\\w+)/`));
         let operand1;
         let operand2;
 

@@ -108,7 +108,7 @@ function createTiledBitmapBrush() { //d2d HAS to be created with ID2D1DeviceCont
 
         d2d.EndDraw();
 
-        bitmap.CopyFromRenderTarget(0, 0, d2d, 0, 0, tileSize, tileSize);
+        bitmap.CopyFromRenderTarget(0, 0, d2d, 0, 0, tileSize, tileSize); //secret sauce
     }
 
     tilingBrush = d2d.CreateBitmapBrush(bitmap);  

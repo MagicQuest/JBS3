@@ -9,6 +9,7 @@
 //another cool thing you could do is call GetCursorPos (don't forget to allocate space for the POINT object (8 bytes)) and add the x to the left and right properties of D2D1_RECT_F and add the y to the top and bottom (ok wait i might just do this myself)
 
 //when do you have to push parameters to the stack??? it seems like it never works that way https://stackoverflow.com/questions/3911578/how-to-call-c-functions-in-my-assembly-code
+//the answer to that previous question is: in x64, if the function has more than 4 parameters, the first 4 arguments are passed through rcx, rdx, r8, and r9. Any other arguments must be passed through the stack (in a certain order probably backwards where the last argument is pushed first)
 
 eval(require("fs").read(__dirname+"/marshallib.js"));
 
@@ -295,7 +296,7 @@ function windowProc(hwnd, msg, wp, lp) {
             print("kernel32:",kernel32);
             print("OutputDebugStringWPtr:",OutputDebugStringWPtr);
             hijackstr = new WString(`hello from hijacked ${methodname}! (called from asm my boys)\n`); //global so the garbage collector doesn't sweep away my variable
-            hijackasmcode = new Uint8Array([ //global so the garbage collector doesn't sweep away my variable
+            hijackasmcode = new Uint8Array([ //global so the garbage collector doesn't sweep away the code lmao
                 //i was gonna try to get the address of the function by dereferencing rcx (the this pointer) and dereferencing the value at vtable+index
                 //0x41, 0x52,                                                 //push r10
                 //0x4c, 0x8b, 0x11,                                           //mov r10, QWORD PTR [rcx]

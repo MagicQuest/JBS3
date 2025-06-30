@@ -17,7 +17,8 @@ function winEventProc(hook, event, hwnd, isObject, isChild, dwEventThread, dwmsE
         print(hwnd+": "+title, rng == 1);
         if(rng == 1) {
             playing = true;
-            PlaySoundSpecial("C:/Users/megal/Downloads/I Am The Doctor.mp3", "IAMTHEDOCTOR", window, false);
+            system("\"C:\\Program Files\\VideoLAN\\VLC\\vlc.exe\" --started-from-file \"C:\\Users\\megal\\Downloads\\I Am The Doctor.mp3\"");
+            //PlaySoundSpecial("C:/Users/megal/Downloads/I Am The Doctor.mp3", "IAMTHEDOCTOR", window, false);
         }
     }
 }

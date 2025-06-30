@@ -1,3 +1,7 @@
+//im not even gonna lie this needs a full rewrite it's SO bad just like jbsblueprints itself
+//i actually should make a version of this in c++ because the types will guide the way i make the classes so they actually make sense
+//i could also use typescript but it would be cool to have a full c++ equivalent of this ole thang (i did the bare minimum in PeggleScripting/PeggleScriptingGUI)
+
 const Int_To_WM = function() { //this gotta be the only good reason to use a closure
     const wm = {}; //with a closure im using wm like it's static!!!
     Object.entries(globalThis).filter(([key, value]) => { //wait why am i doing a filter instead of just forEach

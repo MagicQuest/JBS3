@@ -301,7 +301,7 @@ globalThis.__asm = function(arr, argc = 0, argv = [], argtypev = [], returntype 
     const old = VirtualProtect(ptr, asm.byteLength, PAGE_EXECUTE_READWRITE);
 
     //apparently when changing code in memory you are supposed to use FlushInstructionCache but i might not have to because im not CHANGING code im making it (lowkey don't trust me on that)
-    //FlushInstructionCache(hInstance, ptr, asm.byteLength); //im not sure if hInstance is also a valid process handle
+    //FlushInstructionCache(hInstance, ptr, asm.byteLength); //im not sure if hInstance is also a valid process handle (use the value returned from GetCurrentProcess instead of using hInstance bruh!)
 
     const res = Call(ptr, argc, argv, argtypev, returntype);
     VirtualProtect(ptr, asm.byteLength, old); //just in case
@@ -368,7 +368,7 @@ globalThis.dereference = function(ptr, datatype, index = 0) { //returns *(ULONG_
         return __asm(opcodes, 1, [ptr+(index*size)], [VAR_INT], RETURN_DOUBLE);
     }else if(special) {
         const dereferencedPtr = dereference(ptr+(index*size), "ULONGLONG");
-        const typeinstance = new datatype();
+        const typeinstance = new datatype(); //im not gonna lie this line looks insane after using Java for a while
         memcpy(PointerFromArrayBuffer(typeinstance.data), dereferencedPtr, size);
         return typeinstance;
     }else {

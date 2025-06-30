@@ -2,7 +2,7 @@
 //i wanted to use ffi to make a d2d1 factory but im not sure HOW i'll actually execute the functions of the pointer to an ID2D1Factory7 object
 //lets try anyways
 //when i started making this i actually thought it was impossible but im pretty surprised i was able to make it work  https://blog.holbertonschool.com/hack-virtual-memory-stack-registers-assembly-code/    https://stackoverflow.com/questions/22263890/virtual-table-layout-on-msvc-wheres-the-type-info
-//i would've done this kind of thing sooner if i had thought this was possible because i didn't want to make the opencvhelper dll (seriously i genuinely thought there was no way because it SEEMED like objects didn't even store methods on them (we outa methods) (i guess i was slacking on my vtable knowledge idk))
+//i would've done this kind of thing sooner (because i didn't want to make the opencvhelper dll) but i didn't think this was possible (seriously i genuinely thought there was no way to do it because it SEEMED like objects didn't even store methods on them (we outa methods) (i guess i was slacking on my vtable knowledge idk))
 
 //what i use to generate the assembly bytes is: https://defuse.ca/online-x86-assembler.htm#disassembly (make sure to use x64 tho)
 

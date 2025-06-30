@@ -3776,7 +3776,7 @@ class BottomCenteredButtonBar {
     }
 }
 
-//jbs specific stuff
+//jbs specific stuff (wtf is this function bro)
 function initcustomstuffforbottomcenteredbuttonbar() {
     function playButtonCallback() {
         executeBlueprints();
@@ -3812,7 +3812,7 @@ function initcustomstuffforbottomcenteredbuttonbar() {
     const wic = InitializeWIC();
     ScopeGUIDs(wic);
     
-    const play = new ImageButtonControl(__dirname+"/imgs", "play", undefined, undefined, playButtonCallback, wic);
+    const play = new ImageButtonControl(__dirname+"/imgs", "play", undefined, undefined, playButtonCallback, wic); //couldn't i have just put executeBlueprints here instead of making a playButtonCallback function?
     //const stop = new ImageButtonControl(__dirname+"/imgs", "stop", undefined, undefined, stopButtonCallback, wic);
     const playstandalone = new ImageButtonControl(__dirname+"/imgs", "playstandalone", undefined, undefined, playStandaloneButtonCallback, wic);
 
@@ -4897,10 +4897,10 @@ function windowProc(hwnd, msg, wp, lp) {
 
         DragFinish(wp); //DragFinish to HDROP is as DeleteDC is to memDC (analogymaxxing)
     }else if(msg == WM_SIZE) {
-        let oldw = w;
-        let oldh = h;
-        let wid = LOWORD(lp);
-        let hei = HIWORD(lp);
+        const oldw = w;
+        const oldh = h;
+        const wid = LOWORD(lp);
+        const hei = HIWORD(lp);
         w = wid;
         h = hei;
         d2d.Resize(wid, hei); //hell yeah
@@ -5073,7 +5073,7 @@ function windowProc(hwnd, msg, wp, lp) {
                 //mouse.x -= pane.x;
                 //mouse.y -= pane.y; //to client
                 //hit |= pane.hittest(mouse);
-                pane.mouseDown?.({x: mouse.x-pane.x, y: mouse.y-pane.y});
+                pane.mouseDown?.({x: mouse.x-pane.x, y: mouse.y-pane.y}); //i should've known i was on some bullshit when i started using the optional chaining operator
             }
         }
 
@@ -5211,7 +5211,7 @@ function windowProc(hwnd, msg, wp, lp) {
         const ctrl = GetKey(VK_CONTROL);
         if(wp == "E".charCodeAt(0)) {
             print("e");
-            if(GetKey(VK_CONTROL)) {
+            if(ctrl) {
                 SetForegroundWindow(GetConsoleWindow());
                 try {
                     print(eval(getline("Ctrl+E -> Eval some code: ")));
@@ -5296,7 +5296,7 @@ function windowProc(hwnd, msg, wp, lp) {
 
                 CloseClipboard();
             }else {
-                print(`OpenClipboard failded for some reason (maybe because a window (${c=GetClipboardOwner()} - ${GetWindowText(c) }) already had it open)`, g=GetLastError(), _com_error(g));
+                print(`OpenClipboard failded for some reason (maybe because a window (${c=GetClipboardOwner()} - ${GetWindowText(c)}) already had it open)`, g=GetLastError(), _com_error(g));
             }
         }
 
