@@ -2,7 +2,7 @@
 
 #include <comdef.h> //_com_error
 
-//ok im not gonna lie im getting linker erros saying this shit is already defined and unfortunately i can't be bothered to actually find out why so im turning it into a macro
+//ok im not gonna lie im getting linker erros saying this shit is already defined and unfortunately i can't be bothered to actually find out why so im turning it into a macro (im good at c++ now but im still not gonna fix it)
 //char* errorlookup(const char* msg, DWORD error);
 
 //alright fuck this shit it didn't even work for the error code i wanted it to bruh

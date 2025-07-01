@@ -549,7 +549,7 @@ class Tab extends Container {
     }
 
     static fromJSON(json) {
-        const ts = new Tab(json.name);
+        const ts = new Tab(json.text);
         ts.deserialize(json);
         return ts;
     }
@@ -564,14 +564,27 @@ class Tab extends Container {
     }
 
     serialize() {
-        const data = super.serialize();
+        //const data = super.serialize(); //no super because i don't want to save the child topics that are in this tab's children list
+        const data = {camera: this.camera, children: []};
+        for(const child of this.children) {
+            if(child.isMain) {
+                data.children.push(child.serialize());
+            }
+        }
         data.text = this.text.text;
         return data;
     }
 
     Release() {
         //this.geo.Release();
-        super.Release();
+        for(const child of this.children) {
+            if(child.isMain) {
+                child.Release();
+            }
+        }
+        this.text.Release();
+        print(`custom IUnknown::Release called on Tab!`);
+        //super.Release();
     }
 }
 
@@ -1101,6 +1114,9 @@ function windowProc(hwnd, msg, wp, lp) {
                 print("reading", path);
                 const str = get_lazy_fs().read(path);
                 if(str) {
+                    tabs.forEach(tab => tab.Release());
+                    tabs = []; //oops forgot to actually clear it lol
+
                     const json = JSON.parse(str);
                     print(json);
                     for(const tab of json.tabs) {
