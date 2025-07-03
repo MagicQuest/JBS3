@@ -480,6 +480,10 @@ class Tab extends Container {
         super.preDrag(mouse, data);
     }
 
+    windowResized(oldw, oldh) {
+        this.transform(0, 0, w, h);
+    }
+
     draw() {
         d2d.SetTransform(Matrix3x2F.Translation(this.tabPosition.x, this.tabPosition.y));
         //colorBrush.SetColor(...this.color);
@@ -1083,7 +1087,7 @@ function windowProc(hwnd, msg, wp, lp) {
             });
             if(path) {
                 //print(optional);
-                //const [path] = optional; //ouuuuhhh showSaveFilePicker returns the path directly so when i did this, path = "E" and that's why fs wasn't working
+                //const [path] = optional; //ouuuuhhh showSaveFilePicker returns the path directly so when i did this, path would only equal the first letter and that's why fs wasn't working
 
                 const json = {tabs: []};
                 for(const tab of tabs) {

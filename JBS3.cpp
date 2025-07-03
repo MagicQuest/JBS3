@@ -1429,6 +1429,114 @@ namespace fs {
         //file.close();
     }
 
+    //i have no idea why but i kept getting heap corruption type errors and honestly i have no idea why
+    //if i can reproduce it without all the v8 stuff i might post on stackoverflow to see what the people have to say
+    //void readdirSync(const v8::FunctionCallbackInfo<v8::Value>& info) {
+    //    using namespace v8;
+    //    Isolate* isolate = info.GetIsolate();
+    //    //_aadd_i64() //what did this doe
+    //    WIN32_FIND_DATAA findData;
+    //    HANDLE hFind = INVALID_HANDLE_VALUE;
+    //
+    //    Local<String> dirstr = info[0].As<String>();
+    //    size_t length = dirstr->Utf8Length(isolate);
+    //
+    //    char* pos = strchr(*String::Utf8Value(isolate, dirstr), '*');
+    //    print((UINT_PTR)pos << " el number, length >.< " << length);
+    //    char* directory = (char*)malloc(length + ((UINT_PTR)pos == length-2 ? 0 : 1));
+    //    dirstr->WriteUtf8(isolate, directory);
+    //    if (pos == NULL) {
+    //        strcat(directory, "*");
+    //    }
+    //    hFind = FindFirstFileA(directory, &findData);
+    //    print("dir >> " << directory);
+    //
+    //    std::vector<char*> lines = std::vector<char*>();
+    //
+    //    if (hFind == INVALID_HANDLE_VALUE) {
+    //        //none????
+    //    }
+    //    else {
+    //        do {
+    //            if (strcmp(findData.cFileName, ".") == 0 || strcmp(findData.cFileName, "..") == 0) {
+    //                continue;
+    //            }
+    //            print(findData.cFileName);
+    //            //char* line = new char[strlen(findData.cFileName)]; //i think it's safe to assume that i can't store the findData.cFileName for later so we just gonna copy
+    //            //ok i keep getting heap corruptions or what not so we just gonna go with malloc bro
+    //            char* line = (char*)malloc(strlen(findData.cFileName)); //ok wait i don't know if this would make a difference
+    //            strcpy(line, findData.cFileName);
+    //            print("<< " << line);
+    //            lines.push_back(line);
+    //        } while (FindNextFileA(hFind, &findData) != 0);
+    //    }
+    //
+    //    FindClose(hFind);
+    //
+    //    Local<Context> context = isolate->GetCurrentContext();
+    //    Local<Array> arr = Array::New(isolate);
+    //
+    //    //for (char* line : lines) {
+    //    for(int i = 0; i < lines.size(); i++) {
+    //        char* line = lines[i];
+    //        //arr->Set(context, i, String::NewFromUtf8(isolate, lines[i]).ToLocalChecked()); //uhhh it copies the text right?
+    //        //*line = '\0'; //i gotta make sure
+    //        //delete[] lines[i];
+    //    }
+    //
+    //    info.GetReturnValue().Set(arr);
+    //
+    //    print("iterating through lines to free them");
+    //    for (int i = 0; i < lines.size(); i++) {
+    //    //    delete[] lines[i];
+    //        //print("["<<lines[i]<<"]");
+    //        free(lines[i]);
+    //    }
+    //
+    //    free(directory);
+    //}
+
+    void readdirSync(const v8::FunctionCallbackInfo<v8::Value>& info) {
+        using namespace v8;
+        Isolate* isolate = info.GetIsolate();
+        Local<Context> context = isolate->GetCurrentContext();
+        Local<String> dirstr = info[0].As<String>();
+        size_t length = dirstr->Utf8Length(isolate);
+
+        char* pos = strchr(*String::Utf8Value(isolate, dirstr), '*');
+
+        WIN32_FIND_DATAA findData;
+        const char* directory = (const char*)malloc(length + ((UINT_PTR)pos == length - 2 ? 0 : 1));
+        dirstr->WriteUtf8(isolate, (char*)directory);
+        if (pos == NULL) {
+            strcat((char*)directory, "*");
+        }
+
+        HANDLE searchHandle = FindFirstFileA(directory, &findData);
+
+        Local<Array> arr = Array::New(isolate);
+
+        int i = 0;
+
+        if (searchHandle == INVALID_HANDLE_VALUE) {
+            
+        }
+        else {
+            do {
+                if (strcmp(findData.cFileName, ".") == 0 || strcmp(findData.cFileName, "..") == 0) {
+                    continue;
+                }
+                print("teh filename: " << findData.cFileName);
+                arr->Set(context, i, String::NewFromUtf8(isolate, findData.cFileName).ToLocalChecked());
+                i++;
+            } while (FindNextFileA(searchHandle, &findData));
+        }
+
+        info.GetReturnValue().Set(arr);
+
+        free((void*)directory);
+    }
+
     void write(const v8::FunctionCallbackInfo<v8::Value>& info) {
         using namespace v8;//::String;
         Isolate* isolate = info.GetIsolate();
@@ -1486,6 +1594,7 @@ namespace fs {
         using namespace v8;
         filesys = ObjectTemplate::New(isolate);
         filesys->Set(isolate, "read", FunctionTemplate::New(isolate, fs::read));
+        filesys->Set(isolate, "readdirSync", FunctionTemplate::New(isolate, fs::readdirSync));
         filesys->Set(isolate, "readBinary", FunctionTemplate::New(isolate, fs::readBinary));
         filesys->Set(isolate, "write", FunctionTemplate::New(isolate, fs::write));
     }
@@ -16664,7 +16773,10 @@ V8FUNC(ReadFileWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
 
-    std::wstring s(IntegerFI(info[1]), '\0');
+    //std::wstring s(IntegerFI(info[1]), '\0');
+    //nah i gotta do a more generic version
+    size_t length = IntegerFI(info[1]);
+    void* generic = malloc(length);
 
     OVERLAPPED overlapped{};
 
@@ -16688,14 +16800,24 @@ V8FUNC(ReadFileWrapper) {
         }
     }
 
-    BOOL res = ReadFile((HANDLE)IntegerFI(info[0]), (void*)s.data(), s.length(), NULL, &overlapped);
+    BOOL res = ReadFile((HANDLE)IntegerFI(info[0]), generic, length, NULL, &overlapped);
 
     if (res) {
-        info.GetReturnValue().Set(String::NewFromTwoByte(isolate, (const uint16_t*)s.data()).ToLocalChecked());
+        if (info[3]->BooleanValue(isolate)) {
+            Local<ArrayBuffer> ab = ArrayBuffer::New(isolate, length);
+            memcpy(ab->Data(), generic, length); //GULP
+
+            info.GetReturnValue().Set(Uint8Array::New(ab, 0, length));
+        }
+        else {
+            info.GetReturnValue().Set(String::NewFromTwoByte(isolate, (const uint16_t*)generic).ToLocalChecked());
+        }
     }
     else {
         info.GetReturnValue().Set(res);
     }
+
+    free(generic);
 }
 
 V8FUNC(Shell_NotifyIconWrapper) {
@@ -22010,7 +22132,8 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrevInstance, PWSTR nCmdList, in
     //1.6.01 i changed ColorF to be inside of D2D1
     //1.6.02 i changed every function that returned any type of ArrayBuffer to return a Uint8Array instead (beside hid functions)
     //1.7.0 because i changed WriteProcessMemory and WriteFile to allow writing a cstring instead of only a wstring
-    print("JBS3 -> Version 1.7.0"); //so idk how normal version things work so the first number will probably stay one --- i will increment the second number if i change an existing function like when i remade the CreateWindowClass and CreateWindow functions --- i might random increment the third number if i feel like it
+    //1.7.1 because i added a parameter to ReadFile to get a byte array instead of a string + fs.readdirSync
+    print("JBS3 -> Version 1.7.1"); //so idk how normal version things work so the first number will probably stay one --- i will increment the second number if i change an existing function like when i remade the CreateWindowClass and CreateWindow functions --- i might random increment the third number if i feel like it
     print(screenWidth << "x" << screenHeight);
     
 
