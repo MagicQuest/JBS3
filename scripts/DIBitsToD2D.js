@@ -76,7 +76,7 @@ function windowProc(hwnd, msg, wp, lp) {
         wicBitmap.Release();
         wic.Release();
 
-        d2dbitdepthbits = DIBitsToB8G8R8A8(width, dib.GetBits());
+        d2dbitdepthbits = DIBitsToB8G8R8A8(width, new Uint32Array(dib.GetBits().buffer.transfer())); //back in the day, GetBits used to return a Uint32Array and now it returns a Uint8Array! (since i don't want that we'll just "translate" it back to Uint32 here!)
         d2dBmpFromBits = d2d.CreateBitmap1(width, height, D2D1_BITMAP_OPTIONS_NONE, NULL, NULL, d2dbitdepthbits.bits, d2dbitdepthbits.pitch);
         
         d2ddibitstest = DIBitsToB8G8R8A8(3, dibits);

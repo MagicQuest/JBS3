@@ -1,5 +1,5 @@
-//i wonder what happens if i create a memory bitmap and draw it immediately without putting anything in it
-//hopefully it doesn't automatically zero the memory like i think it does (yeah ok it seems like it does i'm mad)
+print("i wonder what happens if i create a memory bitmap and draw it immediately without putting anything in it");
+print("hopefully it doesn't automatically zero the memory like i think it does (yeah ok it seems like it does i'm mad)");
 
 let screen, dc, cbit, cmem;
 

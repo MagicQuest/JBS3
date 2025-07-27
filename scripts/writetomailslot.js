@@ -22,7 +22,10 @@ if(hFile == INVALID_HANDLE_VALUE) {
 print("start a line with $ to eval the following string (ex: $print('peepee'))")
 
 while((line = getline(`Write a message for ${path}: `, 512)) && line != "") {
-    if(WriteFile(hFile, line)) {
+    //oops! garbage noise keeps coming out from mailslots.js because i don't send the string with a null terminator! (2 nulls since we're sending a wstring)
+    //wait hold on i'll just change read file so i don't have to do this lol
+    //ok read and write file can now both do wstring and cstrings and everything works fine :)
+    if(WriteFile(hFile, line, false, NULL)) {
         print(line);
     }else {
         error(`WriteFile failed [${g=GetLastError()}] (${_com_error(g)})`); //for mailslots GetLastError 38 is probably because the mailslot has closed 

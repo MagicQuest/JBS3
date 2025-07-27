@@ -623,6 +623,36 @@ namespace jsImpl {
         return addr;
     }
 
+    bool fromJSOVERLAPPED(Isolate* isolate, const Local<Context>& context, const Local<Value>& obj, LPOVERLAPPED* overlapped) { //pass a pointer to an LPOVERLAPPED structure
+        //OVERLAPPED overlapped{};
+        //RtlZeroMemory(overlapped, sizeof(OVERLAPPED));
+        if (!obj->IsNullOrUndefined() && !obj->IsNumber()) {
+            Local<Context> context = isolate->GetCurrentContext();
+            Local<Object> jsOverlapped = obj.As<Object>();
+            LPOVERLAPPED temp = new OVERLAPPED{};
+            if (jsOverlapped->Has(context, LITERAL("Internal")).ToChecked()) {
+                temp->Internal = IntegerFI(jsOverlapped->Get(context, LITERAL("Internal")).ToLocalChecked());
+            }
+            if (jsOverlapped->Has(context, LITERAL("InternalHigh")).ToChecked()) {
+                temp->InternalHigh = IntegerFI(jsOverlapped->Get(context, LITERAL("InternalHigh")).ToLocalChecked());
+            }
+            if (jsOverlapped->Has(context, LITERAL("Offset")).ToChecked()) {
+                temp->Offset = IntegerFI(jsOverlapped->Get(context, LITERAL("Offset")).ToLocalChecked());
+            }
+            if (jsOverlapped->Has(context, LITERAL("OffsetHigh")).ToChecked()) {
+                temp->OffsetHigh = IntegerFI(jsOverlapped->Get(context, LITERAL("OffsetHigh")).ToLocalChecked());
+            }
+            if (jsOverlapped->Has(context, LITERAL("hEvent")).ToChecked()) {
+                temp->hEvent = (HANDLE)IntegerFI(jsOverlapped->Get(context, LITERAL("hEvent")).ToLocalChecked());
+            }
+            *overlapped = temp;
+            return true;
+        }
+        *overlapped = NULL;
+        return false;
+        //return overlapped;
+    }
+
     //returns true when memory is allocated
     bool getBytesFromObject(Isolate* isolate, const Local<Value>& data, void** buffer, size_t* length, bool cstring) {
         if (data->IsNumber() || data->IsBoolean()) { //oh snap instead of doing this potential access violation of a move, i could use a union!
@@ -646,7 +676,7 @@ namespace jsImpl {
             else {
                 const char* text = CStringFI(data);
                 size_t len = strlen(text);
-                *buffer = new wchar_t[len]; //malloc(len);
+                *buffer = new char[len]; //malloc(len); //OOPS! i had this set to wchar_t! (actually it wasn't that big of a deal and just allocated an extra len bytes)
                 strcpy((char*)*buffer, text);
                 //mangounion.wstring = WStringFI(data); //aw man this ain't working (prolly because v8 moves the shitss around and i lose this pointer data)
                 *length = len;
@@ -658,6 +688,12 @@ namespace jsImpl {
             *buffer = abv->Buffer()->Data();
             //mangounion.idk = abv->Buffer()->Data();
             *length = abv->ByteLength();
+        }
+        else if (data->IsArrayBuffer()) {
+            Local<ArrayBuffer> ab = data.As<ArrayBuffer>();
+            *buffer = ab->Data();
+            //mangounion.idk = abv->Buffer()->Data();
+            *length = ab->ByteLength();
         }
         return false;
     }
@@ -10279,9 +10315,20 @@ V8FUNC(LOWORDWRAPPER) {
 V8FUNC(GetWindowTextWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
-    wchar_t shit[255];
-    GetWindowText((HWND)IntegerFI(info[0]), shit, 255);
+    HWND window = (HWND)IntegerFI(info[0]);
+    size_t length = (size_t)GetWindowTextLength(window)+1;
+    //wchar_t shit[255];
+    //GetWindowText((HWND)IntegerFI(info[0]), shit, 255);
+    wchar_t* shit = (wchar_t*)_alloca((length) * sizeof(wchar_t));
+    GetWindowText(window, shit, length);
     info.GetReturnValue().Set(String::NewFromTwoByte(isolate, (uint16_t*)shit).ToLocalChecked());
+}
+
+V8FUNC(GetWindowTextLengthWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, GetWindowTextLength((HWND)IntegerFI(info[0]))));
 }
 
 V8FUNC(SetWindowTextWrapper) {
@@ -11457,6 +11504,20 @@ V8FUNC(CreateWindowWrapper) {
     }
 #undef GetProperty
     //MessageBoxA(NULL, (std::string("shit")+std::to_string(GetLastError())).c_str(), "titlke", MB_OKCANCEL); //https://www.youtube.com/watch?v=58OhXFmTUo0
+}
+
+V8FUNC(IsDlgButtonCheckedWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, IsDlgButtonChecked((HWND)IntegerFI(info[0]), IntegerFI(info[1]))));
+}
+
+V8FUNC(GetMenuWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, (ULONG_PTR)GetMenu((HWND)IntegerFI(info[0]))));
 }
 
 V8FUNC(CreateMenuWrapper) {
@@ -16424,6 +16485,24 @@ V8FUNC(CreateFileWrapper) {
     info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)CreateFile(WStringFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), NULL, IntegerFI(info[3]), IntegerFI(info[4]), (HANDLE)IntegerFI(info[5]))));
 }
 
+V8FUNC(GetFileSizeExWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    //SECURITY_ATTRIBUTES attr{ 0 };
+    //attr.nLength = sizeof(SECURITY_ATTRIBUTES);
+
+    LARGE_INTEGER type;
+    BOOL res = GetFileSizeEx((HANDLE)IntegerFI(info[0]), &type);
+
+    if (res) {
+        info.GetReturnValue().Set(Number::New(isolate, type.QuadPart));
+    }
+    else {
+        info.GetReturnValue().Set(Number::New(isolate, -1));
+    }
+}
+
 //https://github.com/apetrone/simplefilewatcher/blob/master/source/FileWatcherWin32.cpp
 //https://learn.microsoft.com/en-us/windows/win32/fileio/obtaining-directory-change-notifications?redirectedfrom=MSDN
 //https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilew
@@ -16687,27 +16766,9 @@ V8FUNC(WriteFileWrapper) {
     DWORD length = NULL; //lowkey forgot to change length so i was writing 0 bytes everytime...
     DWORD written = NULL;
     
-    OVERLAPPED overlapped{};
-
-    if (!info[3]->IsNullOrUndefined() && !info[3]->IsNumber()) {
-        Local<Context> context = isolate->GetCurrentContext();
-        Local<Object> jsOverlapped = info[4].As<Object>();
-        if (jsOverlapped->Has(context, LITERAL("Internal")).ToChecked()) {
-            overlapped.Internal = IntegerFI(jsOverlapped->Get(context, LITERAL("Internal")).ToLocalChecked());
-        }
-        if (jsOverlapped->Has(context, LITERAL("InternalHigh")).ToChecked()) {
-            overlapped.InternalHigh = IntegerFI(jsOverlapped->Get(context, LITERAL("InternalHigh")).ToLocalChecked());
-        }
-        if (jsOverlapped->Has(context, LITERAL("Offset")).ToChecked()) {
-            overlapped.Offset = IntegerFI(jsOverlapped->Get(context, LITERAL("Offset")).ToLocalChecked());
-        }
-        if (jsOverlapped->Has(context, LITERAL("OffsetHigh")).ToChecked()) {
-            overlapped.OffsetHigh = IntegerFI(jsOverlapped->Get(context, LITERAL("OffsetHigh")).ToLocalChecked());
-        }
-        if (jsOverlapped->Has(context, LITERAL("hEvent")).ToChecked()) {
-            overlapped.hEvent = (HANDLE)IntegerFI(jsOverlapped->Get(context, LITERAL("hEvent")).ToLocalChecked());
-        }
-    }
+    //OVERLAPPED overlapped = jsImpl::fromJSOVERLAPPED(isolate, isolate->GetCurrentContext(), info[3]);
+    LPOVERLAPPED overlapped;
+    bool freeOverlapped = jsImpl::fromJSOVERLAPPED(isolate, isolate->GetCurrentContext(), info[3], &overlapped);
 
     //Local<Value> data = info[1];
 
@@ -16740,10 +16801,13 @@ V8FUNC(WriteFileWrapper) {
         length = IntegerFI(info[4]);
     }
 
-    info.GetReturnValue().Set(Number::New(isolate, WriteFile((HANDLE)IntegerFI(info[0]), buffer, length, &written, &overlapped)));
+    info.GetReturnValue().Set(Number::New(isolate, WriteFile((HANDLE)IntegerFI(info[0]), buffer, length, &written, overlapped)));
 
     if (dowegottafree) {
         delete[] buffer;
+    }
+    if (freeOverlapped) {
+        delete overlapped;
     }
 }
 
@@ -16778,39 +16842,26 @@ V8FUNC(ReadFileWrapper) {
     size_t length = IntegerFI(info[1]);
     void* generic = malloc(length);
 
-    OVERLAPPED overlapped{};
+    //OVERLAPPED overlapped = jsImpl::fromJSOVERLAPPED(isolate, isolate->GetCurrentContext(), info[3]);
+    LPOVERLAPPED overlapped;
+    bool freeOverlapped = jsImpl::fromJSOVERLAPPED(isolate, isolate->GetCurrentContext(), info[3], &overlapped);
 
-    if (!info[2]->IsNullOrUndefined() && !info[2]->IsNumber()) {
-        Local<Context> context = isolate->GetCurrentContext();
-        Local<Object> jsOverlapped = info[2].As<Object>();
-        if (jsOverlapped->Has(context, LITERAL("Internal")).ToChecked()) {
-            overlapped.Internal = IntegerFI(jsOverlapped->Get(context, LITERAL("Internal")).ToLocalChecked());
-        }
-        if (jsOverlapped->Has(context, LITERAL("InternalHigh")).ToChecked()) {
-            overlapped.InternalHigh = IntegerFI(jsOverlapped->Get(context, LITERAL("InternalHigh")).ToLocalChecked());
-        }
-        if (jsOverlapped->Has(context, LITERAL("Offset")).ToChecked()) {
-            overlapped.Offset = IntegerFI(jsOverlapped->Get(context, LITERAL("Offset")).ToLocalChecked());
-        }
-        if (jsOverlapped->Has(context, LITERAL("OffsetHigh")).ToChecked()) {
-            overlapped.OffsetHigh = IntegerFI(jsOverlapped->Get(context, LITERAL("OffsetHigh")).ToLocalChecked());
-        }
-        if (jsOverlapped->Has(context, LITERAL("hEvent")).ToChecked()) {
-            overlapped.hEvent = (HANDLE)IntegerFI(jsOverlapped->Get(context, LITERAL("hEvent")).ToLocalChecked());
-        }
-    }
-
-    BOOL res = ReadFile((HANDLE)IntegerFI(info[0]), generic, length, NULL, &overlapped);
+    BOOL res = ReadFile((HANDLE)IntegerFI(info[0]), generic, length, NULL, overlapped);
 
     if (res) {
-        if (info[3]->BooleanValue(isolate)) {
+        if (info[4]->BooleanValue(isolate)) {
             Local<ArrayBuffer> ab = ArrayBuffer::New(isolate, length);
             memcpy(ab->Data(), generic, length); //GULP
 
             info.GetReturnValue().Set(Uint8Array::New(ab, 0, length));
         }
         else {
-            info.GetReturnValue().Set(String::NewFromTwoByte(isolate, (const uint16_t*)generic).ToLocalChecked());
+            if (info[2]->BooleanValue(isolate)) {
+                info.GetReturnValue().Set(String::NewFromUtf8(isolate, (const char*)generic, NewStringType::kNormal, length).ToLocalChecked());
+            }
+            else {
+                info.GetReturnValue().Set(String::NewFromTwoByte(isolate, (const uint16_t*)generic, NewStringType::kNormal, length/sizeof(wchar_t)).ToLocalChecked());
+            }
         }
     }
     else {
@@ -16818,6 +16869,10 @@ V8FUNC(ReadFileWrapper) {
     }
 
     free(generic);
+
+    if (freeOverlapped) {
+        delete overlapped;
+    }
 }
 
 V8FUNC(Shell_NotifyIconWrapper) {
@@ -18489,6 +18544,195 @@ V8FUNC(PerformMicrotaskCheckpointWrapper) {
     isolate->PerformMicrotaskCheckpoint();
 }
 
+V8FUNC(DeviceIoControlWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    
+    LPVOID in = NULL;
+    LPVOID out = NULL;
+
+    DWORD inLength = 0;
+    DWORD outLength = 0;
+
+    if (info[2]->IsArrayBufferView()) {
+        Local<ArrayBufferView> abv = info[2].As<ArrayBufferView>();
+        in = abv->Buffer()->Data();
+        //mangounion.idk = abv->Buffer()->Data();
+        inLength = abv->ByteLength();
+    }
+    else if (info[2]->IsArrayBuffer()) {
+        Local<ArrayBuffer> ab = info[2].As<ArrayBuffer>();
+        in = ab->Data();
+        inLength = ab->ByteLength();
+    }
+
+    if (info[3]->IsArrayBufferView()) {
+        Local<ArrayBufferView> abv = info[3].As<ArrayBufferView>();
+        out = abv->Buffer()->Data();
+        //mangounion.idk = abv->Buffer()->Data();
+        outLength = abv->ByteLength();
+    }
+    else if (info[3]->IsArrayBuffer()) {
+        Local<ArrayBuffer> ab = info[3].As<ArrayBuffer>();
+        out = ab->Data();
+        outLength = ab->ByteLength();
+    }
+
+    //LPOVERLAPPED maybeOverlapped = NULL;
+    //if (info[4]->BooleanValue(isolate)) {
+    //    OVERLAPPED overlapped = jsImpl::fromJSOVERLAPPED(isolate, isolate->GetCurrentContext(), info[4]);
+    //    maybeOverlapped = &overlapped; //this is valid right?
+    //}
+    LPOVERLAPPED maybeOverlapped;
+    bool freeOverlapped = jsImpl::fromJSOVERLAPPED(isolate, isolate->GetCurrentContext(), info[4], &maybeOverlapped);
+    DWORD returned;
+
+    printf("(0x%p)[%lu] : (0x%p)[%lu]\n", in, inLength, out, outLength);
+
+    BOOL res = DeviceIoControl((HANDLE)IntegerFI(info[0]), IntegerFI(info[1]), in, inLength, out, outLength, &returned, maybeOverlapped);
+    
+    printf("(0x%p)[%lu] : (0x%p)[%lu] ()returned: %lu\n", in, inLength, out, outLength, returned);
+    /*if (res) {
+        info.GetReturnValue().Set(Number::New(isolate, returned));
+    }
+    else {
+        info.GetReturnValue().Set(false);
+    }*/
+    info.GetReturnValue().Set(res);
+
+    if (freeOverlapped) {
+        delete maybeOverlapped;
+    }
+}
+
+V8FUNC(CTL_CODEWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, CTL_CODE(IntegerFI(info[0]), IntegerFI(info[1]), IntegerFI(info[2]), IntegerFI(info[3]))));
+}
+
+V8FUNC(DEVICE_TYPE_FROM_CTL_CODEWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, DEVICE_TYPE_FROM_CTL_CODE(IntegerFI(info[0]))));
+}
+
+V8FUNC(METHOD_FROM_CTL_CODEWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, METHOD_FROM_CTL_CODE(IntegerFI(info[0]))));
+}
+
+#include <cfgmgr32.h>
+//#include <initguid.h>
+//#include <usbiodef.h>
+//wait no way all the GUID_DEVINTERFACE things are all in different classes right?
+//sorry chat im not including all of those bro im just gonna add a function that lets you make the guid yourself!
+//just check this list lol https://www.pinvoke.net/default.aspx/Constants/GUID_DEVINTERFACE.html
+
+V8FUNC(DEFINE_GUIDWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    Local<Context> context = isolate->GetCurrentContext();
+    Local<Array> returnval = Array::New(isolate);
+    //DEFINE_GUID(GUID_DEVINTERFACE_USB_HUB, 0xf18a0e88, 0xc30c, 0x11d0, 0x88, 0x15, 0x00, \
+    //    0xa0, 0xc9, 0x06, 0xbe, 0xd8);
+    returnval->Set(context, 0, info[0]);
+    returnval->Set(context, 1, info[1]);
+    returnval->Set(context, 2, info[2]);
+    returnval->Set(context, 3, info[3]);
+    returnval->Set(context, 4, info[4]);
+    returnval->Set(context, 5, info[5]);
+    returnval->Set(context, 6, info[6]);
+    returnval->Set(context, 7, info[7]);
+    returnval->Set(context, 8, info[8]);
+    returnval->Set(context, 9, info[9]);
+    returnval->Set(context, 10, info[10]);
+
+    info.GetReturnValue().Set(returnval);
+}
+
+V8FUNC(CM_Get_Device_Interface_List_SizeWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    Local<Context> context = isolate->GetCurrentContext();
+
+    ULONG length;
+    GUID guid = jsImpl::fromJSGUID(isolate, info[0]);
+    wchar_t* wstr = NewWStringOrNULL<wchar_t>(isolate, info[1]);
+    //GUID_DEVINTERFACE_USB_DEVICE
+    CONFIGRET cr = CM_Get_Device_Interface_List_Size(&length, &guid, wstr, IntegerFI(info[2]));
+    Local<Object> returnval = Object::New(isolate);
+    returnval->Set(context, LITERAL("errorCode"), Number::New(isolate, cr));
+    if (cr == CR_SUCCESS) {
+        returnval->Set(context, LITERAL("length"), Number::New(isolate, length));
+    }
+    else {
+        returnval->Set(context, LITERAL("length"), Undefined(isolate));
+    }
+    info.GetReturnValue().Set(returnval);
+
+    delete[] wstr;
+}
+
+V8FUNC(CM_Get_Device_Interface_ListWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    Local<Context> context = isolate->GetCurrentContext();
+
+    GUID guid = jsImpl::fromJSGUID(isolate, info[0]);
+    wchar_t* wstr = NewWStringOrNULL<wchar_t>(isolate, info[1]);
+    PZZWSTR buffer;
+    size_t length;
+    bool dowegottafree = jsImpl::getBytesFromObject(isolate, info[2], (void**)&buffer, &length, false); //wait dowegottafree only happens if it's a string (which it should not be lol)
+    ULONG flags = IntegerFI(info[3]);
+    bool doitforme = info[4]->BooleanValue(isolate);
+    CONFIGRET cr;
+    if (doitforme) {
+        length = 0; //just in case
+        cr = CM_Get_Device_Interface_List_Size((ULONG*) &length, &guid, wstr, flags);
+        if (cr != CR_SUCCESS) {
+            info.GetReturnValue().Set(Number::New(isolate, cr));
+            delete[] wstr;
+            return;
+        }
+        else {
+            buffer = new wchar_t[length] {};
+            //buffer = (PZZWSTR)_alloca(length * sizeof(wchar_t)); //HUSH! (wait nevermind i don't have to lol)
+            dowegottafree = true;
+        }
+    }
+    cr = CM_Get_Device_Interface_List(&guid, wstr, buffer, length, flags);
+    Local<Value> returnval;
+    if (cr == CR_SUCCESS) {
+        if (doitforme && length > 0) {
+            Local<Array> strArray = Array::New(isolate);
+            PWSTR nextInterface = buffer;
+            ULONG i = 0;
+            while (*nextInterface != UNICODE_NULL) {
+                strArray->Set(context, i, String::NewFromTwoByte(isolate, (const uint16_t*)nextInterface).ToLocalChecked());
+                nextInterface += wcslen(nextInterface) + 1;
+                i++;
+            }
+            returnval = strArray;
+        }
+        else {
+            returnval = info[2];
+        }
+    }
+    else {
+        returnval = Number::New(isolate, cr);
+    }
+    info.GetReturnValue().Set(returnval);
+    delete[] wstr;
+    if (dowegottafree) {
+        delete[] buffer;
+    }
+}
+
 //i think im allowed to use a snapshot thing to load these quicker
 //https://github.com/danbev/learning-v8/blob/master/notes/snapshots.md
 //OHHH my extern "C" __declspec(dllexport) kept crashing when i used LoadLibrary because there is no DllMain and (i guess) stuff isn't initialized (so i gotta call crtmain myself?)
@@ -18896,6 +19140,7 @@ extern "C" __declspec(dllexport) v8::Local<v8::ObjectTemplate> InitGlobals(v8::I
 
     setGlobalWrapper(OVERLAPPED);
     setGlobalWrapper(CreateFile);
+    setGlobalWrapper(GetFileSizeEx);
     setGlobalConst(GENERIC_READ);
     setGlobalConst(GENERIC_WRITE);
     setGlobalConst(GENERIC_EXECUTE);
@@ -20267,6 +20512,8 @@ extern "C" __declspec(dllexport) v8::Local<v8::ObjectTemplate> InitGlobals(v8::I
     setGlobalConst(BS_3STATE); setGlobalConst(BS_AUTO3STATE); setGlobalConst(BS_AUTOCHECKBOX); setGlobalConst(BS_AUTORADIOBUTTON); setGlobalConst(BS_BITMAP); setGlobalConst(BS_BOTTOM); setGlobalConst(BS_CENTER); setGlobalConst(BS_CHECKBOX); /*setGlobalConst(BS_COMMANDLINK); setGlobalConst(BS_DEFCOMMANDLINK);*/ setGlobalConst(BS_DEFPUSHBUTTON); /*setGlobalConst(BS_DEFSPLITBUTTON);*/ setGlobalConst(BS_GROUPBOX); setGlobalConst(BS_ICON); setGlobalConst(BS_FLAT); setGlobalConst(BS_LEFT); setGlobalConst(BS_LEFTTEXT); setGlobalConst(BS_MULTILINE); setGlobalConst(BS_NOTIFY); setGlobalConst(BS_OWNERDRAW); setGlobalConst(BS_PUSHBUTTON); setGlobalConst(BS_PUSHLIKE); setGlobalConst(BS_RADIOBUTTON); setGlobalConst(BS_RIGHT); setGlobalConst(BS_RIGHTBUTTON); /*setGlobalConst(BS_SPLITBUTTON);*/ setGlobalConst(BS_TEXT); setGlobalConst(BS_TOP); setGlobalConst(BS_TYPEMASK); setGlobalConst(BS_USERBUTTON); setGlobalConst(BS_VCENTER);
     /*setGlobalConst(BCN_HOTITEMCHANGE);*/ setGlobalConst(BN_CLICKED); setGlobalConst(BN_DBLCLK); setGlobalConst(BN_DOUBLECLICKED); setGlobalConst(BN_DISABLE); setGlobalConst(BN_PUSHED); setGlobalConst(BN_HILITE); setGlobalConst(BN_KILLFOCUS); setGlobalConst(BN_PAINT); setGlobalConst(BN_SETFOCUS); setGlobalConst(BN_UNPUSHED); setGlobalConst(BN_UNHILITE);
 
+    setGlobalWrapper(IsDlgButtonChecked);
+    global->Set(isolate, "GetMenu", FunctionTemplate::New(isolate, GetMenuWrapper));
     global->Set(isolate, "CreateMenu", FunctionTemplate::New(isolate, CreateMenuWrapper));
     global->Set(isolate, "SetMenu", FunctionTemplate::New(isolate, SetMenuWrapper));
     global->Set(isolate, "RemoveMenu", FunctionTemplate::New(isolate, RemoveMenuWrapper));
@@ -20346,6 +20593,40 @@ extern "C" __declspec(dllexport) v8::Local<v8::ObjectTemplate> InitGlobals(v8::I
     setGlobalConst(ES_READONLY);
     setGlobalConst(ES_WANTRETURN);
     setGlobalConst(ES_NUMBER);
+
+    setGlobalConst(EN_SETFOCUS);
+    setGlobalConst(EN_KILLFOCUS);
+    setGlobalConst(EN_CHANGE);
+    setGlobalConst(EN_UPDATE);
+    setGlobalConst(EN_ERRSPACE);
+    setGlobalConst(EN_MAXTEXT);
+    setGlobalConst(EN_HSCROLL);
+    setGlobalConst(EN_VSCROLL);
+    setGlobalConst(EN_ALIGN_LTR_EC);
+    setGlobalConst(EN_ALIGN_RTL_EC);
+    setGlobalConst(EN_BEFORE_PASTE);
+    setGlobalConst(EN_AFTER_PASTE);
+    setGlobalConst(EC_LEFTMARGIN);
+    setGlobalConst(EC_RIGHTMARGIN);
+    setGlobalConst(EC_USEFONTINFO);
+    setGlobalConst(EMSIS_COMPOSITIONSTRING);
+    setGlobalConst(EIMES_GETCOMPSTRATONCE);
+    setGlobalConst(EIMES_CANCELCOMPSTRINFOCUS);
+    setGlobalConst(EIMES_COMPLETECOMPSTRKILLFOCUS);
+
+    setGlobalConst(BM_GETCHECK);
+    setGlobalConst(BM_SETCHECK);
+    setGlobalConst(BM_GETSTATE);
+    setGlobalConst(BM_SETSTATE);
+    setGlobalConst(BM_SETSTYLE);
+    setGlobalConst(BM_CLICK);
+    setGlobalConst(BM_GETIMAGE);
+    setGlobalConst(BM_SETIMAGE);
+    setGlobalConst(BST_UNCHECKED);
+    setGlobalConst(BST_CHECKED);
+    setGlobalConst(BST_INDETERMINATE);
+    setGlobalConst(BST_PUSHED);
+    setGlobalConst(BST_FOCUS);
 
     setGlobalConst(TPM_LEFTBUTTON);
     setGlobalConst(TPM_RIGHTBUTTON);
@@ -21339,6 +21620,8 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
     setGlobalConst(MK_XBUTTON1);
     setGlobalConst(MK_XBUTTON2);
 
+    setGlobalConst(XBUTTON1);
+    setGlobalConst(XBUTTON2);
 
     setGlobalWrapper(Sleep);
     setGlobalWrapper(GetClientRect);
@@ -21490,6 +21773,7 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
     setGlobalConst(D2D1_COMPOSITE_MODE_MASK_INVERT);
 
     setGlobalWrapper(GetWindowText);
+    setGlobalWrapper(GetWindowTextLength);
     setGlobalWrapper(SetWindowText);
     setGlobalWrapper(SetScrollInfo);
     setGlobalWrapper(GetScrollInfo);
@@ -21967,6 +22251,378 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
 
     //NETWORK END!!!
 
+    setGlobalWrapper(DeviceIoControl);
+    setGlobalWrapper(CTL_CODE);
+    setGlobalWrapper(DEVICE_TYPE_FROM_CTL_CODE);
+    setGlobalWrapper(METHOD_FROM_CTL_CODE);
+    setGlobalConst(FILE_DEVICE_BEEP);
+    setGlobalConst(FILE_DEVICE_CD_ROM);
+    setGlobalConst(FILE_DEVICE_CD_ROM_FILE_SYSTEM);
+    setGlobalConst(FILE_DEVICE_CONTROLLER);
+    setGlobalConst(FILE_DEVICE_DATALINK);
+    setGlobalConst(FILE_DEVICE_DFS);
+    setGlobalConst(FILE_DEVICE_DISK);
+    setGlobalConst(FILE_DEVICE_DISK_FILE_SYSTEM);
+    setGlobalConst(FILE_DEVICE_FILE_SYSTEM);
+    setGlobalConst(FILE_DEVICE_INPORT_PORT);
+    setGlobalConst(FILE_DEVICE_KEYBOARD);
+    setGlobalConst(FILE_DEVICE_MAILSLOT);
+    setGlobalConst(FILE_DEVICE_MIDI_IN);
+    setGlobalConst(FILE_DEVICE_MIDI_OUT);
+    setGlobalConst(FILE_DEVICE_MOUSE);
+    setGlobalConst(FILE_DEVICE_MULTI_UNC_PROVIDER);
+    setGlobalConst(FILE_DEVICE_NAMED_PIPE);
+    setGlobalConst(FILE_DEVICE_NETWORK);
+    setGlobalConst(FILE_DEVICE_NETWORK_BROWSER);
+    setGlobalConst(FILE_DEVICE_NETWORK_FILE_SYSTEM);
+    setGlobalConst(FILE_DEVICE_NULL);
+    setGlobalConst(FILE_DEVICE_PARALLEL_PORT);
+    setGlobalConst(FILE_DEVICE_PHYSICAL_NETCARD);
+    setGlobalConst(FILE_DEVICE_PRINTER);
+    setGlobalConst(FILE_DEVICE_SCANNER);
+    setGlobalConst(FILE_DEVICE_SERIAL_MOUSE_PORT);
+    setGlobalConst(FILE_DEVICE_SERIAL_PORT);
+    setGlobalConst(FILE_DEVICE_SCREEN);
+    setGlobalConst(FILE_DEVICE_SOUND);
+    setGlobalConst(FILE_DEVICE_STREAMS);
+    setGlobalConst(FILE_DEVICE_TAPE);
+    setGlobalConst(FILE_DEVICE_TAPE_FILE_SYSTEM);
+    setGlobalConst(FILE_DEVICE_TRANSPORT);
+    setGlobalConst(FILE_DEVICE_UNKNOWN);
+    setGlobalConst(FILE_DEVICE_VIDEO);
+    setGlobalConst(FILE_DEVICE_VIRTUAL_DISK);
+    setGlobalConst(FILE_DEVICE_WAVE_IN);
+    setGlobalConst(FILE_DEVICE_WAVE_OUT);
+    setGlobalConst(FILE_DEVICE_8042_PORT);
+    setGlobalConst(FILE_DEVICE_NETWORK_REDIRECTOR);
+    setGlobalConst(FILE_DEVICE_BATTERY);
+    setGlobalConst(FILE_DEVICE_BUS_EXTENDER);
+    setGlobalConst(FILE_DEVICE_MODEM);
+    setGlobalConst(FILE_DEVICE_VDM);
+    setGlobalConst(FILE_DEVICE_MASS_STORAGE);
+    setGlobalConst(FILE_DEVICE_SMB);
+    setGlobalConst(FILE_DEVICE_KS);
+    setGlobalConst(FILE_DEVICE_CHANGER);
+    setGlobalConst(FILE_DEVICE_SMARTCARD);
+    setGlobalConst(FILE_DEVICE_ACPI);
+    setGlobalConst(FILE_DEVICE_DVD);
+    setGlobalConst(FILE_DEVICE_FULLSCREEN_VIDEO);
+    setGlobalConst(FILE_DEVICE_DFS_FILE_SYSTEM);
+    setGlobalConst(FILE_DEVICE_DFS_VOLUME);
+    setGlobalConst(FILE_DEVICE_SERENUM);
+    setGlobalConst(FILE_DEVICE_TERMSRV);
+    setGlobalConst(FILE_DEVICE_KSEC);
+    setGlobalConst(FILE_DEVICE_FIPS);
+    setGlobalConst(FILE_DEVICE_INFINIBAND);
+    setGlobalConst(FILE_DEVICE_VMBUS);
+    setGlobalConst(FILE_DEVICE_CRYPT_PROVIDER);
+    setGlobalConst(FILE_DEVICE_WPD);
+    setGlobalConst(FILE_DEVICE_BLUETOOTH);
+    setGlobalConst(FILE_DEVICE_MT_COMPOSITE);
+    setGlobalConst(FILE_DEVICE_MT_TRANSPORT);
+    setGlobalConst(FILE_DEVICE_BIOMETRIC);
+    setGlobalConst(FILE_DEVICE_PMI);
+    setGlobalConst(FILE_DEVICE_EHSTOR);
+    setGlobalConst(FILE_DEVICE_DEVAPI);
+    setGlobalConst(FILE_DEVICE_GPIO);
+    setGlobalConst(FILE_DEVICE_USBEX);
+    setGlobalConst(FILE_DEVICE_CONSOLE);
+    setGlobalConst(FILE_DEVICE_NFP);
+    setGlobalConst(FILE_DEVICE_SYSENV);
+    setGlobalConst(FILE_DEVICE_VIRTUAL_BLOCK);
+    setGlobalConst(FILE_DEVICE_POINT_OF_SERVICE);
+    setGlobalConst(FILE_DEVICE_STORAGE_REPLICATION);
+    setGlobalConst(FILE_DEVICE_TRUST_ENV);
+    setGlobalConst(FILE_DEVICE_UCM);
+    setGlobalConst(FILE_DEVICE_UCMTCPCI);
+    setGlobalConst(FILE_DEVICE_PERSISTENT_MEMORY);
+    setGlobalConst(FILE_DEVICE_NVDIMM);
+    setGlobalConst(FILE_DEVICE_HOLOGRAPHIC);
+    setGlobalConst(FILE_DEVICE_SDFXHCI);
+    setGlobalConst(FILE_DEVICE_UCMUCSI);
+    setGlobalConst(FILE_DEVICE_PRM);
+    setGlobalConst(FILE_DEVICE_EVENT_COLLECTOR);
+    setGlobalConst(FILE_DEVICE_USB4);
+    setGlobalConst(FILE_DEVICE_SOUNDWIRE);
+    setGlobalConst(FILE_DEVICE_FABRIC_NVME);
+    setGlobalConst(FILE_DEVICE_SVM);
+    setGlobalConst(FILE_DEVICE_HARDWARE_ACCELERATOR);
+    setGlobalConst(FILE_DEVICE_I3C);
+    setGlobalConst(METHOD_BUFFERED);
+    setGlobalConst(METHOD_IN_DIRECT);
+    setGlobalConst(METHOD_OUT_DIRECT);
+    setGlobalConst(METHOD_NEITHER);
+    setGlobalConst(METHOD_DIRECT_TO_HARDWARE);
+    setGlobalConst(METHOD_DIRECT_FROM_HARDWARE);
+    setGlobalConst(FILE_ANY_ACCESS);
+    setGlobalConst(FILE_SPECIAL_ACCESS);
+    setGlobalConst(FILE_READ_ACCESS);
+    setGlobalConst(FILE_WRITE_ACCESS);
+    setGlobalConst(IOCTL_STORAGE_BASE);
+    setGlobalConst(IOCTL_STORAGE_CHECK_VERIFY);
+    setGlobalConst(IOCTL_STORAGE_CHECK_VERIFY2);
+    setGlobalConst(IOCTL_STORAGE_MEDIA_REMOVAL);
+    setGlobalConst(IOCTL_STORAGE_EJECT_MEDIA);
+    setGlobalConst(IOCTL_STORAGE_LOAD_MEDIA);
+    setGlobalConst(IOCTL_STORAGE_LOAD_MEDIA2);
+    setGlobalConst(IOCTL_STORAGE_RESERVE);
+    setGlobalConst(IOCTL_STORAGE_RELEASE);
+    setGlobalConst(IOCTL_STORAGE_FIND_NEW_DEVICES);
+    setGlobalConst(IOCTL_STORAGE_EJECTION_CONTROL);
+    setGlobalConst(IOCTL_STORAGE_MCN_CONTROL);
+    setGlobalConst(IOCTL_STORAGE_GET_MEDIA_TYPES);
+    setGlobalConst(IOCTL_STORAGE_GET_MEDIA_TYPES_EX);
+    setGlobalConst(IOCTL_STORAGE_GET_MEDIA_SERIAL_NUMBER);
+    setGlobalConst(IOCTL_STORAGE_GET_HOTPLUG_INFO);
+    setGlobalConst(IOCTL_STORAGE_SET_HOTPLUG_INFO);
+    setGlobalConst(IOCTL_STORAGE_GET_SYSTEM_FEATURE_SUPPORT);
+    setGlobalConst(IOCTL_STORAGE_RESET_BUS);
+    setGlobalConst(IOCTL_STORAGE_RESET_DEVICE);
+    setGlobalConst(IOCTL_STORAGE_BREAK_RESERVATION);
+    setGlobalConst(IOCTL_STORAGE_PERSISTENT_RESERVE_IN);
+    setGlobalConst(IOCTL_STORAGE_PERSISTENT_RESERVE_OUT);
+    setGlobalConst(IOCTL_STORAGE_GET_DEVICE_NUMBER);
+    setGlobalConst(IOCTL_STORAGE_GET_DEVICE_NUMBER_EX);
+    setGlobalConst(IOCTL_STORAGE_PREDICT_FAILURE);
+    setGlobalConst(IOCTL_STORAGE_FAILURE_PREDICTION_CONFIG);
+    setGlobalConst(IOCTL_STORAGE_GET_COUNTERS);
+    setGlobalConst(IOCTL_STORAGE_READ_CAPACITY);
+    setGlobalConst(IOCTL_STORAGE_GET_DEVICE_TELEMETRY);
+    setGlobalConst(IOCTL_STORAGE_DEVICE_TELEMETRY_NOTIFY);
+    setGlobalConst(IOCTL_STORAGE_DEVICE_TELEMETRY_QUERY_CAPS);
+    setGlobalConst(IOCTL_STORAGE_GET_DEVICE_TELEMETRY_RAW);
+    setGlobalConst(IOCTL_STORAGE_SET_TEMPERATURE_THRESHOLD);
+    setGlobalConst(IOCTL_STORAGE_PROTOCOL_COMMAND);
+    setGlobalConst(IOCTL_STORAGE_SET_PROPERTY);
+    setGlobalConst(IOCTL_STORAGE_QUERY_PROPERTY);
+    setGlobalConst(IOCTL_STORAGE_MANAGE_DATA_SET_ATTRIBUTES);
+    setGlobalConst(IOCTL_STORAGE_GET_LB_PROVISIONING_MAP_RESOURCES);
+    setGlobalConst(IOCTL_STORAGE_REINITIALIZE_MEDIA);
+    setGlobalConst(IOCTL_STORAGE_GET_BC_PROPERTIES);
+    setGlobalConst(IOCTL_STORAGE_ALLOCATE_BC_STREAM);
+    setGlobalConst(IOCTL_STORAGE_FREE_BC_STREAM);
+    setGlobalConst(IOCTL_STORAGE_CHECK_PRIORITY_HINT_SUPPORT);
+    setGlobalConst(IOCTL_STORAGE_START_DATA_INTEGRITY_CHECK);
+    setGlobalConst(IOCTL_STORAGE_STOP_DATA_INTEGRITY_CHECK);
+    setGlobalConst(OBSOLETE_IOCTL_STORAGE_RESET_BUS);
+    setGlobalConst(OBSOLETE_IOCTL_STORAGE_RESET_DEVICE);
+    setGlobalConst(IOCTL_STORAGE_FIRMWARE_GET_INFO);
+    setGlobalConst(IOCTL_STORAGE_FIRMWARE_DOWNLOAD);
+    setGlobalConst(IOCTL_STORAGE_FIRMWARE_ACTIVATE);
+    setGlobalConst(IOCTL_STORAGE_ENABLE_IDLE_POWER);
+    setGlobalConst(IOCTL_STORAGE_GET_IDLE_POWERUP_REASON);
+    setGlobalConst(IOCTL_STORAGE_POWER_ACTIVE);
+    setGlobalConst(IOCTL_STORAGE_POWER_IDLE);
+    setGlobalConst(IOCTL_STORAGE_EVENT_NOTIFICATION);
+    setGlobalConst(IOCTL_STORAGE_DEVICE_POWER_CAP);
+    setGlobalConst(IOCTL_STORAGE_RPMB_COMMAND);
+    setGlobalConst(IOCTL_STORAGE_ATTRIBUTE_MANAGEMENT);
+    setGlobalConst(IOCTL_STORAGE_DIAGNOSTIC);
+    setGlobalConst(IOCTL_STORAGE_GET_PHYSICAL_ELEMENT_STATUS);
+    setGlobalConst(IOCTL_STORAGE_REMOVE_ELEMENT_AND_TRUNCATE);
+    setGlobalConst(IOCTL_STORAGE_GET_DEVICE_INTERNAL_LOG);
+    setGlobalConst(IOCTL_SCMBUS_BASE);
+    setGlobalConst(IOCTL_SCMBUS_DEVICE_FUNCTION_BASE);
+    setGlobalConst(IOCTL_SCM_LOGICAL_DEVICE_FUNCTION_BASE);
+    setGlobalConst(IOCTL_SCM_PHYSICAL_DEVICE_FUNCTION_BASE);
+    setGlobalConst(IOCTL_SCM_BUS_GET_LOGICAL_DEVICES);
+    setGlobalConst(IOCTL_SCM_BUS_GET_PHYSICAL_DEVICES);
+    setGlobalConst(IOCTL_SCM_BUS_GET_REGIONS);
+    setGlobalConst(IOCTL_SCM_BUS_QUERY_PROPERTY);
+    setGlobalConst(IOCTL_SCM_BUS_SET_PROPERTY);
+    setGlobalConst(IOCTL_SCM_BUS_RUNTIME_FW_ACTIVATE);
+    setGlobalConst(IOCTL_SCM_BUS_REFRESH_NAMESPACE);
+    setGlobalConst(IOCTL_SCM_LD_GET_INTERLEAVE_SET);
+    setGlobalConst(IOCTL_SCM_PD_QUERY_PROPERTY);
+    setGlobalConst(IOCTL_SCM_PD_FIRMWARE_DOWNLOAD);
+    setGlobalConst(IOCTL_SCM_PD_FIRMWARE_ACTIVATE);
+    setGlobalConst(IOCTL_SCM_PD_PASSTHROUGH);
+    setGlobalConst(IOCTL_SCM_PD_UPDATE_MANAGEMENT_STATUS);
+    setGlobalConst(IOCTL_SCM_PD_REINITIALIZE_MEDIA);
+    setGlobalConst(IOCTL_SCM_PD_SET_PROPERTY);
+    setGlobalConst(IOCTL_DISK_GET_DRIVE_GEOMETRY);
+    setGlobalConst(IOCTL_DISK_GET_PARTITION_INFO);
+    setGlobalConst(IOCTL_DISK_SET_PARTITION_INFO);
+    setGlobalConst(IOCTL_DISK_GET_DRIVE_LAYOUT);
+    setGlobalConst(IOCTL_DISK_SET_DRIVE_LAYOUT);
+    setGlobalConst(IOCTL_DISK_VERIFY);
+    setGlobalConst(IOCTL_DISK_FORMAT_TRACKS);
+    setGlobalConst(IOCTL_DISK_REASSIGN_BLOCKS);
+    setGlobalConst(IOCTL_DISK_PERFORMANCE);
+    setGlobalConst(IOCTL_DISK_IS_WRITABLE);
+    setGlobalConst(IOCTL_DISK_LOGGING);
+    setGlobalConst(IOCTL_DISK_FORMAT_TRACKS_EX);
+    setGlobalConst(IOCTL_DISK_HISTOGRAM_STRUCTURE);
+    setGlobalConst(IOCTL_DISK_HISTOGRAM_DATA);
+    setGlobalConst(IOCTL_DISK_HISTOGRAM_RESET);
+    setGlobalConst(IOCTL_DISK_REQUEST_STRUCTURE);
+    setGlobalConst(IOCTL_DISK_REQUEST_DATA);
+    setGlobalConst(IOCTL_DISK_PERFORMANCE_OFF);
+    setGlobalConst(IOCTL_DISK_CONTROLLER_NUMBER);
+    setGlobalConst(SMART_GET_VERSION);
+    setGlobalConst(SMART_SEND_DRIVE_COMMAND);
+    setGlobalConst(SMART_RCV_DRIVE_DATA);
+    setGlobalConst(SMART_RCV_DRIVE_DATA_EX);
+    setGlobalConst(IOCTL_DISK_GET_PARTITION_INFO_EX);
+    setGlobalConst(IOCTL_DISK_SET_PARTITION_INFO_EX);
+    setGlobalConst(IOCTL_DISK_GET_DRIVE_LAYOUT_EX);
+    setGlobalConst(IOCTL_DISK_SET_DRIVE_LAYOUT_EX);
+    setGlobalConst(IOCTL_DISK_CREATE_DISK);
+    setGlobalConst(IOCTL_DISK_GET_LENGTH_INFO);
+    setGlobalConst(IOCTL_DISK_GET_DRIVE_GEOMETRY_EX);
+    setGlobalConst(IOCTL_DISK_REASSIGN_BLOCKS_EX);
+    setGlobalConst(IOCTL_DISK_UPDATE_DRIVE_SIZE);
+    setGlobalConst(IOCTL_DISK_GROW_PARTITION);
+    setGlobalConst(IOCTL_DISK_GET_CACHE_INFORMATION);
+    setGlobalConst(IOCTL_DISK_SET_CACHE_INFORMATION);
+    setGlobalConst(OBSOLETE_DISK_GET_WRITE_CACHE_STATE);
+    setGlobalConst(IOCTL_DISK_DELETE_DRIVE_LAYOUT);
+    setGlobalConst(IOCTL_DISK_UPDATE_PROPERTIES);
+    setGlobalConst(IOCTL_DISK_FORMAT_DRIVE);
+    setGlobalConst(IOCTL_DISK_SENSE_DEVICE);
+    setGlobalConst(IOCTL_DISK_CHECK_VERIFY);
+    setGlobalConst(IOCTL_DISK_MEDIA_REMOVAL);
+    setGlobalConst(IOCTL_DISK_EJECT_MEDIA);
+    setGlobalConst(IOCTL_DISK_LOAD_MEDIA);
+    setGlobalConst(IOCTL_DISK_RESERVE);
+    setGlobalConst(IOCTL_DISK_RELEASE);
+    setGlobalConst(IOCTL_DISK_FIND_NEW_DEVICES);
+    setGlobalConst(IOCTL_DISK_GET_MEDIA_TYPES);
+    setGlobalConst(PARTITION_ENTRY_UNUSED);
+    setGlobalConst(PARTITION_FAT_12);
+    setGlobalConst(PARTITION_XENIX_1);
+    setGlobalConst(PARTITION_XENIX_2);
+    setGlobalConst(PARTITION_FAT_16);
+    setGlobalConst(PARTITION_EXTENDED);
+    setGlobalConst(PARTITION_HUGE);
+    setGlobalConst(PARTITION_IFS);
+    setGlobalConst(PARTITION_OS2BOOTMGR);
+    setGlobalConst(PARTITION_FAT32);
+    setGlobalConst(PARTITION_FAT32_XINT13);
+    setGlobalConst(PARTITION_XINT13);
+    setGlobalConst(PARTITION_XINT13_EXTENDED);
+    setGlobalConst(PARTITION_MSFT_RECOVERY);
+    setGlobalConst(PARTITION_MAIN_OS);
+    setGlobalConst(PARTIITON_OS_DATA);
+    setGlobalConst(PARTITION_PRE_INSTALLED);
+    setGlobalConst(PARTITION_BSP);
+    setGlobalConst(PARTITION_DPP);
+    setGlobalConst(PARTITION_WINDOWS_SYSTEM);
+    setGlobalConst(PARTITION_PREP);
+    setGlobalConst(PARTITION_LDM);
+    setGlobalConst(PARTITION_DM);
+    setGlobalConst(PARTITION_EZDRIVE);
+    setGlobalConst(PARTITION_UNIX);
+    setGlobalConst(PARTITION_SPACES_DATA);
+    setGlobalConst(PARTITION_SPACES);
+    setGlobalConst(PARTITION_GPT);
+    setGlobalConst(PARTITION_SYSTEM);
+    setGlobalConst(VALID_NTFT);
+    setGlobalConst(PARTITION_NTFT);
+    setGlobalConst(IOCTL_DISK_GET_DISK_ATTRIBUTES);
+    setGlobalConst(IOCTL_DISK_SET_DISK_ATTRIBUTES);
+    setGlobalConst(DISK_ATTRIBUTE_OFFLINE);
+    setGlobalConst(DISK_ATTRIBUTE_READ_ONLY);
+    setGlobalConst(IOCTL_DISK_RESET_SNAPSHOT_INFO);
+    setGlobalConst(IOCTL_CHANGER_GET_PARAMETERS);
+    setGlobalConst(IOCTL_CHANGER_GET_STATUS);
+    setGlobalConst(IOCTL_CHANGER_GET_PRODUCT_DATA);
+    setGlobalConst(IOCTL_CHANGER_SET_ACCESS);
+    setGlobalConst(IOCTL_CHANGER_GET_ELEMENT_STATUS);
+    setGlobalConst(IOCTL_CHANGER_INITIALIZE_ELEMENT_STATUS);
+    setGlobalConst(IOCTL_CHANGER_SET_POSITION);
+    setGlobalConst(IOCTL_CHANGER_EXCHANGE_MEDIUM);
+    setGlobalConst(IOCTL_CHANGER_MOVE_MEDIUM);
+    setGlobalConst(IOCTL_CHANGER_REINITIALIZE_TRANSPORT);
+    setGlobalConst(IOCTL_CHANGER_QUERY_VOLUME_TAGS);
+    setGlobalConst(MAX_VOLUME_ID_SIZE);
+    setGlobalConst(MAX_VOLUME_TEMPLATE_SIZE);
+    setGlobalConst(IOCTL_SERIAL_LSRMST_INSERT);
+    setGlobalConst(IOCTL_SERENUM_EXPOSE_HARDWARE);
+    setGlobalConst(IOCTL_SERENUM_REMOVE_HARDWARE);
+    setGlobalConst(IOCTL_SERENUM_PORT_DESC);
+    setGlobalConst(IOCTL_SERENUM_GET_PORT_NAME);
+    //setGlobalConst(IOCTL_AVIO_ALLOCATE_STREAM); //FILE_DEVICE_AVIO is not defined...
+    //setGlobalConst(IOCTL_AVIO_FREE_STREAM);
+    //setGlobalConst(IOCTL_AVIO_MODIFY_STREAM);
+    setGlobalConst(IOCTL_VOLUME_BASE);
+    setGlobalConst(IOCTL_VOLUME_GET_VOLUME_DISK_EXTENTS);
+    setGlobalConst(IOCTL_VOLUME_ONLINE);
+    setGlobalConst(IOCTL_VOLUME_OFFLINE);
+    setGlobalConst(IOCTL_VOLUME_IS_CLUSTERED);
+    setGlobalConst(IOCTL_VOLUME_GET_GPT_ATTRIBUTES);
+
+    setGlobalWrapper(DEFINE_GUID);
+    setGlobalWrapper(CM_Get_Device_Interface_List_Size);
+    setGlobalWrapper(CM_Get_Device_Interface_List);
+    setGlobalConst(CR_SUCCESS);
+    setGlobalConst(CR_DEFAULT);
+    setGlobalConst(CR_OUT_OF_MEMORY);
+    setGlobalConst(CR_INVALID_POINTER);
+    setGlobalConst(CR_INVALID_FLAG);
+    setGlobalConst(CR_INVALID_DEVNODE);
+    setGlobalConst(CR_INVALID_DEVINST);
+    setGlobalConst(CR_INVALID_RES_DES);
+    setGlobalConst(CR_INVALID_LOG_CONF);
+    setGlobalConst(CR_INVALID_ARBITRATOR);
+    setGlobalConst(CR_INVALID_NODELIST);
+    setGlobalConst(CR_DEVNODE_HAS_REQS);
+    setGlobalConst(CR_DEVINST_HAS_REQS);
+    setGlobalConst(CR_INVALID_RESOURCEID);
+    setGlobalConst(CR_DLVXD_NOT_FOUND);
+    setGlobalConst(CR_NO_SUCH_DEVNODE);
+    setGlobalConst(CR_NO_SUCH_DEVINST);
+    setGlobalConst(CR_NO_MORE_LOG_CONF);
+    setGlobalConst(CR_NO_MORE_RES_DES);
+    setGlobalConst(CR_ALREADY_SUCH_DEVNODE);
+    setGlobalConst(CR_ALREADY_SUCH_DEVINST);
+    setGlobalConst(CR_INVALID_RANGE_LIST);
+    setGlobalConst(CR_INVALID_RANGE);
+    setGlobalConst(CR_FAILURE);
+    setGlobalConst(CR_NO_SUCH_LOGICAL_DEV);
+    setGlobalConst(CR_CREATE_BLOCKED);
+    setGlobalConst(CR_NOT_SYSTEM_VM);
+    setGlobalConst(CR_REMOVE_VETOED);
+    setGlobalConst(CR_APM_VETOED);
+    setGlobalConst(CR_INVALID_LOAD_TYPE);
+    setGlobalConst(CR_BUFFER_SMALL);
+    setGlobalConst(CR_NO_ARBITRATOR);
+    setGlobalConst(CR_NO_REGISTRY_HANDLE);
+    setGlobalConst(CR_REGISTRY_ERROR);
+    setGlobalConst(CR_INVALID_DEVICE_ID);
+    setGlobalConst(CR_INVALID_DATA);
+    setGlobalConst(CR_INVALID_API);
+    setGlobalConst(CR_DEVLOADER_NOT_READY);
+    setGlobalConst(CR_NEED_RESTART);
+    setGlobalConst(CR_NO_MORE_HW_PROFILES);
+    setGlobalConst(CR_DEVICE_NOT_THERE);
+    setGlobalConst(CR_NO_SUCH_VALUE);
+    setGlobalConst(CR_WRONG_TYPE);
+    setGlobalConst(CR_INVALID_PRIORITY);
+    setGlobalConst(CR_NOT_DISABLEABLE);
+    setGlobalConst(CR_FREE_RESOURCES);
+    setGlobalConst(CR_QUERY_VETOED);
+    setGlobalConst(CR_CANT_SHARE_IRQ);
+    setGlobalConst(CR_NO_DEPENDENT);
+    setGlobalConst(CR_SAME_RESOURCES);
+    setGlobalConst(CR_NO_SUCH_REGISTRY_KEY);
+    setGlobalConst(CR_INVALID_MACHINENAME);
+    setGlobalConst(CR_REMOTE_COMM_FAILURE);
+    setGlobalConst(CR_MACHINE_UNAVAILABLE);
+    setGlobalConst(CR_NO_CM_SERVICES);
+    setGlobalConst(CR_ACCESS_DENIED);
+    setGlobalConst(CR_CALL_NOT_IMPLEMENTED);
+    setGlobalConst(CR_INVALID_PROPERTY);
+    setGlobalConst(CR_DEVICE_INTERFACE_ACTIVE);
+    setGlobalConst(CR_NO_SUCH_DEVICE_INTERFACE);
+    setGlobalConst(CR_INVALID_REFERENCE_STRING);
+    setGlobalConst(CR_INVALID_CONFLICT_LIST);
+    setGlobalConst(CR_INVALID_INDEX);
+    setGlobalConst(CR_INVALID_STRUCTURE_SIZE);
+    setGlobalConst(NUM_CR_RESULTS);
+    setGlobalConst(CM_GET_DEVICE_INTERFACE_LIST_PRESENT);
+    setGlobalConst(CM_GET_DEVICE_INTERFACE_LIST_ALL_DEVICES);
+    setGlobalConst(CM_GET_DEVICE_INTERFACE_LIST_BITS);
 
     //global->Set(isolate, "HELP", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
     //    using namespace v8;
@@ -22133,7 +22789,12 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrevInstance, PWSTR nCmdList, in
     //1.6.02 i changed every function that returned any type of ArrayBuffer to return a Uint8Array instead (beside hid functions)
     //1.7.0 because i changed WriteProcessMemory and WriteFile to allow writing a cstring instead of only a wstring
     //1.7.1 because i added a parameter to ReadFile to get a byte array instead of a string + fs.readdirSync
-    print("JBS3 -> Version 1.7.1"); //so idk how normal version things work so the first number will probably stay one --- i will increment the second number if i change an existing function like when i remade the CreateWindowClass and CreateWindow functions --- i might random increment the third number if i feel like it
+    // 
+    //1.7.2 because i added the array buffer option in jsImpl::getBytesFromObject
+    //1.7.3 because i internally changed how GetWindowText worked but I also changed any function that used an OVERLAPPED structure (and added a lot more macros for driver bs) + inserted a cstring parameter between the second and third old parameters lo l for ReadFile
+
+    //ok wait i probably should have done the version thing normally instead of whatever criteria i use to change the numbers lmao
+    print("JBS3 -> Version 1.7.3"); //so idk how normal version things work so the first number will probably stay one --- i will increment the second number if i change an existing function like when i remade the CreateWindowClass and CreateWindow functions --- i might random increment the third number if i feel like it (or if i add a new function)
     print(screenWidth << "x" << screenHeight);
     
 

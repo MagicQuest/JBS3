@@ -91,7 +91,7 @@ function ReadSlot() {
 
     while(info.messageCount != 0) {
         //print(info);
-        let res = ReadFile(mailslot, info.nextSize); //, ov);
+        let res = ReadFile(mailslot, info.nextSize, false, NULL, false); //, ov);
         if(!res) {
             print(`ReadFile failed with [ ${g=GetLastError()} ] ${_com_error(g)}`);
             return;

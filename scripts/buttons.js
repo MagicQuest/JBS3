@@ -13,7 +13,7 @@ function SetFont(button) {
 
 function windowProc(hwnd, msg, wp, lp) {
     if(msg == WM_CREATE) {
-        impact = CreateFontSimple("impact", 20, 40);
+        impact = CreateFontSimple("impact", 20, 40); //                  GIVE  ME!
         buttons.push({i: 1, button: SetFont(CreateWindow(NULL,"BUTTON", "CLICK ME!", WS_CHILD | WS_VISIBLE, 0, 0, width, height, hwnd, 1, hInstance)), x: 0, y: 0, width, height});
         //const wic = InitializeWIC();
         //ScopeGUIDs(wic);

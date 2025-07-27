@@ -170,6 +170,10 @@ class IGeneric {
 
     }
 
+    mouseWheel(wheel, relative) {
+
+    }
+
     keydown(wp) {
 
     }
@@ -282,6 +286,20 @@ class Container extends Positionable {
         for(const child of this.children) {
             if(child.isMouseOver(offset)) {
                 child.mouseUp(button, offset);
+            }
+        }
+    }
+
+    mouseWheel(wheel, relative) {
+        //print("container:", wheel);
+        if(!this.childrenVisible) {
+            return;
+        }
+        const offset = {x: relative.x-this.camera.x, y: relative.y-this.camera.y};
+
+        for(const child of this.children) {
+            if(child.isMouseOver(offset)) {
+                child.mouseWheel(wheel, offset);
             }
         }
     }
@@ -602,6 +620,7 @@ class Topic extends Positionable {
         //this.name = name;
         this.isMain = main;
         this.setText(name);
+        //this.radius = 12;
         //this.text = d2d.CreateTextLayout(this.name, font, 50, 25);
         //this.text.SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
         this.icon = {bitmap: undefined, path: ""};
@@ -670,7 +689,7 @@ class Topic extends Positionable {
         if(this.text) {
             this.text.Release();
         }
-        this.text = d2d.CreateTextLayout(name, font, this.width, this.height/2);
+        this.text = d2d.CreateTextLayout(name, font, this.width, this.height/(this.icon?.path ? 2 : 1));
         this.text.SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
         dirty = true;
     }
@@ -702,12 +721,16 @@ class Topic extends Positionable {
 
     static fromJSON(json, parent) {
         const ts = new (json.isMain ? MainTopic : ChildTopic)(json.x, json.y, json.text, json.icon, parent, json.done);
+        if(json.radius) {
+            ts.size(json.radius, json.radius);
+            ts.setText(json.text); //calling set text to update it since the size might be different
+        }
         ts.deserialize(json);
         return ts;
     }
 
     serialize() {
-        return {icon: this.icon.path, text: this.text.text, x: this.x, y: this.y, done: this.done}; //i could set isMain but it would be redundant for the child topics
+        return {icon: this.icon.path, text: this.text.text, x: this.x, y: this.y, done: this.done, radius: ((!this.isMain && this.width != 25) ? this.width : undefined)}; //i could set isMain but it would be redundant for the child topics
     }
 
     destroy() {
@@ -812,10 +835,10 @@ class ChildTopic extends Topic {
             //print(magnitude({x: child.x-this.x, y: child.y-this.y}));
             const vector = {x: child.x-this.x, y: child.y-this.y};
             let dist;
-            if((dist = magnitude(vector)) < this.width*2) {
+            if((dist = magnitude(vector)) < this.width+child.width) {
                 colorBrush.SetColor(1.0, 0.25, 0.25, 0.5);
                 d2d.FillEllipse(this.x, this.y, this.width, this.height, colorBrush, 1);
-                const diff = this.width*2 - dist;
+                const diff = (child.width+this.width) - dist;
                 changeMagnitude(vector, diff);
                 //print(diff, vector.x, vector.y);
                 child.velocity.x += vector.x;
@@ -823,6 +846,15 @@ class ChildTopic extends Topic {
             }
         }
         super.draw();
+    }
+
+    mouseWheel(wheel, mouse) {
+        print(wheel/120, this.text.GetFontSize());
+        const delta = wheel/120;
+        this.size(this.width+delta, this.height+delta);
+        this.setText(this.text.text);
+        //this.radius = Math.max(this.radius + wheel/120, 0);
+        //this.text.SetFontSize(this.radius);
     }
 
     destroy() {
@@ -833,14 +865,14 @@ class ChildTopic extends Topic {
     }
 }
 
-function dispatchMouseEvent(event, mouse, button) {
+function dispatchMouseEvent(event, mouse, arg) {
     for(const tab of tabs) {
         //if(pane.x <= mouse.x && pane.y <= mouse.y) { //bruh what i haven't been checking if it's within the size AND i've been decrementing mouse
         if(withinBounds(tab, mouse)) {
             //mouse.x -= pane.x;
             //mouse.y -= pane.y; //to client
             //hit |= pane.hittest(mouse);
-            tab[event](button, {x: mouse.x-tab.x, y: mouse.y-tab.y});
+            tab[event](arg, {x: mouse.x-tab.x, y: mouse.y-tab.y});
         }
     }
 }
@@ -1003,12 +1035,12 @@ function windowProc(hwnd, msg, wp, lp) {
         dispatchMouseEvent("mouseUp", mouse, MK_MBUTTON);
     }else if(msg == WM_XBUTTONDOWN) {
         const mouse = {x: GET_X_LPARAM(lp), y: GET_Y_LPARAM(lp)}; //lp is client mouse pos
-        const button = GET_XBUTTON_WPARAM(wp) == 1 ? MK_XBUTTON1 : MK_XBUTTON2; //it actually just uses the HIWORD macro
+        const button = GET_XBUTTON_WPARAM(wp) == XBUTTON1 ? MK_XBUTTON1 : MK_XBUTTON2; //it actually just uses the HIWORD macro
 
         dispatchMouseEvent("mouseDown", mouse, button);
     }else if(msg == WM_XBUTTONUP) {
         const mouse = {x: GET_X_LPARAM(lp), y: GET_Y_LPARAM(lp)}; //lp is client mouse pos
-        const button = GET_XBUTTON_WPARAM(wp) == 1 ? MK_XBUTTON1 : MK_XBUTTON2; //it actually just uses the HIWORD macro
+        const button = GET_XBUTTON_WPARAM(wp) == XBUTTON1 ? MK_XBUTTON1 : MK_XBUTTON2; //it actually just uses the HIWORD macro
 
         dispatchMouseEvent("mouseUp", mouse, button);
     }else if(msg == WM_SETCURSOR) {
@@ -1134,6 +1166,11 @@ function windowProc(hwnd, msg, wp, lp) {
         if(selectedTab) {
             selectedTab.keydown(wp);
         }
+    }else if(msg == WM_MOUSEWHEEL) { //for some reason the mouse wheel function puts the screen mouse position through lp
+        const mouse = {x: GET_X_LPARAM(lp), y: GET_Y_LPARAM(lp)}; //lp is for some reason NOT client mouse pos!
+        ScreenToClient(hwnd, mouse); //NOW mouse holds the client pos;
+        //print(mouse, GET_WHEEL_DELTA_WPARAM(wp));
+        dispatchMouseEvent("mouseWheel", mouse, GET_WHEEL_DELTA_WPARAM(wp));
     }else if(msg == WM_DESTROY) {
         PostQuitMessage(0);
         tabs.forEach(tab => tab.Release());
