@@ -201,17 +201,23 @@ T WStringOrNULL(v8::Isolate* isolate, const v8::Local<v8::Value>& v) {//, T* out
 }
 
 //oh my god wait all i might've needed was a macro and _alloca
-template<class T>
-T* NewWStringOrNULL(v8::Isolate* isolate, const v8::Local<v8::Value>& v) {
+//template<class T>
+//T* NewWStringOrNULL(v8::Isolate* isolate, const v8::Local<v8::Value>& v) {
+//before 1.7.4, this function was writing past the length i allocated (buffer overflow/overrun) because i forgot it was a wchar_t
+wchar_t* NewWStringOrNULL(v8::Isolate* isolate, const v8::Local<v8::Value>& v) {
     using namespace v8;
     if (v->IsString()) {
         Local<String> jsStr = v.As<String>();
-        T* wt = new T[jsStr->Length()];
-        jsStr->Write(isolate, (uint16_t*)wt);
+        //print(jsStr->Length());
+        //T* wt = new T[jsStr->Length()]; //uhhh guys?? does this actually work?
+        //no bro and i don't even know how i've had this bad code here without knowing
+        //T* wt = new T[(jsStr->Length() + 1) * sizeof(T)];
+        wchar_t* wt = new wchar_t[(jsStr->Length() + 1) * sizeof(wchar_t)];
+        jsStr->Write(isolate, (uint16_t*)wt); //String->Write actually includes the null terminator
         return wt;
     }
     else {
-        return (T*)IntegerFI(v);
+        return (wchar_t*)IntegerFI(v);
     }
 }
 
@@ -10319,9 +10325,10 @@ V8FUNC(GetWindowTextWrapper) {
     size_t length = (size_t)GetWindowTextLength(window)+1;
     //wchar_t shit[255];
     //GetWindowText((HWND)IntegerFI(info[0]), shit, 255);
-    wchar_t* shit = (wchar_t*)_alloca((length) * sizeof(wchar_t));
+    wchar_t* shit = (wchar_t*)_malloca((length) * sizeof(wchar_t)); //using malloca here instead because window titles allegedly don't have a limit
     GetWindowText(window, shit, length);
     info.GetReturnValue().Set(String::NewFromTwoByte(isolate, (uint16_t*)shit).ToLocalChecked());
+    _freea(shit);
 }
 
 V8FUNC(GetWindowTextLengthWrapper) {
@@ -11912,9 +11919,9 @@ V8FUNC(CreateDCWrapper) {
     //LPCWSTR pwszDevice = WStringOrNULL<LPCWSTR>(isolate, info[1]);
     //LPCWSTR pszPort = WStringOrNULL<LPCWSTR>(isolate, info[2]);
 
-    LPCWSTR pwszDriver = (LPCWSTR)NewWStringOrNULL<wchar_t>(isolate, info[0]);
-    LPCWSTR pwszDevice = (LPCWSTR)NewWStringOrNULL<wchar_t>(isolate, info[1]);
-    LPCWSTR pszPort = (LPCWSTR)NewWStringOrNULL<wchar_t>(isolate, info[2]);
+    LPCWSTR pwszDriver = (LPCWSTR)NewWStringOrNULL(isolate, info[0]);
+    LPCWSTR pwszDevice = (LPCWSTR)NewWStringOrNULL(isolate, info[1]);
+    LPCWSTR pszPort = (LPCWSTR)NewWStringOrNULL(isolate, info[2]);
 
     info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)CreateDC(pwszDriver, pwszDevice, pszPort, (DEVMODE*)IntegerFI(info[3]))));
     
@@ -11958,8 +11965,8 @@ V8FUNC(EnumPrintProcessorsWrapper) {
     DWORD cbNeeded = 0;
     DWORD cbReturned = 0;
 
-    wchar_t* name = NewWStringOrNULL<wchar_t>(isolate, info[0]);
-    wchar_t* environment = NewWStringOrNULL<wchar_t>(isolate, info[1]);
+    wchar_t* name = NewWStringOrNULL(isolate, info[0]);
+    wchar_t* environment = NewWStringOrNULL(isolate, info[1]);
 
     BOOL result = EnumPrintProcessors(name, environment, level, NULL, NULL, &cbNeeded, &cbReturned);
 
@@ -12006,8 +12013,8 @@ V8FUNC(EnumPrintProcessorDatatypesWrapper) {
     DWORD cbNeeded = 0;
     DWORD cbReturned = 0;
 
-    wchar_t* name = NewWStringOrNULL<wchar_t>(isolate, info[0]); //NULL;
-    wchar_t* ppname = NewWStringOrNULL<wchar_t>(isolate, info[1]); //NULL;
+    wchar_t* name = NewWStringOrNULL(isolate, info[0]); //NULL;
+    wchar_t* ppname = NewWStringOrNULL(isolate, info[1]); //NULL;
 
     //if (info[0]->IsString()) {
     //    Local<String> jsStr = info[0].As<String>();
@@ -12069,7 +12076,7 @@ V8FUNC(EnumPrintersWrapper) {
         return;
     }
 
-    wchar_t* name = NewWStringOrNULL<wchar_t>(isolate, info[1]);
+    wchar_t* name = NewWStringOrNULL(isolate, info[1]);
 
     BOOL result = EnumPrinters(flags, name, level, NULL, NULL, &cbNeeded, &cbReturned);
 
@@ -15111,6 +15118,8 @@ void XInputSetStateWrapper(const v8::FunctionCallbackInfo<v8::Value>& info) {
 #pragma comment(lib, "Setupapi.lib")
 
 #define HID_BUFFER_SIZE 512
+#define MAX_STRING_WCHARS 256
+#define HID_API_MAX_REPORT_DESCRIPTOR_SIZE 4096
 void hid_initWrapper(const v8::FunctionCallbackInfo<v8::Value>& info) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
@@ -15169,15 +15178,22 @@ void hid_enumerateWrapper(const v8::FunctionCallbackInfo<v8::Value>& info) {
 void hid_open_pathWrapper(const v8::FunctionCallbackInfo<v8::Value>& info) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
-    HandleScope handle_scope(isolate); //including a handle scope because storing values returned from WStringFI and CStringFI are fucky
+    //HandleScope handle_scope(isolate); //including a handle scope because storing values returned from WStringFI and CStringFI are fucky
 
-    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)hid_open_path(CStringFI(info[0]))));
+    //just alloca ts
+    Local<String> jsStr = info[0].As<String>();
+    char* str = (char*)_malloca(jsStr->Utf8Length(isolate)); //using malloca instead because i CAN actually be bothered to free lememory
+    jsStr->WriteUtf8(isolate, str);
+
+    info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)hid_open_path(str)));
+
+    _freea(str);
 }
 
 void hid_get_handle_from_info(const v8::FunctionCallbackInfo<v8::Value>& info) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
-    HandleScope handle_scope(isolate); //including a handle scope because storing values returned from WStringFI and CStringFI are fucky
+    //HandleScope handle_scope(isolate); //including a handle scope because storing values returned from WStringFI and CStringFI are fucky
 
     Local<Object> js_device_info = info[0].As<Object>();
     hid_device_info *device_info = (hid_device_info*)IntegerFI(js_device_info->Get(isolate->GetCurrentContext(), LITERAL("_ptr")).ToLocalChecked()); //im doing this because i don't trust what i put into the js object's path because v8 and hidapi
@@ -15190,11 +15206,14 @@ void hid_get_handle_from_info(const v8::FunctionCallbackInfo<v8::Value>& info) {
 void hid_openWrapper(const v8::FunctionCallbackInfo<v8::Value>& info) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
-    HandleScope handle_scope(isolate); //including a handle scope because storing values returned from WStringFI and CStringFI are fucky
+    //HandleScope handle_scope(isolate); //including a handle scope because storing values returned from WStringFI and CStringFI are fucky
 
     wchar_t* wstr = NULL;
     if (info[2]->BooleanValue(isolate)) {
-        wstr = (wchar_t*)WStringFI(info[2]);
+        //wstr = (wchar_t*)WStringFI(info[2]);
+        Local<String> jsStr = info[2].As<String>();
+        wstr = (wchar_t*) _alloca((jsStr->Length() + 1) * sizeof(wchar_t));
+        jsStr->Write(isolate, (uint16_t*)wstr);
     }
 
     info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)hid_open(IntegerFI(info[0]), IntegerFI(info[1]), wstr)));
@@ -15204,8 +15223,16 @@ void hid_get_manufacturer_stringWrapper(const v8::FunctionCallbackInfo<v8::Value
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
 
-    wchar_t wstr[255]{ 0 };
-    int result = hid_get_manufacturer_string((hid_device*)IntegerFI(info[0]), wstr, 255);
+    hid_device* dev = (hid_device*)IntegerFI(info[0]);
+    
+    
+    //the hid.c hid_internal_get_device_info functions shows that the max size for these strings is 256
+    wchar_t wstr[MAX_STRING_WCHARS]{ 0 }; //lol i used to think that { 0 } initialized all the memory to 0 (instead the 0 sets the first byte to 0 and it automatically clears the rest)
+    
+    //wchar_t* wstr = (wchar_t*)_alloca(hid_get_manufacturer_string_length(dev));
+    
+    
+    int result = hid_get_manufacturer_string(dev, wstr, 256);
 
     if (result == -1) {
         //wcscpy(wstr, L"Unable to read manufacturer string (hid_get_manufacturer_string)");
@@ -15220,8 +15247,8 @@ void hid_get_product_stringWrapper(const v8::FunctionCallbackInfo<v8::Value>& in
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
 
-    wchar_t wstr[255]{ 0 };
-    int result = hid_get_product_string((hid_device*)IntegerFI(info[0]), wstr, 255);
+    wchar_t wstr[MAX_STRING_WCHARS]{ 0 };
+    int result = hid_get_product_string((hid_device*)IntegerFI(info[0]), wstr, 256);
 
     if (result == -1) {
         //wcscpy(wstr, L"Unable to read product string (hid_get_product_string)");
@@ -15236,8 +15263,8 @@ void hid_get_serial_number_stringWrapper(const v8::FunctionCallbackInfo<v8::Valu
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
 
-    wchar_t wstr[255]{ 0 };
-    int result = hid_get_serial_number_string((hid_device*)IntegerFI(info[0]), wstr, 255);
+    wchar_t wstr[MAX_STRING_WCHARS]{ 0 };
+    int result = hid_get_serial_number_string((hid_device*)IntegerFI(info[0]), wstr, 256);
 
     if (result == -1) {
         //wcscpy(wstr, L"Unable to read serial number string (hid_get_serial_number_string)");
@@ -15252,8 +15279,8 @@ void hid_get_indexed_stringWrapper(const v8::FunctionCallbackInfo<v8::Value>& in
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
 
-    wchar_t wstr[255]{ 0 };
-    int result = hid_get_indexed_string((hid_device*)IntegerFI(info[0]), IntegerFI(info[1]), wstr, 255);
+    wchar_t wstr[MAX_STRING_WCHARS]{ 0 };
+    int result = hid_get_indexed_string((hid_device*)IntegerFI(info[0]), IntegerFI(info[1]), wstr, 256);
 
     if (result == -1) {
         //wcscpy(wstr, L"Unable to read indexed string (hid_get_indexed_string)");
@@ -15275,8 +15302,13 @@ void hid_readWrapper(const v8::FunctionCallbackInfo<v8::Value>& info) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
 
-    unsigned char buf[HID_BUFFER_SIZE]{ 0 };
-    int bytes_wrote = hid_read((hid_device*)IntegerFI(info[0]), buf, HID_BUFFER_SIZE);
+    size_t size = IntegerFI(info[1]);
+    if (size <= 0) {
+        size = HID_BUFFER_SIZE;
+    }
+    //unsigned char buf[HID_BUFFER_SIZE]{ 0 };
+    unsigned char* buf = (unsigned char*)_malloca(size); //malloca because the size could be large idk ol
+    int bytes_wrote = hid_read((hid_device*)IntegerFI(info[0]), buf, size);
 
     if (bytes_wrote == -1 || bytes_wrote == 0) {
         info.GetReturnValue().Set(bytes_wrote);
@@ -15284,18 +15316,31 @@ void hid_readWrapper(const v8::FunctionCallbackInfo<v8::Value>& info) {
     }
 
     //print(sizeof(buf) << " " << sizeof(unsigned char) * bytes_wrote << " " << bytes_wrote);
-    Local<ArrayBuffer> ab = ArrayBuffer::New(isolate, sizeof(buf));
+    
+    //lowkey wtf is this?????
+    /*Local<ArrayBuffer> ab = ArrayBuffer::New(isolate, sizeof(buf));
     memcpy(ab->Data(), buf, sizeof(buf)); //GULP
-    Local<Uint32Array> arr = Uint32Array::New(ab, 0, bytes_wrote);
+    Local<Uint32Array> arr = Uint32Array::New(ab, 0, bytes_wrote);*/
+    
+    Local<ArrayBuffer> ab = ArrayBuffer::New(isolate, bytes_wrote);
+    memcpy(ab->Data(), buf, bytes_wrote);
+    Local<Uint8Array> arr = Uint8Array::New(ab, 0, bytes_wrote);
     info.GetReturnValue().Set(arr);
+    
+    _freea(buf);
 }
 
 void hid_read_timeoutWrapper(const v8::FunctionCallbackInfo<v8::Value>& info) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
 
-    unsigned char buf[HID_BUFFER_SIZE]{ 0 };
-    int bytes_wrote = hid_read_timeout((hid_device*)IntegerFI(info[0]), buf, HID_BUFFER_SIZE, IntegerFI(info[1]));
+    size_t size = IntegerFI(info[2]);
+    if (size <= 0) {
+        size = HID_BUFFER_SIZE;
+    }
+    //unsigned char buf[HID_BUFFER_SIZE]{ 0 };
+    unsigned char* buf = (unsigned char*)_malloca(size); //malloca because the size could be large idk ol
+    int bytes_wrote = hid_read_timeout((hid_device*)IntegerFI(info[0]), buf, size, IntegerFI(info[1]));
 
     if (bytes_wrote == -1 || bytes_wrote == 0) {
         info.GetReturnValue().Set(bytes_wrote);
@@ -15303,90 +15348,130 @@ void hid_read_timeoutWrapper(const v8::FunctionCallbackInfo<v8::Value>& info) {
     }
 
     //print(sizeof(buf) << " " << sizeof(unsigned char) * bytes_wrote << " " << bytes_wrote);
-    Local<ArrayBuffer> ab = ArrayBuffer::New(isolate, sizeof(buf));
-    memcpy(ab->Data(), buf, sizeof(buf)); //GULP
-    Local<Uint32Array> arr = Uint32Array::New(ab, 0, bytes_wrote);
-    info.GetReturnValue().Set(arr);
-}
+    //Local<ArrayBuffer> ab = ArrayBuffer::New(isolate, sizeof(buf));
+    //memcpy(ab->Data(), buf, sizeof(buf)); //GULP
+    //Local<Uint32Array> arr = Uint32Array::New(ab, 0, bytes_wrote);
 
+    Local<ArrayBuffer> ab = ArrayBuffer::New(isolate, bytes_wrote);
+    memcpy(ab->Data(), buf, bytes_wrote);
+    Local<Uint8Array> arr = Uint8Array::New(ab, 0, bytes_wrote);
+    info.GetReturnValue().Set(arr);
+    
+    _freea(buf);
+}
 
 void hid_send_feature_reportWrapper(const v8::FunctionCallbackInfo<v8::Value>& info) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
 
-    unsigned char buf[HID_BUFFER_SIZE]{0};
-    size_t length = IntegerFI(info[2]); //i've been a size_t hater ever since i was using it with a for loop and didn't realize it was unsigned so when the range was -1 to 1, size_t spat out garbage and i was geeking (plus i already thought it was stupid and didn't know why i should use it)
-    if (length > HID_BUFFER_SIZE) {
-        length = HID_BUFFER_SIZE;
-        errprint("(hid_send_feature_report) yoooo the number you passed as the second parameter was TOO big and we gotta cap that off at 512 you know what i mean (if you have this problem feel free to tell me about it on github or something because idk what i was doing around this part)");
-    }
-    Local<Uint32Array> jsArr = info[1].As<Uint32Array>();
-    //memcpy(buf, jsArr->Buffer()->Data(), length-1);
-    jsArr->CopyContents(buf, length - 1);
-    int bytes_wrote = hid_send_feature_report((hid_device*)IntegerFI(info[0]), buf, length);
+    //back in the day i didn't know shit bruh
+    //unsigned char buf[HID_BUFFER_SIZE]{0};
+    //size_t length = IntegerFI(info[2]); //i've been a size_t hater ever since i was using it with a for loop and didn't realize it was unsigned so when the range was -1 to 1, size_t spat out garbage and i was geeking (plus i already thought it was stupid and didn't know why i should use it)
+    //if (length > HID_BUFFER_SIZE) {
+    //    length = HID_BUFFER_SIZE;
+    //    errprint("(hid_send_feature_report) yoooo the number you passed as the second parameter was TOO big and we gotta cap that off at 512 you know what i mean (if you have this problem feel free to tell me about it on github or something because idk what i was doing around this part)");
+    //}
+    //Local<Uint32Array> jsArr = info[1].As<Uint32Array>();
+    ////memcpy(buf, jsArr->Buffer()->Data(), length-1);
+    //jsArr->CopyContents(buf, length - 1);
+    //int bytes_wrote = hid_send_feature_report((hid_device*)IntegerFI(info[0]), buf, length);
 
     //memcpy(jsArr->Buffer()->Data(), buf, sizeof(buf));
+
+    //Local<Uint8Array> jsArr = info[1].As<Uint8Array>();
+    Local<ArrayBufferView> jsABV = info[1].As<ArrayBufferView>();
+    int bytes_wrote = hid_send_feature_report((hid_device*)IntegerFI(info[0]), (const unsigned char*)jsABV->Buffer()->Data(), jsABV->ByteLength());
 
     if (bytes_wrote < 0) {
         info.GetReturnValue().Set(bytes_wrote);
         return;
     }
 
-    Local<ArrayBuffer> ab = ArrayBuffer::New(isolate, sizeof(buf));
-    memcpy(ab->Data(), buf, sizeof(buf)); //GULP
-    Local<Uint32Array> arr = Uint32Array::New(ab, 0, bytes_wrote);
-    info.GetReturnValue().Set(arr);
+    //Local<ArrayBuffer> ab = ArrayBuffer::New(isolate, sizeof(buf));
+    //memcpy(ab->Data(), buf, sizeof(buf)); //GULP
+    //Local<Uint32Array> arr = Uint32Array::New(ab, 0, bytes_wrote);
+    //info.GetReturnValue().Set(arr);
+
+    //wait wtf this function doesn't actually do anything to the buffer so there's no point in returning it!
+    info.GetReturnValue().Set(Number::New(isolate, bytes_wrote));
 }
 
 void hid_get_feature_reportWrapper(const v8::FunctionCallbackInfo<v8::Value>& info) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
 
-    unsigned char buf[HID_BUFFER_SIZE]{ 0 };
-    Local<Uint32Array> jsArr = info[1].As<Uint32Array>();
+    //unsigned char buf[HID_BUFFER_SIZE]{ 0 };
+    Local<ArrayBufferView> jsArr = info[1].As<ArrayBufferView>();
     size_t length = jsArr->ByteLength();
-    if (length > HID_BUFFER_SIZE) {
-        length = HID_BUFFER_SIZE;
-        errprint("(hid_get_feature_report) yoooo the array you passed as the second parameter had TOO much data in it and we gotta chop that off at 512 you know what i mean (if you have this problem feel free to tell me about it on github or something because idk what i was doing around this part)");
-    }
+    //if (length > HID_BUFFER_SIZE) {
+    //    length = HID_BUFFER_SIZE;
+    //    errprint("(hid_get_feature_report) yoooo the array you passed as the second parameter had TOO much data in it and we gotta chop that off at 512 you know what i mean (if you have this problem feel free to tell me about it on github or something because idk what i was doing around this part)");
+    //}
     //memcpy(buf, jsArr->Buffer()->Data(), jsArr->Length());//jsArr->ByteLength());
-    jsArr->CopyContents(buf, length); //hmm...
+    //jsArr->CopyContents(buf, length); //hmm...
 
-    int bytes_wrote = hid_get_feature_report((hid_device*)IntegerFI(info[0]), buf, sizeof(buf));
+    int bytes_wrote = hid_get_feature_report((hid_device*)IntegerFI(info[0]), (unsigned char*)jsArr->Buffer()->Data(), length);
 
     if (bytes_wrote < 0) {
         info.GetReturnValue().Set(bytes_wrote);
         return;
     }
 
-    Local<ArrayBuffer> ab = ArrayBuffer::New(isolate, sizeof(buf));
-    memcpy(ab->Data(), buf, sizeof(buf)); //GULP
-    Local<Uint32Array> arr = Uint32Array::New(ab, 0, bytes_wrote);
-    info.GetReturnValue().Set(arr);
+    ///Local<ArrayBuffer> ab = ArrayBuffer::New(isolate, sizeof(buf));
+    ///memcpy(ab->Data(), buf, sizeof(buf)); //GULP
+    ///Local<Uint32Array> arr = Uint32Array::New(ab, 0, bytes_wrote);
+    info.GetReturnValue().Set(jsArr);
 }
 
 void hid_writeWrapper(const v8::FunctionCallbackInfo<v8::Value>& info) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
 
-    unsigned char buf[HID_BUFFER_SIZE]{ 0 };
-    size_t length = IntegerFI(info[2]); //i've been a size_t hater ever since i was using it with a for loop and didn't realize it was unsigned so when the range was -1 to 1, size_t spat out garbage and i was geeking (plus i already thought it was stupid and didn't know why i should use it)
+    //unsigned char buf[HID_BUFFER_SIZE]{ 0 };
+    //size_t length = IntegerFI(info[2]); //i've been a size_t hater ever since i was using it with a for loop and didn't realize it was unsigned so when the range was -1 to 1, size_t spat out garbage and i was geeking (plus i already thought it was stupid and didn't know why i should use it)
     //if(length > )
-    Local<Uint32Array> jsArr = info[1].As<Uint32Array>();
+    Local<ArrayBufferView> jsArr = info[1].As<ArrayBufferView>();
     //memcpy(buf, jsArr->Buffer()->Data(), length - 1);
-    int bytes_wrote = hid_write((hid_device*)IntegerFI(info[0]), buf, length);
+    //int bytes_wrote = hid_write((hid_device*)IntegerFI(info[0]), buf, length);
+    int bytes_wrote = hid_write((hid_device*)IntegerFI(info[0]), (const unsigned char*)((unsigned char*)jsArr->Buffer()->Data()), jsArr->ByteLength());
 
     //memcpy(jsArr->Buffer()->Data(), buf, sizeof(buf));
 
-    if (bytes_wrote < 0) {
-        info.GetReturnValue().Set(bytes_wrote);
-        return;
-    }
+    //if (bytes_wrote < 0) {
+    //    info.GetReturnValue().Set(bytes_wrote);
+    //    return;
+    //}
 
-    Local<ArrayBuffer> ab = ArrayBuffer::New(isolate, sizeof(buf));
-    memcpy(ab->Data(), buf, sizeof(buf)); //GULP (WTF IS THIS?)
-    Local<Uint32Array> arr = Uint32Array::New(ab, 0, bytes_wrote);
-    info.GetReturnValue().Set(arr);
+    //Local<ArrayBuffer> ab = ArrayBuffer::New(isolate, sizeof(buf));
+    //memcpy(ab->Data(), buf, sizeof(buf)); //GULP (WTF IS THIS?)
+    //Local<Uint32Array> arr = Uint32Array::New(ab, 0, bytes_wrote);
+    info.GetReturnValue().Set(bytes_wrote);
+}
+
+void hid_get_input_reportWrapper(const v8::FunctionCallbackInfo<v8::Value>& info) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    Local<ArrayBufferView> jsArr = info[1].As<ArrayBufferView>();
+
+    info.GetReturnValue().Set(Number::New(isolate, hid_get_input_report((hid_device*)IntegerFI(info[0]), (unsigned char*)jsArr->Buffer()->Data(), jsArr->ByteLength())));
+}
+
+void hid_get_report_descriptorWrapper(const v8::FunctionCallbackInfo<v8::Value>& info) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    unsigned char descriptor[HID_API_MAX_REPORT_DESCRIPTOR_SIZE];
+    int bytes_wrote = hid_get_report_descriptor((hid_device*)IntegerFI(info[0]), descriptor, sizeof(descriptor));
+    if (bytes_wrote >= 0) {
+        Local<ArrayBuffer> ab = ArrayBuffer::New(isolate, bytes_wrote);
+        memcpy(ab->Data(), descriptor, bytes_wrote);
+        Local<Uint8Array> arr = Uint8Array::New(ab, 0, bytes_wrote);
+        info.GetReturnValue().Set(arr);
+    }
+    else {
+        info.GetReturnValue().Set(bytes_wrote);
+    }
 }
 
 void hid_errorWrapper(const v8::FunctionCallbackInfo<v8::Value>& info) {
@@ -17864,6 +17949,16 @@ V8FUNC(WSACleanupWrapper) {
 
 //NETWORK END!!!
 
+V8FUNC(mt_newwstr) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    wchar_t* str = NewWStringOrNULL(isolate, info[0]);
+    wprint(str);
+    MessageBoxW(NULL, str, str, MB_OK);
+    delete[] str;
+}
+
 V8FUNC(mt_incremento) { //so far so good...
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
@@ -18314,7 +18409,7 @@ V8FUNC(GetModuleHandleWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
 
-    LPCWSTR moduleName = (LPCWSTR)NewWStringOrNULL<wchar_t>(isolate, info[0]);
+    LPCWSTR moduleName = (LPCWSTR)NewWStringOrNULL(isolate, info[0]);
 
     info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)GetModuleHandle(moduleName)));
 
@@ -18629,8 +18724,8 @@ V8FUNC(METHOD_FROM_CTL_CODEWrapper) {
 #include <cfgmgr32.h>
 //#include <initguid.h>
 //#include <usbiodef.h>
-//wait no way all the GUID_DEVINTERFACE things are all in different classes right?
-//sorry chat im not including all of those bro im just gonna add a function that lets you make the guid yourself!
+//wait no way all the GUID_DEVINTERFACE things are all in different headers right?
+//sorry chat im not including all of those im just gonna add a function that lets you make the guid yourself!
 //just check this list lol https://www.pinvoke.net/default.aspx/Constants/GUID_DEVINTERFACE.html
 
 V8FUNC(DEFINE_GUIDWrapper) {
@@ -18662,7 +18757,7 @@ V8FUNC(CM_Get_Device_Interface_List_SizeWrapper) {
 
     ULONG length;
     GUID guid = jsImpl::fromJSGUID(isolate, info[0]);
-    wchar_t* wstr = NewWStringOrNULL<wchar_t>(isolate, info[1]);
+    wchar_t* wstr = NewWStringOrNULL(isolate, info[1]);
     //GUID_DEVINTERFACE_USB_DEVICE
     CONFIGRET cr = CM_Get_Device_Interface_List_Size(&length, &guid, wstr, IntegerFI(info[2]));
     Local<Object> returnval = Object::New(isolate);
@@ -18684,7 +18779,7 @@ V8FUNC(CM_Get_Device_Interface_ListWrapper) {
     Local<Context> context = isolate->GetCurrentContext();
 
     GUID guid = jsImpl::fromJSGUID(isolate, info[0]);
-    wchar_t* wstr = NewWStringOrNULL<wchar_t>(isolate, info[1]);
+    wchar_t* wstr = NewWStringOrNULL(isolate, info[1]);
     PZZWSTR buffer;
     size_t length;
     bool dowegottafree = jsImpl::getBytesFromObject(isolate, info[2], (void**)&buffer, &length, false); //wait dowegottafree only happens if it's a string (which it should not be lol)
@@ -18817,6 +18912,7 @@ extern "C" __declspec(dllexport) v8::Local<v8::ObjectTemplate> InitGlobals(v8::I
     setGlobal(DeletePtr);
     setGlobal(DeleteArrayPtr);
 
+    setGlobal(mt_newwstr);
     setGlobal(mt_incremento);
     setGlobal(mt_makeobject);
     setGlobal(numbertest);
@@ -19689,6 +19785,8 @@ extern "C" __declspec(dllexport) v8::Local<v8::ObjectTemplate> InitGlobals(v8::I
     setGlobalWrapper(hid_read);
     setGlobalWrapper(hid_read_timeout);
     setGlobalWrapper(hid_write);
+    setGlobalWrapper(hid_get_input_report);
+    setGlobalWrapper(hid_get_report_descriptor);
     setGlobalWrapper(hid_error);
     setGlobalWrapper(hid_send_feature_report);
     setGlobalWrapper(hid_get_feature_report);
@@ -22760,7 +22858,7 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrevInstance, PWSTR nCmdList, in
     //print("JUST LEARNED THAT I'VE BEEN USING OBJECT TEMPLATES WRONG AND IT'S BEEN SLOWING DOWN JBS3 THIS ENTIRE TIME CHECK jsEffectOT!!!"); //i had no idea the actual problem with my use of object templates was the memory
     //print("finish CreateTableTransferEffect when i feel like it");
     print("make effects take an animation parameters because idk how that works yet");
-    print("oh my GOD i GOTTA retest all the hid functions because the way i wrote some of those there's actually no way they work");
+    //print("oh my GOD i GOTTA retest all the hid functions because the way i wrote some of those there's actually no way they work");
     print("also i ramble on about dibits being flips but idk if gdi does that or javascript so investigatw!."); //big fan of balatro flush 5 hand
     print("watch out for ID2D1Bitmap CopyFromMemory because the pitch might be wrong if the bitmap isn't 32 bit count/depth");
     print("honestly i could probably move all these features into different dlls so you can just require the ones you want");
@@ -22791,10 +22889,11 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrevInstance, PWSTR nCmdList, in
     //1.7.1 because i added a parameter to ReadFile to get a byte array instead of a string + fs.readdirSync
     // 
     //1.7.2 because i added the array buffer option in jsImpl::getBytesFromObject
-    //1.7.3 because i internally changed how GetWindowText worked but I also changed any function that used an OVERLAPPED structure (and added a lot more macros for driver bs) + inserted a cstring parameter between the second and third old parameters lo l for ReadFile
+    //1.7.3 because i inserted a cstring parameter between the second and third old parameters lo l for ReadFile (breaking) and internally changed how GetWindowText worked but I also changed any function that used an OVERLAPPED structure (and added a lot more macros for driver bs)
+    //1.7.4 because i fixed NewWStringOrNULL's buffer overrun issue (that i didn't even know existed) and also changed all hidapi functions to use Uint8Arrays (which broke like 3 scripts)
 
     //ok wait i probably should have done the version thing normally instead of whatever criteria i use to change the numbers lmao
-    print("JBS3 -> Version 1.7.3"); //so idk how normal version things work so the first number will probably stay one --- i will increment the second number if i change an existing function like when i remade the CreateWindowClass and CreateWindow functions --- i might random increment the third number if i feel like it (or if i add a new function)
+    print("JBS3 -> Version 1.7.4"); //so idk how normal version things work so the first number will probably stay one --- i will increment the second number if i change an existing function like when i remade the CreateWindowClass and CreateWindow functions --- i might random increment the third number if i feel like it (or if i add a new function)
     print(screenWidth << "x" << screenHeight);
     
 

@@ -1,17 +1,25 @@
 Msgbox("im not gonna lie this one will only work if you have a wii guitar plugged into the computer with a raphnet adapter (WUSBMote v2.2)", "sorry bruh", MB_OK | MB_SYSTEMMODAL);
+eval(require("fs").read(__dirname+"/dllstuffs/marshallib.js")); //for the REPORT class
+
+//i've lowkey made a driver that works (roughly) the same way as this script does
+//it uses a virtual HID device to send the keyboard inputs (instead of using keybd_event or SendInput)
+//https://github.com/MagicQuest/VirtualHIDivinations
 
 print("Init: " + hid_init());
 
 let wiimotes = [];
 
-hid_enumerate(0x0, 0x0, (device) => {
+//289B is the vendor id for DRACAL technologies (?)
+//0080 is the product id for this specific raphnet adapter (?)
+hid_enumerate(0x289b, 0x0080, (device) => {
     //print(device);
     //if(device.product_string.includes("WUSBMote") || device.manufacturer_string.includes("raphnet")) {
-    print(device.product_string);
+    /*print(device.product_string);
     if(device.product_string.includes("WUSBMote")) {
         //wiimote = device;
         wiimotes.push(device);
-    }
+    }*/
+   wiimotes.push(device);
 });
 
 print(wiimotes);
@@ -21,7 +29,7 @@ print(wiimotes);
 //let handle = hid_open(0x046d, 0x0a66, NULL);
 //print(handle);
 if(wiimotes.length == 0) {
-    Msgbox("found NO wiimote guitars bruh", "JBS3 WILL CRASH AFTER THIS MESSAGE (HELP!)", MB_ICONERROR);
+    Msgbox("found NO raphnet adapters bruh", "JBS3 WILL CRASH AFTER THIS MESSAGE (HELP!)", MB_ICONERROR);
 }
 let handle = hid_get_handle_from_info(wiimotes[wiimotes.findIndex(mote => mote.usage>1)]);//wiimotes[1].handle; (write dumb code)
 if(!handle) {
@@ -30,6 +38,8 @@ if(!handle) {
 }
 //print("0x"+wiimote.vendor_id.toString(16), "0x"+wiimote.product_id.toString(16));
 print(handle, "handle");
+
+//the following code was ported from https://github.com/signal11/hidapi/blob/master/hidtest/hidtest.cpp (because i just wanted to make sure hidapi was working)
 let manufacturer = hid_get_manufacturer_string(handle);
 if(manufacturer < 0) {
     print("Unable to read manufacturer string");
@@ -63,7 +73,7 @@ for(let i = 0; i < 255; i++) {
 }
 
 //let buf = new Uint32Array([0x2, 0xa0, 0x0a, 0x00, 0x00]);
-let buf = new Uint32Array(HID_BUFFER_SIZE);
+let buf = new Uint32Array(HID_BUFFER_SIZE); //lowkey i don't think this would've worked anyways i should've BEEN using Uint8Arrays
 buf[0] = 0x2;
 buf[1] = 0xa0;
 buf[2] = 0x0a;
@@ -112,6 +122,15 @@ if (res < 0)
 
 res = 0;
 
+print(hid_get_report_descriptor(handle));
+{
+    const ip30 = new Uint8Array([0x30, 0x00, 0x00]); //the wiimote's 0x30 input report only has 3 bytes including the report id
+    print("input report 0x30:", hid_get_input_report(handle, ip30));
+    print(ip30);
+}
+
+//end random bs
+
 //const VOLUME_UP = 0x100;
 //const VOLUME_DOWN = 0x200;
 
@@ -123,8 +142,24 @@ res = 0;
 //const BLUE = 0x80;
 //const ORANGE = 0x100;
 
+class RAPHNET_REPORT extends memoobjectidk {
+    static types = {
+        id: "BYTE", //report id
+        x: "WORD",
+        y: "WORD",
+        Rx: "WORD",
+        Ry: "WORD",
+        Rz: "WORD",
+        z: "WORD",
+        buttons: "WORD",
+    };
+    constructor(data, ...vargs) { //data must be a Uint8Array
+        super(data, ...vargs);
+    }
+}
+
 let lastKeycode = 0;
-let keycodes = {GREEN: 0x100, RED: 0x200, YELLOW: 0x400, BLUE: 0x800, ORANGE: 0x1000, START: 0x4000, STRUM_UP: 0x2000, STRUM_DOWN: 0x10000, STARPOWER: 0x8000};
+let keycodes = {GREEN: 0x1, RED: 0x2, YELLOW: 0x4, BLUE: 0x8, ORANGE: 0x10, START: 0x40, STRUM_UP: 0x20, STRUM_DOWN: 0x100, STARPOWER: 0x80};
 
 let bools = {};
 for(let key of Object.keys(keycodes)) bools[key] = false;
@@ -138,7 +173,7 @@ function checkBit(bit, mask) {
 }
 
 while(true) {//!GetKey(VK_ESCAPE)) {
-    let result = hid_read(handle);//, buf, HID_BUFFER_SIZE); //returns 0 or 1 if no read and returns an uint32array
+    let result = hid_read(handle);//, buf, HID_BUFFER_SIZE); //returns 0 or 1 if no read and returns an uint32array (not anymore lol Uint8Array now)
     if(result == 0) {
         print("waiting");
     }else if(result < 0) {
@@ -149,9 +184,16 @@ while(true) {//!GetKey(VK_ESCAPE)) {
         //}else if((result[0] & VOLUME_DOWN) == VOLUME_DOWN) {
         //    print("volume down!");
         //}else {
+        const report = new RAPHNET_REPORT(result);
+        //print(report); //wow this works great!
+        for(const prop of Object.keys(report)) {
+            if(prop != "data") {
+                print(`${prop}: `, report[prop]);
+            }
+        }
         for(const key in keycodes) {
             const code = keycodes[key];
-            if(checkBit(result[3], code)) {
+            if(checkBit(report.buttons, code)) {
                 //print("hit "+key);
                 if(!bools[key]) {
                     print("first hit "+key);
@@ -175,7 +217,7 @@ while(true) {//!GetKey(VK_ESCAPE)) {
             }
             print(str);
         //}
-        lastKeycode = result[3];
+        lastKeycode = report.buttons;
     }
 }
 

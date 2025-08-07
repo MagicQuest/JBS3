@@ -1,5 +1,8 @@
 //don't expect this to work for you because i'm using a real wiimote connected to my computer with bluetooth (and with a little bit of help from Dolphin)
 
+//wait wtf i forgot to call hid_init!
+print("Init: " + hid_init());
+
 let wiimote;
 
 hid_enumerate(0x0, 0x0, (device) => {
@@ -24,15 +27,22 @@ function checkBit(bit, mask) {
 }
 
 while(true) {
-    let result = hid_read(handle);
+    let result = hid_read(handle); //welp since i changed hid_read to return a Uint8Array instead, we'll just do the ole' transfer trick
     if(result == 0) {
         print("waiting");
     }else if(result < 0) {
         print("Unable to read: ", hid_error(handle));
     }else {
+        //back in the day hid_read returned a Uint32Array on success so we'll just "convert" it back here
+        //result = new Uint32Array(result.buffer.transfer());
+        //uh wait a minute i was doing some genuine bullshit to make hid_read spit out a Uint32Array...
+        //we'll just turn the first 4 bytes into a 32 bit value so i can read it (instead of using result[-])
+        const dword = result[3] << 24 | result[2] << 16 | result[1] << 8 | result[0];
+        print(dword);
         for(const key in keycodes) {
             const code = keycodes[key];
-            if(checkBit(result[0], code)) {
+            //if(checkBit(result[0], code)) {
+            if(checkBit(dword, code)) {
                 //print("hit "+key);
                 if(!bools[key]) {
                     print("first hit "+key);
@@ -66,6 +76,6 @@ while(true) {
         }
         print(str);
 
-        lastKeycode = result[0];
+        lastKeycode = dword; //result[0];
     }
 }

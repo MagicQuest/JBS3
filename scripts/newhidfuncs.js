@@ -82,8 +82,8 @@ function windowProc(hwnd, msg, wp, lp) {
 
     if(msg == WM_TIMER) {
         if(connected) {
-            //const buf = new Uint32Array(HID_BUFFER_SIZE);
-            let result = hid_read(connected); //buf, HID_BUFFER_SIZE); //returns 0 or 1 if no read and returns an uint32array
+            //const buf = new Uint8Array(HID_BUFFER_SIZE);
+            let result = hid_read(connected); //buf, HID_BUFFER_SIZE); //returns 0 or 1 if no read and returns an uint8array
             if(result == 0) {
                 print("waiting");
             }else if(result < 0) {

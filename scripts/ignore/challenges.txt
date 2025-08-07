@@ -1,9 +1,28 @@
-{"nx": 1550, "ny": 450, "nw": 512, "nh": 300, "b": false}
-SetBkColor(memDC, RGB(255, 255, 255)); CreateFontSimple("burbank big cd bd", 10/1.25, 20/1.25); //haha fortnite font burbank big cd bd
+{"nx": 75, "ny": 200, "nw": 512, "nh": 300, "b": false}
+SetBkColor(memDC, RGB(255, 255, 255)); CreateFontSimple("consolas", 10/1.25, 20/1.25); //haha fortnite font burbank big cd bd
 
-search golden llamas
-use common outlaw card to access backrooms
-kill niggas EXOTICally
+//{"nx": 1550, "ny": 450, "nw": 512, "nh": 300, "b": false}
+
+WARMUP =====>
+olympian calm solo
+endless
+jarvis tapping practice quad insanity b
+
+TODO =======>
+insurmountable obstacle (slow to practice 2orange -> 1yellow) and then fast to practice 3 fingers in first and pinky on orange to hit second pattern
+soulless 5 genocide solo
+it's gone / TTFAF hopo tap strums
+olympian mountain of vigor 8:18
+olympian triumph -> valor 29:39 until "chorus"
+jarvis tapping practice wtf patterns a
+supernovae solo a
+
+TRILLS =====>
+supernovae inspired 7:02
+chiastic decline 5:32
+
+MISC =======>
+end of medium trillmageddon 1:19:25
 
 //(<b>shit i need to use a text layout for special effects like</b>)
 //wait nevermind im using gdi to draw this shit aren't i
