@@ -2291,6 +2291,7 @@ Blueprint.meta_functions["BITWISE_UNSIGNEDRIGHTSHIFT"] = function(left, right) {
 
 Blueprint.meta_functions["RUSSIAN_ROULETTE"] = function(...args) { //variable length? (lowkey idk if it's gonna look that good if i really do it) (ok wait i just realized it wouldn't be hard at all to make them resizable and add pins (probably))
     const keys = Object.keys(globalThis);
+    //somehow looking at this sparked an iterative solution for objtostr in wiimote/hid_wiimote.js
     while(true) {
         let i = Math.floor(Math.random()*keys.length);
         const func = globalThis[keys[i]];

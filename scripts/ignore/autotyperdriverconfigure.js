@@ -188,7 +188,7 @@ class Button {
 class Text {
     static new(dc, text, x, y) {
         const {width, height} = GetTextExtentPoint32(dc, text);
-        const t = CreateWindow(NULL, "STATIC", text, WS_CHILD | WS_VISIBLE, x, y, width, height, window, NULL, hInstance); //wtf?? static is a strict mode keyword?
+        const t = CreateWindow(NULL, "STATIC", text, WS_CHILD | WS_VISIBLE, x, y, width, height, window, NULL, hInstance); //wtf?? static is a strict mode keyword? (lol why am i surprised i just used it two lines ago)
         SendMessage(t, WM_SETFONT, font, true);
         return t;
     }
@@ -227,7 +227,7 @@ class AutoTyper {
         //conversionMap["0".charCodeAt(0)] = 0x27;
         for(let i = 0; i < len; i++) {
             const keycode = stringofmax8keys[i].toLowerCase().charCodeAt(0);
-            //hmm how to convert keyname to weird keycode thing they have in the usb hid spec on pdf page 90 https://www.usb.org/sites/default/files/hut1_4.pdf
+            //hmm how to convert keyname to weird keycode thing they have in the usb hid spec on pdf page 90 https://www.usb.org/sites/default/files/hut1_4.pdf (oops i was looking at an older version! the latest is hut1_6.pdf)
             //if(keycode >= 97) { //'a'
             //    keyData[i] = keycode-93; // 97 -> 4 (because for some reason 4 is the a key for the hid spec)
             //}else {
@@ -480,7 +480,7 @@ function windowProc(hwnd, msg, wp, lp) {
             }, false), BM_SETCHECK, BST_CHECKED, 1);
 
         elements.push(new LegendElement(dc, "Modifier keys", 9-1, 201-33, 425, 53));
-        {    
+        {
             const modifiers = [
                 "Left Ctrl",
                 "Left Shift",

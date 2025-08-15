@@ -15206,7 +15206,7 @@ void hid_enumerateWrapper(const v8::FunctionCallbackInfo<v8::Value>& info) {
         device->Set(context, LITERAL("usage_page"), Number::New(isolate, cur_dev->usage_page));
         device->Set(context, LITERAL("usage"), Number::New(isolate, cur_dev->usage));
         device->Set(context, LITERAL("interface_number"), Number::New(isolate, cur_dev->interface_number));
-        device->Set(context, LITERAL("_ptr"), Number::New(isolate, (LONG_PTR)cur_dev));
+        //device->Set(context, LITERAL("_ptr"), Number::New(isolate, (LONG_PTR)cur_dev)); //no this is just waiting to cause an access violation!
 
         Local<Value> arg[] = {device};
         MaybeLocal<Value> returnedValue = func->Call(context, isolate->GetCurrentContext()->Global(), 1, arg);
@@ -15241,9 +15241,13 @@ void hid_get_handle_from_info(const v8::FunctionCallbackInfo<v8::Value>& info) {
     //HandleScope handle_scope(isolate); //including a handle scope because storing values returned from WStringFI and CStringFI are fucky
 
     Local<Object> js_device_info = info[0].As<Object>();
-    hid_device_info *device_info = (hid_device_info*)IntegerFI(js_device_info->Get(isolate->GetCurrentContext(), LITERAL("_ptr")).ToLocalChecked()); //im doing this because i don't trust what i put into the js object's path because v8 and hidapi
+    //hid_device_info *device_info = (hid_device_info*)IntegerFI(js_device_info->Get(isolate->GetCurrentContext(), LITERAL("_ptr")).ToLocalChecked()); //im doing this because i don't trust what i put into the js object's path because v8 and hidapi
+    //
+    //hid_device* device = hid_open_path(device_info->path);
 
-    hid_device* device = hid_open_path(device_info->path);
+    //yeah ok, who knew that was a bad idea (hilarity ensues)
+    //so i was using the _ptr value but the memory that pointed to was freed at the end of hid_enumerate so... (accident waiting to happen)
+    hid_device* device = hid_open_path(CStringFI(js_device_info->Get(isolate->GetCurrentContext(), LITERAL("path")).ToLocalChecked()));
     
     info.GetReturnValue().Set(Number::New(isolate, (LONG_PTR)device));
 }
