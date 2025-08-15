@@ -1,3 +1,5 @@
+//keyboard and mouse devices are opened in "exclusive" mode by windows so you can't read from them
+
 if(hid_init() != 0) {
     Msgbox("failed to init hid for some reason", "newhidfuncs.js", MB_OK);
 }
@@ -74,6 +76,20 @@ function windowProc(hwnd, msg, wp, lp) {
                 devices[str] = device_info;
                 SendMessage(list, LB_ADDSTRING, 0, str);    
             });
+        }
+    }else if(msg == WM_KEYDOWN) {
+        const ctrl = GetKey(VK_CONTROL);
+        if(wp == "E".charCodeAt(0)) {
+            print("e");
+            if(ctrl) {
+                SetForegroundWindow(GetConsoleWindow());
+                try {
+                    print(eval(getline("Ctrl+E -> Eval some code: ")));
+                }catch(e) {
+                    print(e.toString());
+                }
+                SetForegroundWindow(hwnd);
+            }
         }
     }else if(msg == WM_DESTROY) {
         PostQuitMessage(0);

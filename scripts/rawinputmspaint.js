@@ -1,6 +1,10 @@
 //obviously i could've just done with with hidapi but it's easier to get the input of every drawing tablet by using the usages and shit with raw input i think
 //and hey it works with my specific device even when i use it with a virtual machine i thik
 
+//i BARELY understood hid when i created this file but now i'm ready to make things right...
+//nevermind bruh the only readable report my tablet sends out is vendor defined! i can't parse shit!
+//so much for making this one more generic... i don't have another tablet to test this out on so i guess it's staying like this
+
 let w = 1280;
 let h = 720;
 
@@ -15,7 +19,38 @@ function windowProc(hwnd, msg, wp, lp) {
         //                                              oh wait i thought inputsink would capture the input lol but you can only do that with RIDEV_CAPTUREMOUSE (inputsink will let this window still receive WM_INPUT events when it's not in the foreground)
         rawinputdevicelist.push(MakeRAWINPUTDEVICE(65290, 0x0000, RIDEV_PAGEONLY | RIDEV_INPUTSINK, hwnd)); //for some reason i gotta use this for my pen (the usage number is only 1 but just incase im doing PAGEONLY)
         rawinputdevicelist.push(MakeRAWINPUTDEVICE(0x000D, 0x0001, RIDEV_INPUTSINK, hwnd)); //external pen
-        rawinputdevicelist.push(MakeRAWINPUTDEVICE(0x000D, 0x0002, RIDEV_INPUTSINK, hwnd)); //internal pen
+        rawinputdevicelist.push(MakeRAWINPUTDEVICE(0x000D, 0x0002, RIDEV_INPUTSINK, hwnd)); //internal pen (wait are these opened in exclusive mode too?)
+        
+        //hmm i gotta ask again bruh
+        //HOW DOES BLENDER DO IT?
+        //the only readable reports that come from my tablet use the vendor defined usage page
+        //maybe it checks all the usbs for their devices but im not doing allat (also speaking of seeing usb devices check out usb tree viewer (it's way better than usbviewer!) https://www.uwe-sieber.de/usbtreeview_e.html)
+
+        //const actuallist = GetRawInputDeviceList();
+        ////print(actuallist);
+        //for(const element of actuallist) {
+        //    //print("//");
+        //    const name = GetRawInputDeviceInfo(element.hDevice, RIDI_DEVICENAME);
+        //    const info = GetRawInputDeviceInfo(element.hDevice, RIDI_DEVICEINFO);
+        //    if(info.dwType == RIM_TYPEHID) {
+        //        //if(info.usUsagePage == 65290) {
+        //            //print(name);
+        //            //print(GetRawInputDeviceInfo(element.hDevice, RIDI_PREPARSEDDATA));
+        //        //}
+        //        print(`${name} (0x${info.deviceInfo.usUsagePage.toString(16)}:0x${info.deviceInfo.usUsage.toString(16)})`);
+        //        //ok bruh why is it so weird to get the report descriptor???
+        //        //we gotta use hidapi because it seems like they've already done the hard parts
+        //        //const handle = hid_open_path(name);
+        //        //if(handle) {
+        //        //    const report = hid_get_report_descriptor(handle);
+        //        //    print(report);
+        //        //    hid_close(handle);
+        //        //}else {
+        //        //    print("hid_open_path failed?", hid_error());
+        //        //}
+        //    }
+        //    //print(GetRawInputDeviceInfo(element.hDevice, RIDI_DEVICEINFO));
+        //}
 
         print(RegisterRawInputDevices(rawinputdevicelist) == 1, "ijustlostmygawggs");
 
@@ -28,7 +63,8 @@ function windowProc(hwnd, msg, wp, lp) {
         const hRawInput = lp;
 
         const input = GetRawInputData(hRawInput, RID_INPUT);
-    
+        print(input);
+
         const memDC = CreateCompatibleDC(dc);
 
         SelectObject(memDC, bmp);

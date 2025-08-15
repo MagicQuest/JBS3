@@ -1,4 +1,4 @@
-{"nx": 75, "ny": 200, "nw": 512, "nh": 300, "b": false}
+{"nx": 75, "ny": 200, "nw": 512, "nh": 350, "b": false}
 SetBkColor(memDC, RGB(255, 255, 255)); CreateFontSimple("consolas", 10/1.25, 20/1.25); //haha fortnite font burbank big cd bd
 
 //{"nx": 1550, "ny": 450, "nw": 512, "nh": 300, "b": false}
@@ -16,6 +16,7 @@ olympian mountain of vigor 8:18
 olympian triumph -> valor 29:39 until "chorus"
 jarvis tapping practice wtf patterns a
 supernovae solo a
+olmypian inverse solo
 
 TRILLS =====>
 supernovae inspired 7:02

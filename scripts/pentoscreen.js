@@ -1,6 +1,6 @@
 //twas feeling quirky and wanted to copy the blender feature where when you hold d, it lets you draw onto the viewport with your mouse
 print("hold 'd' and click + drag to draw on the screen");
-print("press ctrl to toggle if the text will be cleared or not");
+print("press ctrl to toggle if the drawing will be cleared or not");
 
 class Wrapper {
     impl = undefined;

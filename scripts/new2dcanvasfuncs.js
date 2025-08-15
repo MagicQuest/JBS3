@@ -3,11 +3,16 @@ let i = 0;
 
 let points = [];
 
+const w = 512;
+const h = 512;
+
 function windowProc(hwnd, msg, wp, lp) {
     if(msg == WM_CREATE) {
         context = createCanvas("2d", NULL, hwnd);
+        print(context.fillStyle, context.strokeStyle);
         //context.fillStyle = "rgb(255, 255, 0)";
         context.strokeStyle = "#ffaa00";
+        //print(context.fillStyle, context.strokeStyle);
         print(context);
 
         for(let i = 0; i < 4; i++) {
@@ -17,8 +22,9 @@ function windowProc(hwnd, msg, wp, lp) {
         SetTimer(hwnd, 0, 16);
     }else if(msg == WM_TIMER) {
         context.BeginDraw(); //idk how tf there is no BeginDraw for canvas (OR WEBGL) in html
-        //context.clearRect(); //idk if i can make clearRect because there's just no function in d2d for that (and a transparent brush is NOT gonna do it)
+        //context.clearRect(); //idk if i can make clearRect because there's just no function in d2d for that (and a transparent brush is NOT gonna do it) (maybe i should try to use a layer? ok that didn't work lol)
         //WAIT A SEC I WAS WORRIED ABOUT ALL THE PATH TYPE FUNCTIONS D2D MIGHT HAVE SOMETHING FOR THAT ID2D1PathGeometry1?!
+        //context.clearRect(0, 0, w, h);
         context.clear();
         
         context.fillStyle = "#ffff00";
@@ -92,4 +98,4 @@ const wc = CreateWindowClass("winclass", windowProc);
 wc.hbrBackground = COLOR_WINDOW+1;
 wc.hCursor = LoadCursor(NULL, IDC_HAND);
 
-window = CreateWindow(WS_EX_NOREDIRECTIONBITMAP, wc, "new2dcanvasfuncs.js", WS_OVERLAPPEDWINDOW | WS_VISIBLE, CW_USEDEFAULT, CW_USEDEFAULT, 512+20, 512+42, NULL, NULL, hInstance);
+window = CreateWindow(WS_EX_NOREDIRECTIONBITMAP, wc, "new2dcanvasfuncs.js", WS_OVERLAPPEDWINDOW | WS_VISIBLE, CW_USEDEFAULT, CW_USEDEFAULT, w+20, h+42, NULL, NULL, hInstance);

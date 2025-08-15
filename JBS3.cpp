@@ -8531,14 +8531,31 @@ namespace DIRECT2D {
 
                 d2d->d2dcontext->Clear();
             }));
+            //js2DRenderingContextCopy->Set(isolate, "clearRect", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            //    Isolate* isolate = info.GetIsolate();
+            //    Canvas2DRenderingContext* d2d = (Canvas2DRenderingContext*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+            //
+            //    ID2D1Layer* layer = NULL;
+            //
+            //    float left = FloatFI(info[0]);
+            //    float top = FloatFI(info[1]);
+            //
+            //    D2D1_LAYER_PARAMETERS parameters = D2D1::LayerParameters(D2D1::RectF(left, top, left+FloatFI(info[2]), top+FloatFI(info[3])));
+            //
+            //    d2d->d2dcontext->PushLayer(parameters, NULL);
+            //    //d2d->d2dcontext->FillRectangle(d2d->fillBrush)
+            //    d2d->d2dcontext->Clear();
+            //    d2d->d2dcontext->PopLayer();
+            //}));
             js2DRenderingContextCopy->Set(isolate, "fillRect", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
                 Isolate* isolate = info.GetIsolate();
                 Canvas2DRenderingContext* d2d = (Canvas2DRenderingContext*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                const char* brush = CStringFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("fillStyle")).ToLocalChecked());
+                //const char* brush = CStringFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("fillStyle")).ToLocalChecked());
                 //d2d->FindOrCreateBrush(brush); //https://html.spec.whatwg.org/multipage/canvas.html#serialisation-of-a-color
                 //wait a sec i wrongly thought that if i changed the color of a brush before EndDraw it wouldn't work (idk why i thought this)
                 //d2d->UpdateFillBrush(brush);
-                d2d->fillBrush->SetColor(d2d->SerializeColor(brush));
+                //ok i should make fillStyle a special property so i can update ts when i chang eit
+                //d2d->fillBrush->SetColor(d2d->SerializeColor(brush));
                 float x = FloatFI(info[0]);
                 float y = FloatFI(info[1]);
                 d2d->d2dcontext->FillRectangle(D2D1::RectF(x, y, x + FloatFI(info[2]), y + FloatFI(info[3])), d2d->fillBrush);//d2d->colorBrushes[brush]);
@@ -8546,10 +8563,10 @@ namespace DIRECT2D {
             js2DRenderingContextCopy->Set(isolate, "strokeRect", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
                 Isolate* isolate = info.GetIsolate();
                 Canvas2DRenderingContext* d2d = (Canvas2DRenderingContext*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                const char* brush = CStringFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("strokeStyle")).ToLocalChecked());
+                //const char* brush = CStringFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("strokeStyle")).ToLocalChecked());
                 //d2d->FindOrCreateBrush(brush);
                 //d2d->UpdateStrokeBrush(brush);
-                d2d->strokeBrush->SetColor(d2d->SerializeColor(brush));
+                //d2d->strokeBrush->SetColor(d2d->SerializeColor(brush));
                 float x = FloatFI(info[0]);
                 float y = FloatFI(info[1]);
                 d2d->d2dcontext->DrawRectangle(D2D1::RectF(x, y, x + FloatFI(info[2]), y + FloatFI(info[3])), d2d->strokeBrush, FloatFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("lineWidth")).ToLocalChecked()));//d2d->colorBrushes[brush]);
@@ -8588,11 +8605,11 @@ namespace DIRECT2D {
             js2DRenderingContextCopy->Set(isolate, "stroke", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
                 Isolate* isolate = info.GetIsolate();
                 Canvas2DRenderingContext* d2d = (Canvas2DRenderingContext*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                const char* brush = CStringFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("strokeStyle")).ToLocalChecked());
+                //const char* brush = CStringFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("strokeStyle")).ToLocalChecked());
                 //d2d->FindOrCreateBrush(brush);
                 //d2d->UpdateStrokeBrush(brush);
         
-                d2d->strokeBrush->SetColor(d2d->SerializeColor(brush));
+                //d2d->strokeBrush->SetColor(d2d->SerializeColor(brush));
 
                 d2d->closePath(D2D1_FIGURE_END_OPEN); //calling stroke leaves the path open
 
@@ -8601,11 +8618,11 @@ namespace DIRECT2D {
             js2DRenderingContextCopy->Set(isolate, "fill", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
                 Isolate* isolate = info.GetIsolate();
                 Canvas2DRenderingContext* d2d = (Canvas2DRenderingContext*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
-                const char* brush = CStringFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("fillStyle")).ToLocalChecked());
+                //const char* brush = CStringFI(info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("fillStyle")).ToLocalChecked());
                 //d2d->FindOrCreateBrush(brush); //https://html.spec.whatwg.org/multipage/canvas.html#serialisation-of-a-color
                 //wait a sec i wrongly thought that if i changed the color of a brush before EndDraw it wouldn't work (idk why i thought this)
                 //d2d->UpdateFillBrush(brush);
-                d2d->fillBrush->SetColor(d2d->SerializeColor(brush));
+                //d2d->fillBrush->SetColor(d2d->SerializeColor(brush));
 
                 d2d->closePath(D2D1_FIGURE_END_OPEN); //apparently it doesn't really matter how it's closed when drawing the filled version
 
@@ -8630,6 +8647,34 @@ namespace DIRECT2D {
 
                 delete d2d;
             }));
+
+            //le special properties
+            js2DRenderingContextCopy->SetAccessorProperty(LITERAL("fillStyle"), FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                Canvas2DRenderingContext* d2d = (Canvas2DRenderingContext*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                info.GetReturnValue().Set(String::NewFromUtf8(isolate, d2d->fillStyle.c_str()).ToLocalChecked());
+            }), FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                Canvas2DRenderingContext* d2d = (Canvas2DRenderingContext*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                d2d->SetFillStyle(CStringFI(info[0]));
+                //d2d->fillBrush->SetColor(d2d->SerializeColor(brush));
+            }));
+
+            js2DRenderingContextCopy->SetAccessorProperty(LITERAL("strokeStyle"), FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                Canvas2DRenderingContext* d2d = (Canvas2DRenderingContext*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                info.GetReturnValue().Set(String::NewFromUtf8(isolate, d2d->strokeStyle.c_str()).ToLocalChecked());
+            }), FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+                Isolate* isolate = info.GetIsolate();
+                Canvas2DRenderingContext* d2d = (Canvas2DRenderingContext*)info.This()->GetRealNamedProperty(isolate->GetCurrentContext(), LITERAL("internalDXPtr")).ToLocalChecked()/*.As<Number>()*/->IntegerValue(isolate->GetCurrentContext()).FromJust();
+
+                d2d->SetStrokeStyle(CStringFI(info[0]));
+                //d2d->fillBrush->SetColor(d2d->SerializeColor(brush));
+            }));
+
             return js2DRenderingContextCopy;
         }
 
@@ -9762,8 +9807,8 @@ namespace DIRECT2D {
         renderingContext->Set(c, LITERAL("backBitmap"), DIRECT2D::getBitmapImpl(isolate, d2d->d2dBackBitmap.Get()));
         renderingContext->Set(c, LITERAL("targetBitmap"), DIRECT2D::getBitmapImpl(isolate, d2d->d2dTargetBitmap.Get()));
 
-        renderingContext->Set(c, LITERAL("fillStyle"), LITERAL("black")); //i think i could just write these in _2DRenderingContext but whatever
-        renderingContext->Set(c, LITERAL("strokeStyle"), LITERAL("black"));
+        //renderingContext->Set(c, LITERAL("fillStyle"), LITERAL("black")); //i think i could just write these in _2DRenderingContext but whatever
+        //renderingContext->Set(c, LITERAL("strokeStyle"), LITERAL("black"));
         renderingContext->Set(c, LITERAL("lineWidth"), Number::New(isolate, 1.0));
         renderingContext->Set(c, LITERAL("font"), LITERAL("12px comic sans ms"));
         return renderingContext;
@@ -16066,7 +16111,35 @@ V8FUNC(GetRawInputDeviceInfoWrapper) {
     UINT command = IntegerFI(info[1]);
     if (command == RIDI_PREPARSEDDATA) {
         //i forgor. (idk if i can add this one because i think it starts getting deep into the driver shit)
-        print("i forgor. (RIDI_PREPARSEDDATA)");
+        //print("i forgor. (RIDI_PREPARSEDDATA)");
+        //uhhh im back now to fix this one and im just gonna send the bytes as a uint8array
+        UINT size;
+        int res = GetRawInputDeviceInfo((HANDLE)IntegerFI(info[0]), command, NULL, &size);
+        if (res < 0) {
+            HANDLE console = GetStdHandle(STD_OUTPUT_HANDLE);
+            SetConsoleTextAttribute(console, 4);
+            print("oopsie poopsie GetRawInputDeviceInfo (uiCommand was RIDI_PREPARSEDDATA) didn't work for some reason when i tried to get the size of the preparsed data (returned " << res << ") GetLastError says: (" << GetLastError() << ")");
+            SetConsoleTextAttribute(console, 7);
+        }
+        else {
+            BYTE* preparseddata = new BYTE[size];
+            res = GetRawInputDeviceInfo((HANDLE)IntegerFI(info[0]), command, preparseddata, &size);
+            if (res <= 0) {
+                HANDLE console = GetStdHandle(STD_OUTPUT_HANDLE);
+                SetConsoleTextAttribute(console, 4);
+                print("oopsie poopsie GetRawInputDeviceInfo (uiCommand was RIDI_PREPARSEDDATA) didn't work for some reason when i tried to get the preparsed data (returned " << res << ") GetLastError says: (" << GetLastError() << ")");
+                SetConsoleTextAttribute(console, 7);
+            }
+            else {
+                Local<ArrayBuffer> ab = ArrayBuffer::New(isolate, size);
+                memcpy(ab->Data(), preparseddata, size);
+
+                Local<Uint8Array> arr = Uint8Array::New(ab, 0, size);
+
+                info.GetReturnValue().Set(arr);
+            }
+            delete[] preparseddata;
+        }
     }
     else if (command == RIDI_DEVICENAME) {
         wchar_t shit[MAX_PATH]{}; //idk how big i can be so

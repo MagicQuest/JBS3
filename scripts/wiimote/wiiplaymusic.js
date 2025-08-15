@@ -35,8 +35,8 @@ const bytes = 20;
 // const raw = require("fs").readBinary(__dirname+"/tv_world (2000hz).raw");
 // const raw = require("fs").readBinary("C:/Users/megal/Documents/Audacity/dirt rhodes jarvis9999 remix (2000hz).raw");
 // const raw = require("fs").readBinary("C:/Users/megal/Documents/Audacity/Can You Hear The Music Full (2000hz).raw");
-//const raw = require("fs").readBinary("C:/Users/megal/Documents/Audacity/Travis Scott - 4X4 (Official Audio 2000hz).raw");
-const raw = require("fs").readBinary("C:/Users/megal/Documents/Audacity/Red Hot Champion.raw");
+const raw = require("fs").readBinary("C:/Users/megal/Documents/Audacity/Travis Scott - 4X4 (Official Audio 2000hz).raw");
+// const raw = require("fs").readBinary("C:/Users/megal/Documents/Audacity/Red Hot Champion.raw");
 
 print(raw[0]);
 

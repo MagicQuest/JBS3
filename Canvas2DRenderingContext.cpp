@@ -3,12 +3,16 @@
 using namespace v8;
 
 bool Canvas2DRenderingContext::Init(HWND window) {
-	((Direct2D11*)this)->Init(window, 3); //lmao (wait is Init virtual?)
+	//((Direct2D11*)this)->Init(window, 3); //lmao (wait is Init virtual?)
+	Direct2D11::Init(window, 3);
+	//__super::Init(window, 3); (i think this also works)
 	std::cout << "this trenderf type " << this->type << " " << this->textfactory << std::endl;
 	SusIfFailed(this->factory->CreatePathGeometry(&this->path), "ID2D1Factory7->CreatePathGeometry failed (Canvas2DRenderingContext)");
 	SusIfFailed(this->d2dcontext->CreateSolidColorBrush(D2D1::ColorF(0, 0, 0, 1.0), &this->fillBrush), "Canvas2DRenderingContext failed to create fillStyleBrush");
 	SusIfFailed(this->d2dcontext->CreateSolidColorBrush(D2D1::ColorF(0, 0, 0, 1.0), &this->strokeBrush), "Canvas2DRenderingContext failed to create strokeStyleBrush");
 	this->currentTransform = D2D1::Matrix3x2F::Identity();
+	this->SetFillStyle("black");
+	this->SetStrokeStyle("black");
 }
 
 void Canvas2DRenderingContext::save(const Local<Object>& info) {
@@ -47,6 +51,25 @@ void Canvas2DRenderingContext::restore(const Local<Object>& info) {
 //void Canvas2DRenderingContext::FindOrCreateBrush(std::string brush) {
 //
 //}
+
+void Canvas2DRenderingContext::SetFillStyle(const char* style) {
+	/*if (this->fillStyle) {
+		delete[] this->fillStyle;
+	}
+	size_t len = strlen(style);
+	this->fillStyle = new char[len+1];
+	strcpy(this->fillStyle, style);*/
+
+	//ok i WAS gonna use a char* on the heap but since most of the style strings are usually less than 7 characters, i could get the benefits of using a string (if the data in a vector is less than 16 bytes)
+	//this->fillStyle.resize(strlen(style));
+	this->fillStyle = std::string(style);
+	this->fillBrush->SetColor(this->SerializeColor(this->fillStyle));
+}
+
+void Canvas2DRenderingContext::SetStrokeStyle(const char* style) {
+	this->strokeStyle = std::string(style);
+	this->strokeBrush->SetColor(this->SerializeColor(this->strokeStyle));
+}
 
 D2D1_COLOR_F Canvas2DRenderingContext::SerializeColor(std::string color) {
 	//https://html.spec.whatwg.org/multipage/canvas.html#serialisation-of-a-color

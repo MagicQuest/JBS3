@@ -28,6 +28,10 @@ public:
 
 	std::vector<SaveState> stateStack;
 	D2D1::Matrix3x2F currentTransform;
+	//char* fillStyle;
+	//char* strokeStyle;
+	std::string fillStyle;
+	std::string strokeStyle;
 	ID2D1SolidColorBrush* fillBrush = nullptr;
 	ID2D1SolidColorBrush* strokeBrush = nullptr;
 	ID2D1PathGeometry1* path = nullptr;
@@ -44,6 +48,8 @@ public:
 	//void FindOrCreateBrush(std::string);
 	//void UpdateFillBrush(const char*);
 	//void UpdateStrokeBrush(const char*);
+	void SetFillStyle(const char*);
+	void SetStrokeStyle(const char*);
 	D2D1_COLOR_F SerializeColor(std::string color);
 
 	bool Init(HWND window);

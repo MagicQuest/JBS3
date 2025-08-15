@@ -1,4 +1,4 @@
-//aw shit i think this is wacom ONLY (yeah i have an XP-PEN i'm cooked (but not out, how does blender do it 🤔🤔🤔🤔))
+//aw shit i think this is wacom ONLY (yeah i have an XP-PEN i'm cooked (but not out, how does blender do it 🤔🤔🤔🤔 (the answer is probably hid)))
 
 function windowProc(hwnd, msg, wp, lp) {
     if(msg == WM_CREATE) {

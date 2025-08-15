@@ -1,7 +1,7 @@
 //extraordinary resource on wiimote hid reports: https://wiibrew.org/wiki/Wiimote
 //my hid knowledge has expanded since the last time i used the hidapi (because i wrote that driver lol)
 
-//const dc = GetDC(NULL);
+const dc = GetDC(NULL);
 
 print("Init: " + hid_init());
 
@@ -57,6 +57,49 @@ const EXTENSION_MOTIONPLUS_ACTIVATE = 0x0000_A420_0405;
 const EXTENSION_MOTIONPLUS_PASSTHROUGH_NUNCHUK = 0x0000_A420_0505;
 const EXTENSION_MOTIONPLUS_PASSTHROUGH_CLASSIC_CONTROLLER = 0x0000_A420_0705;
 
+const MOTIONPLUS_TIMEOUT_MS = 1000;
+
+const PASSTHROUGH_NONE = 0x04;
+const PASSTHROUGH_NUNCHUK = 0x05;
+const PASSTHROUGH_CLASSIC_CONTROLLER = 0x07;
+
+//                                                         block 1                                 block 2
+const IR_SENSITIVITY_MARCAN =      [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x90, 0x00, 0xC0,        0x40, 0x00];
+const IR_SENSITIVITY_MAX =         [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0x00, 0x0C,        0x00, 0x00];
+const IR_SENSITIVITY_HIGH =        [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x90, 0x00, 0x41,        0x40, 0x00]; //lowkey i've only tested this one haha
+const IR_SENSITIVITY_WII_LEVEL_1 = [0x02, 0x00, 0x00, 0x71, 0x01, 0x00, 0x64, 0x00, 0xfe,        0xfd, 0x05];
+const IR_SENSITIVITY_WII_LEVEL_2 = [0x02, 0x00, 0x00, 0x71, 0x01, 0x00, 0x96, 0x00, 0xb4,        0xb3, 0x04];
+const IR_SENSITIVITY_WII_LEVEL_3 = [0x02, 0x00, 0x00, 0x71, 0x01, 0x00, 0xaa, 0x00, 0x64,        0x63, 0x03];
+const IR_SENSITIVITY_WII_LEVEL_4 = [0x02, 0x00, 0x00, 0x71, 0x01, 0x00, 0xc8, 0x00, 0x36,        0x35, 0x03];
+const IR_SENSITIVITY_WII_LEVEL_5 = [0x07, 0x00, 0x00, 0x71, 0x01, 0x00, 0x72, 0x00, 0x20,        0x1f, 0x03];
+
+//if the wiimote's reporting mode doesn't send exactly the amount of ir data for the ir mode, it doesn't send any ir data!
+
+const IR_MODE_BASIC = 1; //10 bytes of ir data (use the 0x36 or 0x37 reporting modes)
+const IR_MODE_EXTENDED = 3; //12 bytes of ir data (use the 0x33 reporting mode)
+const IR_MODE_FULL = 5; //36 (18) bytes of ir data (use the 0x3e/0x3f reporting modes)
+
+//for debugging lel
+function objtostr(obj, str = "", i = 0) {
+    i++;
+    let tabs = "";
+    for(let j = 0; j < i; j++) {
+        tabs += "\t";
+    }
+    if(typeof obj == "object") {
+        str += "\r\n"+tabs.substring(0, tabs.length-1)+"{";
+        for(const prop in obj) {
+            const val = obj[prop];
+            str += "\r\n";
+            str += tabs+prop+": " + objtostr(val, "", i);
+        }
+        str += "\r\n"+tabs.substring(0, tabs.length-1)+"},";
+    }else {
+        str += obj+",";
+    }
+    return str;
+}
+
 class hid_wiimote {
     #rumbling = false;
     #requestingStatus = false;
@@ -64,7 +107,21 @@ class hid_wiimote {
     //#writeMemoryListeners = []; //rip
     buttons = 0; //WORD
     lastButtons = 0; //WORD
-    #eventListeners = {};
+    #eventListeners = {
+        //built in listeners
+        //onMotionPlusExtensionChange: [
+        //    {
+        //        callback: (lastExtensionStatus) => {
+        //            if(lastExtensionStatus) {
+        //                if(this.currentExtensionId == EXTENSION_MOTIONPLUS_PASSTHROUGH_NUNCHUK || this.currentExtensionId == EXTENSION_MOTIONPLUS_PASSTHROUGH_CLASSIC_CONTROLLER) {
+        //                    
+        //                }
+        //            }
+        //        },
+        //        extra: undefined,
+        //    },
+        //]
+    };
     #reportingMode = 0x30;
     status = {
         batteryLevel: 0,
@@ -74,13 +131,19 @@ class hid_wiimote {
         IRcamera: 0,
         leds: [0, 0, 0, 0]
     };
+    IRBytes = []; //ir camera bytes returned from input reports
+    IR = undefined;
     currentExtensionId = EXTENSION_NONE;
     extensionBytes = []; //extension bytes returned from input reports
     extension = {
         //[currentExtensionId]: {
             //...
         //}
-    }; //parsed properties of the current extension (only one extension id (the current one) will be defined in this object)
+    }; //parsed properties of the current extension (only one extension id (the current one) will be defined in this object at once)
+    expectingMotionPlus = false;
+    expectingMotionPlusTimer = 0; //we wait MOTIONPLUS_TIMEOUT_MS for the wiimote to send a status report before giving up on motion plus
+
+    static periodicallyCheckForMotionPlus = true;
 
     static #makeInfo(accelerometerByteCount = 0, IRByteCount = 0, extensionByteCount = 0, hasButtonBytes = true) {
         //if button bytes are present, it's always two bytes
@@ -152,9 +215,25 @@ class hid_wiimote {
         this.requestStatus(() => {
             print(this.status);
             if(this.status.extension) {
-                this.initializeExtension();
-            }else {
+                //aw damn we gotta check if it's motion plus
                 this.readCurrentExtensionFromWiimote();
+                if(this.currentExtensionId == EXTENSION_MOTIONPLUS_ACTIVATE || this.currentExtensionId == EXTENSION_MOTIONPLUS_PASSTHROUGH_NUNCHUK || this.currentExtensionId == EXTENSION_MOTIONPLUS_PASSTHROUGH_CLASSIC_CONTROLLER) {
+                    printNoHighlight("WAIT A SECOND THERE'S [[MotionPlus]]");
+                }else {
+                    this.initializeExtension();
+                }
+            }else {
+                this.maybeSetupMotionPlus();
+                if(!this.expectingMotionPlus) {
+                    this.readCurrentExtensionFromWiimote();
+                }
+            }
+            if(this.status.IRcamera) {
+                if(!this.IR) {
+                    this.IR = {mode: undefined};
+                }
+                //print(this.readMemorySync(0x04, 0xb00033, 1), "ir mode");
+                this.IR.mode = this.readMemorySync(0x04, 0xb00033, 1)[0];
             }
         });
     }
@@ -176,6 +255,12 @@ class hid_wiimote {
 
     onData(raw) {
         const id = raw[0];
+        if(this.expectingMotionPlus && (Date.now() - this.expectingMotionPlusTimer) > MOTIONPLUS_TIMEOUT_MS) {
+            this.expectingMotionPlus = false;
+            this.expectingMotionPlusTimer = 0;
+            printNoHighlight("(expected motion plus but wiimote didn't send status report)"); //maybe we should assume an extension is plugged into it?
+
+        }
         if((id & 0x30) == 0x30) { //we'll handle all the 0x30 input reports here
             this.#reportingMode = id;
             //if(id == 0x32 || id == 0x34 || id == 0x36 || id == 0x37 || id == 0x3d) { //each of these report ids sends some extension bytes
@@ -184,12 +269,26 @@ class hid_wiimote {
                 const byteCount = reportInfo.extensionByteCount;
                 const temp = []; //so i can clear the extensionBytes list (just in case the amount of extension bytes in this report was less than the previous one)
                 //the extension bytes are always the last set of bytes
-                const pos = reportInfo.buttonByteCount + reportInfo.accelerometerByteCount + reportInfo.IRByteCount + 1; // + 1 because if the report id (i forgot about that part)
+                const pos = 1 + reportInfo.buttonByteCount + reportInfo.accelerometerByteCount + reportInfo.IRByteCount; // + 1 because if the report id (i forgot about that part)
                 for(let i = 0; i < byteCount; i++) {
                     temp[i] = raw[pos + i];
                 }
                 this.extensionBytes = temp;
                 this.#parseExtensionBytes();
+            }
+            if(this.status.IRcamera && reportInfo.IRByteCount) {
+                if(!this.IR) {
+                    this.IR = {};
+                }
+
+                const byteCount = reportInfo.IRByteCount;
+                const temp = [];
+                const pos = 1 + reportInfo.buttonByteCount + reportInfo.accelerometerByteCount;
+                for(let i = 0; i < byteCount; i++) {
+                    temp[i] = raw[pos + i];
+                }
+                this.IRBytes = temp;
+                this.#parseIRbytes(id);
             }
             if(reportInfo.buttonByteCount) {
                 this.buttons = raw[2] << 8 | raw[1];
@@ -241,7 +340,13 @@ class hid_wiimote {
                     const prevId = this.currentExtensionId;
                     if(this.status.extension) {
                         //initialize the extension
-                        this.initializeExtension();
+                        if(!this.expectingMotionPlus) {
+                            this.initializeExtension();
+                        }else {
+                            this.expectingMotionPlus = false;
+                            this.expectingMotionPlusTimer = 0;
+                            this.readCurrentExtensionFromWiimote();
+                        }
                         //this.readCurrentExtensionFromWiimote();
                         /*SetForegroundWindow(GetConsoleWindow());
                         if(getline("An extension was detected. Change reporting mode to 0x34? (16 extension bytes) [Y/N] -> ").toLowerCase()[0] == "y") {
@@ -295,6 +400,7 @@ class hid_wiimote {
             current.size -= bytes_read;
             print(bytes_read, current.size);
             if(current.size <= 0) {
+                print("all bytes received");
                 current.callback(true, current.data);
                 this.#readMemoryListeners.splice(0, 1);
             }
@@ -324,10 +430,11 @@ class hid_wiimote {
             if(!properties) {
                 properties = {};
                 firstTick = true;
+                this.extension[this.currentExtensionId] = properties;
             }
+
             //let fireButtonEvent = false;
             //let changedButtons = [];
-
             switch(this.currentExtensionId) {
                 case EXTENSION_NUNCHUK:
                     properties.sX = this.extensionBytes[0]; //analog x
@@ -348,13 +455,13 @@ class hid_wiimote {
                     properties.type = (this.extensionBytes[0] >> 7) & 1; //1 for GH3 les pauls, 0 for GHWT guitars
                     properties.sX = this.extensionBytes[0]; //analog x
                     properties.sY = this.extensionBytes[1]; //analog y
-                    properties.lastTouchBar = properties.touchBar;
+                    properties.lastTouchBar = properties.touchBar; //i should make these an actual separate javascript class so the "last" members can be private
                     properties.touchBar = this.extensionBytes[2]; //touch bar (that only exists on GHWT guitars (lucky for me!))
                     if(firstTick) {
                         properties.lastTouchBar = properties.touchBar;
                     }
                     properties.whammyBar = this.extensionBytes[3];
-                    properties.lastButtons = properties.buttons; //kinda error prone to taking buttons by reference but i remedy this by setting buttons to a new object created in the next line lol
+                    properties.lastButtons = properties.buttons; //kinda error prone by taking buttons by reference but i remedy this by setting buttons to a new object created in the next line lol
                     //for some reason yet again, the buttons are 0 when pressed
                     properties.buttons = {
                         green:  !((this.extensionBytes[5] >> 4) & 1),
@@ -373,9 +480,113 @@ class hid_wiimote {
                         this.#fireEvent("onGuitarTouchBarChange");
                     }
                     break;
+                
+                case EXTENSION_MOTIONPLUS_PASSTHROUGH_NUNCHUK:
+                case EXTENSION_MOTIONPLUS_PASSTHROUGH_CLASSIC_CONTROLLER:
+                case EXTENSION_MOTIONPLUS_ACTIVATE:
+                    //let properties = properties;
+                    if(!(this.extensionBytes[5] >> 1 & 1)) { //bit 1 of byte 5 tells us if this is motion plus data
+                        //all the motion plus passthrough data has the extension bit in byte 4 so let's just handle that rn
+                        //properties.lastHasExtension = properties.hasExtension; //i should make these an actual separate javascript class so the "last" members can be private
+                        //properties.hasExtension = this.extensionBytes[4] & 1;
+                        //if(firstTick) {
+                        //    properties.lastHasExtension = properties.hasExtension;
+                        //}
+                        ////DrawText(dc, objtostr(properties), 904, screenHeight/2, screenWidth, screenHeight, DT_EXPANDTABS);
+                        //if(properties.lastHasExtension != properties.hasExtension) {
+                        //    this.#fireEvent("onMotionPlusExtensionChange", properties.lastHasExtension);
+                        //}
+                        //continue; //if not, continue (ok wait switch statements don't do continue i have to actually if else the whole thing)
+                    }else {
+                        if(this.currentExtensionId != EXTENSION_MOTIONPLUS_ACTIVATE) {
+                            if(firstTick) {
+                                //print("firstick");
+                                properties.motionplus = {};
+                                if(this.currentExtensionId == EXTENSION_MOTIONPLUS_PASSTHROUGH_NUNCHUK) {
+                                    properties.nunchuk = {};
+                                    //print("[ro[erties nunchuk", properties);
+                                }else {
+                                    properties.classicController = {};
+                                }
+                                //print("p[roerties.motionplus", properties.motionplus);
+                            }
+                            properties = properties.motionplus;
+                            //print(properties, "m", this.extension[this.currentExtensionId]);
+                        }
+                        properties.raw = {
+                            yaw: (this.extensionBytes[3] >> 2) << 8 | this.extensionBytes[0],
+                            roll: (this.extensionBytes[4] >> 2) << 8 | this.extensionBytes[1],
+                            pitch: (this.extensionBytes[5] >> 2) << 8 | this.extensionBytes[2],
+                        }
+                        properties.slowMode = {
+                            yaw: (this.extensionBytes[3] >> 1 & 1),
+                            roll: (this.extensionBytes[4] >> 1 & 1),
+                            pitch: (this.extensionBytes[3] & 1),
+                        };
+                        //properties.yawSlowMode = (this.extensionBytes[3] >> 1 & 1);
+                        //properties.rollSlowMode = (this.extensionBytes[4] >> 1 & 1);
+                        //properties.pitchSlowMode = (this.extensionBytes[3] & 1);
+                        properties.yaw = properties.raw.yaw/(8192/595);
+                        if(!properties.slowMode.yaw) {
+                            properties.yaw *= 2000/440;
+                        }
+                        properties.roll = properties.raw.roll/(8192/595);
+                        if(!properties.slowMode.roll) {
+                            properties.roll *= 2000/440;
+                        }
+                        properties.pitch = properties.raw.pitch/(8192/595);
+                        if(!properties.slowMode.pitch) {
+                            properties.pitch *= 2000/440;
+                        }
+                        properties.lastHasExtension = properties.hasExtension; //i should make these an actual separate javascript class so the "last" members can be private
+                        properties.hasExtension = this.extensionBytes[4] & 1;
+                        if(firstTick) {
+                            properties.lastHasExtension = properties.hasExtension;
+                        }
+                        //DrawText(dc, objtostr(properties), 904, screenHeight/2, screenWidth, screenHeight, DT_EXPANDTABS);
+                        if(properties.lastHasExtension != properties.hasExtension) {
+                            this.#fireEvent("onMotionPlusExtensionChange", properties.lastHasExtension);
+                        }
+                        break;
+                    }
+                
+                //i've already handled the cases where passthrough sends motion plus data so this is all nunchuk baby
+                case EXTENSION_MOTIONPLUS_PASSTHROUGH_NUNCHUK:
+                    //let properties = properties.nunchuk;
+                    //print("passthrougbn nunchuk", this.currentExtensionId == EXTENSION_MOTIONPLUS_PASSTHROUGH_NUNCHUK, properties);
+                    if(firstTick) {
+                        properties.nunchuk = {};
+                        properties.motionplus = {};
+                    }
+                    properties = properties.nunchuk;
+                    properties.sX = this.extensionBytes[0]; //analog x
+                    properties.sY = this.extensionBytes[1]; //analog y
+                    properties.aX = this.extensionBytes[2] << 2 | (((this.extensionBytes[5] >> 4) & 0b1) << 1); //10 bit accelerometer x (i think?)
+                    properties.aY = this.extensionBytes[3] << 2 | (((this.extensionBytes[5] >> 5) & 0b1) << 1); //10 bit accelerometer y (i think?)
+                    properties.aZ = this.extensionBytes[4] << 2 | ((this.extensionBytes[5] >> 6) & 0b11); //10 bit accelerometer z (i think?)
+                    properties.lastButtons = properties.buttons; //kinda error prone to take buttons by reference but i remedy this by setting buttons to a new object created in the next line lol
+                    if(!properties.lastButtons) { //this motion plus passthrough stuff is kinda weird and i can't use first tick if they do the motion plus data first then the nunchuk data
+                        properties.lastButtons = {
+                            c: !((this.extensionBytes[5] >> 3) & 1), //c button (for some reason, 0 means it's pressed)
+                            z: !((this.extensionBytes[5] >> 2) & 1), //z button (for some reason, 0 means it's pressed)
+                        };
+                    }
+                    properties.buttons = {
+                        c: !((this.extensionBytes[5] >> 3) & 1), //c button (for some reason, 0 means it's pressed)
+                        z: !((this.extensionBytes[5] >> 2) & 1), //z button (for some reason, 0 means it's pressed)
+                    };
+                    //DrawText(dc, objtostr(properties), 904, screenHeight/2, screenWidth, screenHeight, DT_EXPANDTABS);
+                    break;
+
+                case EXTENSION_MOTIONPLUS_PASSTHROUGH_CLASSIC_CONTROLLER:
+                    //lowkey i don't have a classic controller so i'll just put this here
+                    if(firstTick) {
+                        properties.classicController = {};
+                        properties.motionplus = {};
+                    }
             }
 
-            this.extension[this.currentExtensionId] = properties;
+            //this.extension[this.currentExtensionId] = properties; //wait i don't have to do this i only directly set properties once
 
             if(properties.buttons) {
                 if(firstTick) {
@@ -404,7 +615,97 @@ class hid_wiimote {
         }
     }
 
+    #parseIRbytes(id) {
+        let dots = [];
+        let dotindex = 0;
+        switch(this.IR.mode) {
+            case IR_MODE_BASIC:
+                //example data: [0x29 0xdd 0x21 0xe0 0x9c 0xff 0xff 0xff 0xff 0xff]
+                for(let i = 0; i < 2; i++) { //only looping two times because im trying to read each pair of dots (each pair is 5 bytes)
+                    const offset = 5*i;
+                    if(this.IRBytes[0+offset] != 0xff && this.IRBytes[1+offset] != 0xff) {
+                        //not empty
+                        //additional two bytes of x position stored in bits 4 and 5 of byte 2 + offset
+                        //additional two bytes of y position stored in bits 6 and 7 ! of byte 2 + offset
+                        const x = ((this.IRBytes[2+offset] >> 4 & 0b11) << 8) | this.IRBytes[0+offset];
+                        const y = ((this.IRBytes[2+offset] >> 6) << 8) | this.IRBytes[1+offset];
+                        
+                        //ok yeah it was clearly not like this lol, this additional two bytes must be put after the most significant bit of the value (so in our case, after the 7th bit)
+                        // const x = this.IRBytes[0+offset] << 2 | (this.IRBytes[2+offset] >> 4 & 0b11);
+                        // const y = this.IRBytes[1+offset] << 2 | (this.IRBytes[2+offset] >> 6);
+                        
+                        //dots.push({x, y}); //wait no if i push the order might be wrong!
+                        dots[dotindex] = {x, y};
+                    }
+                    dotindex++;
+                    if(this.IRBytes[3+offset] != 0xff && this.IRBytes[4+offset] != 0xff) {
+                        const x = ((this.IRBytes[2+offset] & 0b11) << 8) | this.IRBytes[3+offset];
+                        const y = ((this.IRBytes[2+offset] >> 2 & 0b11) << 8) | this.IRBytes[4+offset];
+                        
+                        //ok yeah it was clearly not like this lol, this additional two bytes must be put after the most significant bit of the value (so in our case, after the 7th bit)
+                        //const x = this.IRBytes[3+offset] << 2 | (this.IRBytes[2+offset] & 0b11);
+                        //const y = this.IRBytes[4+offset] << 2 | (this.IRBytes[2+offset] >> 2 & 0b11);
+
+                        //dots.push({x, y});
+                        dots[dotindex] = {x, y};
+                    }
+                    dotindex++;
+                }
+                break;
+            case IR_MODE_EXTENDED:
+                for(let i = 0; i < 4; i++) {
+                    const offset = 3*i;
+                    if(this.IRBytes[0+offset] != 0xff && this.IRBytes[1+offset] != 0xff) {
+                        //not empty
+                                                //additional two bytes of x position stored in bits 4 and 5 of byte 2 + offset
+                        //additional two bytes of y position stored in bits 6 and 7 ! of byte 2 + offset
+                        const x = ((this.IRBytes[2+offset] >> 4 & 0b11) << 8) | this.IRBytes[0+offset];
+                        const y = ((this.IRBytes[2+offset] >> 6) << 8) | this.IRBytes[1+offset];
+                        const size = this.IRBytes[2+offset] & 0b1111;
+
+                        //i don't use dotindex here because i loop 4 times lel
+                        dots[i] = {x, y, size};
+                    }
+                }
+                break;
+            case IR_MODE_FULL:
+                //we gotta check the report id because 0x3e sends the first 2 pairs of ir dots and 0x3f sends the last 2
+                //ok we're gonna do this kinda differently since it returns dots in TWO reports instead of one
+                if(this.IR.dots) {
+                    dots = this.IR.dots; //by doing it like this i keep the dot data of the last report
+                }
+                dotindex = 2*(id - 0x3e); //if the id == 0x3e dotindex starts at 0, else dotindex starts at 2 (if id == 0x3f) (branchless code god (they call me doctor runtime, call me doctor optimization haha))
+                for(let i = 0; i < 2; i++) {
+                    const offset = 9*i;
+                    if(this.IRBytes[0+offset] != 0xff && this.IRBytes[1+offset] != 0xff) {
+                        const x = ((this.IRBytes[2+offset] >> 4 & 0b11) << 8) | this.IRBytes[0+offset];
+                        const y = ((this.IRBytes[2+offset] >> 6) << 8) | this.IRBytes[1+offset];
+                        const size = this.IRBytes[2+offset] & 0b1111;
+
+                        const minX = this.IRBytes[3+offset];
+                        const minY = this.IRBytes[4+offset];
+                        const maxX = this.IRBytes[5+offset];
+                        const maxY = this.IRBytes[6+offset];
+
+                        const intensity = this.IRBytes[8+offset];
+
+                        const blob = {minX, minY, maxX, maxY}
+                        dots[dotindex] = {x, y, blob, size, intensity};
+                    }else {
+                        //delete the old entry
+                        delete dots[dotindex];
+                    }
+                    dotindex++;
+                }
+                break;
+        }
+        this.IR.dots = dots;
+        DrawText(dc, objtostr(this.IR), 904, screenHeight/2, screenWidth, screenHeight, DT_EXPANDTABS);
+        this.#fireEvent("onIRData");
+    }
+
     addEventListener(event, extra, callback) {
+        event = event.toLowerCase();
         if(!this.#eventListeners[event]) {
             this.#eventListeners[event] = [];
         }
@@ -416,11 +717,11 @@ class hid_wiimote {
         //for(const {callback, extra} of this.#eventListeners[event]) {
             //this.#eventDispatchers[event](callback, extra);
         //}
-
+        event = event.toLowerCase();
         if(!this.#eventListeners[event]) { //if nobody is listening to this event then we'll just return (otherwise you get a TypeError lol)
             return;
         }
-        if(event == "onSpecificButtonDown" || event == "onSpecificButtonUp") {
+        if(event == "onspecificbuttondown" || event == "onspecificbuttonup") {
             /*for(const {callback, extra} of this.#eventListeners[event]) {
               if((this.buttons >> extra) & 1) {
                     callback();
@@ -431,26 +732,36 @@ class hid_wiimote {
                     callback();
                 }
             }
-        }else if(event == "onButtonDown" || event == "onButtonUp") {
+        }else if(event == "onbuttondown" || event == "onbuttonup") {
             this.#fireEvent("onSpecific"+event.substring(2), eventExtra);
             for(const {callback} of this.#eventListeners[event]) {
                 //extension status, previous extension id
                 callback(eventExtra);
             }
-        }else if(event == "onExtensionChange") {
+        }else if(event == "onextensionchange") {
             for(const {callback} of this.#eventListeners[event]) {
                 //extension status, previous extension id
                 callback(this.status.extension, eventExtra);
             }
-        }else if(event == "onExtensionButtonDown" || event == "onExtensionButtonUp") { //no specific version because the extensions are all different
+        }else if(event == "onmotionplusextensionchange") {
+            for(const {callback} of this.#eventListeners[event]) {
+                //extension status, previous extension id
+                callback(eventExtra);
+            }
+        }else if(event == "onextensionbuttondown" || event == "onextensionbuttonup") { //no specific version because the extensions are all different
             for(const {callback} of this.#eventListeners[event]) {
                 //extension id, extension object,
                 callback(this.currentExtensionId, this.extension[this.currentExtensionId], eventExtra);
             }
-        }else if(event == "onGuitarTouchBarChange") {
+        }else if(event == "onguitartouchbarchange") {
             for(const {callback} of this.#eventListeners[event]) {
                 //extension id, extension object,
                 callback(this.extension[this.currentExtensionId].touchBar);
+            }
+        }else if(event == "onirdata") {
+            for(const {callback} of this.#eventListeners[event]) {
+                //extension id, extension object,
+                callback(this.IR);
             }
         }
     }
@@ -465,11 +776,45 @@ class hid_wiimote {
         this.write(new Uint8Array([0x15, this.#rumbling], "requestStatus"));
     }
 
-    initializeExtension() {
+    waitForReport(reportId) {
+        let raw;
+        while(true) {
+            raw = hid_read(this.handle);
+            if(raw[0] == reportId) {
+                break;
+            }
+            print("0x"+raw[0].toString(16)+" reported while waiting for 0x"+reportId.toString(16));
+            this.onData(raw);
+        }
+        return raw;
+    }
+    
+    //reportCallback param signature is Function(report : Uint8Array) : boolean | undefined
+    //the value you return determines whether to return (true), continue (false), or let the the wiimote handle it (undefined)
+    waitForReportWithPredicate(reportId, reportCallback) {
+        let raw;
+        while(true) {
+            raw = hid_read(this.handle);
+            if(raw[0] == reportId) {
+                const val = reportCallback(raw);
+                if(val) {
+                    return raw;
+                }else if(val == false) {
+                    continue;
+                }
+            }
+            print("0x"+raw[0].toString(16)+" reported while waiting for 0x"+reportId.toString(16));
+            this.onData(raw);
+        }
+    }
+
+    initializeExtension(motionplus = false) {
         //                                                     i think the (4) means the addressSpace mode
-        this.writeMemorySync(0x04, 0xA400F0, 1, [0x55]); //write 0x55 to 0x(4)A400F0
-        this.writeMemorySync(0x04, 0xA400FB, 1, [0x00]); //write 0x00 to 0x(4)A400FB
-        this.readCurrentExtensionFromWiimote();
+        this.writeMemorySync(0x04, 0xA400F0 + (motionplus*0x020000), 1, [0x55]); //write 0x55 to 0x(4)A400F0 (or if motion plus, 0x(4)A600F0)
+        if(!motionplus) { //there's one more step to activating motionplus so it won't show up yet...
+            this.writeMemorySync(0x04, 0xA400FB, 1, [0x00]); //write 0x00 to 0x(4)A400FB (you don't need to actually do this for motion plus)
+            this.readCurrentExtensionFromWiimote();
+        }
     }
 
     //updates the currentExtension property
@@ -494,27 +839,43 @@ class hid_wiimote {
         const addressSpace = 0x04;
         const offset = 0xa400fa;
         const size = 6;
-        this.write(new Uint8Array([0x17, addressSpace | this.#rumbling, (offset & 0xff0000) >> 16, (offset & 0xff00) >> 8, offset & 0xff, size >> 8, size & 0xff]), "readMemory");
-        let raw;
-        let data = [];
-        while(true) {
-            raw = hid_read(this.handle);
-            if(raw[0] == 0x21) {
-                //print(raw, raw[3] >> 4, "FACK");
-                const byteLength = (raw[3] >> 4) + 1;           //it seems like when there's an error byteLength just defaults to 16?
-                //making sure we're reading the correct response by checking the two offset bytes at raw[4] and raw[5]
-                if((raw[4] << 8 | raw[5]) == (offset & 0xffff) && (byteLength == size || raw[3] & 0b1111 != 0)) {
-                    //print(raw, raw[3] >> 4, (raw[4] << 8 | raw[5]));
-                    for(let i = 0; i < byteLength; i++) {
-                        data.push(raw[i+6]);
-                    }
-                    break;
-                }
-            }
-            this.onData(raw);
-        }
-        if((raw[3] & 0b1111) == 0) { //no error
-            let val = 0n; //i gotta use a big int because javascript starts tweaking (turning numbers negative) when shifting 32 bits or something like that
+        //this.write(new Uint8Array([0x17, addressSpace | this.#rumbling, (offset & 0xff0000) >> 16, (offset & 0xff00) >> 8, offset & 0xff, size >> 8, size & 0xff]), "readMemory");
+        //let raw;
+        //let data = [];
+        //while(true) {
+        //    raw = hid_read(this.handle);
+        //    if(raw[0] == 0x21) {
+        //        //print(raw, raw[3] >> 4, "FACK");
+        //        const byteLength = (raw[3] >> 4) + 1;           //it seems like when there's an error byteLength just defaults to 16?
+        //        //making sure we're reading the correct response by checking the two offset bytes at raw[4] and raw[5]
+        //        if((raw[4] << 8 | raw[5]) == (offset & 0xffff) && (byteLength == size || raw[3] & 0b1111 != 0)) {
+        //            //print(raw, raw[3] >> 4, (raw[4] << 8 | raw[5]));
+        //            for(let i = 0; i < byteLength; i++) {
+        //                data.push(raw[i+6]);
+        //            }
+        //            break;
+        //        }
+        //    }
+        //    this.onData(raw);
+        //}
+
+        //oh wait i wrote this when i was in the middle of writing readMemorySync
+        //const raw = this.waitForReportWithPredicate(0x21, (raw) => {
+        //    //print(raw, raw[3] >> 4, "FACK");
+        //    const byteLength = (raw[3] >> 4) + 1;           //it seems like when there's an error byteLength just defaults to 16?
+        //    //making sure we're reading the correct response by checking the two offset bytes at raw[4] and raw[5]
+        //    if((raw[4] << 8 | raw[5]) == (offset & 0xffff) && (byteLength == size || raw[3] & 0b1111 != 0)) {
+        //        //print(raw, raw[3] >> 4, (raw[4] << 8 | raw[5]));
+        //        for(let i = 0; i < byteLength; i++) {
+        //            data.push(raw[i+6]);
+        //        }
+        //        return true;
+        //    }
+        //});
+
+        const data = this.readMemorySync(addressSpace, offset, size);
+        if(data) {
+            let val = 0n; //i gotta use a big int because when using bitwise operations, javascript converts the value into a 32bit signed integer (don't question this source: https://en.wikipedia.org/wiki/Asm.js#:~:text=In%20JavaScript%2C%20bitwise%20operators%20convert%20their%20operands%20to%2032%2Dbit%20signed%20integers%20and%20give%20integer%20results)
             //for(let i = 0; i < 6; i++) {
             //    this.currentExtension |= data[i] << (6-i)*8;
             //}
@@ -527,6 +888,55 @@ class hid_wiimote {
             this.currentExtensionId = EXTENSION_NONE;
         }
     }
+
+    maybeSetupMotionPlus(passthrough_mode = PASSTHROUGH_NONE) {
+        //this.readMemory(0x04, 0xa600fa, 0x6, (success, data) => {
+        //    if(!success) {
+        //        printNoHighlight("(no )")
+        //    }
+        //});
+        const data = this.readMemorySync(0x04, 0xa600fe, 0x2); //reading the "two-byte expansion identifier" at 0xa600fe
+        if(!data) { //read memory fails with error code 7 if there's no motion plus extension (or if it's already active)
+            printNoHighlight("(no motion plus detected)");
+        }else {
+            //init motion plus
+            this.initializeExtension(true);
+            this.expectingMotionPlus = true;
+            this.expectingMotionPlusTimer = Date.now();
+            //activate motion plus
+            this.writeMemorySync(0x04, 0xA600FE, 1, [passthrough_mode]);
+            //after this point the wiimote should send a status report telling us the motion plus connected
+            //const data = this.readMemorySync(0x04, 0xA400FA, 6);
+            //if(data) {
+            //    let val = 0n; //i gotta use a big int because when using bitwise operations, javascript converts the value into a 32bit signed integer (don't question this source: https://en.wikipedia.org/wiki/Asm.js#:~:text=In%20JavaScript%2C%20bitwise%20operators%20convert%20their%20operands%20to%2032%2Dbit%20signed%20integers%20and%20give%20integer%20results)
+            //    //for(let i = 0; i < 6; i++) {
+            //    //    this.currentExtension |= data[i] << (6-i)*8;
+            //    //}
+            //    for(let i = 0; i < 6; i++) {
+            //        val |= (BigInt(data[i]) << ((5n-BigInt(i))*8n));
+            //    }
+            //    if(Number(val) == EXTENSION_MOTIONPLUS_ACTIVATE) {
+            //        printNoHighlight("(motion plus successfully activated)");
+            //    }
+            //}else {
+            //    printNoHighlight("(motion plus failed to activate (perhaps it was already active?))")
+            //}
+        }
+    }
+
+    setMotionPlusPassthroughMode(passthrough_mode) {
+        //you lowkey gotta disable motion plus first
+        this.deactivateMotionPlus();
+        this.maybeSetupMotionPlus(passthrough_mode)
+    }
+
+    //deactivates motion plus and activates the extension plugged into it
+    deactivateMotionPlus() {
+        this.writeMemorySync(0x04, 0xA400F0, 1, [0x55]);
+    }
+
+    //valid line of js consisting of three keywords!
+    //void delete this
 
     setDataReportingMode(continuous, mode) {
         //this.#errorCheck(hid_write(this.handle, new Uint8Array([0x12, continuous << 2, mode])), "setDataReportingMode (hid_write -> id: 0x12)");
@@ -598,11 +1008,58 @@ class hid_wiimote {
         this.enableSpeaker(format, sampleRate, volume);
     }
 
+    //use one of the IR_SENSITIVITY consts my boy
+    enableIR(sensitivityArr, mode) {
+        if(mode == IR_MODE_BASIC) { //10 bytes required
+            this.setDataReportingMode(false, 0x36);
+        }else if(mode == IR_MODE_EXTENDED) { //12 bytes required
+            this.setDataReportingMode(false, 0x33);
+        }else if(mode == IR_MODE_FULL) { //36 (18) bytes required
+            this.setDataReportingMode(false, 0x3e);
+        }
+        this.write(new Uint8Array([0x13, 0b110 | this.#rumbling]), "enabling ir camera (1)");
+        let report = this.waitForReport(0x22);
+        this.onData(report);
+        if(report[4] != 0) {
+            return;
+        }
+        this.write(new Uint8Array([0x1a, 0b110 | this.#rumbling]), "enabling ir camera (2)");
+        report = this.waitForReport(0x22);
+        this.onData(report);
+        if(report[4] != 0) {
+            return;
+        }
+        // this.writeMemorySync(0x04, 0xb00000, 9, sensitivityArr.reduce((a,b,i)=>i<9?(a.push(b),a):a,[])); //although this code looks like ass it does get the job done (of course we're supposed to be writing dumb code so i won't use it)
+        let value;
+        if(Math.random() > .5) {
+            value = 0x01;
+            print("doing wiimote init method")
+        }else {
+            value = 0x08;
+            print("doing wiki method");
+        }
+        //                   0x04 since this is the ir camera's register or whatever
+        this.writeMemorySync(0x04, 0xb00030, 1, [value]);
+        this.writeMemorySync(0x04, 0xb00000, 9, sensitivityArr.slice(0, 9)); //writing to sensitivity block 1 (9 bytes)
+        this.writeMemorySync(0x04, 0xb0001a, 2, sensitivityArr.slice(9)); //writing to sensitivity block 2 (2 bytes);
+        this.writeMemorySync(0x04, 0xb00033, 1, [mode]);
+        this.writeMemorySync(0x04, 0xb00030, 1, [0x08]);
+        this.requestStatus(print);
+        this.IR = {mode};
+    }
+
+    disableIR() {
+        this.write(new Uint8Array([0x13, this.#rumbling]), "disabling ir camera (1)");
+        this.write(new Uint8Array([0x1a, this.#rumbling]), "disabling ir camera (2)");
+        this.requestStatus(print);
+        this.IR = undefined;
+    }
+
     playSoundData(data) {
         if(!this.status.speaker) {
             printNoHighlight("the speaker hasn't been enabled yet but we'll try anyways");
         }
-        this.write(new Uint8Array([0x18, (data.length << 3) | this.#rumbling, ...data]));
+        this.write(new Uint8Array([0x18, (data.length << 3) | this.#rumbling, ...data]), "playSoundData");
     }
 
     //callback param signature is Function(success : boolean, data : Array<Number>) : void
@@ -613,18 +1070,43 @@ class hid_wiimote {
         this.write(new Uint8Array([0x17, addressSpace | this.#rumbling, (offset & 0xff0000) >> 16, (offset & 0xff00) >> 8, offset & 0xff, size >> 8, size & 0xff]), "readMemory");
     }
 
-    waitForReport(reportId) {
-        let raw;
-        while(true) {
-            raw = hid_read(this.handle);
-            if(raw[0] == reportId) {
-                break;
+    //returns data (if success) or undefined (if not)
+    readMemorySync(addressSpace, offset, size) {
+        this.write(new Uint8Array([0x17, addressSpace | this.#rumbling, (offset & 0xff0000) >> 16, (offset & 0xff00) >> 8, offset & 0xff, size >> 8, size & 0xff]), "readMemory");
+        let data = [];
+        this.waitForReportWithPredicate(0x21, (raw) => {
+            //print(raw, raw[3] >> 4, "FACK");
+            const byteLength = (raw[3] >> 4) + 1;           //it seems like when there's an error byteLength just defaults to 16?
+            //making sure we're reading the correct response by checking the two offset bytes at raw[4] and raw[5] (unfortunately it doesn't include the most significant byte (and also changes by 16 if you request more than 16 bytes))
+            print((raw[4] << 8 | raw[5]), offset & 0xffff);
+            if((raw[4] << 8 | raw[5]) == (offset & 0xffff)) {
+                //print(raw, raw[3] >> 4, (raw[4] << 8 | raw[5]));
+                if(raw[3] & 0b1111 != 0) { //if the error bits are set then return undefined
+                    const console = GetStdHandle(STD_OUTPUT_HANDLE);
+                    SetConsoleTextAttribute(console, 4);
+                    printNoHighlight("readMemorySync failed with error code", raw[3]&0b1111);
+                    SetConsoleTextAttribute(console, 7);
+                    data = undefined;
+                    return true; //return true from the predicate callback will stop the loop and return control
+                }
+                for(let i = 0; i < byteLength; i++) {
+                    data.push(raw[i+6]);
+                }
+                size -= byteLength;
+                offset += byteLength;
+                if(size == 0) {
+                    return true; //return true from the predicate callback will stop the loop and return control
+                }
+
+                return false; //return false to continue the loop but stop the wiimote from handling the report (because we've already done that ourselves here)
             }
-            this.onData(raw);
-        }
-        return raw;
+
+            //returning undefined will continue the loop and let the wiimote handle the report
+        });
+        return data;
     }
 
+    //waits until the wiimote acknowledges our write memory report
     writeMemorySync(addressSpace, offset, size, byteArray) { //yeah something weird was happening when i was trying to enable the speaker and i think it's because you have to wait for the wiimote's response
         //return new Promise((resolve, reject) => {
             //this.#writeMemoryListeners.push({resolve, reject});
@@ -653,12 +1135,24 @@ const wiimote = new hid_wiimote(handle);
 
 let taps = 0;
 wiimote.addEventListener("onSpecificButtonDown", A_BUTTON, () => {
-    taps = (taps + 1) % 0b1111;
-    wiimote.setLEDs(taps << 4);
+    if(!wiimote.status.IRcamera) {
+        taps = (taps + 1) % 0b1111;
+        wiimote.setLEDs(taps << 4);
+    }
 });
 
 wiimote.addEventListener("onSpecificButtonDown", B_BUTTON, () => {
-    wiimote.toggleRumble();
+    if(!wiimote.status.IRcamera) {
+        wiimote.toggleRumble();
+    }else {
+        SendInput(MakeMouseInput(0,0,0,MOUSEEVENTF_LEFTDOWN));
+    }
+});
+
+wiimote.addEventListener("onSpecificButtonUp", B_BUTTON, () => {
+    if(wiimote.status.IRcamera) {
+        SendInput(MakeMouseInput(0,0,0,MOUSEEVENTF_LEFTUP));
+    }
 });
 
 wiimote.addEventListener("onSpecificButtonDown", HOME_BUTTON, () => {
@@ -686,12 +1180,26 @@ wiimote.addEventListener("onExtensionChange", undefined, (hasExtension, previous
     }
 });
 
+//lel almost like wiimoteshit.js and WUSBMote for osu!mania.js
+const guitarButtonToKey = {
+    green:  'A'.charCodeAt(0),
+    red:    'S'.charCodeAt(0),
+    yellow: 'F'.charCodeAt(0),
+    blue:   'G'.charCodeAt(0),
+    orange: 'H'.charCodeAt(0),
+    down:   VK_DOWN,
+    up:     VK_UP,
+    pedal:  'I'.charCodeAt(0),
+    plus:   VK_RETURN,
+    minus:  VK_LMENU,
+};
+
 wiimote.addEventListener("onExtensionButtonDown", undefined, (id, extension, buttonName) => {
     if(id == EXTENSION_NUNCHUK) {
         if(buttonName == "c") {
-            SendInput(MakeMouseInput(0,0,0,MOUSEEVENTF_LEFTDOWN));
+            //SendInput(MakeMouseInput(0,0,0,MOUSEEVENTF_LEFTDOWN));
         }else if(buttonName == "z") {
-            SendInput(MakeMouseInput(0,0,0,MOUSEEVENTF_RIGHTDOWN));
+            //SendInput(MakeMouseInput(0,0,0,MOUSEEVENTF_RIGHTDOWN));
         }
     }else if(id == EXTENSION_GUITAR) {
         if(buttonName == "minus") {
@@ -699,18 +1207,32 @@ wiimote.addEventListener("onExtensionButtonDown", undefined, (id, extension, but
         }else {
             printNoHighlight(buttonName + " DOWN");
         }
+        SendInput(MakeKeyboardInput(guitarButtonToKey[buttonName], false));
+    }else if(id == EXTENSION_MOTIONPLUS_PASSTHROUGH_NUNCHUK) {
+        printNoHighlight(buttonName);
+    }
+});
+
+wiimote.addEventListener("onMotionPlusExtensionChange", undefined, (lastExtensionStatus) => {
+    if(lastExtensionStatus) { //if the last extension status was 1, then something was disconnected
+        printNoHighlight("something was disconnected from the motion plus extension");
+    }else {
+        printNoHighlight("something was connected to the motion plus extension!");
     }
 });
 
 wiimote.addEventListener("onExtensionButtonUp", undefined, (id, extension, buttonName) => {
     if(id == EXTENSION_NUNCHUK) {
         if(buttonName == "c") {
-            SendInput(MakeMouseInput(0,0,0,MOUSEEVENTF_LEFTUP));
+            //SendInput(MakeMouseInput(0,0,0,MOUSEEVENTF_LEFTUP));
         }else if(buttonName == "z") {
-            SendInput(MakeMouseInput(0,0,0,MOUSEEVENTF_RIGHTUP));
+            //SendInput(MakeMouseInput(0,0,0,MOUSEEVENTF_RIGHTUP));
         }
     }else if(id == EXTENSION_GUITAR) {
-        printNoHighlight(buttonName + " UP");    
+        printNoHighlight(buttonName + " UP");
+        SendInput(MakeKeyboardInput(guitarButtonToKey[buttonName], true));
+    }else if(id == EXTENSION_MOTIONPLUS_PASSTHROUGH_NUNCHUK) {
+        printNoHighlight(buttonName);
     }
 });
 
@@ -734,6 +1256,16 @@ wiimote.addEventListener("onButtonUp", undefined, (button) => {
 
 wiimote.addEventListener("onGuitarTouchBarChange", undefined, (touchbar) => {
     print(touchbar);
+});
+
+wiimote.addEventListener("onIRdata", undefined, (ir) => {
+    if(ir.dots[0]) {
+        //this is an extremely basic way of moving the mouse to the wiimote lol i don't have my sensor bar turned on so i'm using a light instead
+        //the range of each dot is 0 - 1023 on the x axis and 0 - 767 on the y axis so we'll scale the value to our screen's width and height
+        //for some reason the x was flipped for me so i just do a little of that
+        SendInput(MakeMouseInput(((1023 - ir.dots[0].x)/1023)*screenWidth, (ir.dots[0].y/767)*screenHeight, 0, MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MOVE));
+        //mouse_event(MOUSEEVENTF_ABSOLUTE, , , 0);
+    }
 });
 
 let x = 0;
