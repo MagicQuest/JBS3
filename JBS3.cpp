@@ -2207,10 +2207,11 @@ V8FUNC(TextOutWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
     HDC dc = (HDC)IntegerFI(info[0]);
-    //const wchar_t* words = WStringFI(info[3]); //for some reason storing WStringFI into wchar_t* sometimes gets corrupted
+    const wchar_t* words = WStringFI(info[3]); //for some reason storing WStringFI into wchar_t* sometimes gets corrupted
+    //yeah im bringing back my original solution because TextOut just crashed when i put a number as the text parameter
     //print(words << " words");
     //print(wcslen(WStringFI(info[3])) << " " << info[3].As<String>()->Length());
-    info.GetReturnValue().Set(TextOut(dc, IntegerFI(info[1]), IntegerFI(info[2]), WStringFI(info[3]), info[3].As<String>()->Length()));//wcslen(words)));
+    info.GetReturnValue().Set(TextOut(dc, IntegerFI(info[1]), IntegerFI(info[2]), words, wcslen(words))); //info[3].As<String>()->Length()));//wcslen(words)));
 }
 
 V8FUNC(BitBltWrapper) {
@@ -11862,6 +11863,145 @@ V8FUNC(SendMessageTimeoutWrapper) {
     }
 }
 
+V8FUNC(PostMessageWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    WPARAM shit = WStringOrNULL<WPARAM>(isolate, info[2]);
+    LPARAM shit2 = WStringOrNULL<LPARAM>(isolate, info[3]);
+
+    info.GetReturnValue().Set(Number::New(isolate, PostMessage((HWND)IntegerFI(info[0]), IntegerFI(info[1]), shit, shit2)));
+}
+
+V8FUNC(PostThreadMessageWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    WPARAM shit = WStringOrNULL<WPARAM>(isolate, info[2]);
+    LPARAM shit2 = WStringOrNULL<LPARAM>(isolate, info[3]);
+
+    info.GetReturnValue().Set(Number::New(isolate, PostThreadMessage(IntegerFI(info[0]), IntegerFI(info[1]), shit, shit2)));
+}
+
+BOOL SetConsoleCtrlHandlerSecondaryCallbackForJsFunctionsLol(v8::Isolate* isolate, v8::Persistent<v8::Function>* jsFunc) {
+    using namespace v8;
+    //Isolate* isolate = v8::Isolate::GetCurrent(); //welp now that i know this is on a different thread there's no way i can get the current isolate :/ (oh wait i could pass it)
+    isolate->Enter();
+    Local<Context> context = isolate->GetCurrentContext();
+    Local<Value> out;
+    BOOL retval = FALSE;
+    TryCatch shit(isolate);
+    MaybeLocal<Value> jsretval = jsFunc->Get(isolate)->Call(context, context->Global(), 0, nullptr); //what the fuck this actually has a high chance of working
+    CHECKEXCEPTIONS(shit);
+    if (jsretval.ToLocal(&out)) {
+        retval = out->BooleanValue(isolate);
+    }
+    isolate->Exit();
+    return retval; //and it was at this point i learned that SetConsoleCtrlHandler will call the handler function ON A DIFFERENT THREAD! (im cooked bruh there's no way)
+}
+
+V8FUNC(SetConsoleCtrlHandlerWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    BOOL add = IntegerFI(info[1]);
+    BYTE* asmbytes = nullptr;
+    void* jsFunc = nullptr;
+    if (add) {
+        if (!info[0]->IsFunction()) {
+            HANDLE console = GetStdHandle(STD_OUTPUT_HANDLE);
+            SetConsoleTextAttribute(console, 4);
+            print("you've called SetConsoleCtrlHandler to add a control handler but the first parameter is not a function! normally this would just crash the process but since i'm nice you are getting this warning!\x07");
+            SetConsoleTextAttribute(console, 7);
+            return;
+        }
+        jsFunc = new Persistent<Function>(isolate, info[0].As<Function>());
+//ASYNC_STGMEDIUM_UserMarshal
+
+        BYTE* rdx = (BYTE*)&jsFunc; //js function pointer address bytes
+        BYTE* rcx = (BYTE*)&isolate; //isolate pointer address bytes
+        //BYTE* rax = (BYTE*)&SetConsoleCtrlHandlerSecondaryCallbackForJsFunctionsLol; //c++ function pointer address bytes (ok for some reason it doesn't like me trying to do it like this)
+        void* cppfunc = SetConsoleCtrlHandlerSecondaryCallbackForJsFunctionsLol;
+        BYTE* rax = (BYTE*)&cppfunc;
+
+        //hmm you can't send any data to the handler routine... assembly bullshit ensues...
+        asmbytes = new BYTE[51] { //well since i don't push anything we can assume rsp is on a 16 byte boundary (probably)
+            //0xcc,                   //int 3
+            0x90,
+            0x55,                   //push rbp
+            0x48, 0x89, 0xe5,       //mov rbp, rsp
+            0x48, 0x83, 0xec, 0x20, //sub rsp, 0x20 (32 bytes for shadow space (since we're going to call another function))
+            0x48, 0xb9, rcx[0], rcx[1], rcx[2], rcx[3], rcx[4], rcx[5], rcx[6], rcx[7], //movabs rcx, isolate pointer
+            0x48, 0xba, rdx[0], rdx[1], rdx[2], rdx[3], rdx[4], rdx[5], rdx[6], rdx[7], //movabs rdx, js function pointer
+            0x48, 0xb8, rax[0], rax[1], rax[2], rax[3], rax[4], rax[5], rax[6], rax[7], //movabs rax, actual function pointer
+            0xff, 0xd0,             //call rax
+            0x48, 0x83, 0xc4, 0x20, //add rsp, 0x20
+            0x5d,                   //pop rbp
+            0xc3,                   //ret
+            0x00, 0x00, 0x00, 0x00, //old page protection lmao im storing it here because im lazy
+        };
+        //SetConsoleCtrlHandler([](DWORD ctrlType) -> BOOL {
+        //
+        //}, IntegerFI(info[1]));
+        //LOL! I FORGOT TO MAKE THE MEMORY EXECUTABLE!
+        //oh my god i made it PAGE_EXECUTE_READ only and then tried writing the old protection straight to the memory i was making read only :facepalm:
+        //the only reason it wasn't obvious was because malloc would give me an access violation which the google told me was probably a heap corruption kind of issue
+        if (!VirtualProtect(asmbytes, 51, PAGE_EXECUTE_READWRITE, (PDWORD)(asmbytes + 47))) {
+            HANDLE console = GetStdHandle(STD_OUTPUT_HANDLE);
+            SetConsoleTextAttribute(console, 4);
+            print("VirtualProtect failed to make memory executable for SetConsoleCtrlHandler's ykykyk");
+            DWORD err = GetLastError();
+            printf("GetLastError returned %u -> \"%ws\"\n", err, _com_error(err).ErrorMessage());
+            SetConsoleTextAttribute(console, 7);
+            delete[] asmbytes;
+            delete jsFunc;
+            return;
+        }
+    }
+    else {
+        asmbytes = (BYTE*)IntegerFI(info[0]);
+    }
+    if (SetConsoleCtrlHandler((PHANDLER_ROUTINE)asmbytes, add)) {
+        if (add) {
+            info.GetReturnValue().Set(Number::New(isolate, (ULONG_PTR)asmbytes)); //only returning asmbytes because 
+        }
+        else {
+            //if we're not adding a handler we're removing it so we have to cleanup all that memory i allocated
+            //before i delete asmbytes i gotta read it to get the js function pointer (so i can delete that too)
+            
+            jsFunc = (void*)(*(ULONG_PTR*)(asmbytes + 21)); //yeah i just manually counted to see where the number is lol
+
+            DWORD oldidgafiknowwhatitwas;
+
+            DWORD storedoldvalue = *(DWORD*)(asmbytes + 47);
+
+            VirtualProtect(asmbytes, 51, storedoldvalue, &oldidgafiknowwhatitwas);
+
+            delete[] asmbytes;
+            delete jsFunc;
+            info.GetReturnValue().Set(TRUE);
+        }
+    }
+    else if(add) {
+        DWORD oldidgafiknowwhatitwas;
+
+        DWORD storedoldvalue = *(DWORD*)(asmbytes + 47);
+
+        VirtualProtect(asmbytes, 51, storedoldvalue, &oldidgafiknowwhatitwas);
+
+        delete[] asmbytes;
+        delete jsFunc;
+        info.GetReturnValue().Set(FALSE);
+    }
+}
+
+V8FUNC(GenerateConsoleCtrlEventWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Number::New(isolate, GenerateConsoleCtrlEvent(IntegerFI(info[0]), IntegerFI(info[1]))));
+}
+
 V8FUNC(ClientToScreenWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
@@ -16406,6 +16546,18 @@ V8FUNC(GetMessageExtraInfoWrapper) {
     info.GetReturnValue().Set(Number::New(isolate, GetMessageExtraInfo()));
 }
 
+//https://learn.microsoft.com/en-us/windows/win32/tablet/system-events-and-mouse-messages#distinguishing-pen-input-from-mouse-and-touch
+#define MI_WP_SIGNATURE 0xFF515700
+#define SIGNATURE_MASK 0xFFFFFF00
+#define IsPenEvent(dw) (((dw) & SIGNATURE_MASK) == MI_WP_SIGNATURE)
+
+V8FUNC(IsPenEventWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    info.GetReturnValue().Set(Boolean::New(isolate, IsPenEvent(IntegerFI(info[0]))));
+}
+
 V8FUNC(SetMessageExtraInfoWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
@@ -20108,6 +20260,8 @@ extern "C" __declspec(dllexport) v8::Local<v8::ObjectTemplate> InitGlobals(v8::I
     setGlobalWrapper(GetMessageExtraInfo);
     setGlobalWrapper(SetMessageExtraInfo);
 
+    setGlobalWrapper(IsPenEvent);
+
     setGlobal(MakeRAWINPUTDEVICE);
     setGlobalWrapper(RegisterRawInputDevices);
     setGlobal(GetRawInputDeviceListLength);
@@ -21982,6 +22136,13 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
     setGlobalWrapper(SendMessage);
     setGlobal(SendMessageStr);
     setGlobalWrapper(SendMessageTimeout);
+    setGlobalWrapper(PostMessage);
+    setGlobalWrapper(PostThreadMessage);
+    setGlobalWrapper(SetConsoleCtrlHandler);
+    setGlobalWrapper(GenerateConsoleCtrlEvent);
+
+    setGlobalConst(CTRL_C_EVENT);
+    setGlobalConst(CTRL_BREAK_EVENT);
 
     setGlobalConst(ICON_BIG);
     setGlobalConst(ICON_SMALL);

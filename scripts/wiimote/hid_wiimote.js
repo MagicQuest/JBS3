@@ -44,10 +44,10 @@ globalThis.PASSTHROUGH_CLASSIC_CONTROLLER = 0x07;
 globalThis.IR_SENSITIVITY_MARCAN =      [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x90, 0x00, 0xC0,        0x40, 0x00];
 globalThis.IR_SENSITIVITY_MAX =         [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0x00, 0x0C,        0x00, 0x00];
 globalThis.IR_SENSITIVITY_HIGH =        [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x90, 0x00, 0x41,        0x40, 0x00]; //lowkey i've only tested this one haha
-globalThis.IR_SENSITIVITY_WII_LEVEL_1 = [0x02, 0x00, 0x00, 0x71, 0x01, 0x00, 0x64, 0x00, 0xfe,	     0xfd, 0x05];
+globalThis.IR_SENSITIVITY_WII_LEVEL_1 = [0x02, 0x00, 0x00, 0x71, 0x01, 0x00, 0x64, 0x00, 0xfe,        0xfd, 0x05];
 globalThis.IR_SENSITIVITY_WII_LEVEL_2 = [0x02, 0x00, 0x00, 0x71, 0x01, 0x00, 0x96, 0x00, 0xb4,        0xb3, 0x04];
 globalThis.IR_SENSITIVITY_WII_LEVEL_3 = [0x02, 0x00, 0x00, 0x71, 0x01, 0x00, 0xaa, 0x00, 0x64,        0x63, 0x03];
-globalThis.IR_SENSITIVITY_WII_LEVEL_4 = [0x02, 0x00, 0x00, 0x71, 0x01, 0x00, 0xc8, 0x00, 0x36,	     0x35, 0x03];
+globalThis.IR_SENSITIVITY_WII_LEVEL_4 = [0x02, 0x00, 0x00, 0x71, 0x01, 0x00, 0xc8, 0x00, 0x36,        0x35, 0x03];
 globalThis.IR_SENSITIVITY_WII_LEVEL_5 = [0x07, 0x00, 0x00, 0x71, 0x01, 0x00, 0x72, 0x00, 0x20,        0x1f, 0x03];
 
 //if the wiimote's reporting mode doesn't send exactly the amount of ir data for the ir mode, it doesn't send any ir data!
@@ -133,6 +133,13 @@ class hid_wiimote {
     #readMemoryListeners = [];
     //#writeMemoryListeners = []; //rip
     buttons = 0; //WORD
+    accelX = 0;
+    accelY = 0;
+    accelZ = 0;
+    #tempAccelZ = 0; //the 0x3e and 0x3f reports send half of the Z acceleration so i neede this for that calc
+
+    static rawAcceleration = false; //if true, the hid_wiimote class will set the accel properties to the unsigned value straight from the wiimote without subtracting them (don't forget that to get the accelerometer bytes you have to set the data reporting mode to one that has them (like 0x33))
+
     lastButtons = 0; //WORD
     #eventListeners = {
         //built in listeners
@@ -149,7 +156,7 @@ class hid_wiimote {
         //    },
         //]
     };
-    #reportingMode = 0x30;
+    reportingMode = 0x30; //not private anymore lol because i wanted to know what it was (don't set it though because nothing will happen)
     status = {
         batteryLevel: 0,
         batteryLow: 0,
@@ -180,17 +187,17 @@ class hid_wiimote {
     }
 
     static inputReportInfo = {
-        0x30: hid_wiimote.#makeInfo(),
-        0x31: hid_wiimote.#makeInfo(3),
-        0x32: hid_wiimote.#makeInfo(0, 0, 8),
-        0x33: hid_wiimote.#makeInfo(3, 12, 0),
-        0x34: hid_wiimote.#makeInfo(0, 0, 19),
-        0x35: hid_wiimote.#makeInfo(3, 0, 16),
-        0x36: hid_wiimote.#makeInfo(0, 10, 9),
-        0x37: hid_wiimote.#makeInfo(3, 10, 6),
-        0x3d: hid_wiimote.#makeInfo(0, 0, 21, false),
-        0x3e: hid_wiimote.#makeInfo(1, 18, 0), //, true),
-        0x3f: hid_wiimote.#makeInfo(1, 18, 0), //, true),
+        0x30: hid_wiimote.#makeInfo(),                    //Core Buttons
+        0x31: hid_wiimote.#makeInfo(3),                   //Core Buttons and Accelerometer
+        0x32: hid_wiimote.#makeInfo(0, 0, 8),             //Core Buttons with 8 Extension bytes
+        0x33: hid_wiimote.#makeInfo(3, 12, 0),            //Core Buttons and Accelerometer with 12 IR bytes
+        0x34: hid_wiimote.#makeInfo(0, 0, 19),            //Core Buttons with 19 Extension bytes
+        0x35: hid_wiimote.#makeInfo(3, 0, 16),            //Core Buttons and Accelerometer with 16 Extension Bytes
+        0x36: hid_wiimote.#makeInfo(0, 10, 9),            //Core Buttons with 10 IR bytes and 9 Extension Bytes
+        0x37: hid_wiimote.#makeInfo(3, 10, 6),            //Core Buttons and Accelerometer with 10 IR bytes and 6 Extension Bytes
+        0x3d: hid_wiimote.#makeInfo(0, 0, 21, false),     //21 Extension Bytes
+        0x3e: hid_wiimote.#makeInfo(1, 18, 0), //, true), //Interleaved Core Buttons and Accelerometer with 36 IR bytes (one accelerometer byte for x, accelerometer byte for z is spread across both reports in the unused bits of the button bytes)
+        0x3f: hid_wiimote.#makeInfo(1, 18, 0), //, true), //Interleaved Core Buttons and Accelerometer with 36 IR bytes (one accelerometer byte for y, accelerometer byte for z is spread across both reports in the unused bits of the button bytes)
     }
 
     //wait i could just shift all of these instead (ok wait a minute that's still not foolproofe)
@@ -301,7 +308,7 @@ class hid_wiimote {
 
         }
         if((id & 0x30) == 0x30) { //we'll handle all the 0x30 input reports here
-            this.#reportingMode = id;
+            this.reportingMode = id;
             //if(id == 0x32 || id == 0x34 || id == 0x36 || id == 0x37 || id == 0x3d) { //each of these report ids sends some extension bytes
             const reportInfo = hid_wiimote.inputReportInfo[id];
             if(reportInfo.extensionByteCount != 0 && this.currentExtensionId) {
@@ -328,6 +335,33 @@ class hid_wiimote {
                 }
                 this.IRBytes = temp;
                 this.#parseIRbytes(id);
+            }
+            //wait i never did acceleration?!
+            if(reportInfo.accelerometerByteCount) {
+                const sub = (1-hid_wiimote.rawAcceleration)*0x200; //branchless code god
+                //haha jsbenchmark says the branch version is BARELY slower
+                //const sub = hid_wiimote.rawAcceleration ? 0 : 0x200;
+                if(id != 0x3e && id != 0x3f) {
+                    //normal
+                    // const x = (raw[3] << 2 | (raw[1] >> 5 & 0b11)) - 0x80;
+                    // const y = (raw[4] << 2 | ((raw[2] >> 5 & 1) << 1)) - 0x80;
+                    // const z = (raw[5] << 2 | ((raw[2] >> 6 & 1) << 1)) - 0x80;
+                    this.accelX = (raw[3] << 2 | (raw[1] >> 5 & 0b11)) - sub; // - 0x80;
+                    this.accelY = (raw[4] << 2 | ((raw[2] >> 5 & 1) << 1)) - sub; // - 0x80;
+                    this.accelZ = (raw[5] << 2 | ((raw[2] >> 6 & 1) << 1)) - sub; // - 0x80;
+                }else {
+                    //bs
+                    if(id == 0x3e) {
+                        this.accelX = (raw[3] << 2) - sub; //no least significant bits
+                        this.#tempAccelZ = ((raw[2] >> 5 & 0b11) << 6) | ((raw[1] >> 5 & 0b11) << 4);
+                    }else {
+                        this.accelY = (raw[3] << 2) - sub;
+                        //const lowNibbleZ = (raw[2] >> 3 & 0b1100) | (raw[1] >> 5 & 0b11); //nybble
+                        const lowNibbleZ = ((raw[2] >> 5 & 0b11) << 2) | (raw[1] >> 5 & 0b11)
+                        this.accelZ = ((this.#tempAccelZ | lowNibbleZ) << 2) - sub; //ahh the problem was i forgot to shift it right at the end
+                    }
+                }
+                //DrawText(dc, this.accelX+"\n"+this.accelY+"\n"+this.accelZ, 10, 10, screenWidth, screenHeight, DT_EXPANDTABS);
             }
             if(reportInfo.buttonByteCount) {
                 this.buttons = raw[2] << 8 | raw[1];
@@ -370,7 +404,7 @@ class hid_wiimote {
 
             if(!this.#requestingStatus) {
                 printNoHighlight("unexpected status!");
-                this.setDataReportingMode(false, this.#reportingMode); //go back to whatever the reporting mode was before lol
+                this.setDataReportingMode(false, this.reportingMode); //go back to whatever the reporting mode was before lol
                 /*this.readMemory(0x04, 0xa400fe, 2, (data) => {
                     print(data);
                     });*/
@@ -405,12 +439,18 @@ class hid_wiimote {
                     //this.#requestingStatus(raw);
                     this.#requestingStatus(this.status);
                 }
+                //print("resetting requeastinst status");
                 this.#requestingStatus = false;
             }
         }else if(id == 0x21) {
             this.buttons = raw[2] << 8 | raw[1];
 
             const current = this.#readMemoryListeners[0];
+
+            if(!current) {
+                printNoHighlight("unexpected read memory report! (something else is probably also talking to the wiimote)");
+                return;
+            }
 
             if((raw[3] & 0b1111) != 0) {
                 const g = raw[3] & 0b1111;
@@ -656,6 +696,12 @@ class hid_wiimote {
 
     #parseIRbytes(id) {
         let dots = [];
+        if(!this.IR.lastPresentDots) {
+            this.IR.lastPresentDots = [false, false, false, false];
+        }else {
+            this.IR.lastPresentDots = Array.from(this.IR.presentDots); //lowkey i do some weird stuff so we def need to copy presentDots
+        }
+        let presentDots = [];
         let dotindex = 0;
         switch(this.IR.mode) {
             case IR_MODE_BASIC:
@@ -675,6 +721,9 @@ class hid_wiimote {
                         
                         //dots.push({x, y}); //wait no if i push the order might be wrong!
                         dots[dotindex] = {x, y};
+                        presentDots[dotindex] = true;
+                    }else {
+                        presentDots[dotindex] = false;
                     }
                     dotindex++;
                     if(this.IRBytes[3+offset] != 0xff && this.IRBytes[4+offset] != 0xff) {
@@ -687,6 +736,9 @@ class hid_wiimote {
 
                         //dots.push({x, y});
                         dots[dotindex] = {x, y};
+                        presentDots[dotindex] = true;
+                    }else {
+                        presentDots[dotindex] = false;
                     }
                     dotindex++;
                 }
@@ -704,6 +756,9 @@ class hid_wiimote {
 
                         //i don't use dotindex here because i loop 4 times lel
                         dots[i] = {x, y, size};
+                        presentDots[i] = true;
+                    }else {
+                        presentDots[i] = false;
                     }
                 }
                 break;
@@ -712,6 +767,7 @@ class hid_wiimote {
                 //ok we're gonna do this kinda differently since it returns dots in TWO reports instead of one
                 if(this.IR.dots) {
                     dots = this.IR.dots; //by doing it like this i keep the dot data of the last report
+                    presentDots = this.IR.presentDots;
                 }
                 dotindex = 2*(id - 0x3e); //if the id == 0x3e dotindex starts at 0, else dotindex starts at 2 (if id == 0x3f) (branchless code god (they call me doctor runtime, call me doctor optimization haha))
                 for(let i = 0; i < 2; i++) {
@@ -730,17 +786,29 @@ class hid_wiimote {
 
                         const blob = {minX, minY, maxX, maxY}
                         dots[dotindex] = {x, y, blob, size, intensity};
+                        presentDots[dotindex] = true;
                     }else {
                         //delete the old entry
                         delete dots[dotindex];
+                        presentDots[dotindex] = false;
                     }
                     dotindex++;
                 }
                 break;
         }
         this.IR.dots = dots;
+        this.IR.presentDots = presentDots;
         //DrawText(dc, objtostr(this.IR), 904, screenHeight/2, screenWidth, screenHeight, DT_EXPANDTABS);
         this.#fireEvent("onIRData");
+        for(let i = 0; i < 4; i++) {
+            if(this.IR.lastPresentDots[i] != this.IR.presentDots[i]) {
+                if(this.IR.presentDots[i]) {
+                    this.#fireEvent("onirdotfound", i);
+                }else {
+                    this.#fireEvent("onirdotlost", i);
+                }
+            }
+        }
     }
 
     addEventListener(event, extra, callback) {
@@ -774,7 +842,7 @@ class hid_wiimote {
         }else if(event == "onbuttondown" || event == "onbuttonup") {
             this.#fireEvent("onSpecific"+event.substring(2), eventExtra);
             for(const {callback} of this.#eventListeners[event]) {
-                //extension status, previous extension id
+                //button
                 callback(eventExtra);
             }
         }else if(event == "onextensionchange") {
@@ -784,23 +852,28 @@ class hid_wiimote {
             }
         }else if(event == "onmotionplusextensionchange") {
             for(const {callback} of this.#eventListeners[event]) {
-                //extension status, previous extension id
+                //last extension status
                 callback(eventExtra);
             }
         }else if(event == "onextensionbuttondown" || event == "onextensionbuttonup") { //no specific version because the extensions are all different
             for(const {callback} of this.#eventListeners[event]) {
-                //extension id, extension object,
+                //extension id, extension object, button
                 callback(this.currentExtensionId, this.extension[this.currentExtensionId], eventExtra);
             }
         }else if(event == "onguitartouchbarchange") {
             for(const {callback} of this.#eventListeners[event]) {
-                //extension id, extension object,
+                //guitar touchbar object
                 callback(this.extension[this.currentExtensionId].touchBar);
             }
         }else if(event == "onirdata") {
             for(const {callback} of this.#eventListeners[event]) {
-                //extension id, extension object,
+                //ir object
                 callback(this.IR);
+            }
+        }else if(event == "onirdotfound" || event == "onirdotlost") {
+            for(const {callback} of this.#eventListeners[event]) {
+                //ir object, dot index
+                callback(this.IR, eventExtra);
             }
         }
     }
@@ -848,7 +921,7 @@ class hid_wiimote {
     }
 
     initializeExtension(motionplus = false) {
-        //                                                     i think the (4) means the addressSpace mode
+        //                                                                             i think the (4) means the addressSpace mode
         this.writeMemorySync(0x04, 0xA400F0 + (motionplus*0x020000), 1, [0x55]); //write 0x55 to 0x(4)A400F0 (or if motion plus, 0x(4)A600F0)
         if(!motionplus) { //there's one more step to activating motionplus so it won't show up yet...
             this.writeMemorySync(0x04, 0xA400FB, 1, [0x00]); //write 0x00 to 0x(4)A400FB (you don't need to actually do this for motion plus)
@@ -980,7 +1053,7 @@ class hid_wiimote {
     setDataReportingMode(continuous, mode) {
         //this.#errorCheck(hid_write(this.handle, new Uint8Array([0x12, continuous << 2, mode])), "setDataReportingMode (hid_write -> id: 0x12)");
         if(this.write(new Uint8Array([0x12, (continuous << 2) | this.#rumbling, mode]), "setDataReportingMode")) {
-            this.#reportingMode = mode;
+            this.reportingMode = mode;
         }
     }
 

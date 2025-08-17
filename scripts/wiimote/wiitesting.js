@@ -165,6 +165,16 @@ wiimote.addEventListener("onIRdata", undefined, (ir) => {
     }
 });
 
+wiimote.addEventListener("onIRdotfound", undefined, (IR, index) => {
+    const dot = IR.dots[index];
+    print("the IR camera has found dot", index);
+});
+
+wiimote.addEventListener("onIRdotlost", undefined, (IR, index) => {
+    const dot = IR.dots[index];
+    print("the IR camera has lost dot",index,"!");
+});
+
 let x = 0;
 
 //without poll
