@@ -11266,7 +11266,7 @@ LRESULT CALLBACK WinProc(HWND hWnd, UINT msg, WPARAM wp, LPARAM lp);
 //};
 
 #define SKIBIDI_CHECK 0x0021B1D1
-std::map<HWND, std::function<LRESULT(HWND, UINT, WPARAM, LPARAM)>> winProcMap; //thanks chatgpt!!! (ok nah nah bruh this solution did NOT solve basically anything (some win messages aren't sent to the js win proc, you still can't have 2 windows (because the blocking thing (ok i was lying))))
+std::map<HWND, std::function<LRESULT(HWND, UINT, WPARAM, LPARAM)>> winProcMap; //thanks chatgpt!!! (ok nah nah bruh this solution did NOT solve basically anything (some win messages aren't sent to the js win proc, you still can't have 2 windows (because the blocking thing (ok i was lying about the two windows thing))))
 //std::map<HWND, std::vector<std::tuple<UINT, WPARAM, LPARAM>>> nullMsgsMap;
 
 LRESULT CALLBACK WinProc(HWND hWnd, UINT msg, WPARAM wp, LPARAM lp)
@@ -11296,6 +11296,8 @@ LRESULT CALLBACK WinProc(HWND hWnd, UINT msg, WPARAM wp, LPARAM lp)
 //#include <vssym32.h> //BP_PUSHBUTTON
 //#include <Uxtheme.h>
 
+//wait ok i could have the loop in CreateWindow in a microtask instead so you immediately get the hwnd after you call CreateWindow!
+//also that ridiculous assembly solution for SetConsoleCtrlHandler could genuinely let me call the js callback for every message (including the messages sent before CreateWindow returns!)
 V8FUNC(CreateWindowWrapper) {
     //MessageBoxA(NULL, "aw shit another unfiinished hting", "ok so like no cap the only message you can resieve as of now is WM_PAINT", MB_OK | MB_ICONEXCLAMATION);
     using namespace v8;
@@ -11429,7 +11431,7 @@ V8FUNC(CreateWindowWrapper) {
                 //return SKIBIDI_CHECK;
             }
         };
-        newWindow = CreateWindowExW(IntegerFI(info[0]), //HOLY SHIT THIS LINE WAS FAILING EVERYTIME I EVEN USED BREAKPOINTS TO FIND THE ISSUE AND GUESS WHAT
+        newWindow = CreateWindowExW(IntegerFI(info[0]), //HOLY SHIT THIS LINE WAS FAILING EVERYTIME I EVEN USED BREAKPOINTS TO FIND THE ISSUE (yeah back in the day i barely used breakpoints) AND GUESS WHAT
             //THE ERROR WAS ACTUALLY IN THE WINPROC AND I WAS GETTING THE ISOLATE LPARAM WRONG (literally spent at minimum 30 minutes to figure this out (this is why JBS3 has me talking about banning it))
             wc.lpszClassName, //buddy idk what but something around here is KILLING M(Y/E) PROGRAM
             WStringFI(info[2]), //title was truncated because i was using DefWindowProcA https://stackoverflow.com/questions/11884021/c-why-this-window-title-gets-truncated
@@ -11883,7 +11885,7 @@ V8FUNC(PostThreadMessageWrapper) {
     info.GetReturnValue().Set(Number::New(isolate, PostThreadMessage(IntegerFI(info[0]), IntegerFI(info[1]), shit, shit2)));
 }
 
-BOOL SetConsoleCtrlHandlerSecondaryCallbackForJsFunctionsLol(v8::Isolate* isolate, v8::Persistent<v8::Function>* jsFunc) {
+BOOL SetConsoleCtrlHandlerSecondaryCallbackForJsFunctionsLol(DWORD ctrlType, v8::Isolate* isolate, v8::Persistent<v8::Function>* jsFunc) {
     using namespace v8;
     //Isolate* isolate = v8::Isolate::GetCurrent(); //welp now that i know this is on a different thread there's no way i can get the current isolate :/ (oh wait i could pass it)
     isolate->Enter();
@@ -11891,7 +11893,9 @@ BOOL SetConsoleCtrlHandlerSecondaryCallbackForJsFunctionsLol(v8::Isolate* isolat
     Local<Value> out;
     BOOL retval = FALSE;
     TryCatch shit(isolate);
-    MaybeLocal<Value> jsretval = jsFunc->Get(isolate)->Call(context, context->Global(), 0, nullptr); //what the fuck this actually has a high chance of working
+    //guiys guyse who was going to remindeth me that this function had a parameter lole?
+    Local<Value> jsCtrlType = Number::New(isolate, ctrlType);
+    MaybeLocal<Value> jsretval = jsFunc->Get(isolate)->Call(context, context->Global(), 1, &jsCtrlType); //what the fuck this actually has a high chance of working (hopefully now with the parameter it still does (yep it's still "great"!))
     CHECKEXCEPTIONS(shit);
     if (jsretval.ToLocal(&out)) {
         retval = out->BooleanValue(isolate);
@@ -11900,6 +11904,8 @@ BOOL SetConsoleCtrlHandlerSecondaryCallbackForJsFunctionsLol(v8::Isolate* isolat
     return retval; //and it was at this point i learned that SetConsoleCtrlHandler will call the handler function ON A DIFFERENT THREAD! (im cooked bruh there's no way)
 }
 
+//this is the reason i added this function lol
+//https://stackoverflow.com/questions/140111/sending-an-arbitrary-signal-in-windows
 V8FUNC(SetConsoleCtrlHandlerWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
@@ -11908,54 +11914,60 @@ V8FUNC(SetConsoleCtrlHandlerWrapper) {
     BYTE* asmbytes = nullptr;
     void* jsFunc = nullptr;
     if (add) {
-        if (!info[0]->IsFunction()) {
+        if (info[0]->IsNumber()) {
+
+        }else if (!info[0]->IsFunction()) {
             HANDLE console = GetStdHandle(STD_OUTPUT_HANDLE);
             SetConsoleTextAttribute(console, 4);
             print("you've called SetConsoleCtrlHandler to add a control handler but the first parameter is not a function! normally this would just crash the process but since i'm nice you are getting this warning!\x07");
             SetConsoleTextAttribute(console, 7);
             return;
         }
-        jsFunc = new Persistent<Function>(isolate, info[0].As<Function>());
-//ASYNC_STGMEDIUM_UserMarshal
+        else {
+            jsFunc = new Persistent<Function>(isolate, info[0].As<Function>());
+            //ASYNC_STGMEDIUM_UserMarshal
 
-        BYTE* rdx = (BYTE*)&jsFunc; //js function pointer address bytes
-        BYTE* rcx = (BYTE*)&isolate; //isolate pointer address bytes
-        //BYTE* rax = (BYTE*)&SetConsoleCtrlHandlerSecondaryCallbackForJsFunctionsLol; //c++ function pointer address bytes (ok for some reason it doesn't like me trying to do it like this)
-        void* cppfunc = SetConsoleCtrlHandlerSecondaryCallbackForJsFunctionsLol;
-        BYTE* rax = (BYTE*)&cppfunc;
+            BYTE* r8 = (BYTE*)&jsFunc; //js function pointer address bytes
+            BYTE* rdx = (BYTE*)&isolate; //isolate pointer address bytes
+            //BYTE* rax = (BYTE*)&SetConsoleCtrlHandlerSecondaryCallbackForJsFunctionsLol; //c++ function pointer address bytes (ok for some reason it doesn't like me trying to do it like this)
+            void* cppfunc = SetConsoleCtrlHandlerSecondaryCallbackForJsFunctionsLol;
+            BYTE* rax = (BYTE*)&cppfunc;
 
-        //hmm you can't send any data to the handler routine... assembly bullshit ensues...
-        asmbytes = new BYTE[51] { //well since i don't push anything we can assume rsp is on a 16 byte boundary (probably)
-            //0xcc,                   //int 3
-            0x90,
-            0x55,                   //push rbp
-            0x48, 0x89, 0xe5,       //mov rbp, rsp
-            0x48, 0x83, 0xec, 0x20, //sub rsp, 0x20 (32 bytes for shadow space (since we're going to call another function))
-            0x48, 0xb9, rcx[0], rcx[1], rcx[2], rcx[3], rcx[4], rcx[5], rcx[6], rcx[7], //movabs rcx, isolate pointer
-            0x48, 0xba, rdx[0], rdx[1], rdx[2], rdx[3], rdx[4], rdx[5], rdx[6], rdx[7], //movabs rdx, js function pointer
-            0x48, 0xb8, rax[0], rax[1], rax[2], rax[3], rax[4], rax[5], rax[6], rax[7], //movabs rax, actual function pointer
-            0xff, 0xd0,             //call rax
-            0x48, 0x83, 0xc4, 0x20, //add rsp, 0x20
-            0x5d,                   //pop rbp
-            0xc3,                   //ret
-            0x00, 0x00, 0x00, 0x00, //old page protection lmao im storing it here because im lazy
-        };
-        //SetConsoleCtrlHandler([](DWORD ctrlType) -> BOOL {
-        //
-        //}, IntegerFI(info[1]));
-        //LOL! I FORGOT TO MAKE THE MEMORY EXECUTABLE!
-        //oh my god i made it PAGE_EXECUTE_READ only and then tried writing the old protection straight to the memory i was making read only :facepalm:
-        //the only reason it wasn't obvious was because malloc would give me an access violation which the google told me was probably a heap corruption kind of issue
-        if (!VirtualProtect(asmbytes, 51, PAGE_EXECUTE_READWRITE, (PDWORD)(asmbytes + 47))) {
-            HANDLE console = GetStdHandle(STD_OUTPUT_HANDLE);
-            SetConsoleTextAttribute(console, 4);
-            print("VirtualProtect failed to make memory executable for SetConsoleCtrlHandler's ykykyk");
-            DWORD err = GetLastError();
-            printf("GetLastError returned %u -> \"%ws\"\n", err, _com_error(err).ErrorMessage());
-            SetConsoleTextAttribute(console, 7);
-            delete[] asmbytes;
-            delete jsFunc;
-            return;
+            //hmm you can't send any data to the handler routine... assembly bullshit ensues...
+            asmbytes = new BYTE[51]{ //well since i don't push anything we can assume rsp is on a 16 byte boundary (probably)
+                //0xcc,                   //int 3
+                0x90,
+                0x55,                   //push rbp
+                0x48, 0x89, 0xe5,       //mov rbp, rsp
+                0x48, 0x83, 0xec, 0x20, //sub rsp, 0x20 (32 bytes for shadow space (since we're going to call another function))
+                //oops guys i forgot that SetConsoleCtrlHandler will call the handler function with a DWORD parameter (so it would be in the RCX register that I was overwriting)
+                //that's why im using rdx and r8 instead now lol
+                0x48, 0xba, rdx[0], rdx[1], rdx[2], rdx[3], rdx[4], rdx[5], rdx[6], rdx[7], //movabs rdx, isolate pointer
+                0x49, 0xb8, r8[0], r8[1], r8[2], r8[3], r8[4], r8[5], r8[6], r8[7], //movabs r8, js function pointer
+                0x48, 0xb8, rax[0], rax[1], rax[2], rax[3], rax[4], rax[5], rax[6], rax[7], //movabs rax, actual function pointer
+                0xff, 0xd0,             //call rax
+                0x48, 0x83, 0xc4, 0x20, //add rsp, 0x20
+                0x5d,                   //pop rbp
+                0xc3,                   //ret
+                0x00, 0x00, 0x00, 0x00, //old page protection lmao im storing it here because im lazy
+            };
+            //SetConsoleCtrlHandler([](DWORD ctrlType) -> BOOL {
+            //
+            //}, IntegerFI(info[1]));
+            //LOL! I FORGOT TO MAKE THE MEMORY EXECUTABLE!
+            //oh my god i made it PAGE_EXECUTE_READ only and then tried writing the old protection straight to the memory i was making read only :facepalm:
+            //the only reason it wasn't obvious was because malloc would give me an access violation which the google told me was probably a heap corruption kind of issue
+            if (!VirtualProtect(asmbytes, 51, PAGE_EXECUTE_READWRITE, (PDWORD)(asmbytes + 47))) {
+                HANDLE console = GetStdHandle(STD_OUTPUT_HANDLE);
+                SetConsoleTextAttribute(console, 4);
+                print("VirtualProtect failed to make memory executable for SetConsoleCtrlHandler's ykykyk");
+                DWORD err = GetLastError();
+                printf("GetLastError returned %u -> \"%ws\"\n", err, _com_error(err).ErrorMessage());
+                SetConsoleTextAttribute(console, 7);
+                delete[] asmbytes;
+                delete jsFunc;
+                return;
+            }
         }
     }
     else {
@@ -11969,16 +11981,18 @@ V8FUNC(SetConsoleCtrlHandlerWrapper) {
             //if we're not adding a handler we're removing it so we have to cleanup all that memory i allocated
             //before i delete asmbytes i gotta read it to get the js function pointer (so i can delete that too)
             
-            jsFunc = (void*)(*(ULONG_PTR*)(asmbytes + 21)); //yeah i just manually counted to see where the number is lol
+            if (asmbytes != 0) {
+                jsFunc = (void*)(*(ULONG_PTR*)(asmbytes + 21)); //yeah i just manually counted to see where the number is lol
 
-            DWORD oldidgafiknowwhatitwas;
+                DWORD oldidgafiknowwhatitwas;
 
-            DWORD storedoldvalue = *(DWORD*)(asmbytes + 47);
+                DWORD storedoldvalue = *(DWORD*)(asmbytes + 47);
 
-            VirtualProtect(asmbytes, 51, storedoldvalue, &oldidgafiknowwhatitwas);
+                VirtualProtect(asmbytes, 51, storedoldvalue, &oldidgafiknowwhatitwas);
 
-            delete[] asmbytes;
-            delete jsFunc;
+                delete[] asmbytes;
+                delete jsFunc;
+            }
             info.GetReturnValue().Set(TRUE);
         }
     }
