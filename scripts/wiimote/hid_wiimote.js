@@ -128,7 +128,7 @@ function iterativeobjtostr(obj) {
 }
 
 class hid_wiimote {
-    #rumbling = false;
+    #rumbling = false; //private but there's a getter with the same name
     #requestingStatus = false;
     #readMemoryListeners = [];
     //#writeMemoryListeners = []; //rip
@@ -244,6 +244,10 @@ class hid_wiimote {
 
     get two() {
         return (this.buttons >> 8) & 1;
+    }
+
+    get rumbling() {
+        return this.#rumbling; //lol no setter
     }
 
     constructor(handle, statusCallback) {

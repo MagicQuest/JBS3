@@ -180,6 +180,10 @@ void errprint(const char* str) {
 
 #include <v8-proxy.h>
 
+//ok since i wasn't really gonna add ViGEmClient to JBS im not including the source lol only my precompiled lib (which was compiled from the (latest as of 9/13/2025) october 10th 2022 cb8c9f47870fcf661be22f38f354eb96e2123e88 commit)
+#pragma comment(lib, "ViGEm/ViGEmClient.lib")
+#include "ViGEm/Client.h"
+
 template<class T>
 T WStringOrNULL(v8::Isolate* isolate, const v8::Local<v8::Value>& v) {//, T* out) {
     using namespace v8;
@@ -389,6 +393,37 @@ namespace jsImpl {
             print("bad guid passed (lowkey don't know from where tho...)");
             return GUID_NULL;
         }
+    }
+
+    XUSB_REPORT fromJSXUSB_REPORT(Isolate* isolate, Local<Object> jsReport) {
+        XUSB_REPORT report{};
+        Local<Context> context = isolate->GetCurrentContext();
+
+        report.wButtons = IntegerFI(jsReport->Get(context, LITERAL("wButtons")).ToLocalChecked());
+        report.bLeftTrigger = IntegerFI(jsReport->Get(context, LITERAL("bLeftTrigger")).ToLocalChecked());
+        report.bRightTrigger = IntegerFI(jsReport->Get(context, LITERAL("bRightTrigger")).ToLocalChecked());
+        report.sThumbLX = IntegerFI(jsReport->Get(context, LITERAL("sThumbLX")).ToLocalChecked());
+        report.sThumbLY = IntegerFI(jsReport->Get(context, LITERAL("sThumbLY")).ToLocalChecked());
+        report.sThumbRX = IntegerFI(jsReport->Get(context, LITERAL("sThumbRX")).ToLocalChecked());
+        report.sThumbRY = IntegerFI(jsReport->Get(context, LITERAL("sThumbRY")).ToLocalChecked());
+
+        return report;
+    }
+
+    DS4_REPORT fromJSDS4_REPORT(Isolate* isolate, Local<Object> jsReport) {
+        DS4_REPORT report{};
+        Local<Context> context = isolate->GetCurrentContext();
+
+        report.bThumbLX = IntegerFI(jsReport->Get(context, LITERAL("bThumbLX")).ToLocalChecked());
+        report.bThumbLY = IntegerFI(jsReport->Get(context, LITERAL("bThumbLY")).ToLocalChecked());
+        report.bThumbRX = IntegerFI(jsReport->Get(context, LITERAL("bThumbRX")).ToLocalChecked());
+        report.bThumbRY = IntegerFI(jsReport->Get(context, LITERAL("bThumbRY")).ToLocalChecked());
+        report.wButtons = IntegerFI(jsReport->Get(context, LITERAL("wButtons")).ToLocalChecked());
+        report.bSpecial = IntegerFI(jsReport->Get(context, LITERAL("bSpecial")).ToLocalChecked());
+        report.bTriggerL = IntegerFI(jsReport->Get(context, LITERAL("bTriggerL")).ToLocalChecked());
+        report.bTriggerR = IntegerFI(jsReport->Get(context, LITERAL("bTriggerR")).ToLocalChecked());
+
+        return report;
     }
 
     //template<typename T>
@@ -19071,6 +19106,556 @@ V8FUNC(CM_Get_Device_Interface_ListWrapper) {
     }
 }
 
+V8FUNC(QueryPerformanceCounterWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    LARGE_INTEGER large;
+
+    BOOL res = QueryPerformanceCounter(&large);
+    if (res) {
+        info.GetReturnValue().Set(Number::New(isolate, large.QuadPart));
+    }
+    else {
+        info.GetReturnValue().Set(res);
+    }
+}
+
+V8FUNC(GetCurrentIsolateWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    info.GetReturnValue().Set(Number::New(isolate, (ULONG_PTR)isolate));
+}
+
+V8FUNC(PersistentWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    Local<Value> thing = info[0];
+
+    //void* retval;
+
+    //dang i gotta do this myself (wait do i)
+    //if (thing->IsArray()) {
+    //    retval = new Persistent<Array>(isolate, thing.As<Array>());
+    //}else if(thing->Is)
+    info.GetReturnValue().Set(Number::New(isolate, (ULONG_PTR) new Persistent<Value>(isolate, thing)));//retval));
+}
+
+V8FUNC(CallFunctionForMe) {
+    __debugbreak();
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    Local<Context> context = isolate->GetCurrentContext();
+    
+    Local<Function> func = info[0].As<Function>();
+    Function* raw = *func;
+    raw->Call(context, context->Global(), 0, nullptr);
+    //func->Call(context, context->Global(), 0, nullptr);
+}
+
+std::wstring __dirname;
+
+//nevermind man at some point i'll just finally split off v8 into its own dll (not today though because i can't seem to fucking compile it)
+//the reason i was trying to do this was because the stuff i wanted to add felt pretty obscure but i've spent at least an hour trying to get some kind of extension thing working and it just ain't meant to be without v8 in a separate dll
+//anyways im just gonna add the stuff anyways lol
+
+//struct JBS_API {
+//    void(*setGlobalFunction)(v8::Isolate*, const char* name, v8::FunctionCallback);
+//    void(*setGlobalStr)(v8::Isolate*, const char* name, const char* value);
+//    void(*setGlobalNumb)(v8::Isolate*, const char* name, double value);
+//};
+//
+//void JBS_API_setGlobalFunction(v8::Isolate* isolate, const char* name, v8::FunctionCallback cb) {
+//    using namespace v8;
+//    Local<Context> context = isolate->GetCurrentContext();
+//    Local<Object> global = context->Global();
+//    Local<String> n = String::NewFromOneByte(isolate, (const uint8_t*)name).ToLocalChecked();
+//    Local<Function> f = Function::New(context, cb).ToLocalChecked();
+//    global->Set(context, n, f);
+//}
+//
+//void JBS_API_setGlobalStr(v8::Isolate* isolate, const char* name, const char* value) {
+//    using namespace v8;
+//    Local<Context> context = isolate->GetCurrentContext();
+//    Local<Object> global = context->Global();
+//    Local<String> n = String::NewFromOneByte(isolate, (const uint8_t*)name).ToLocalChecked();
+//    Local<String> v = String::NewFromOneByte(isolate, (const uint8_t*)value).ToLocalChecked();
+//    global->Set(context, n, v);
+//}
+//
+//void JBS_API_setGlobalNumb(v8::Isolate* isolate, const char* name, double value) {
+//    using namespace v8;
+//    Local<Context> context = isolate->GetCurrentContext();
+//    Local<Object> global = context->Global();
+//    Local<String> n = String::NewFromOneByte(isolate, (const uint8_t*)name).ToLocalChecked();
+//    global->Set(context, n, Number::New(isolate, value));
+//}
+//
+//V8FUNC(__require_extension) {
+//    using namespace v8;
+//    Isolate* isolate = info.GetIsolate();
+//    Local<Context> context = isolate->GetCurrentContext();
+//    Local<Object> global = context->Global();
+//
+//    ////searching directory of script first
+//    //ok wait nevermind lolk f that
+//    std::wstring filename = WStringFI(info[0]);
+//    HMODULE dll = LoadLibrary(filename.c_str());
+//    if (dll == NULL) {
+//        DWORD g = GetLastError();
+//        MessageBox(NULL, (filename + L" failed to load.\nGetLastError returned " + std::to_wstring(g)).c_str(), L"__require_extension failed!", MB_OK | MB_ICONWARNING | MB_SYSTEMMODAL);
+//        info.GetReturnValue().Set(Number::New(isolate, g));
+//        return;
+//    }
+//
+//    //typedef void(*LPFUN_DefineGlobalProperties)(Isolate*, const Local<Context>&, const Local<Object>&);
+//    typedef void(*LPFUN_DefineGlobalProperties)(Isolate*, const Local<Context>&, JBS_API*);
+//    LPFUN_DefineGlobalProperties SetExtensionGlobals = (LPFUN_DefineGlobalProperties)GetProcAddress(dll, "DefineGlobalProperties");
+//    if (!SetExtensionGlobals) {
+//        DWORD g = GetLastError();
+//        //MessageBox(NULL, (L"expected extern void DefineGlobalProperties(Isolate*, const Local<Context>&, const Local<Object>&) in " + filename + L" but found no such function!").c_str(), L"__require_extension failed!", MB_OK | MB_ICONWARNING | MB_SYSTEMMODAL);
+//        MessageBox(NULL, (L"expected extern void DefineGlobalProperties(Isolate*, const Local<Context>&, JBS_API* api) in " + filename + L" but found no such function!").c_str(), L"__require_extension failed!", MB_OK | MB_ICONWARNING | MB_SYSTEMMODAL);
+//        info.GetReturnValue().Set(Number::New(isolate, g));
+//        return;
+//    }
+//
+//    JBS_API api{
+//        JBS_API_setGlobalFunction,
+//        JBS_API_setGlobalStr,
+//        JBS_API_setGlobalNumb
+//    };
+//
+//    //SetExtensionGlobals(isolate, context, global);
+//    SetExtensionGlobals(isolate, context, &api);
+//
+//    info.GetReturnValue().Set(0);
+//}
+
+V8FUNC(vigem_allocWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    info.GetReturnValue().Set(Number::New(isolate, (ULONG_PTR)vigem_alloc()));
+}
+
+V8FUNC(vigem_connectWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    info.GetReturnValue().Set(Number::New(isolate, vigem_connect((PVIGEM_CLIENT)IntegerFI(info[0]))));
+}
+
+V8FUNC(vigem_target_is_waitable_add_supportedWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    info.GetReturnValue().Set(vigem_target_is_waitable_add_supported((PVIGEM_TARGET)IntegerFI(info[0])));
+}
+
+V8FUNC(vigem_target_x360_allocWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    info.GetReturnValue().Set(Number::New(isolate, (ULONG_PTR)vigem_target_x360_alloc()));
+}
+
+V8FUNC(XUSB_REPORTWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    Local<Context> context = isolate->GetCurrentContext();
+
+    Local<Object> jsRv = Object::New(isolate);
+    jsRv->Set(context, LITERAL("wButtons"), info[0]);
+    jsRv->Set(context, LITERAL("bLeftTrigger"), info[1]);
+    jsRv->Set(context, LITERAL("bRightTrigger"), info[2]);
+    jsRv->Set(context, LITERAL("sThumbLX"), info[3]);
+    jsRv->Set(context, LITERAL("sThumbLY"), info[4]);
+    jsRv->Set(context, LITERAL("sThumbRX"), info[5]);
+    jsRv->Set(context, LITERAL("sThumbRY"), info[6]);
+
+    info.GetReturnValue().Set(jsRv);
+}
+
+V8FUNC(DS4_REPORTWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    Local<Context> context = isolate->GetCurrentContext();
+
+    Local<Object> jsRv = Object::New(isolate);
+    if (info[0]->IsUndefined()) {
+        jsRv->Set(context, LITERAL("bThumbLX"), Number::New(isolate, 0x80));
+    }
+    else {
+        jsRv->Set(context, LITERAL("bThumbLX"), info[0]);
+    }
+    if (info[1]->IsUndefined()) {
+        jsRv->Set(context, LITERAL("bThumbLY"), Number::New(isolate, 0x80));
+    }
+    else {
+        jsRv->Set(context, LITERAL("bThumbLY"), info[1]);
+    }
+    if (info[2]->IsUndefined()) {
+        jsRv->Set(context, LITERAL("bThumbRX"), Number::New(isolate, 0x80));
+    }
+    else {
+        jsRv->Set(context, LITERAL("bThumbRX"), info[2]);
+    }
+    if (info[3]->IsUndefined()) {
+        jsRv->Set(context, LITERAL("bThumbRY"), Number::New(isolate, 0x80));
+    }
+    else {
+        jsRv->Set(context, LITERAL("bThumbRY"), info[3]);
+    }
+    if (info[4]->IsUndefined()) {
+        jsRv->Set(context, LITERAL("wButtons"), Number::New(isolate, DS4_BUTTON_DPAD_NONE));
+    }
+    else {
+        jsRv->Set(context, LITERAL("wButtons"), info[4]);
+    }
+    jsRv->Set(context, LITERAL("bSpecial"), info[5]);
+    jsRv->Set(context, LITERAL("bTriggerL"), info[6]);
+    jsRv->Set(context, LITERAL("bTriggerR"), info[7]);
+
+    info.GetReturnValue().Set(jsRv);
+}
+
+V8FUNC(DS4_SET_DPADWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    Local<Context> context = isolate->GetCurrentContext();
+
+    //DS4_SET_DPAD();
+
+    Local<Object> jsRv = info[0].As<Object>();
+
+    USHORT wButtons = IntegerFI(jsRv->Get(context, LITERAL("wButtons")).ToLocalChecked());
+    wButtons &= ~0xF;
+    wButtons |= (USHORT)IntegerFI(info[1]);
+    jsRv->Set(context, LITERAL("wButtons"), Number::New(isolate, wButtons));
+}
+
+V8FUNC(vigem_target_x360_updateWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    XUSB_REPORT report = jsImpl::fromJSXUSB_REPORT(isolate, info[2].As<Object>());
+    info.GetReturnValue().Set(Number::New(isolate, vigem_target_x360_update((PVIGEM_CLIENT)IntegerFI(info[0]), (PVIGEM_TARGET)IntegerFI(info[1]), report)));
+}
+
+V8FUNC(vigem_target_x360_get_user_indexWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    ULONG index;
+    VIGEM_ERROR res = vigem_target_x360_get_user_index((PVIGEM_CLIENT)IntegerFI(info[0]), (PVIGEM_TARGET)IntegerFI(info[1]), &index);
+    if (!VIGEM_SUCCESS(res)) {
+        SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), 4);
+        print("vigem_target_x360_get_user_index with error code: " << res);
+        SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), 7);
+        info.GetReturnValue().Set(Number::New(isolate, res));
+    }
+    else {
+        info.GetReturnValue().Set(Number::New(isolate, index));
+    }
+}
+
+struct UserData {
+    v8::Isolate* isolate;
+    v8::Persistent<v8::Function> callback;
+};
+
+struct NotificationX360 {
+    UserData* data; //lowkey i could just get this data from the map but it's only 8 bytes lol dwabi
+    PVIGEM_CLIENT Client;
+    PVIGEM_TARGET Target;
+    UCHAR LargeMotor;
+    UCHAR SmallMotor;
+    UCHAR LedNumber;
+};
+
+struct NotificationDS4 {
+    UserData* data; //lowkey i could just get this data from the map but it's only 8 bytes lol dwabi
+    PVIGEM_CLIENT Client;
+    PVIGEM_TARGET Target;
+    UCHAR LargeMotor;
+    UCHAR SmallMotor;
+    DS4_LIGHTBAR_COLOR LightbarColor;
+};
+
+void v8_x360_notification_microtask(void* data) {
+    using namespace v8;
+    NotificationX360* n = (NotificationX360*)data;
+    Isolate* isolate = n->data->isolate; //oh wait i could probably actually use Isolate::GetCurrent()
+    Local<Context> context = isolate->GetCurrentContext();
+    Local<Value> jsElements[5] = {
+        Number::New(isolate, (ULONG_PTR)n->Client),
+        Number::New(isolate, (ULONG_PTR)n->Target),
+        Number::New(isolate, n->LargeMotor),
+        Number::New(isolate, n->SmallMotor),
+        Number::New(isolate, n->LedNumber)
+    };
+
+    n->data->callback.Get(isolate)->Call(context, context->Global(), 5, jsElements); //&jsInfo.As<Value>());
+
+    delete n;
+}
+
+void v8_ds4_notification_microtask(void* data) {
+    using namespace v8;
+    NotificationDS4* n = (NotificationDS4*)data;
+    Isolate* isolate = n->data->isolate; //oh wait i could probably actually use Isolate::GetCurrent()
+    Local<Context> context = isolate->GetCurrentContext();
+
+    Local<Object> jsLightbarColor = Object::New(isolate);
+    jsLightbarColor->Set(context, LITERAL("Red"), Number::New(isolate, n->LightbarColor.Red));
+    jsLightbarColor->Set(context, LITERAL("Green"), Number::New(isolate, n->LightbarColor.Green));
+    jsLightbarColor->Set(context, LITERAL("Blue"), Number::New(isolate, n->LightbarColor.Blue));
+
+    Local<Value> jsElements[5] = {
+        Number::New(isolate, (ULONG_PTR)n->Client),
+        Number::New(isolate, (ULONG_PTR)n->Target),
+        Number::New(isolate, n->LargeMotor),
+        Number::New(isolate, n->SmallMotor),
+        jsLightbarColor,
+    };
+
+    n->data->callback.Get(isolate)->Call(context, context->Global(), 5, jsElements); //&jsInfo.As<Value>());
+
+    delete n;
+}
+
+VOID CALLBACK vigem_x360_notification(
+    PVIGEM_CLIENT Client,
+    PVIGEM_TARGET Target,
+    UCHAR LargeMotor,
+    UCHAR SmallMotor,
+    UCHAR LedNumber,
+    LPVOID UserDefined
+) {
+    //using namespace v8;
+    //Isolate* isolate = Isolate::GetCurrent(); //lol (ok nevermind not lol this function may be called from a different thread WHICH IS BAD)
+    //if (isolate == nullptr) {
+    //    //print("x360_notification called from a DIFFERENT thread!!! Isolate* was nullptr\x07");
+    //    return;
+    //}
+    //Local<Context> context = isolate->GetCurrentContext();
+    //Persistent<Function>* callback = (Persistent<Function>*)UserData;
+    //
+    ////Local<Object> jsInfo = Object::New(isolate);
+    ////jsInfo->Set(context, LITERAL("Client"), Number::New(isolate, (ULONG_PTR)Client));
+    ////jsInfo->Set(context, LITERAL("Target"), Number::New(isolate, (ULONG_PTR)Target));
+    ////jsInfo->Set(context, LITERAL("LargeMotor"), Number::New(isolate, LargeMotor));
+    ////jsInfo->Set(context, LITERAL("SmallMotor"), Number::New(isolate, SmallMotor));
+    ////jsInfo->Set(context, LITERAL("LedNumber"), Number::New(isolate, LedNumber));
+    //
+    //Local<Value> jsElements[5] = {
+    //    Number::New(isolate, (ULONG_PTR)Client),
+    //    Number::New(isolate, (ULONG_PTR)Target),
+    //    Number::New(isolate, LargeMotor),
+    //    Number::New(isolate, SmallMotor),
+    //    Number::New(isolate, LedNumber)
+    //};
+    //
+    //callback->Get(isolate)->Call(context, context->Global(), 5, jsElements); //&jsInfo.As<Value>());
+
+    //well alright plan b
+    //this function is called on a different thread so we need to enqueue a microtask so it gets run on the main thread
+    UserData* data = (UserData*)UserDefined;
+    //we'll create this NotificationX360 object, then delete it when the microtask is run.
+    NotificationX360* dataForJS = new NotificationX360{data, Client, Target, LargeMotor, SmallMotor, LedNumber };
+    data->isolate->EnqueueMicrotask(v8_x360_notification_microtask, dataForJS);
+}
+
+VOID CALLBACK vigem_ds4_notification(
+    PVIGEM_CLIENT Client,
+    PVIGEM_TARGET Target,
+    UCHAR LargeMotor,
+    UCHAR SmallMotor,
+    DS4_LIGHTBAR_COLOR LightbarColor,
+    LPVOID UserDefined
+) {
+    //using namespace v8;
+    //Isolate* isolate = Isolate::GetCurrent(); //lol
+    //Local<Context> context = isolate->GetCurrentContext();
+    //Persistent<Function>* callback = (Persistent<Function>*)UserData;
+    //
+    ////Local<Object> jsInfo = Object::New(isolate);
+    ////jsInfo->Set(context, LITERAL("Client"), Number::New(isolate, (ULONG_PTR)Client));
+    ////jsInfo->Set(context, LITERAL("Target"), Number::New(isolate, (ULONG_PTR)Target));
+    ////jsInfo->Set(context, LITERAL("LargeMotor"), Number::New(isolate, LargeMotor));
+    ////jsInfo->Set(context, LITERAL("SmallMotor"), Number::New(isolate, SmallMotor));
+    ////jsInfo->Set(context, LITERAL("LedNumber"), Number::New(isolate, LedNumber));
+    //
+    //Local<Object> jsLightbarColor = Object::New(isolate);
+    //jsLightbarColor->Set(context, LITERAL("Red"), Number::New(isolate, LightbarColor.Red));
+    //jsLightbarColor->Set(context, LITERAL("Green"), Number::New(isolate, LightbarColor.Green));
+    //jsLightbarColor->Set(context, LITERAL("Blue"), Number::New(isolate, LightbarColor.Blue));
+    //
+    //Local<Value> jsElements[5] = {
+    //    Number::New(isolate, (ULONG_PTR)Client),
+    //    Number::New(isolate, (ULONG_PTR)Target),
+    //    Number::New(isolate, LargeMotor),
+    //    Number::New(isolate, SmallMotor),
+    //    jsLightbarColor
+    //};
+    //
+    //callback->Get(isolate)->Call(context, context->Global(), 5, jsElements); //&jsInfo.As<Value>());
+
+    //well alright plan b
+    //this function is called on a different thread so we need to enqueue a microtask so it gets run on the main thread
+    UserData* data = (UserData*)UserDefined;
+    //we'll create this NotificationX360 object, then delete it when the microtask is run.
+    NotificationDS4* dataForJS = new NotificationDS4{ data, Client, Target, LargeMotor, SmallMotor, LightbarColor };
+    data->isolate->EnqueueMicrotask(v8_ds4_notification_microtask, dataForJS);
+}
+
+std::map<PVIGEM_TARGET, UserData*> vigem_notification_callbacks;
+
+void register_notification_helper(const v8::FunctionCallbackInfo<v8::Value>& info, VIGEM_TARGET_TYPE type) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    PVIGEM_TARGET Target = (PVIGEM_TARGET)IntegerFI(info[1]);
+    //Persistent<Function>* callback = new Persistent<Function>(isolate, info[2].As<Function>()); //lowkey a memory leak here because there's no way to free this! (wait nevermind there's an unregister function!)
+    UserData* data = new UserData{
+        isolate,
+        Persistent<Function>(isolate, info[2].As<Function>())
+    };
+    VIGEM_ERROR res = VIGEM_ERROR_NONE;
+    switch (type) {
+        case Xbox360Wired:
+            res = vigem_target_x360_register_notification((PVIGEM_CLIENT)IntegerFI(info[0]), Target, vigem_x360_notification, data);
+            break;
+        case DualShock4Wired:
+            res = vigem_target_ds4_register_notification((PVIGEM_CLIENT)IntegerFI(info[0]), Target, vigem_ds4_notification, data);
+            break;
+    }
+    if (!VIGEM_SUCCESS(res)) {
+        delete data;
+    }
+    else {
+        vigem_notification_callbacks.insert({ Target, data });
+    }
+
+    info.GetReturnValue().Set(Number::New(isolate, res));
+}
+
+void unregister_notification_helper(const v8::FunctionCallbackInfo<v8::Value>& info, VIGEM_TARGET_TYPE type) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    PVIGEM_TARGET Target = (PVIGEM_TARGET)IntegerFI(info[0]);
+    try {
+        delete vigem_notification_callbacks.at(Target);
+        vigem_notification_callbacks.erase(Target);
+    }
+    catch (const std::out_of_range& e) {
+
+    }
+    switch (type) {
+        case Xbox360Wired:
+            vigem_target_x360_unregister_notification(Target);
+            break;
+        case DualShock4Wired:
+            vigem_target_ds4_unregister_notification(Target);
+            break;
+    }
+}
+
+V8FUNC(vigem_target_x360_register_notificationWrapper) {
+    register_notification_helper(info, Xbox360Wired);
+}
+
+V8FUNC(vigem_target_x360_unregister_notificationWrapper) {
+    unregister_notification_helper(info, Xbox360Wired);
+}
+
+V8FUNC(vigem_target_set_vidWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    vigem_target_set_vid((PVIGEM_TARGET)IntegerFI(info[0]), IntegerFI(info[1]));
+}
+
+V8FUNC(vigem_target_set_pidWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    vigem_target_set_pid((PVIGEM_TARGET)IntegerFI(info[0]), IntegerFI(info[1]));
+}
+
+V8FUNC(vigem_target_get_vidWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    info.GetReturnValue().Set(Number::New(isolate, vigem_target_get_vid((PVIGEM_TARGET)IntegerFI(info[0]))));
+}
+
+V8FUNC(vigem_target_get_pidWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    info.GetReturnValue().Set(Number::New(isolate, vigem_target_get_pid((PVIGEM_TARGET)IntegerFI(info[0]))));
+}
+
+V8FUNC(vigem_target_get_indexWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    info.GetReturnValue().Set(Number::New(isolate, vigem_target_get_index((PVIGEM_TARGET)IntegerFI(info[0]))));
+}
+
+V8FUNC(vigem_target_get_typeWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    info.GetReturnValue().Set(Number::New(isolate, vigem_target_get_type((PVIGEM_TARGET)IntegerFI(info[0]))));
+}
+
+V8FUNC(vigem_target_is_attachedWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    info.GetReturnValue().Set(vigem_target_is_attached((PVIGEM_TARGET)IntegerFI(info[0])));
+}
+
+V8FUNC(vigem_target_ds4_allocWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    info.GetReturnValue().Set(Number::New(isolate, (ULONG_PTR)vigem_target_ds4_alloc()));
+}
+
+V8FUNC(vigem_target_ds4_updateWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    DS4_REPORT report = jsImpl::fromJSDS4_REPORT(isolate, info[2].As<Object>());
+    info.GetReturnValue().Set(Number::New(isolate, vigem_target_ds4_update((PVIGEM_CLIENT)IntegerFI(info[0]), (PVIGEM_TARGET)IntegerFI(info[1]), report)));
+}
+
+V8FUNC(vigem_target_ds4_register_notificationWrapper) {
+    register_notification_helper(info, DualShock4Wired);
+}
+
+V8FUNC(vigem_target_ds4_unregister_notificationWrapper) {
+    unregister_notification_helper(info, DualShock4Wired);
+}
+
+V8FUNC(vigem_target_addWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    info.GetReturnValue().Set(Number::New(isolate, vigem_target_add((PVIGEM_CLIENT)IntegerFI(info[0]), (PVIGEM_TARGET)IntegerFI(info[1]))));
+}
+
+V8FUNC(vigem_target_removeWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    info.GetReturnValue().Set(Number::New(isolate, vigem_target_remove((PVIGEM_CLIENT)IntegerFI(info[0]), (PVIGEM_TARGET)IntegerFI(info[1]))));
+}
+
+V8FUNC(vigem_target_freeWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    vigem_target_free((PVIGEM_TARGET)IntegerFI(info[0]));
+}
+
+V8FUNC(vigem_disconnectWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    vigem_disconnect((PVIGEM_CLIENT)IntegerFI(info[0]));
+}
+
+V8FUNC(vigem_freeWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    vigem_free((PVIGEM_CLIENT)IntegerFI(info[0]));
+}
+
 //i think im allowed to use a snapshot thing to load these quicker
 //https://github.com/danbev/learning-v8/blob/master/notes/snapshots.md
 //OHHH my extern "C" __declspec(dllexport) kept crashing when i used LoadLibrary because there is no DllMain and (i guess) stuff isn't initialized (so i gotta call crtmain myself?)
@@ -19114,19 +19699,10 @@ extern "C" __declspec(dllexport) v8::Local<v8::ObjectTemplate> InitGlobals(v8::I
 
     global->Set(isolate, "file", file);
 
-    {
-        std::wstring tempStr(filename);
-        std::wstring strFileName = tempStr.substr(0, tempStr.find_last_of(L'\\'));
-        //print(tempStr << " " << strFileName);
-        if (strFileName[0] == L'"') {
-            strFileName = strFileName.substr(1, strFileName.find(L'"', 1) - 1); //sounds right
-            wprint(L"STRFILENAME::" << strFileName);
-        }
-        global->Set(isolate, "__dirname", String::NewFromTwoByte(isolate, (const uint16_t*)strFileName.c_str()).ToLocalChecked());
-        
-        global->Set(isolate, "args", String::NewFromTwoByte(isolate, (const uint16_t*)filename).ToLocalChecked());
-        //tempStr
-    }
+    global->Set(isolate, "__dirname", String::NewFromTwoByte(isolate, (const uint16_t*)__dirname.c_str()).ToLocalChecked());
+    
+    global->Set(isolate, "args", String::NewFromTwoByte(isolate, (const uint16_t*)filename).ToLocalChecked());
+    //tempStr
 
     global->Set(isolate, "screenWidth", Number::New(isolate, screenWidth));
     global->Set(isolate, "screenHeight", Number::New(isolate, screenHeight));
@@ -21116,6 +21692,7 @@ extern "C" __declspec(dllexport) v8::Local<v8::ObjectTemplate> InitGlobals(v8::I
     setGlobalConst(MB_ICONERROR);
     setGlobalConst(MB_ICONQUESTION);
     setGlobalConst(MB_ICONEXCLAMATION);
+    setGlobalConst(MB_ICONWARNING);
     setGlobalConst(MB_ICONINFORMATION);
     setGlobalConst(MB_DEFBUTTON1);
     setGlobalConst(MB_DEFBUTTON2);
@@ -22984,6 +23561,101 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
     //    print(shit);
     //}));
 
+    setGlobalWrapper(QueryPerformanceCounter);
+    setGlobalWrapper(GetCurrentIsolate);
+    setGlobalWrapper(Persistent);
+    setGlobal(CallFunctionForMe);
+    //setGlobal(__require_extension);
+
+    setGlobalWrapper(vigem_alloc);
+    setGlobalWrapper(vigem_connect);
+    setGlobalWrapper(vigem_target_is_waitable_add_supported);
+    setGlobalWrapper(vigem_target_x360_alloc);
+    setGlobalWrapper(vigem_target_x360_update);
+    setGlobalWrapper(vigem_target_x360_get_user_index);
+    setGlobalWrapper(vigem_target_x360_register_notification);
+    setGlobalWrapper(vigem_target_x360_unregister_notification);
+    setGlobalWrapper(vigem_target_set_vid);
+    setGlobalWrapper(vigem_target_set_pid);
+    setGlobalWrapper(vigem_target_get_vid);
+    setGlobalWrapper(vigem_target_get_pid);
+    setGlobalWrapper(vigem_target_get_index);
+    setGlobalWrapper(vigem_target_ds4_alloc);
+    setGlobalWrapper(vigem_target_ds4_update);
+    setGlobalWrapper(vigem_target_ds4_register_notification);
+    setGlobalWrapper(vigem_target_ds4_unregister_notification);
+    setGlobalWrapper(vigem_target_add);
+    setGlobalWrapper(vigem_target_remove);
+    setGlobalWrapper(vigem_target_free);
+    setGlobalWrapper(vigem_disconnect);
+    setGlobalWrapper(vigem_free);
+    setGlobalConst(VIGEM_ERROR_NONE);
+    setGlobalConst(VIGEM_ERROR_BUS_NOT_FOUND);
+    setGlobalConst(VIGEM_ERROR_NO_FREE_SLOT);
+    setGlobalConst(VIGEM_ERROR_INVALID_TARGET);
+    setGlobalConst(VIGEM_ERROR_REMOVAL_FAILED);
+    setGlobalConst(VIGEM_ERROR_ALREADY_CONNECTED);
+    setGlobalConst(VIGEM_ERROR_TARGET_UNINITIALIZED);
+    setGlobalConst(VIGEM_ERROR_TARGET_NOT_PLUGGED_IN);
+    setGlobalConst(VIGEM_ERROR_BUS_VERSION_MISMATCH);
+    setGlobalConst(VIGEM_ERROR_BUS_ACCESS_FAILED);
+    setGlobalConst(VIGEM_ERROR_CALLBACK_ALREADY_REGISTERED);
+    setGlobalConst(VIGEM_ERROR_CALLBACK_NOT_FOUND);
+    setGlobalConst(VIGEM_ERROR_BUS_ALREADY_CONNECTED);
+    setGlobalConst(VIGEM_ERROR_BUS_INVALID_HANDLE);
+    setGlobalConst(VIGEM_ERROR_XUSB_USERINDEX_OUT_OF_RANGE);
+    setGlobalConst(VIGEM_ERROR_INVALID_PARAMETER);
+    setGlobalConst(VIGEM_ERROR_NOT_SUPPORTED);
+    setGlobalConst(VIGEM_ERROR_WINAPI);
+    setGlobalConst(VIGEM_ERROR_TIMED_OUT);
+
+    setGlobalConst(Xbox360Wired);
+    setGlobalConst(DualShock4Wired);
+
+    setGlobalWrapper(XUSB_REPORT);
+    setGlobalConst(XUSB_GAMEPAD_DPAD_UP);
+    setGlobalConst(XUSB_GAMEPAD_DPAD_DOWN);
+    setGlobalConst(XUSB_GAMEPAD_DPAD_LEFT);
+    setGlobalConst(XUSB_GAMEPAD_DPAD_RIGHT);
+    setGlobalConst(XUSB_GAMEPAD_START);
+    setGlobalConst(XUSB_GAMEPAD_BACK);
+    setGlobalConst(XUSB_GAMEPAD_LEFT_THUMB);
+    setGlobalConst(XUSB_GAMEPAD_RIGHT_THUMB);
+    setGlobalConst(XUSB_GAMEPAD_LEFT_SHOULDER);
+    setGlobalConst(XUSB_GAMEPAD_RIGHT_SHOULDER);
+    setGlobalConst(XUSB_GAMEPAD_GUIDE);
+    setGlobalConst(XUSB_GAMEPAD_A);
+    setGlobalConst(XUSB_GAMEPAD_B);
+    setGlobalConst(XUSB_GAMEPAD_X);
+    setGlobalConst(XUSB_GAMEPAD_Y);
+
+    setGlobalWrapper(DS4_REPORT);
+    setGlobalConst(DS4_BUTTON_THUMB_RIGHT);
+    setGlobalConst(DS4_BUTTON_THUMB_LEFT);
+    setGlobalConst(DS4_BUTTON_OPTIONS);
+    setGlobalConst(DS4_BUTTON_SHARE);
+    setGlobalConst(DS4_BUTTON_TRIGGER_RIGHT);
+    setGlobalConst(DS4_BUTTON_TRIGGER_LEFT);
+    setGlobalConst(DS4_BUTTON_SHOULDER_RIGHT);
+    setGlobalConst(DS4_BUTTON_SHOULDER_LEFT);
+    setGlobalConst(DS4_BUTTON_TRIANGLE);
+    setGlobalConst(DS4_BUTTON_CIRCLE);
+    setGlobalConst(DS4_BUTTON_CROSS);
+    setGlobalConst(DS4_BUTTON_SQUARE);
+    setGlobalConst(DS4_SPECIAL_BUTTON_PS);
+    setGlobalConst(DS4_SPECIAL_BUTTON_TOUCHPAD);
+    setGlobalConst(DS4_BUTTON_DPAD_NONE);
+    setGlobalConst(DS4_BUTTON_DPAD_NORTHWEST);
+    setGlobalConst(DS4_BUTTON_DPAD_WEST);
+    setGlobalConst(DS4_BUTTON_DPAD_SOUTHWEST);
+    setGlobalConst(DS4_BUTTON_DPAD_SOUTH);
+    setGlobalConst(DS4_BUTTON_DPAD_SOUTHEAST);
+    setGlobalConst(DS4_BUTTON_DPAD_EAST);
+    setGlobalConst(DS4_BUTTON_DPAD_NORTHEAST);
+    setGlobalConst(DS4_BUTTON_DPAD_NORTH);
+    setGlobalWrapper(DS4_SET_DPAD);
+
+
     global->Set(isolate, "wprint", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
         using namespace v8;
         Isolate* isolate = info.GetIsolate();
@@ -23239,6 +23911,19 @@ https://forums.codeguru.com/showthread.php?69236-How-to-obtain-HINSTANCE-using-H
     
        // v8::TryCatch trycatch(isolate);
         // Create a new context.
+        
+        {
+            std::wstring tempStr(nCmdList);
+            std::wstring strFileName = tempStr.substr(0, tempStr.find_last_of(L'\\'));
+            //print(tempStr << " " << strFileName);
+            if (strFileName[0] == L'"') {
+                strFileName = strFileName.substr(1, strFileName.find(L'"', 1) - 1); //sounds right
+                wprint(L"STRFILENAME::" << strFileName);
+            }
+            //global->Set(isolate, "__dirname", String::NewFromTwoByte(isolate, (const uint16_t*)strFileName.c_str()).ToLocalChecked());
+            __dirname = strFileName; //i want to move it like rust lol
+        }
+
         v8::Local<v8::Context> context = v8::Context::New(isolate, NULL, InitGlobals(isolate, nCmdList, nCmdShow)); //InitGlobals(isolate, nCmdList, nCmdShow);//argv[1]);//v8::Context::New(isolate, NULL, global);
         //context->GetMicrotaskQueue();
         // Enter the context for compiling and running the hello world script.
@@ -23330,7 +24015,11 @@ https://forums.codeguru.com/showthread.php?69236-How-to-obtain-HINSTANCE-using-H
                     wchar_t scriptwstr[256]; //buddy why was i using char (when you tried to use emoji in the terminal it wouldn't go through)
                     std::wcout << L">>> ";
                     std::wcin.getline(scriptwstr, 256);
-                    
+                    //whoops it seems like if i wanted to fix the undefined spam when you hit Ctrl+C i would use the following lines
+                    //https://stackoverflow.com/questions/26762470/cli-in-c-cin-and-ctrlc
+                    //if (cin.fail() || cin.eof()) {
+                    //    cin.clear(); // reset cin state
+                    //}
                     if (wcscmp(scriptwstr, L"exit") == 0 || wcscmp(scriptwstr, L"quit") == 0) {
                         break;
                     }

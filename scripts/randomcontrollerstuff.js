@@ -1,3 +1,5 @@
+//https://www.ifeelpixel.com/support/joystickdata.htm
+
 let d2d, brush, font;
 let triggers = {LEFT_TRIGGER: 0, RIGHT_TRIGGER: 0};
 let bools = {};

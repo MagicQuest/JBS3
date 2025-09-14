@@ -195,6 +195,10 @@
     <ClInclude Include="libffi\fficonfig.h" />
     <ClInclude Include="libffi\include\ffi.h" />
     <ClInclude Include="resource.h" />
+    <ClInclude Include="ViGEm\Client.h" />
+    <ClInclude Include="ViGEm\Common.h" />
+    <ClInclude Include="ViGEm\km\BusShared.h" />
+    <ClInclude Include="ViGEm\Util.h" />
     <ClInclude Include="WICHelper.h" />
   </ItemGroup>
   <ItemGroup>

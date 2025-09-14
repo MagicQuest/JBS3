@@ -1,4 +1,7 @@
 //lowkey had a thought the other day about how you would make eval if eval didn't exist yet and then i thought about interpreting other languages and now im here
+//https://lukaswirth.dev/tlborm/syntax-extensions/source-analysis.html
+//https://en.wikipedia.org/wiki/Abstract_syntax_tree
+//don't think i forgot about this script we're cooking something behind the scenes dw 👀
 
 class Operator {
     constructor() {
@@ -26,7 +29,12 @@ class Interpreter { //"abstract" https://stackoverflow.com/questions/597769/how-
         
     }
 
+    parse(code) {
+        //returns an abstract syntax tree (which i didn't know was a thing until like 3 days ago)
+    }
+
     eval(code) {
+        const ast = this.parse(code);
         const lines = code.split("\n");
         for(const line of lines) {
             //throw new Error("Method 'eval()' must be implemented.")
@@ -73,6 +81,16 @@ class LuaInterpreter extends Interpreter {
             const [_, varname] = code.match(/(\w[A-z_0-9]+)/);
             this.variables[varname] = ; //nah fuck that globalThis
         }};*/
+    }
+
+    eval(code) {
+        super.eval(code);
+    }
+}
+
+class VBScriptInterpreter extends Interpreter {
+    constructor () {
+        this.keywords[]
     }
 
     eval(code) {

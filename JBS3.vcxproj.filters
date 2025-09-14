@@ -25,6 +25,12 @@
     <Filter Include="Source Files\libffi">
       <UniqueIdentifier>{3f401c71-3b76-414f-8d78-3bebca3eb395}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\ViGEm">
+      <UniqueIdentifier>{2af8799d-f4d6-40e1-8121-e0528b8430e6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\ViGEm\km">
+      <UniqueIdentifier>{f0e9238a-be87-4df0-847d-e99e69fbe9ec}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="JBS3.cpp">
@@ -141,6 +147,18 @@
     </ClInclude>
     <ClInclude Include="libffi\include\ffi.h">
       <Filter>Header Files\libffi</Filter>
+    </ClInclude>
+    <ClInclude Include="ViGEm\Client.h">
+      <Filter>Header Files\ViGEm</Filter>
+    </ClInclude>
+    <ClInclude Include="ViGEm\Common.h">
+      <Filter>Header Files\ViGEm</Filter>
+    </ClInclude>
+    <ClInclude Include="ViGEm\Util.h">
+      <Filter>Header Files\ViGEm</Filter>
+    </ClInclude>
+    <ClInclude Include="ViGEm\km\BusShared.h">
+      <Filter>Header Files\ViGEm\km</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -27,4 +27,4 @@ wc.hbrBackground = COLOR_WINDOW;
 wc.hCursor = LoadCursor(NULL, IDC_ARROW);
 
 //oooh i was accidently using WS_EX_OVERLAPPEDWINDOW and it left the popup border on my screen
-window = CreateWindow(/*WS_EX_OVERLAPPEDWINDOW | */WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_TOPMOST | WS_EX_TOOLWINDOW, wc, "hopefully this one works", WS_POPUP | WS_VISIBLE, 0, 0, screenWidth, screenHeight, NULL, NULL, hInstance);
+window = CreateWindow(/*WS_EX_OVERLAPPEDWINDOW |*/ WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_TOPMOST | WS_EX_TOOLWINDOW, wc, "hopefully this one works", WS_POPUP | WS_VISIBLE, 0, 0, screenWidth, screenHeight, NULL, NULL, hInstance);

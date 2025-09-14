@@ -255,7 +255,7 @@ let newFont;
 
 //const mouseMovement = {x: 0, y: 0, vx: 1, vy: 0};
 
-const bmpTest = LoadImage(null, __dirname+"/ifoundamongus.bmp", IMAGE_BITMAP, 200, 200, LR_SHARED | LR_LOADFROMFILE);
+const bmpTest = LoadImage(null, __dirname+"/ifoundamongus.bmp", IMAGE_BITMAP, 200, 200, LR_SHARED | LR_LOADFROMFILE); //lowkey apparently you aren't supposed to use LR_SHARED when loading from a file
 
 function loop() {
     if(GetKey(VK_ESCAPE)) {

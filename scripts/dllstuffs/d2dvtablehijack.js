@@ -295,6 +295,7 @@ function windowProc(hwnd, msg, wp, lp) {
             const OutputDebugStringWPtr = GetProcAddress(kernel32, "OutputDebugStringW"); //OutputDebugString is just the name of the macro
             print("kernel32:",kernel32);
             print("OutputDebugStringWPtr:",OutputDebugStringWPtr);
+            const isolate = GetCurrentIsolate();
             hijackstr = new WString(`hello from hijacked ${methodname}! (called from asm my boys)\n`); //global so the garbage collector doesn't sweep away my variable
             hijackasmcode = new Uint8Array([ //global so the garbage collector doesn't sweep away the code lmao
                 //i was gonna try to get the address of the function by dereferencing rcx (the this pointer) and dereferencing the value at vtable+index
@@ -343,24 +344,39 @@ function windowProc(hwnd, msg, wp, lp) {
                 0x41, 0x58,                                             //pop r8
                 0x5a,                                                   //pop rdx
                 0x59,                                                   //pop rcx
-
+                
                 //and you know what, while we're here...
                 //lets modify the D2D1_RECT_F rect struct passed as a pointer through rdx
                 //lets loop 4 times so we can add 10 to each float in the struct (for the lolz)
                 //im gonna use r10 to hold how many times we've looped
                 //NOTE: i'm actually directly modifying the D2D1_RECT_F that's been passed so if you use the same rect again with FillRectangle/the function you want to call it will be changed, again!
                 //i could allocate a copy on the stack (and pass it into FillRectangle/the function you want to call) but i don't feel like it since jbs will create the rect when you call d2d.FillRectangle so it doesn't matter
-                0x4d, 0x31, 0xd2,                                       //xor r10, r10
-                0x49, 0xc7, 0xc3, ...int32_to_little_endian_hex(50),    //mov r11, imm32           ;lol im using int32 to little endian so i can change the number easily
-                0xf3, 0x49, 0x0f, 0x2a, 0xcb,                           //cvtsi2ss xmm1, r11       ;convert r11 to a float and store it in xmm1
-                0xf3, 0x42, 0x0f, 0x10, 0x04, 0x92,                     //movss xmm0, DWORD PTR [rdx+r10*4]         ;dereference rdx (rect struct) + r10 (loop index) * 4 (sizeof float)
-                0xf3, 0x0f, 0x58, 0xc1,                                 //addss xmm0, xmm1                          ;add le value
-                0xf3, 0x42, 0x0f, 0x11, 0x04, 0x92,                     //movss DWORD PTR [rdx+r10*4], xmm0         ;put that shit back in the struct
-                0x49, 0xff, 0xc2,                                       //inc r10
-                0x49, 0x83, 0xfa, 0x04,                                 //cmp r10, 0x4 (4)
-                //UINT32 TO LITTLE ENDIAN HEX HERE!!!
-                0x0f, 0x85, ...uint32_to_little_endian_hex(-29),           //jne rel32                                 ;when using an immediate for any jmp, it's relative 
+                //hold on are there any vector extension or SiMD functions that let me do this in like one instruction? (add scalar value to 4 floats in 128 xmm register?)
+                //0x4d, 0x31, 0xd2,                                       //xor r10, r10
+                //0x49, 0xc7, 0xc3, ...int32_to_little_endian_hex(50),    //mov r11, imm32           ;lol im using int32 to little endian so i can change the number easily
+                //0xf3, 0x49, 0x0f, 0x2a, 0xcb,                           //cvtsi2ss xmm1, r11       ;convert r11 to a float and store it in xmm1
+                //0xf3, 0x42, 0x0f, 0x10, 0x04, 0x92,                     //movss xmm0, DWORD PTR [rdx+r10*4]         ;dereference rdx (rect struct) + r10 (loop index) * 4 (sizeof float)
+                //0xf3, 0x0f, 0x58, 0xc1,                                 //addss xmm0, xmm1                          ;add le value
+                //0xf3, 0x42, 0x0f, 0x11, 0x04, 0x92,                     //movss DWORD PTR [rdx+r10*4], xmm0         ;put that shit back in the struct
+                //0x49, 0xff, 0xc2,                                       //inc r10
+                //0x49, 0x83, 0xfa, 0x04,                                 //cmp r10, 0x4 (4)
+                ////UINT32 TO LITTLE ENDIAN HEX HERE!!!
+                //0x0f, 0x85, ...uint32_to_little_endian_hex(-29),           //jne rel32                                 ;when using an immediate for any jmp, it's relative 
 
+                //guys the answer to that previous query was YES!
+                //we're pretty lucky that it's four continous floats in memory!
+                0x0f, 0x10, 0x02,                                       //movups xmm0, XMMWORD PTR [rdx] ;loads the rect (four floats) into xmm0 (im using movups here because idk if it's gonna be aligned lol)
+                0x49, 0xc7, 0xc3, ...int32_to_little_endian_hex(50),    //mov r11, imm32                 ;lol im using int32 to little endian so i can change the number easily
+                0xf3, 0x49, 0x0f, 0x2a, 0xcb,                           //cvtsi2ss xmm1, r11             ;convert r11 to a float and store it in xmm1
+                0x0f, 0xc6, 0xc9, 0x00,                                 //shufps xmm1, xmm1, 0x0         ;copy scalar float into each 32 byte section of xmm1 (so it's added to each float in rect)
+                0x0f, 0x58, 0xc1,                                       //addps xmm0, xmm1               ;add scalar to rect floats
+                0x0f, 0x11, 0x02,                                       //movups XMMWORD PTR [rdx], xmm0 ;put changed floats back into rect
+                
+                //anyways wouldn't it be cooler if i could call a js function INSIDE this hijacked function?!
+                //yeah im not sure about that lol but it's definitely possible since we're on the same thread!
+                
+                // 0x48, 0xb9, ...int64_to_little_endian_hex(isolate),     //movabs rcx, [isolate] ; using rcx because calling GetCurrentContext
+                //uh oh how could i call GetCurrentContext since Isolate has no vtable...                
 
                 //0x5d,                                                   //pop rbp
                 0x48, 0xb8, ...int64_to_little_endian_hex(methodAddress),   //movabs rax, imm64        //oops i wrote methodptr instead here and didn't realize why it wasn't working lmao

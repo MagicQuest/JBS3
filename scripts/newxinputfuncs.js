@@ -1,5 +1,8 @@
 //renamed from controllers.js because why did i name it that lmao
 
+//https://www.bing.com/search?q=xinput%20led%20number&qs=n&form=QBRE&sp=-1&ghc=1&lq=0&pq=xinput%20led%20number&sc=7-17&sk=&cvid=B9BCE1B3953F47FFB5711121DE0C6D04
+//ts looks cool asf i might do this for randomcontrollerstuff.js https://www.ifeelpixel.com/support/joystickdata.htm
+
 //let time = Date.now();
 //while(true) {
 //    //print(1000/(Date.now()-time));
@@ -33,6 +36,8 @@ let lowfreqrumble = 0; //according to msdn the left motor is low frequency
 let highfreqrumble = 0; //and the right motor is high frequency (and their values are from 0-65535)
 let mouse = {button: 0};
 
+let controllerId = 0;
+
 function GetClientCursorPos(rect) {
     let mouse = GetCursorPos();
     return {x: mouse.x-rect.left-8, y: mouse.y-rect.top-33/*-20*/};
@@ -44,6 +49,7 @@ function windowProc(hwnd, msg, wp, lp) {
         brush = d2d.CreateSolidColorBrush(0.0, 0.0, 0.0);
         font = d2d.CreateFont(NULL, 12); //oh putting nothing gives you the default windows font
         SetTimer(hwnd, NULL, 16);
+        print("Press ENTER to switch to the next controller (if one is plugged in)");
     }/*else if(msg == WM_PAINT) {
         const ps = BeginPaint(hwnd);
         const dc = ps.hdc;
@@ -89,9 +95,11 @@ function windowProc(hwnd, msg, wp, lp) {
         let buttons = -1;
         let gamepad = {sThumbLX: 0, sThumbLY: 0, sThumbRX: 0, sThumbRY: 0};
         const controllers = GetControllers();
-        if(controllers[0] != undefined) { //using the first controller available
-            gamepad = XInputGetState(controllers[0]).Gamepad;
+        if(controllers[controllerId] != undefined) { //using the first controller available
+            gamepad = XInputGetState(controllers[controllerId]).Gamepad;
             buttons = gamepad.wButtons;
+        }else {
+            controllerId = 0;
         }
 
         let i = 1;
@@ -157,6 +165,10 @@ function windowProc(hwnd, msg, wp, lp) {
     }else if(msg == WM_LBUTTONUP) {
         ReleaseCapture();
         mouse.button = 0;
+    }else if(msg == WM_KEYDOWN) {
+        if(wp == VK_RETURN) {
+            controllerId++;
+        }
     }
     else if(msg == WM_DESTROY) {
         font.Release();
