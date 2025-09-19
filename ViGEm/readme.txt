@@ -1,0 +1,1 @@
+precompiled ViGEmClient.lib was compiled from https://github.com/nefarius/ViGEmClient/tree/cb8c9f47870fcf661be22f38f354eb96e2123e88

@@ -2,6 +2,8 @@
 //use eval(require("fs").read(__dirname+"/hid_wiimote.js")); to import (make sure to fix up the path if your script isn't in the same directory as hid_wiimote)
 //at some point i may or may not make each extension its own javascript object so they can have private properties and stuff like that but idk
 
+//see wiitesting.js for actual use
+
 globalThis.LEFT_BUTTON = 0;
 globalThis.RIGHT_BUTTON = 1;
 globalThis.DOWN_BUTTON = 2;

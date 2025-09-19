@@ -180,9 +180,10 @@ void errprint(const char* str) {
 
 #include <v8-proxy.h>
 
-//ok since i wasn't really gonna add ViGEmClient to JBS im not including the source lol only my precompiled lib (which was compiled from the (latest as of 9/13/2025) october 10th 2022 cb8c9f47870fcf661be22f38f354eb96e2123e88 commit)
+//ok since i wasn't really gonna add ViGEmClient to JBS im not including the source lol only my precompiled lib (which was compiled from https://github.com/nefarius/ViGEmClient/tree/cb8c9f47870fcf661be22f38f354eb96e2123e88)
 #pragma comment(lib, "ViGEm/ViGEmClient.lib")
 #include "ViGEm/Client.h"
+#include "ViGEm/Util.h"
 
 template<class T>
 T WStringOrNULL(v8::Isolate* isolate, const v8::Local<v8::Value>& v) {//, T* out) {
@@ -424,6 +425,20 @@ namespace jsImpl {
         report.bTriggerR = IntegerFI(jsReport->Get(context, LITERAL("bTriggerR")).ToLocalChecked());
 
         return report;
+    }
+
+    Local<Object> createDS4_REPORT(Isolate* isolate, DS4_REPORT report) {
+        Local<Context> context = isolate->GetCurrentContext();
+        Local<Object> jsRv = Object::New(isolate);
+        jsRv->Set(context, LITERAL("wButtons"), Number::New(isolate, report.wButtons));
+        jsRv->Set(context, LITERAL("bTriggerL"), Number::New(isolate, report.bTriggerL));
+        jsRv->Set(context, LITERAL("bTriggerR"), Number::New(isolate, report.bTriggerR));
+        jsRv->Set(context, LITERAL("bThumbLX"), Number::New(isolate, report.bThumbLX));
+        jsRv->Set(context, LITERAL("bThumbLY"), Number::New(isolate, report.bThumbLY));
+        jsRv->Set(context, LITERAL("bThumbRX"), Number::New(isolate, report.bThumbRX));
+        jsRv->Set(context, LITERAL("bThumbRY"), Number::New(isolate, report.bThumbRY));
+        jsRv->Set(context, LITERAL("bSpecial"), Number::New(isolate, report.bSpecial));
+        return jsRv;
     }
 
     //template<typename T>
@@ -19280,38 +19295,38 @@ V8FUNC(DS4_REPORTWrapper) {
 
     Local<Object> jsRv = Object::New(isolate);
     if (info[0]->IsUndefined()) {
-        jsRv->Set(context, LITERAL("bThumbLX"), Number::New(isolate, 0x80));
-    }
-    else {
-        jsRv->Set(context, LITERAL("bThumbLX"), info[0]);
-    }
-    if (info[1]->IsUndefined()) {
-        jsRv->Set(context, LITERAL("bThumbLY"), Number::New(isolate, 0x80));
-    }
-    else {
-        jsRv->Set(context, LITERAL("bThumbLY"), info[1]);
-    }
-    if (info[2]->IsUndefined()) {
-        jsRv->Set(context, LITERAL("bThumbRX"), Number::New(isolate, 0x80));
-    }
-    else {
-        jsRv->Set(context, LITERAL("bThumbRX"), info[2]);
-    }
-    if (info[3]->IsUndefined()) {
-        jsRv->Set(context, LITERAL("bThumbRY"), Number::New(isolate, 0x80));
-    }
-    else {
-        jsRv->Set(context, LITERAL("bThumbRY"), info[3]);
-    }
-    if (info[4]->IsUndefined()) {
         jsRv->Set(context, LITERAL("wButtons"), Number::New(isolate, DS4_BUTTON_DPAD_NONE));
     }
     else {
-        jsRv->Set(context, LITERAL("wButtons"), info[4]);
+        jsRv->Set(context, LITERAL("wButtons"), info[0]);
     }
-    jsRv->Set(context, LITERAL("bSpecial"), info[5]);
-    jsRv->Set(context, LITERAL("bTriggerL"), info[6]);
-    jsRv->Set(context, LITERAL("bTriggerR"), info[7]);
+    jsRv->Set(context, LITERAL("bTriggerL"), info[1]);
+    jsRv->Set(context, LITERAL("bTriggerR"), info[2]);
+    if (info[3]->IsUndefined()) {
+        jsRv->Set(context, LITERAL("bThumbLX"), Number::New(isolate, 0x80));
+    }
+    else {
+        jsRv->Set(context, LITERAL("bThumbLX"), info[3]);
+    }
+    if (info[4]->IsUndefined()) {
+        jsRv->Set(context, LITERAL("bThumbLY"), Number::New(isolate, 0x80));
+    }
+    else {
+        jsRv->Set(context, LITERAL("bThumbLY"), info[4]);
+    }
+    if (info[5]->IsUndefined()) {
+        jsRv->Set(context, LITERAL("bThumbRX"), Number::New(isolate, 0x80));
+    }
+    else {
+        jsRv->Set(context, LITERAL("bThumbRX"), info[5]);
+    }
+    if (info[6]->IsUndefined()) {
+        jsRv->Set(context, LITERAL("bThumbRY"), Number::New(isolate, 0x80));
+    }
+    else {
+        jsRv->Set(context, LITERAL("bThumbRY"), info[6]);
+    }
+    jsRv->Set(context, LITERAL("bSpecial"), info[7]);
 
     info.GetReturnValue().Set(jsRv);
 }
@@ -19654,6 +19669,17 @@ V8FUNC(vigem_freeWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
     vigem_free((PVIGEM_CLIENT)IntegerFI(info[0]));
+}
+
+V8FUNC(XUSB_TO_DS4_REPORTWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    XUSB_REPORT xreport = jsImpl::fromJSXUSB_REPORT(isolate, info[0].As<Object>());
+    DS4_REPORT ds4report;
+    XUSB_TO_DS4_REPORT(&xreport, &ds4report);
+
+    info.GetReturnValue().Set(jsImpl::createDS4_REPORT(isolate, ds4report));
 }
 
 //i think im allowed to use a snapshot thing to load these quicker
@@ -23654,7 +23680,7 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
     setGlobalConst(DS4_BUTTON_DPAD_NORTHEAST);
     setGlobalConst(DS4_BUTTON_DPAD_NORTH);
     setGlobalWrapper(DS4_SET_DPAD);
-
+    setGlobalWrapper(XUSB_TO_DS4_REPORT);
 
     global->Set(isolate, "wprint", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
         using namespace v8;
@@ -23815,9 +23841,10 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrevInstance, PWSTR nCmdList, in
     //1.7.2 because i added the array buffer option in jsImpl::getBytesFromObject
     //1.7.3 because i inserted a cstring parameter between the second and third old parameters lo l for ReadFile (breaking) and internally changed how GetWindowText worked but I also changed any function that used an OVERLAPPED structure (and added a lot more macros for driver bs)
     //1.7.4 because i fixed NewWStringOrNULL's buffer overrun issue (that i didn't even know existed) and also changed all hidapi functions to use Uint8Arrays (which broke like 3 scripts)
+    //1.7.5 because i added ViGEm (oops forgot to make a release on github for 1.7.4 lol)
 
     //ok wait i probably should have done the version thing normally instead of whatever criteria i use to change the numbers lmao
-    print("JBS3 -> Version 1.7.4"); //so idk how normal version things work so the first number will probably stay one --- i will increment the second number if i change an existing function like when i remade the CreateWindowClass and CreateWindow functions --- i might random increment the third number if i feel like it (or if i add a new function)
+    print("JBS3 -> Version 1.7.5"); //so idk how normal version things work so the first number will probably stay one --- i will increment the second number if i change an existing function like when i remade the CreateWindowClass and CreateWindow functions --- i might random increment the third number if i feel like it (or if i add a new function)
     print(screenWidth << "x" << screenHeight);
     
 
