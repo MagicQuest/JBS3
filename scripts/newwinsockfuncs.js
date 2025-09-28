@@ -108,7 +108,7 @@ ${hits} hit${hits > 1 ? "s" : ""}
 </body>
 </html>`
 
-        send(clientSocket, html, true, 0);
+        print("sent:", send(clientSocket, html, true, 0), "out of", html.length);
     }
 
     closesocket(clientSocket);

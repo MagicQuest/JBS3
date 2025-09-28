@@ -656,22 +656,22 @@ namespace jsImpl {
 
     sockaddr_in fromJS_sockaddr_in(Isolate* isolate, const Local<Context>& context, const Local<Object>& obj) {
         ADDRESS_FAMILY family = IntegerFI(obj->Get(context, LITERAL("sin_family")).ToLocalChecked());
-        print(family << " familyu");
+        //print(family << " familyu");
         USHORT port = IntegerFI(obj->Get(context, LITERAL("sin_port")).ToLocalChecked());
         ULONG sin_addr = IntegerFI(obj->Get(context, LITERAL("sin_addr")).ToLocalChecked().As<Object>()->Get(context, LITERAL("S_un")).ToLocalChecked().As<Object>()->Get(context, LITERAL("S_addr")).ToLocalChecked());
         IN_ADDR in;
         in.S_un.S_addr = sin_addr;
-        print(sin_addr << " sin_dddr");
-        print(in.S_un.S_addr << " S_addr cast");
+        //print(sin_addr << " sin_dddr");
+        //print(in.S_un.S_addr << " S_addr cast");
         sockaddr_in addr;//{ family, port, in };
         addr.sin_family = family;
         addr.sin_port = port;
         addr.sin_addr = in;
         Local<String> zero = obj->Get(context, LITERAL("sin_zero")).ToLocalChecked().As<String>();
-        print(&addr);
-        print(&addr.sin_zero);
-        print(CStringFI(obj->Get(context, LITERAL("sin_zero")).ToLocalChecked()));
-        print(min(zero->Utf8Length(isolate), 8));
+        //print(&addr);
+        //print(&addr.sin_zero);
+        //print(CStringFI(obj->Get(context, LITERAL("sin_zero")).ToLocalChecked()));
+        //print(min(zero->Utf8Length(isolate), 8));
         //strncpy_s((char*) &addr.sin_zero, 8, CStringFI(obj->Get(context, LITERAL("sin_zero")).ToLocalChecked()), 8);
         //yeah this is too complicated let's just memcpy
         memcpy((void*)&addr.sin_zero, CStringFI(zero), min(zero->Utf8Length(isolate), 8)); //wait should i also include the null terminator or not?
@@ -722,18 +722,33 @@ namespace jsImpl {
             //Local<String> yeppers = data.As<String>();
             if (!cstring) {
                 //*buffer = (void*)WStringFI(data);
-                const wchar_t* text = WStringFI(data);
-                size_t len = wcslen(text) * sizeof(wchar_t);
+                v8::String::Value ref(isolate, data);
+                const wchar_t* text = (const wchar_t*)*ref;
+                if (text == NULL) {
+                    isolate->ThrowError("A wstring was null!");
+                    return false;
+                }
+                //const wchar_t* text = WStringFI(data);
+                size_t len = ref.length() * sizeof(wchar_t);
                 *buffer = new wchar_t[len]; //malloc(len); //im not using malloc here because even though i could, i don't really use it anywhere else
-                wcscpy((wchar_t*)*buffer, text);
+                //wcscpy((wchar_t*)*buffer, text);
+                memcpy(*buffer, text, len);
                 //mangounion.wstring = WStringFI(data); //aw man this ain't working (prolly because v8 moves the shitss around and i lose this pointer data)
                 *length = len;
             }
             else {
-                const char* text = CStringFI(data);
-                size_t len = strlen(text);
+                v8::String::Utf8Value ref(isolate, data);
+                //const char* text = CStringFI(data);
+                const char* text = *ref;
+                if (text == NULL) {
+                    isolate->ThrowError("A string was null!");
+                    return false;
+                }
+                //size_t len = strlen(text);
+                size_t len = ref.length();
                 *buffer = new char[len]; //malloc(len); //OOPS! i had this set to wchar_t! (actually it wasn't that big of a deal and just allocated an extra len bytes)
-                strcpy((char*)*buffer, text);
+                //strcpy((char*)*buffer, text);
+                memcpy(*buffer, text, len);
                 //mangounion.wstring = WStringFI(data); //aw man this ain't working (prolly because v8 moves the shitss around and i lose this pointer data)
                 *length = len;
             }
@@ -751,6 +766,9 @@ namespace jsImpl {
             //mangounion.idk = abv->Buffer()->Data();
             *length = ab->ByteLength();
         }
+        else if (data->IsArray()) {
+            isolate->ThrowError("jsImpl::getBytesFromObject -> You must pass a typed array.");
+        }
         return false;
     }
 
@@ -765,6 +783,7 @@ namespace jsImpl {
     Local<ObjectTemplate> mt_testot;
     //Local<ObjectTemplate> _IN_ADDR;
     Local<ObjectTemplate> _S_un;
+    Local<ObjectTemplate> jsfd_setProxy;
     //Local<ObjectTemplate> _S_un_b;
     //Local<ObjectTemplate> _S_un_w;
     //Local<ObjectTemplate> _u;
@@ -776,7 +795,50 @@ namespace jsImpl {
         //    Local<ArrayBufferView> buffer = info.This().As<Object>()->Get(context, LITERAL("buffer")).ToLocalChecked().As<ArrayBufferView>();
         //    buffer->Data
         //}));
-
+        jsfd_setProxy = ObjectTemplate::New(isolate);
+        jsfd_setProxy->Set(isolate, "get", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            Local<Context> context = isolate->GetCurrentContext();
+            Local<Value> _ptr = info[0].As<Object>()->Get(context, LITERAL("_ptr")).ToLocalChecked();
+            if (!info[1]->IsString()) { //for some reason when trying to print ts it would pass a symbol (which i was not ready for)
+                info.GetReturnValue().SetUndefined();
+                return;
+            }
+            if (strcmp(CStringFI(info[1]), "_ptr") == 0) {
+                info.GetReturnValue().Set(_ptr);
+            }
+            else if (strcmp(CStringFI(info[1]), "count") == 0) {
+                fd_set* set = (fd_set*)IntegerFI(_ptr);
+                info.GetReturnValue().Set(Number::New(isolate, set->fd_count));
+            }
+            else {
+                size_t index = IntegerFI(info[1]);
+                if (index >= FD_SETSIZE) {
+                    info.GetReturnValue().SetUndefined();
+                    return;
+                }
+                fd_set* set = (fd_set*)IntegerFI(_ptr);
+                info.GetReturnValue().Set(Number::New(isolate, set->fd_array[index]));
+            }
+        }));
+        jsfd_setProxy->Set(isolate, "set", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+            Isolate* isolate = info.GetIsolate();
+            Local<Context> context = isolate->GetCurrentContext();
+            //print("fd_set properties are read-only! manipulate this object with the FD_ functions!\x07");
+            isolate->ThrowError("fd_set properties are read-only! manipulate this object with the FD_ functions!\x07");
+            //Local<Value> _ptr = info[0].As<Object>()->Get(context, LITERAL("_ptr")).ToLocalChecked();
+            //if (!info[1]->IsString() || strcmp(CStringFI(info[1]), "_ptr") == 0) { //for some reason when trying to print ts it would pass a symbol (which i was not ready for)
+            //    //info.GetReturnValue().SetUndefined();
+            //    return;
+            //}
+            //size_t index = IntegerFI(info[1]);
+            //if (index >= FD_SETSIZE) {
+            //    //info.GetReturnValue().SetUndefined();
+            //    return;
+            //}
+            //fd_set* set = (fd_set*)IntegerFI(_ptr);
+            //set->fd_array[index] = IntegerFI(info[2]);
+        }));
         _S_un = ObjectTemplate::New(isolate);
         //there's gotta be a better way to do this so that i don't have to make like 6 new functions just for each of these properties but you can't get a property by name in c++ like javascript and i'd probably have to use a proxy
         _S_un->SetAccessorProperty(LITERAL("s_b1"), FunctionTemplate::New(isolate, [](const FunctionCallbackInfo<Value>& info) {
@@ -12541,19 +12603,21 @@ V8FUNC(StartDocWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
 
+    bool obj = info[1]->IsObject();
+
     DOCINFO di{};
     di.cbSize = sizeof(DOCINFO);
-    if (info[1]->IsObject()) {
+    if (obj) {
         Local<Context> context = isolate->GetCurrentContext();
         Local<Object> jsDI = info[1].As<Object>();
         if (jsDI->Has(context, LITERAL("lpszDocName")).FromJust()) {
-            di.lpszDocName = WStringOrNULL<LPCWSTR>(isolate, jsDI->Get(context, LITERAL("lpszDocName")).ToLocalChecked());
+            di.lpszDocName = NewWStringOrNULL(isolate, jsDI->Get(context, LITERAL("lpszDocName")).ToLocalChecked());
         }
         if (jsDI->Has(context, LITERAL("lpszOutput")).FromJust()) {
-            di.lpszOutput = WStringOrNULL<LPCWSTR>(isolate, jsDI->Get(context, LITERAL("lpszOutput")).ToLocalChecked());
+            di.lpszOutput = NewWStringOrNULL(isolate, jsDI->Get(context, LITERAL("lpszOutput")).ToLocalChecked());
         }
         if (jsDI->Has(context, LITERAL("lpszDatatype")).FromJust()) {
-            di.lpszDatatype = WStringOrNULL<LPCWSTR>(isolate, jsDI->Get(context, LITERAL("lpszDatatype")).ToLocalChecked());
+            di.lpszDatatype = NewWStringOrNULL(isolate, jsDI->Get(context, LITERAL("lpszDatatype")).ToLocalChecked());
         }
         if (jsDI->Has(context, LITERAL("fwType")).FromJust()) {
             di.fwType = IntegerFI(jsDI->Get(context, LITERAL("fwType")).ToLocalChecked());
@@ -12561,6 +12625,12 @@ V8FUNC(StartDocWrapper) {
     }
 
     info.GetReturnValue().Set(Number::New(isolate, StartDoc((HDC)IntegerFI(info[0]), &di))); //random hresult exception bruh shut up
+
+    if (obj) {
+        delete di.lpszDocName;
+        delete di.lpszOutput;
+        delete di.lpszDatatype;
+    }
 }
 
 V8FUNC(EndDocWrapper) {
@@ -18120,13 +18190,14 @@ V8FUNC(listenWrapper) {
 }
 
 V8FUNC(acceptWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
     if (!info[1]->IsObject()) {
-        print("you gotta pass an empty object as the second parameter for the accept function buddy!");
+        //print("you gotta pass an empty object as the second parameter for the accept function buddy!");
+        isolate->ThrowError("you gotta pass an empty object as the second parameter for the accept function buddy!");
         return;
     }
 
-    using namespace v8;
-    Isolate* isolate = info.GetIsolate();
     Local<Context> context = isolate->GetCurrentContext();
 
     sockaddr_in clientl{};
@@ -18175,7 +18246,7 @@ V8FUNC(recvWrapper) {
 
     size_t size = IntegerFI(info[1]);
     char* bytes = (char*)_malloca(size); //malloca SHUSH!
-    print("malloca!");
+    //print("malloca!");
     int res = recv(IntegerFI(info[0]), bytes, size, IntegerFI(info[2]));
     if (res > 0) {
         Local<ArrayBuffer> ab = ArrayBuffer::New(isolate, res);
@@ -18189,13 +18260,197 @@ V8FUNC(recvWrapper) {
     _freea(bytes);
 }
 
+V8FUNC(fd_setWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    Local<Context> context = isolate->GetCurrentContext();
+
+    fd_set* looking = (fd_set*)malloc(sizeof(fd_set));
+    //FD_ZERO(looking);
+    ZeroMemory(looking, sizeof(fd_set));
+
+    //i wasn't originally making this an object but it\'s kinda lame if not
+    Local<Object> ts = Object::New(isolate);
+    ts->Set(context, LITERAL("_ptr"), Number::New(isolate, (ULONG_PTR) looking));
+    ts->Set(context, LITERAL("count"), Number::New(isolate, 0));
+    Local<Proxy> p = Proxy::New(context, ts, jsImpl::jsfd_setProxy->NewInstance(context).ToLocalChecked()).ToLocalChecked();
+
+    //info.GetReturnValue().Set(Number::New(isolate, (ULONG_PTR)looking));
+    info.GetReturnValue().Set(p);
+}
+
+V8FUNC(FD_SETWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    if (info[1]->IsObject()) {
+        FD_SET(IntegerFI(info[0]), IntegerFI(info[1].As<Object>()->Get(isolate->GetCurrentContext(), LITERAL("_ptr")).ToLocalChecked()));
+    }
+    else {
+        FD_SET(IntegerFI(info[0]), IntegerFI(info[1]));
+    }
+}
+
+V8FUNC(FD_ZEROWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    if (info[0]->IsObject()) {
+        FD_ZERO(IntegerFI(info[0].As<Object>()->Get(isolate->GetCurrentContext(), LITERAL("_ptr")).ToLocalChecked()));
+    }
+    else {
+        FD_ZERO(IntegerFI(info[0]));
+    }
+}
+
+V8FUNC(FD_CLRWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    if (info[1]->IsObject()) {
+        FD_CLR(IntegerFI(info[0]), IntegerFI(info[1].As<Object>()->Get(isolate->GetCurrentContext(), LITERAL("_ptr")).ToLocalChecked()));
+    }
+    else {
+        FD_CLR(IntegerFI(info[0]), IntegerFI(info[1]));
+    }
+}
+
+V8FUNC(FD_ISSETWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    int retval;
+    fd_set* set = NULL;
+    if (info[1]->IsObject()) {
+        set = (fd_set*)IntegerFI(info[1].As<Object>()->Get(isolate->GetCurrentContext(), LITERAL("_ptr")).ToLocalChecked());
+    }
+    else {
+        set = (fd_set*)IntegerFI(info[1]);
+    }
+    if (set == NULL) {
+        isolate->ThrowError("FD_ISSET set was NULL!");
+    }
+    info.GetReturnValue().Set(Number::New(isolate, FD_ISSET(IntegerFI(info[0]), set)));
+}
+
+V8FUNC(FD_COPY) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    Local<Context> context = isolate->GetCurrentContext();
+    fd_set* tobecopied = NULL;
+    if (info[0]->IsObject()) {
+        tobecopied = (fd_set*)IntegerFI(info[0].As<Object>()->Get(context, LITERAL("_ptr")).ToLocalChecked());
+    }
+    else {
+        tobecopied = (fd_set*)IntegerFI(info[0]);
+    }
+    if (tobecopied == NULL) {
+        isolate->ThrowError("FD_COPY's first argument cannot be NULL!");
+        return;
+    }
+    fd_set* looking = (fd_set*)malloc(sizeof(fd_set));
+    //FD_ZERO(looking);
+    memcpy(looking, tobecopied, sizeof(fd_set));
+
+    //i wasn't originally making this an object but it\'s kinda lame if not
+    Local<Object> ts = Object::New(isolate);
+    ts->Set(context, LITERAL("_ptr"), Number::New(isolate, (ULONG_PTR)looking));
+    ts->Set(context, LITERAL("count"), Number::New(isolate, tobecopied->fd_count));
+    Local<Proxy> p = Proxy::New(context, ts, jsImpl::jsfd_setProxy->NewInstance(context).ToLocalChecked()).ToLocalChecked();
+
+    //info.GetReturnValue().Set(Number::New(isolate, (ULONG_PTR)looking));
+    info.GetReturnValue().Set(p);
+}
+
+bool selectfdshelper(v8::Isolate* isolate, const v8::Local<v8::Value>& jsShit, OUT fd_set** set) {
+    using namespace v8;
+    Local<Context> context = isolate->GetCurrentContext();
+    fd_set* temp = NULL;
+    bool allocated = false;
+    if (jsShit->BooleanValue(isolate)) {
+        if (jsShit->IsArray()) {
+            Local<Array> arr = jsShit.As<Array>();
+            if (arr->Length() > FD_SETSIZE) {
+                print("\x07Too many sockets in array! Attempting to increase limit (by allocating more memory?)!");
+                temp = (fd_set*)malloc(sizeof(u_int) + (sizeof(SOCKET) * arr->Length()));
+            }
+            else {
+                temp = (fd_set*)malloc(sizeof(fd_set));
+            }
+
+            if (temp == NULL) {
+                isolate->ThrowError("malloc failed when trying to allocate an fd_set object!?!?!");
+                return false;
+            }
+
+            temp->fd_count = arr->Length();
+
+            for (int i = 0; i < arr->Length(); i++) {
+                Local<Value> v = arr->Get(context, i).ToLocalChecked();
+                temp->fd_array[i] = IntegerFI(v);
+            }
+
+            allocated = true;
+        }
+        else if (jsShit->IsObject()) {
+            //one of those fancy js fd_sets
+            temp = (fd_set*)IntegerFI(jsShit.As<Object>()->Get(context, LITERAL("_ptr")).ToLocalChecked());
+        }else {
+            //we'll assume this is a pointer to an fd_set object
+            temp = (fd_set*)IntegerFI(jsShit);
+        }
+    }
+
+    *set = temp;
+    return allocated;
+}
+
+V8FUNC(selectWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    //Local<Context> context = isolate->GetCurrentContext();
+
+    fd_set* readfds = NULL;
+    bool readalloc = selectfdshelper(isolate, info[1], &readfds);
+    
+    fd_set* writefds = NULL;
+    bool writealloc = selectfdshelper(isolate, info[2], &writefds);
+
+    fd_set* exceptfds = NULL;
+    bool exceptalloc = selectfdshelper(isolate, info[3], &exceptfds);
+
+    timeval* val = NULL;
+    if (info[4]->BooleanValue(isolate)) {
+        long time = IntegerFI(info[4]);
+        val = (timeval*)_malloca(sizeof(timeval)); //but the performance tho.
+        //boy that was close i didn't even realize it said microseconds instead of milliseconds
+        val->tv_sec = (long)(double(time) / 1000000.0);
+        val->tv_usec = time % 1000000;
+    }
+
+    info.GetReturnValue().Set(Number::New(isolate, select(IntegerFI(info[0]), readfds, writefds, exceptfds, val)));
+
+    if (readalloc) {
+        free(readfds);
+    }
+    if (writealloc) {
+        free(writefds);
+    }
+    if (exceptalloc) {
+        free(exceptfds);
+    }
+    if (val) {
+        _freea(val);
+    }
+}
+
 V8FUNC(ioctlsocketWrapper) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
 
-    u_long loong;
+    long cmd = IntegerFI(info[1]);
 
-    int failed = ioctlsocket(IntegerFI(info[0]), IntegerFI(info[1]), &loong);
+    u_long loong;
+    if (cmd == FIONBIO) {
+        loong = IntegerFI(info[2]);
+    }
+    int failed = ioctlsocket(IntegerFI(info[0]), cmd, &loong);
     if (failed) {
         loong = failed;
     }
@@ -18250,6 +18505,37 @@ V8FUNC(mt_newwstr) {
     wprint(str);
     MessageBoxW(NULL, str, str, MB_OK);
     delete[] str;
+}
+
+//while(!GetKey(VK_ESCAPE)){mt_stringtestthatmightmakemehavetorefactorallofjbs3("mustard")}
+V8FUNC(mt_stringtestthatmightmakemehavetorefactorallofjbs3) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    Local<Context> context = isolate->GetCurrentContext();
+
+    String::Utf8Value ref(isolate, info[0]);
+    printf("ref length: %u >> \"%s\"\n", ref.length(), *ref);
+    const char* accordingtoknowledgeihavejustgainedthismightactuallybeinvalid = CStringFI(info[0]);
+    printf("cstr length: %llu >> \"%s\"\n", strlen(accordingtoknowledgeihavejustgainedthismightactuallybeinvalid), accordingtoknowledgeihavejustgainedthismightactuallybeinvalid);
+    double bsnoise = FloatFI(context->Global()->Get(context, LITERAL("Math")).ToLocalChecked().As<Object>()->Get(context, LITERAL("random")).ToLocalChecked().As<Function>()->Call(context, context->Global(), 0, nullptr).ToLocalChecked());
+    printf("bs %lf\n", bsnoise);
+    if (strlen(accordingtoknowledgeihavejustgainedthismightactuallybeinvalid) != ref.length()) {
+        printf("%llu != %u\n", strlen(accordingtoknowledgeihavejustgainedthismightactuallybeinvalid), ref.length());
+        __debugbreak(); //sometimes the whole string would be overwritten or just the first byte (but the ref was fine...)
+        isolate->ThrowError("holy shit i've been using v8 strings wrong this ENTIRE FUCKING TIME"); //if this actually happens bro i'm gonna be spending a few days trying to heavily understand v8...
+                                                                                                    //you guys are never gonna guess what happened
+    }
+}
+
+V8FUNC(mt_strlen) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+
+    Local<String> value = info[0].As<String>();
+    String::Utf8Value ref8(isolate, info[0]);
+    String::Value ref16(isolate, info[0]);
+    printf("\"%s\" (ref: %llu, strlen: %llu) -> L\"%ws\" (ref: %llu, wcslen: %llu)\n", *ref8, ref8.length(), strlen(*ref8), *ref16, ref16.length(), wcslen((const wchar_t*)*ref16));
+    printf("Utf8Length: %llu, Length: %llu\n", value->Utf8Length(isolate), value->Length());
 }
 
 V8FUNC(mt_incremento) { //so far so good...
@@ -19682,6 +19968,23 @@ V8FUNC(XUSB_TO_DS4_REPORTWrapper) {
     info.GetReturnValue().Set(jsImpl::createDS4_REPORT(isolate, ds4report));
 }
 
+V8FUNC(freeWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    if (info[0]->IsObject()) {
+        free((void*)IntegerFI(info[0].As<Object>()->Get(isolate->GetCurrentContext(), LITERAL("_ptr")).ToLocalChecked()));
+    }
+    else {
+        free((void*)IntegerFI(info[0]));
+    }
+}
+
+V8FUNC(IsDebuggerPresentWrapper) {
+    using namespace v8;
+    Isolate* isolate = info.GetIsolate();
+    info.GetReturnValue().Set(Number::New(isolate, IsDebuggerPresent()));
+}
+
 //i think im allowed to use a snapshot thing to load these quicker
 //https://github.com/danbev/learning-v8/blob/master/notes/snapshots.md
 //OHHH my extern "C" __declspec(dllexport) kept crashing when i used LoadLibrary because there is no DllMain and (i guess) stuff isn't initialized (so i gotta call crtmain myself?)
@@ -19758,6 +20061,8 @@ extern "C" __declspec(dllexport) v8::Local<v8::ObjectTemplate> InitGlobals(v8::I
     setGlobal(DeleteArrayPtr);
 
     setGlobal(mt_newwstr);
+    setGlobal(mt_stringtestthatmightmakemehavetorefactorallofjbs3);
+    setGlobal(mt_strlen);
     setGlobal(mt_incremento);
     setGlobal(mt_makeobject);
     setGlobal(numbertest);
@@ -23082,6 +23387,13 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
     setGlobalWrapper(accept);
     setGlobalWrapper(getnameinfo);
     setGlobalWrapper(recv);
+    setGlobalWrapper(fd_set);
+    setGlobalWrapper(FD_SET);
+    setGlobalWrapper(FD_ZERO);
+    setGlobalWrapper(FD_CLR);
+    setGlobalWrapper(FD_ISSET);
+    setGlobal(FD_COPY);
+    setGlobalWrapper(select);
     setGlobalWrapper(ioctlsocket);
     setGlobalWrapper(send);
     setGlobalWrapper(shutdown);
@@ -23201,6 +23513,104 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
     setGlobalConst(SIOCSLOWAT);
     setGlobalConst(SIOCGLOWAT);
     setGlobalConst(SIOCATMARK);
+
+    setGlobalConst(FD_SETSIZE);
+
+    setGlobalConst(WSA_INVALID_HANDLE);
+    setGlobalConst(WSA_NOT_ENOUGH_MEMORY);
+    setGlobalConst(WSA_INVALID_PARAMETER);
+    setGlobalConst(WSA_OPERATION_ABORTED);
+    setGlobalConst(WSA_IO_INCOMPLETE);
+    setGlobalConst(WSA_IO_PENDING);
+    setGlobalConst(WSAEINTR);
+    setGlobalConst(WSAEBADF);
+    setGlobalConst(WSAEACCES);
+    setGlobalConst(WSAEFAULT);
+    setGlobalConst(WSAEINVAL);
+    setGlobalConst(WSAEMFILE);
+    setGlobalConst(WSAEWOULDBLOCK);
+    setGlobalConst(WSAEINPROGRESS);
+    setGlobalConst(WSAEALREADY);
+    setGlobalConst(WSAENOTSOCK);
+    setGlobalConst(WSAEDESTADDRREQ);
+    setGlobalConst(WSAEMSGSIZE);
+    setGlobalConst(WSAEPROTOTYPE);
+    setGlobalConst(WSAENOPROTOOPT);
+    setGlobalConst(WSAEPROTONOSUPPORT);
+    setGlobalConst(WSAESOCKTNOSUPPORT);
+    setGlobalConst(WSAEOPNOTSUPP);
+    setGlobalConst(WSAEPFNOSUPPORT);
+    setGlobalConst(WSAEAFNOSUPPORT);
+    setGlobalConst(WSAEADDRINUSE);
+    setGlobalConst(WSAEADDRNOTAVAIL);
+    setGlobalConst(WSAENETDOWN);
+    setGlobalConst(WSAENETUNREACH);
+    setGlobalConst(WSAENETRESET);
+    setGlobalConst(WSAECONNABORTED);
+    setGlobalConst(WSAECONNRESET);
+    setGlobalConst(WSAENOBUFS);
+    setGlobalConst(WSAEISCONN);
+    setGlobalConst(WSAENOTCONN);
+    setGlobalConst(WSAESHUTDOWN);
+    setGlobalConst(WSAETOOMANYREFS);
+    setGlobalConst(WSAETIMEDOUT);
+    setGlobalConst(WSAECONNREFUSED);
+    setGlobalConst(WSAELOOP);
+    setGlobalConst(WSAENAMETOOLONG);
+    setGlobalConst(WSAEHOSTDOWN);
+    setGlobalConst(WSAEHOSTUNREACH);
+    setGlobalConst(WSAENOTEMPTY);
+    setGlobalConst(WSAEPROCLIM);
+    setGlobalConst(WSAEUSERS);
+    setGlobalConst(WSAEDQUOT);
+    setGlobalConst(WSAESTALE);
+    setGlobalConst(WSAEREMOTE);
+    setGlobalConst(WSASYSNOTREADY);
+    setGlobalConst(WSAVERNOTSUPPORTED);
+    setGlobalConst(WSANOTINITIALISED);
+    setGlobalConst(WSAEDISCON);
+    setGlobalConst(WSAENOMORE);
+    setGlobalConst(WSAECANCELLED);
+    setGlobalConst(WSAEINVALIDPROCTABLE);
+    setGlobalConst(WSAEINVALIDPROVIDER);
+    setGlobalConst(WSAEPROVIDERFAILEDINIT);
+    setGlobalConst(WSASYSCALLFAILURE);
+    setGlobalConst(WSASERVICE_NOT_FOUND);
+    setGlobalConst(WSATYPE_NOT_FOUND);
+    setGlobalConst(WSA_E_NO_MORE);
+    setGlobalConst(WSA_E_CANCELLED);
+    setGlobalConst(WSAEREFUSED);
+    setGlobalConst(WSAHOST_NOT_FOUND);
+    setGlobalConst(WSATRY_AGAIN);
+    setGlobalConst(WSANO_RECOVERY);
+    setGlobalConst(WSANO_DATA);
+    setGlobalConst(WSA_QOS_RECEIVERS);
+    setGlobalConst(WSA_QOS_SENDERS);
+    setGlobalConst(WSA_QOS_NO_SENDERS);
+    setGlobalConst(WSA_QOS_NO_RECEIVERS);
+    setGlobalConst(WSA_QOS_REQUEST_CONFIRMED);
+    setGlobalConst(WSA_QOS_ADMISSION_FAILURE);
+    setGlobalConst(WSA_QOS_POLICY_FAILURE);
+    setGlobalConst(WSA_QOS_BAD_STYLE);
+    setGlobalConst(WSA_QOS_BAD_OBJECT);
+    setGlobalConst(WSA_QOS_TRAFFIC_CTRL_ERROR);
+    setGlobalConst(WSA_QOS_GENERIC_ERROR);
+    setGlobalConst(WSA_QOS_ESERVICETYPE);
+    setGlobalConst(WSA_QOS_EFLOWSPEC);
+    setGlobalConst(WSA_QOS_EPROVSPECBUF);
+    setGlobalConst(WSA_QOS_EFILTERSTYLE);
+    setGlobalConst(WSA_QOS_EFILTERTYPE);
+    setGlobalConst(WSA_QOS_EFILTERCOUNT);
+    setGlobalConst(WSA_QOS_EOBJLENGTH);
+    setGlobalConst(WSA_QOS_EFLOWCOUNT);
+    setGlobalConst(WSA_QOS_EUNKOWNPSOBJ);
+    setGlobalConst(WSA_QOS_EPOLICYOBJ);
+    setGlobalConst(WSA_QOS_EFLOWDESC);
+    setGlobalConst(WSA_QOS_EPSFLOWSPEC);
+    setGlobalConst(WSA_QOS_EPSFILTERSPEC);
+    setGlobalConst(WSA_QOS_ESDMODEOBJ);
+    setGlobalConst(WSA_QOS_ESHAPERATEOBJ);
+    setGlobalConst(WSA_QOS_RESERVED_PETYPE);
 
     //NETWORK END!!!
 
@@ -23682,6 +24092,9 @@ setGlobalConst(DXGI_FORMAT_UNKNOWN); setGlobalConst(DXGI_FORMAT_R32G32B32A32_TYP
     setGlobalWrapper(DS4_SET_DPAD);
     setGlobalWrapper(XUSB_TO_DS4_REPORT);
 
+    setGlobalWrapper(free);
+    setGlobalWrapper(IsDebuggerPresent);
+
     global->Set(isolate, "wprint", FunctionTemplate::New(isolate, [](const v8::FunctionCallbackInfo<v8::Value>& info) {
         using namespace v8;
         Isolate* isolate = info.GetIsolate();
@@ -23811,8 +24224,9 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrevInstance, PWSTR nCmdList, in
     //print("oh my GOD i GOTTA retest all the hid functions because the way i wrote some of those there's actually no way they work");
     print("also i ramble on about dibits being flips but idk if gdi does that or javascript so investigatw!."); //big fan of balatro flush 5 hand
     print("watch out for ID2D1Bitmap CopyFromMemory because the pitch might be wrong if the bitmap isn't 32 bit count/depth");
-    print("honestly i could probably move all these features into different dlls so you can just require the ones you want");
+    print("honestly i could probably move all these features into different dlls so you can just require the ones you want"); //holy shit trying to build a (working) v8 dll has been really hard
     print("the IPv6 sockaddr_in and related functions probably won't work correctly because i got lazy");
+    print("EXTREMELY BAD: ANY TIME I USE THE CStringFI OR WStringFI MACROS THERE'S A GENUINE ~1% CHANCE THAT THE STRING MIGHT GET FUCKED!!!!!!!"); //this issue has been PLAGUING the winsock send wrapper function and i was actually about to TWEAK (more specifically, it was in jsImpl's getBytesFromObject)
     //print("oh yeah i don't have to use GetRealNamedProperty and i can just use Get instead (my bad)"); //nah idk if i should switch because what if get is slower or something idk...
 
     SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), 7);
