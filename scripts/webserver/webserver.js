@@ -1,5 +1,30 @@
+//Usage: see ViGEmMobileController3.js and VMC3.html
+
+/*
+WebSocketManager.on("connection", function(socket) {
+    print("hello websocket!",socket.socket);
+
+    socket.on("message", function(msg) {
+        print("Socket", socket.socket, "says \""+msg+"\"");
+        if(msg == "!ping") {
+            socket.emit("pong!");
+        }
+    });
+    socket.on("disconnect", function() {
+        print("bye bye websocket...", socket.socket);
+    });
+});
+
+//ahhh just like good old nodejs express
+Server.get("/", function(req, res) {
+    return res.sendFile(__dirname + "/");
+});
+*/
+
+const fs = require("fs");
+
 //for SHA1
-eval(require("fs").read(__dirname+"/hashes.js")); //https://github.com/h2non/jshashes
+eval(fs.read(__dirname+"/hashes.js")); //https://github.com/h2non/jshashes
 
 //for atob and btoa (which i didn't realize weren't included in v8)
 //ok wait i didn't need it lol
@@ -7,62 +32,13 @@ eval(require("fs").read(__dirname+"/hashes.js")); //https://github.com/h2non/jsh
 
 const SHA1 = new Hashes.SHA1;
 
-let hits = 0;
+// let hits = 0;
 
-const rngdata = WSAStartup(MAKEWORD(2, 2));
-print(rngdata);
-
-const listening = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-print(listening);
-
-if(listening == INVALID_SOCKET) {
-    print("fuck ts invalid");
-    const err = WSAGetLastError();
-    print("FUCK SOMETHING WENT FUC (" + _com_error(err) + ") [" + err + "]");
-    print(WSACleanup());
-    quit;
-}
-
-const hint = new sockaddr_in(AF_INET, htons(25565));
-//print(hint, ntohs(hint.sin_port));
-
-print(inet_pton(AF_INET, "127.0.0.1", hint.sin_addr)); //pass sin_addr "directly" instead of by & reference in c++ lool
-//print(hint);
-
-let res = bind(listening, hint);
-if(res == SOCKET_ERROR) {
-    const err = WSAGetLastError();
-    print("FUCK SOMETHING WENT FUC (" + _com_error(err) + ") [" + err + "]");
-    closesocket(listening);
-    print(WSACleanup());
-    quit;
-}
-
-res = listen(listening, SOMAXCONN);
-if(res == SOCKET_ERROR) {
-    const err = WSAGetLastError();
-    print("listen failed? (" + _com_error(err) + ") [" + err + "]");
-    closesocket(listening);
-    print(WSACleanup());
-    quit;
-}
-
-//if(ioctlsocket(listening, FIONBIO, 1) == SOCKET_ERROR) {
-//    const err = WSAGetLastError();
-//    printNoHighlight("<ioctlsocket FIONBIO failed?> (" + _com_error(err) + ") [" + err + "]");
-//    closesocket(listening);
-//    print(WSACleanup());
-//    quit;
-//}
-
-const master_set = new fd_set();
-FD_SET(listening, master_set);
+let listening, master_set;
 
 const sockaddr_map = {};
 
 //let read_fds = new fd_set();
-
-print(listening, master_set, master_set[0]);
 
 function del_socket(socket) {
     print("dial tone", socket);
@@ -120,8 +96,6 @@ function actually_send_all_the_data_for_me_kthxbai(socket, arr) {
     }
     return closedconnection;
 }
-
-print("master_set:",master_set._ptr);
 
 class basehttp {
     constructor() {
@@ -238,6 +212,7 @@ class http_response extends basehttp {
         this.status = "OK";
         this.body = ""; //t
         this.socket = socket;
+        this.closed = false;
     }
 
     setStatus(code, message) {
@@ -258,6 +233,7 @@ class http_response extends basehttp {
     write(body) {
         this.body = body;
         this.setHeader("Content-Length", this.body.length);
+        print("content length now", this.body.length);
         return this;
     }
 
@@ -281,7 +257,13 @@ class http_response extends basehttp {
             closedconnection = true; 
         }
 
+        this.closed = closedconnection;
+
         return closedconnection;
+    }
+
+    sendFile(filename) {
+        return this.send(fs.read(filename));
     }
 
     toString() {
@@ -465,7 +447,8 @@ function getPayloadDecoded(frame, firstIndexAfterPayloadLength) {
     return Number("0b"+result.join(""));
 }*/
 
-class Reader {
+//big endian (network byte order)
+class BEReader {
     static consecutivebits = {1: 0b1, 2: 0b11, 3: 0b111, 4: 0b1111, 5: 0b11111, 6: 0b111111, 7: 0b1111111, 8: 0b11111111}; //i feel like yandere dev leaving bullshit like this here when there very well could be a better way (this shit O(1) tho.)
 
     constructor(raw) {
@@ -474,7 +457,7 @@ class Reader {
     }
 
     readNBits(n) {
-        debugger;
+        debugger; //oops left that in there lol (if only i actually knew how to debug this shit)
         let i = Math.floor(this.bitpos/8);
         let offset = this.bitpos % 8;
         //let byte = raw[i];
@@ -488,7 +471,7 @@ class Reader {
             while(temp != 0) {
                 //result <<= temp;
                 mod = Math.min(8 - offset, temp);
-                result |= (this.raw[i] >> ((7-offset) - (mod-1)) & Reader.consecutivebits[mod]) << (n-temp);
+                result |= (this.raw[i] >> ((7-offset) - (mod-1)) & BEReader.consecutivebits[mod]) << (n-temp);
                 i++;
                 //byte = raw[i];
                 //offset = (mod+offset) % 8;
@@ -496,7 +479,7 @@ class Reader {
                 temp -= mod;
             }
         }else {
-            result = this.raw[i] >> ((7-offset) - (n-1)) & Reader.consecutivebits[n];
+            result = this.raw[i] >> ((7-offset) - (n-1)) & BEReader.consecutivebits[n];
         }
         this.bitpos += n;
         return result; //reverse(result, n);
@@ -543,6 +526,40 @@ class Reader {
     //    return result;
     //}
 
+    readNBytesAsArray(n) {
+        debugger;
+        n*=8;
+        let i = Math.floor(this.bitpos/8);
+        let offset = this.bitpos % 8;
+        //let byte = raw[i];
+        print(i, offset, this.raw[i]);
+        let result = [];
+        if(offset + n > 8) {
+            print("g2g!");
+            let temp = n;
+            let mod = 0;
+            //take out the 8 - offset and do it before the loop so i don't have oofset = 0 in the loop weirdly
+            while(temp != 0) {
+                //result <<= temp;
+                mod = Math.min(8 - offset, temp);
+                result.push((this.raw[i] >> ((7-offset) - (mod-1)) & BEReader.consecutivebits[mod]));
+                i++;
+                //byte = raw[i];
+                //offset = (mod+offset) % 8;
+                offset = 0;
+                temp -= mod;
+            }
+        }else {
+            result.push(this.raw[i] >> ((7-offset) - (n-1)) & BEReader.consecutivebits[n]);
+        }
+        this.bitpos += n;
+        return result; //reverse(result, n);
+    }
+
+    eof() {
+        return (this.bitpos/8) >= this.raw.byteLength;
+    }
+
     reset() {
         this.bitpos = 0;
     }
@@ -583,8 +600,8 @@ class WebSocketPayload {
                 //i gotta be honest im not 100% sure this is correct but fortunately i'm probably not gonna be sending that much information
                 packet.push(
                     length | mask << 7,
-                    extendedLength & Reader.consecutivebits[8],
-                    (extendedLength >> 8) & Reader.consecutivebits[8],
+                    extendedLength & BEReader.consecutivebits[8],
+                    (extendedLength >> 8) & BEReader.consecutivebits[8],
                 );
             }else {
                 length = 127;
@@ -595,10 +612,10 @@ class WebSocketPayload {
                 //bytes.push((extendedLength >> 24) & Reader.consecutivebits[8]);
                 packet.push(
                     length | mask << 7,
-                    extendedLength & Reader.consecutivebits[8],
-                    (extendedLength >> 8) & Reader.consecutivebits[8],
-                    (extendedLength >> 16) & Reader.consecutivebits[8],
-                    (extendedLength >> 24) & Reader.consecutivebits[8],
+                    extendedLength & BEReader.consecutivebits[8],
+                    (extendedLength >> 8) & BEReader.consecutivebits[8],
+                    (extendedLength >> 16) & BEReader.consecutivebits[8],
+                    (extendedLength >> 24) & BEReader.consecutivebits[8],
                 );
             }
         }else {
@@ -697,23 +714,48 @@ class WebSocketManager {
     //    "connection": WebSocketManager.defaultEventDispatcher,
     //}
     
-    static on(event, callback) {
-        event = event.toLowerCase();
-        if(!this.#eventListeners[event]) {
-            this.#eventListeners[event] = [];
+    ////static path(pathName) {
+    ////    return {on: function(...args) {
+    ////        WebSocketManager.on(pathName, ...args);
+    ////    }}
+    ////}
+    //
+    //static on(event, callback) {
+    //    event = event.toLowerCase();
+    //    if(!this.#eventListeners[event]) {
+    //        this.#eventListeners[event] = [];
+    //    }
+    //    this.#eventListeners[event].push(callback);
+    //}
+
+    static onConnect(path, callback) {
+        if(!this.#eventListeners["connection"]) {
+            this.#eventListeners["connection"] = {};
         }
-        this.#eventListeners[event].push(callback);
+        this.#eventListeners["connection"][path] = callback;
     }
 
-    static #fireEvent(event, extra) {
-        event = event.toLowerCase();
-        if(!this.#eventListeners[event] || this.#eventListeners[event].length == 0) { //if nobody is listening to this event then we'll just return (otherwise you get a TypeError lol)
+    //static #fireEvent(event, extra) {
+    //    event = event.toLowerCase();
+    //    if(!this.#eventListeners[event]) { //if nobody is listening to this event then we'll just return (otherwise you get a TypeError lol)
+    //        return;
+    //    }
+    //    //this.#events[event](this.#eventListeners[event], extra);
+    //    for(const callback of this.#eventListeners[event]) {
+    //        callback(extra);
+    //    }
+    //}
+
+    static allowConnection(pathName) {
+        //we'll allow a websocket connection if there's an event listener for that path
+        return this.#eventListeners["connection"][pathName] != undefined;
+    }
+
+    static #fireConnection(path, websocket) {
+        if(!this.#eventListeners["connection"]) {
             return;
         }
-        //this.#events[event](this.#eventListeners[event], extra);
-        for(const callback of this.#eventListeners[event]) {
-            callback(extra);
-        }
+        this.#eventListeners["connection"][path](websocket);
     }
 
     static emit(strMessage) {
@@ -722,10 +764,12 @@ class WebSocketManager {
         }
     }
 
-    static connect(socket) {
+    static connect(path, socket) {
         const websocket = new WebSocketRepresentation(socket);
         WebSocketManager.#websockets[socket] = websocket;
-        this.#fireEvent("connection", websocket);
+        //this.#fireEvent("connection", websocket);
+        print("connected", path);
+        this.#fireConnection(path,  websocket);
     }
     
     //raw must be a Uint8Array!
@@ -753,7 +797,7 @@ class WebSocketManager {
 
         //wait so is the whole thing big endian?
 
-        const reader = new Reader(raw);
+        const reader = new BEReader(raw);
         
         const fin = reader.readBit();
         const rsv1 = reader.readBit(); //im supposed to _Fail the WebSocket Connection_ if these are nonzero AND i didn't negotiate any extensions
@@ -778,10 +822,19 @@ class WebSocketManager {
             realLength = reader.readNBytes(8); //gul[p]
         }
 
-        //if(mask) {
+        //mask key seems to always be on a byte boundary thankfully so i can slice it like mdn does
+
+        //if(mask) { //wait we don't need to check lol i already return if there's no mask
         //    const key = reader.readNBytes(4); //door
         //}
-        const payload = getPayloadDecoded(raw, reader.bitpos/8); //thank you mdn
+
+        const key = reader.readNBytesAsArray(4);
+
+        //const payload = getPayloadDecoded(raw, reader.bitpos/8); //thank you mdn
+
+        //nah we can do this ourselves watch
+        const payload = reader.readNBytesAsArray(realLength).map((v, i) => v ^ key[i%4]);
+
         websocket.incomingData.push(...payload);
         print("FIN:", fin, ", RSV1:",rsv1,",RSV2:",rsv2,",RSV3:",rsv3,",OPCODE:",opcode,",MASK:",mask,",LENGTH:",length);
         if(fin) {
@@ -807,6 +860,21 @@ class WebSocketManager {
                 websocket.pong();
             }
         }
+
+        if(!reader.eof()) {
+            //did we some how recv more than one websocket message ?! (this is bad!)
+            const restoftheshit = raw.slice(reader.bitpos/8);
+            //print("first payload:", raw.slice(0, reader.bitpos/8));
+            //print("second payload:", restoftheshit);
+            //welp since we read too much data we'll just call collectMessage again!
+            WebSocketManager.collectMessage(socket, restoftheshit); //recursion bad.
+            //SetForegroundWindow(GetConsoleWindow());
+            //try {
+            //   print(eval(getline("uh oh we read TWO payloads so what should we do chat...")));
+            //}catch(e) {
+            //   print(e.toString());
+            //}
+        }
         
         //websocket.fireEvent("message", );
     }
@@ -820,34 +888,6 @@ class WebSocketManager {
         const websocket = WebSocketManager.#websockets[socket];
         websocket.fireEvent("disconnect", undefined);
         delete WebSocketManager.#websockets[socket];
-    }
-}
-
-//like express
-//the websocket opening handshake is handled elsewhere
-class Server {
-    static #paths = {};
-
-    static genericdothething(method, path, callback) {
-        if(!this.#paths[path]) {
-            this.#paths[path] = {};
-        }
-        this.#paths[path][method] = callback;
-    }
-
-    static get(path, callback) {
-        this.genericdothething("GET", path, callback);
-        //this.#paths[path] = callback;
-    }
-
-    static request(socket, request) {
-        if(!this.#paths[request.path]?.[request.method]) { //if nobody is listening to this event then we'll just return (otherwise you get a TypeError lol)
-            return new http_response(socket).setStatus(404).send(); //fuck yes i KNEW making setStatus return itself was a good call (method chaining!)
-        }
-        //this.#events[event](this.#eventListeners[event], extra);
-        const response = new http_response(socket);
-        return this.#paths[request.path][request.method](request, response);
-        //return response.send();
     }
 }
 
@@ -884,259 +924,337 @@ class socket_info {
     }
 }
 
-WebSocketManager.on("connection", function(socket) {
-    print("hello websocket!",socket.socket);
+//like express
+//the websocket opening handshake is handled elsewhere
+class Server {
+    static #paths = {};
 
-    socket.on("message", function(msg) {
-        print("Socket", socket.socket, "says \""+msg+"\"");
-        if(msg == "!ping") {
-            socket.emit("pong!");
+    static addGenericListener(method, path, callback) {
+        if(!this.#paths[path]) {
+            this.#paths[path] = {};
         }
-    });
-    socket.on("disconnect", function() {
-        print("bye bye websocket...", socket.socket);
-    });
-});
-
-//ahhh just like good old nodejs express
-Server.get("/", function(req, res) {
-    return res.sendFile(__dirname + "/"); //this doesn't work yet lol hold on
-});
-
-while(!GetKey(VK_ESCAPE)) {
-    //hmm i need to copy...
-    const read_fds = FD_COPY(master_set); //custom function for copying lol
-    //const write_fds = FD_COPY(master_set); //custom function for copying lol
-    const write_fds = new fd_set();
-    for(let i = 0; i < master_set.count; i++) {
-        const socket = master_set[i];
-        if(socket == listening) continue;
-        if(sockaddr_map[socket].writable) {
-            FD_SET(socket, write_fds);
-        }
+        this.#paths[path][method] = callback;
     }
-    print("waiting...");
-    const status = select(0, read_fds, write_fds, NULL, NULL);
-    if(status == SOCKET_ERROR) {
+
+    static get(path, callback) {
+        this.addGenericListener("GET", path, callback);
+        //this.#paths[path] = callback;
+    }
+
+    //returns whether or not the socket was closed after this operation
+    static request(socket, request) {
+        if(!this.#paths[request.path]?.[request.method]) { //if nobody is listening to this event then we'll just return (otherwise you get a TypeError lol)
+            return new http_response(socket).setStatus(404).send(); //fuck yes i KNEW making setStatus return itself was a good call (method chaining!)
+        }
+        //this.#events[event](this.#eventListeners[event], extra);
+        const response = new http_response(socket);
+        response.setHeader("Connection", "close"); //lol fuckal ll that
+        const result = this.#paths[request.path][request.method](request, response);
+        if(result != undefined) {
+            return result;
+        }
+        return response.closed;
+        //return response.send();
+    }
+
+    static listen(port) {
+        const st = Date.now();
+        const rngdata = WSAStartup(MAKEWORD(2, 2));
+        print(rngdata);
+
+        listening = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+        print(listening);
+
+        if(listening == INVALID_SOCKET) {
+            print("fuck ts invalid");
+            const err = WSAGetLastError();
+            print("FUCK SOMETHING WENT FUC (" + _com_error(err) + ") [" + err + "]");
+            print(WSACleanup());
+            return false;
+        }
+
+        const hint = new sockaddr_in(AF_INET, htons(port));
+        //print(hint, ntohs(hint.sin_port));
+
+        //oops i had the address string as "127.0.0.1" and i 
+        print(inet_pton(AF_INET, "localhost", hint.sin_addr)); //pass sin_addr "directly" instead of by & reference in c++ lool
+        //print(hint);
+
+        let res = bind(listening, hint);
+        if(res == SOCKET_ERROR) {
+            const err = WSAGetLastError();
+            print("FUCK SOMETHING WENT FUC (" + _com_error(err) + ") [" + err + "]");
+            closesocket(listening);
+            print(WSACleanup());
+            return false;
+        }
+
+        res = listen(listening, SOMAXCONN);
+        if(res == SOCKET_ERROR) {
+            const err = WSAGetLastError();
+            print("listen failed? (" + _com_error(err) + ") [" + err + "]");
+            closesocket(listening);
+            print(WSACleanup());
+            return false;
+        }
+
+        //if(ioctlsocket(listening, FIONBIO, 1) == SOCKET_ERROR) {
+        //    const err = WSAGetLastError();
+        //    printNoHighlight("<ioctlsocket FIONBIO failed?> (" + _com_error(err) + ") [" + err + "]");
+        //    closesocket(listening);
+        //    print(WSACleanup());
+        //    quit;
+        //}
+
+        master_set = new fd_set();
+        FD_SET(listening, master_set);
+        print(listening, master_set, master_set[0]);
+
+        print("master_set:",master_set._ptr);
+
+        print(`doin' ur mom doin' doin' ur mom on port ${port} [in ${Date.now()-st}ms]!`);
+        
+        return true;
+    }
+
+    //returns false if something bad happened lol
+    //timeout is in microseconds! (use NULL to block teh thread)
+    static poll(timeout) {
+        //hmm i need to copy...
+        const read_fds = FD_COPY(master_set); //custom function for copying lol
+        //const write_fds = FD_COPY(master_set); //custom function for copying lol
+        const write_fds = new fd_set();
+        for(let i = 0; i < master_set.count; i++) {
+            const socket = master_set[i];
+            if(socket == listening) continue;
+            if(sockaddr_map[socket].writable) {
+                FD_SET(socket, write_fds);
+            }
+        }
+        print("waiting...");
+        const status = select(0, read_fds, write_fds, NULL, timeout);
+        if(status == SOCKET_ERROR) {
+            free(read_fds);
+            free(write_fds);
+            return false;
+        }
+
+        //print("status:",status);
+        //print("read_fds:",read_fds._ptr);
+        //print("write_fds:",write_fds._ptr);
+
+        //__debugbreak();
+
+        let j = 0;
+
+        for(let i = 0; i < FD_SETSIZE; i++) {
+            const socket = master_set[i];
+            if(FD_ISSET(socket, read_fds)) {
+                if(socket == listening) {
+                    const clientl = {};
+                    
+                    const clientSocket = accept(listening, clientl);
+
+                    let info;
+
+                    sockaddr_map[clientSocket] = new socket_info(clientl);
+
+                    if(info = getnameinfo(clientl)) {
+                        print(info.host + " connected with port " + info.service);
+                    }else {
+                        print(inet_ntop(AF_INET, clientl.sin_addr) + " connected with port " + ntohs(clientl.sin_port));
+                    }
+
+                    //if(ioctlsocket(clientSocket, FIONBIO, 1) == SOCKET_ERROR) { //for some reason recv keeps hanging when you refresh the webpage with the devconsole open so instead of trying to find out why im just gonna make them non blocking LOL!
+                    //    const err = WSAGetLastError();
+                    //    printNoHighlight("<ioctlsocket FIONBIO failed?> (" + _com_error(err) + ") [" + err + "]");
+                    //}
+
+                    FD_SET(clientSocket, master_set);
+                }else {
+                    //print("Socket", socket, "(",i,") is ready to be read!");
+                    let content = "";
+
+                    let res;
+                    print("recv before");
+                    if((res = recv(socket, 4096, 0)) <= 0) {
+                        if(res == SOCKET_ERROR) {
+                            const err = WSAGetLastError();
+                            printNoHighlight("recv failed?> (" + _com_error(err) + ") [" + err + "]");
+                            if(err == WSAEWOULDBLOCK) {
+                                printNoHighlight("skipping because would block");
+                                break;
+                            }
+                        }else {
+                            print("socket hung up...");
+                        }
+                        del_socket(socket);
+                    }else {
+                        //<clientl>nigga what the fuck!</clientl> //sum jsx in here
+                        content += String.fromCharCode(...res); //not a great solution if receiving wstrings lol
+                        
+                        const client = sockaddr_map[socket];
+                        if(!client.websocket) { //lol when you print the bytes that websockets send it commonly sends the bell \x07 character (and i don't need it to do that.)
+                            print(content);
+                        }
+
+                        if(content.substring(0, content.indexOf("\n")).includes("HTTP")) { //assuming content is the whole thing (hopefully)
+                            client.parseHttpRequest(content);
+                        }else {
+                            if(client.websocket) {
+                                //welp we're not using res after this anyways so we'll transfer the array buffer to a Uint8Array
+                                WebSocketManager.collectMessage(socket, new Uint8Array(res.buffer.transfer()));
+                            }else {
+                                print("client sent something unexpected!");
+                                print(res);
+                                SetForegroundWindow(GetConsoleWindow());
+                                try {
+                                    print(eval(getline("Content was not an http request or a WebSocket packet (what should we do chief): ")));
+                                }catch(e) {
+                                    print(e.toString());
+                                }
+                                //SetForegroundWindow(hwnd);
+                            }
+                        }
+                    }
+                    print("recv after");
+
+                }
+                j++;
+            }else if(FD_ISSET(socket, write_fds)) {
+                if(socket == listening) { //what would this mean lol
+                    printNoHighlight("listening socket ready to write???");
+                }else {
+                    //print("ready to write to socket", socket, "(",i,")");
+
+                    const client = sockaddr_map[socket];
+
+                    let closed = false;
+
+                    if(client.http_request) {
+                        if(!Server.request(socket, client.request)) { //if not closed, don't write again (unless it asks again)
+                            client.writable = false;
+                        }
+
+                        /*const response = new http_response(socket);
+                        response.setHeader("Content-Type", "text/html");
+                        response.setHeader("Connection", "close");
+
+                        if(info.request.method == "GET") {
+                            switch(info.request.path) {
+                                case "/":
+                                    hits++;
+
+                                    response.write(`<!DOCTYPE html>
+    <html lang="en-US">
+    <head>
+    </head>
+    <body>
+    <h1>
+    hello from my <span style="filter: blur(1px); text-shadow: 0 0 8px black; color: yellow;">jbs/c++</span> webserver!
+    </h1>
+    <p>
+    ${hits} hit${hits > 1 ? "s" : ""}
+    </p>
+    </body>
+    </html>`);
+                                    break;
+                                default:
+                                    response.setStatus(404);
+                                    break;
+                            }
+
+                            //const split = html.split("\n");
+                            ////split[2] += html.length + (html.length);
+                            //const len = html.length;
+                            //const calc = (len + (len.toString().length));
+                            //if(len.toString().length < calc.toString().length) {
+                            //   calc += calc.toString().length - len.toString().length;
+                            //}
+                            //split[2] += calc; //content length is at index 2uah
+                            //const result = split.join("\n");
+                            //print(result);
+
+                            //ohhh content length is message body only i calculated allat for nuttin
+                            //const result = header+body;
+                            
+                            //const result = response.toString();
+                            closed = response.send();
+                            if(!closed) {
+                                info.writable = false; //yeah we don't need to write to it anymore if it's just a regular request
+                            }
+                        }*/
+
+                        //print("sent:", send(socket, html, true, 0), "out of", html.length);
+                    }else if(client.websocket) {
+                        if(!client.payload) {
+                            const response = new http_response(socket);
+                            if(WebSocketManager.allowConnection(client.request.path)) {
+                                response.setStatus(101); //switching protocols
+                                response.setHeader("Upgrade", "websocket");
+                                response.setHeader("Connection", "Upgrade");
+                                //let acceptKey = btoa(SHA1.hex(info.request.headers["Sec-WebSocket-Key"] + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"));
+                                //oh wait nevermind it's SHA1.b64
+                                
+                                const acceptKey = SHA1.b64(client.request.headers["Sec-WebSocket-Key"] + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"); //https://datatracker.ietf.org/doc/html/rfc6455#section-4.2.2
+                                response.setHeader("Sec-WebSocket-Accept", acceptKey);
+                            }else {
+                                print(`websocket tried connect at '${client.request.path}' but there are no listeners for that path!`);
+                                response.setStatus(404);
+                            }
+
+                            //if(client.request.path == "/") {
+                            //    response.setStatus(101); //switching protocols
+                            //    response.setHeader("Upgrade", "websocket");
+                            //    response.setHeader("Connection", "Upgrade");
+                            //    //let acceptKey = btoa(SHA1.hex(info.request.headers["Sec-WebSocket-Key"] + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"));
+                            //    //oh wait nevermind it's SHA1.b64
+                            //    
+                            //    const acceptKey = SHA1.b64(client.request.headers["Sec-WebSocket-Key"] + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"); //https://datatracker.ietf.org/doc/html/rfc6455#section-4.2.2
+                            //    response.setHeader("Sec-WebSocket-Accept", acceptKey);
+                            //}else {
+                            //    response.setStatus(404);
+                            //}
+                            
+                            closed = response.send(); //when you send 404 i close the connection so that's why i check it like this
+                            if(!closed) {
+                                client.writable = false;
+                                WebSocketManager.connect(client.request.path, socket);
+                            }
+                        }
+                    }
+                    if(!closed && client.payload) { //for sending data to websockets and also just anywhere lol
+                        closed = actually_send_all_the_data_for_me_kthxbai(socket, client.payload);
+                        if(!closed) {
+                            client.writable = false;
+                            client.payload = undefined;
+                        }
+                    }
+                }
+                j++;
+            }
+            if(j == status) {
+                break;
+            }
+        }
+
         free(read_fds);
         free(write_fds);
-        break;
+
+        return true;
     }
 
-    print("status:",status);
-    print("read_fds:",read_fds._ptr);
-    print("write_fds:",write_fds._ptr);
-
-    //__debugbreak();
-
-    let j = 0;
-
-    for(let i = 0; i < FD_SETSIZE; i++) {
-        const socket = master_set[i];
-        if(FD_ISSET(socket, read_fds)) {
-            if(socket == listening) {
-                const clientl = {};
-                
-                const clientSocket = accept(listening, clientl);
-
-                let info;
-
-                sockaddr_map[clientSocket] = new socket_info(clientl);
-
-                if(info = getnameinfo(clientl)) {
-                    print(info.host + " connected with port " + info.service);
-                }else {
-                    print(inet_ntop(AF_INET, clientl.sin_addr) + " connected with port " + ntohs(clientl.sin_port));
-                }
-
-                //if(ioctlsocket(clientSocket, FIONBIO, 0) == SOCKET_ERROR) {
-                //    const err = WSAGetLastError();
-                //    printNoHighlight("<ioctlsocket FIONBIO failed?> (" + _com_error(err) + ") [" + err + "]");
-                //}
-
-                FD_SET(clientSocket, master_set);
-            }else {
-                //print("Socket", socket, "(",i,") is ready to be read!");
-                let content = "";
-
-                let res;
-                print("recv before");
-                if((res = recv(socket, 4096, 0)) <= 0) {
-                    if(res == SOCKET_ERROR) {
-                        const err = WSAGetLastError();
-                        printNoHighlight("recv failed?> (" + _com_error(err) + ") [" + err + "]");
-                        if(err == WSAEWOULDBLOCK) {
-                            printNoHighlight("skipping because would block");
-                            break;
-                        }
-                    }else {
-                        print("socket hung up...");
-                    }
-                    del_socket(socket);
-                }else {
-                    //<clientl>nigga what the fuck!</clientl> //sum jsx in here
-                    content += String.fromCharCode(...res); //not a great solution if receiving wstrings lol
-                    print(content);
-
-                    const info = sockaddr_map[socket];
-
-                    if(content.substring(0, content.indexOf("\n")).includes("HTTP")) { //assuming content is the whole thing (hopefully)
-                        info.parseHttpRequest(content);
-                    }else {
-                        if(info.websocket) {
-                            //welp we're not using res after this anyways so we'll transfer the array buffer to a Uint8Array
-                            WebSocketManager.collectMessage(socket, new Uint8Array(res.buffer.transfer()));
-                        }else {
-                            SetForegroundWindow(GetConsoleWindow());
-                            try {
-                                print(eval(getline("Content was not an http request (what should we do chief): ")));
-                            }catch(e) {
-                                print(e.toString());
-                            }
-                            //SetForegroundWindow(hwnd);
-                        }
-                    }
-                }
-                print("recv after");
-
-            }
-            j++;
-        }else if(FD_ISSET(socket, write_fds)) {
-            if(socket == listening) { //what would this mean lol
-                printNoHighlight("listening socket ready to write???");
-            }else {
-                print("ready to write to socket", socket, "(",i,")");
-
-                const info = sockaddr_map[socket];
-
-                let closed = false;
-
-                if(info.http_request) {
-                    if(!Server.request(socket, info.request)) { //if not closed, don't write again (unless it asks again)
-                        info.writable = false;
-                    }
-
-                    /*const response = new http_response(socket);
-                    response.setHeader("Content-Type", "text/html");
-                    response.setHeader("Connection", "close");
-
-                    if(info.request.method == "GET") {
-                        switch(info.request.path) {
-                            case "/":
-                                hits++;
-
-                                response.write(`<!DOCTYPE html>
-<html lang="en-US">
-<head>
-</head>
-<body>
-<h1>
-hello from my <span style="filter: blur(1px); text-shadow: 0 0 8px black; color: yellow;">jbs/c++</span> webserver!
-</h1>
-<p>
-${hits} hit${hits > 1 ? "s" : ""}
-</p>
-</body>
-</html>`);
-                                break;
-                            default:
-                                response.setStatus(404);
-                                break;
-                        }
-
-                        //const split = html.split("\n");
-                        ////split[2] += html.length + (html.length);
-                        //const len = html.length;
-                        //const calc = (len + (len.toString().length));
-                        //if(len.toString().length < calc.toString().length) {
-                        //   calc += calc.toString().length - len.toString().length;
-                        //}
-                        //split[2] += calc; //content length is at index 2uah
-                        //const result = split.join("\n");
-                        //print(result);
-
-                        //ohhh content length is message body only i calculated allat for nuttin
-                        //const result = header+body;
-                        
-                        //const result = response.toString();
-                        closed = response.send();
-                        if(!closed) {
-                            info.writable = false; //yeah we don't need to write to it anymore if it's just a regular request
-                        }
-                    }*/
-
-                    //print("sent:", send(socket, html, true, 0), "out of", html.length);
-                }else if(info.websocket) {
-                    if(!info.payload) {
-                        const response = new http_response(socket);
-                        if(info.request.path == "/") {
-                            response.setStatus(101); //switching protocols
-                            response.setHeader("Upgrade", "websocket");
-                            response.setHeader("Connection", "Upgrade");
-                            //let acceptKey = btoa(SHA1.hex(info.request.headers["Sec-WebSocket-Key"] + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"));
-                            //oh wait nevermind it's SHA1.b64
-                            
-                            const acceptKey = SHA1.b64(info.request.headers["Sec-WebSocket-Key"] + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"); //https://datatracker.ietf.org/doc/html/rfc6455#section-4.2.2
-                            response.setHeader("Sec-WebSocket-Accept", acceptKey);
-                        }else {
-                            response.setStatus(404);
-                        }
-                        
-                        closed = response.send();
-                        if(!closed) {
-                            info.writable = false;
-                            WebSocketManager.connect(socket);
-                        }
-                    }else {
-                        closed = actually_send_all_the_data_for_me_kthxbai(socket, info.payload);
-                        if(!closed) {
-                            info.writable = false;
-                            info.payload = undefined;
-                        }
-                    }
-                }
-
-//                hits++;
-//
-//                const body =
-//`<!DOCTYPE html>
-//<html lang="en-US">
-//<head>
-//</head>
-//<body>
-//<h1>
-//hello from my <span style="filter: blur(1px); text-shadow: 0 0 8px black; color: yellow;">jbs/c++</span> webserver!
-//</h1>
-//<p>
-//${hits} hit${hits > 1 ? "s" : ""}
-//</p>
-//</body>
-//</html>`;
-//
-//                const header = 
-//`HTTP/1.1 200 OK
-//Content-Type: text/html
-//Content-Length: ${body.length}
-//Connection: close
-//
-//`
-            }
-            j++;
+    static cleanup() { //oops i forgot to make it static lol
+        for(let i = 0; i < master_set.count; i++) {
+            del_socket(master_set[i]);
         }
-        if(j == status) {
-            break;
-        }
+
+        free(master_set);
+
+        print(closesocket(listening));
+        print(WSACleanup());
     }
-
-    free(read_fds);
-    free(write_fds);
 }
 
-for(let i = 0; i < master_set.count; i++) {
-    del_socket(master_set[i]);
-}
-
-free(master_set);
-
-print(closesocket(listening));
-print(WSACleanup());
+globalThis.Server = Server;
+globalThis.WebSocketManager = WebSocketManager;

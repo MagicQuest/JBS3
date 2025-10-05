@@ -270,7 +270,7 @@ function onExtensionChange(hasExtension, previousExtensionId) {
 
 //CODE START
 
-if(!ViGEmBus.init()) {
+if(ViGEmBus.init() != VIGEM_ERROR_NONE) {
     quit;
 }
 
@@ -306,10 +306,10 @@ function generic_notification(Client, Target, LargeMotor, SmallMotor, TypeDepend
 }
 
 controller = ViGEmBus.addController(CONTROLLER_X360);
-if(!controller) {
-    quit;
+if(!controller.pad) { //if the return value is false or an error code, the "pad" property will be undefined
+    quit; //lol
 }
-//uh oh... do the notifications happen on a different thread?! (if so, it's cooked OR i could enqueue a microtask or something like that but that requires more manual setup unfortunately)
+//uh oh... do the notifications happen on a different thread?! (if so, it's cooked OR i could enqueue a microtask or something like that but that requires more manual setup unfortunately (the manual set up in question is the dispatchNotifications))
 //if(controller.type == CONTROLLER_X360) {
 //    controller.register_notification(function(Client, Target, LargeMotor, SmallMotor, LedNumber) {
 //        print("> NotificationX360 {");

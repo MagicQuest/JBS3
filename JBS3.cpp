@@ -18582,8 +18582,12 @@ V8FUNC(numbertest) {
     using namespace v8;
     Isolate* isolate = info.GetIsolate();
 
-    long long value = info[0].As<Number>()->IntegerValue(isolate->GetCurrentContext()).FromJust();
-    print(&value);
+    Local<Number> number = info[0].As<Number>();
+
+    double dvalue = number->Value();
+    long long value = number->IntegerValue(isolate->GetCurrentContext()).FromJust();
+    //print(&value);
+    print(dvalue);
     print(value); //ok so undefined and NaN are 0 while Infinity is 2**(64-1)
 }
 

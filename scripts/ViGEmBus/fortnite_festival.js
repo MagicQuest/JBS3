@@ -81,12 +81,12 @@ function GetFirstWiimote() {
     currentDevice = handle;
 }
 
-if(!ViGEmBus.init()) {
+if(ViGEmBus.init() != VIGEM_ERROR_NONE) {
     quit;
 }
 
 controller = ViGEmBus.addController(CONTROLLER_X360);
-if(!controller) {
+if(!controller.pad) {
     quit;
 }
 

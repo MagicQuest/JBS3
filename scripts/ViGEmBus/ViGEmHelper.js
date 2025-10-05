@@ -1,5 +1,21 @@
 //see scripts/wiimote/x360_emulation.js or scripts/ViGEmBus/fortnite_festival.js for actual use
 
+//ViGEmBus.init now returns the error code if something went wrong (or false if it couldn't allocate memory or something like that)
+//now to check if it succeeded use the following code
+/*
+    if(ViGEmBus.init() != VIGEM_ERROR_NONE) {
+        //do something if it fails...
+    }
+*/
+
+//ViGEmBus.addController now also returns an error code if something goes wrong so use the following code to correctly check if it worked
+/*
+    const controller = ViGEmBus.addController(CONTROLLER_X360); //controller type doesn't matter lol
+    if(!controller.pad) { //if addController doesn't return a controller object, this property won't exist.
+        //do something if no controller...
+    }
+*/
+
 globalThis.CONTROLLER_X360 = Xbox360Wired;
 globalThis.CONTROLLER_DS4 = DualShock4Wired;
 
@@ -144,8 +160,6 @@ class DS4Controller extends VirtualController {
     //if button is one of the combination dpad inputs im cooked
     //@Override
     setButton(button, enable) {
-        if(button == undefined) return; //just in case some keybinds are unbound
-
         if(button <= 0x8) { //one of the dpad buttons (idk why they;re so weird)
             if(enable) {
                 this.dpad |= 1 << (button/2); //dividing by two because each whole direction is even
@@ -155,11 +169,7 @@ class DS4Controller extends VirtualController {
             print(this.dpad);
             DS4_SET_DPAD(this.report, DS4Controller.dpadMap[this.dpad]); //correctly sets the combination dpad value based on this.dpad :)
         }else {
-            if(enable) {
-                this.report.wButtons |= button;
-            }else {
-                this.report.wButtons &= ~button;
-            }
+            super.setButton(button, enable);
         }
     }
 
@@ -220,9 +230,9 @@ class ViGEmBus {
         if(res != VIGEM_ERROR_NONE) {
             Msgbox(`vigem_connect failed for some reason! (error code: ${res})`, "ViGEmHelper", MB_OK | MB_ICONERROR | MB_SYSTEMMODAL);
             vigem_free(this.client);
-            return false;
+            return res;
         }
-        return true;
+        return VIGEM_ERROR_NONE;
     }
 
     static addController(type) {
@@ -245,7 +255,7 @@ class ViGEmBus {
             const res = vigem_target_add(this.client, pad);
             if(res != VIGEM_ERROR_NONE) {
                 Msgbox("Target plugin failed with error code: " + res, "ViGEmHelper", MB_OK | MB_ICONERROR | MB_SYSTEMMODAL);
-                return false;
+                return res;
             }else {
                 controller = new controllertypes[type](pad); //aura.
                 this.controllers.push(controller); //yep ;)

@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>keyboard and mouse</title>
+    <style>
+        html {
+            touch-action: none;
+            user-select: none;
+        }
+        body {
+            margin:0;
+        }
+        canvas {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas">
+        it's 2025 bro
+    </canvas>
+    <!--div style="margin: auto; left: 0; right: 0; top: 0; bottom: 0; position: absolute;">
+        <button style="font-size: 100px; display: block;" onclick="canvas.requestFullscreen();">
+            fullscreen
+        </button>
+    </div-->
+    <script>
+        const EVENT_KBD_KEY = 1;
+        const EVENT_KBD_KEYUP = 2;
+        const EVENT_MOUSE_DOWN = 3;
+        const EVENT_MOUSE_MOVE = 4;
+        const EVENT_MOUSE_UP = 5;
+        
+        const MOUSE_LEFT = 1;   //1
+        const MOUSE_RIGHT = 2;  //2
+        const MOUSE_MIDDLE = 4; //4
+        const MOUSE_X1 = 5;     //5
+        const MOUSE_X2 = 6;     //6
+
+        const VK_LBUTTON = 1;
+        const VK_RBUTTON = 2;
+        const VK_CANCEL = 3;
+        const VK_MBUTTON = 4;
+        const VK_XBUTTON1 = 5;
+        const VK_XBUTTON2 = 6;
+        const VK_BACK = 8;
+        const VK_TAB = 9;
+        const VK_CLEAR = 12;
+        const VK_RETURN = 13;
+        const VK_SHIFT = 16;
+        const VK_CONTROL = 17;
+        const VK_MENU = 18;
+        const VK_PAUSE = 19;
+        const VK_CAPITAL = 20;
+        const VK_KANA = 21;
+        const VK_HANGUL = 21;
+        const VK_IME_ON = 22;
+        const VK_JUNJA = 23;
+        const VK_FINAL = 24;
+        const VK_HANJA = 25;
+        const VK_KANJI = 25;
+        const VK_IME_OFF = 26;
+        const VK_ESCAPE = 27;
+        const VK_CONVERT = 28;
+        const VK_NONCONVERT = 29;
+        const VK_ACCEPT = 30;
+        const VK_MODECHANGE = 31;
+        const VK_SPACE = 32;
+        const VK_PRIOR = 33;
+        const VK_NEXT = 34;
+        const VK_END = 35;
+        const VK_HOME = 36;
+        const VK_LEFT = 37;
+        const VK_UP = 38;
+        const VK_RIGHT = 39;
+        const VK_DOWN = 40;
+        const VK_SELECT = 41;
+        const VK_PRINT = 42;
+        const VK_EXECUTE = 43;
+        const VK_SNAPSHOT = 44;
+        const VK_INSERT = 45;
+        const VK_DELETE = 46;
+        const VK_HELP = 47;
+        const VK_LWIN = 91;
+        const VK_RWIN = 92;
+        const VK_APPS = 93;
+        const VK_SLEEP = 95;
+        const VK_NUMPAD0 = 96;
+        const VK_NUMPAD1 = 97;
+        const VK_NUMPAD2 = 98;
+        const VK_NUMPAD3 = 99;
+        const VK_NUMPAD4 = 100;
+        const VK_NUMPAD5 = 101;
+        const VK_NUMPAD6 = 102;
+        const VK_NUMPAD7 = 103;
+        const VK_NUMPAD8 = 104;
+        const VK_NUMPAD9 = 105;
+        const VK_MULTIPLY = 106;
+        const VK_ADD = 107;
+        const VK_SEPARATOR = 108;
+        const VK_SUBTRACT = 109;
+        const VK_DECIMAL = 110;
+        const VK_DIVIDE = 111;
+        const VK_F1 = 112;
+        const VK_F2 = 113;
+        const VK_F3 = 114;
+        const VK_F4 = 115;
+        const VK_F5 = 116;
+        const VK_F6 = 117;
+        const VK_F7 = 118;
+        const VK_F8 = 119;
+        const VK_F9 = 120;
+        const VK_F10 = 121;
+        const VK_F11 = 122;
+        const VK_F12 = 123;
+        const VK_F13 = 124;
+        const VK_F14 = 125;
+        const VK_F15 = 126;
+        const VK_F16 = 127;
+        const VK_F17 = 128;
+        const VK_F18 = 129;
+        const VK_F19 = 130;
+        const VK_F20 = 131;
+        const VK_F21 = 132;
+        const VK_F22 = 133;
+        const VK_F23 = 134;
+        const VK_F24 = 135;
+        const VK_NUMLOCK = 144;
+        const VK_SCROLL = 145;
+        const VK_LSHIFT = 160;
+        const VK_RSHIFT = 161;
+        const VK_LCONTROL = 162;
+        const VK_RCONTROL = 163;
+        const VK_LMENU = 164;
+        const VK_RMENU = 165;
+        const VK_BROWSER_BACK = 166;
+        const VK_BROWSER_FORWARD = 167;
+        const VK_BROWSER_REFRESH = 168;
+        const VK_BROWSER_STOP = 169;
+        const VK_BROWSER_SEARCH = 170;
+        const VK_BROWSER_FAVORITES = 171;
+        const VK_BROWSER_HOME = 172;
+        const VK_VOLUME_MUTE = 173;
+        const VK_VOLUME_DOWN = 174;
+        const VK_VOLUME_UP = 175;
+        const VK_MEDIA_NEXT_TRACK = 176;
+        const VK_MEDIA_PREV_TRACK = 177;
+        const VK_MEDIA_STOP = 178;
+        const VK_MEDIA_PLAY_PAUSE = 179;
+        const VK_LAUNCH_MAIL = 180;
+        const VK_LAUNCH_MEDIA_SELECT = 181;
+        const VK_LAUNCH_APP1 = 182;
+        const VK_LAUNCH_APP2 = 183;
+        const VK_OEM_1 = 186;
+        const VK_OEM_PLUS = 187;
+        const VK_OEM_COMMA = 188;
+        const VK_OEM_MINUS = 189;
+        const VK_OEM_PERIOD = 190;
+        const VK_OEM_2 = 191;
+        const VK_OEM_3 = 192;
+        const VK_OEM_4 = 219;
+        const VK_OEM_5 = 220;
+        const VK_OEM_6 = 221;
+        const VK_OEM_7 = 222;
+        const VK_OEM_8 = 223;
+        const VK_OEM_102 = 226;
+        const VK_PROCESSKEY = 229;
+        const VK_PACKET = 231;
+        const VK_ATTN = 246;
+        const VK_CRSEL = 247;
+        const VK_EXSEL = 248;
+        const VK_EREOF = 249;
+        const VK_PLAY = 250;
+        const VK_ZOOM = 251;
+        const VK_NONAME = 252;
+        const VK_PA1 = 253;
+        const VK_OEM_CLEAR = 254;
+
+        const canvas = document.getElementById("canvas");
+        const context = canvas.getContext('2d');
+
+        canvas.width = innerWidth;
+        canvas.height = innerHeight;
+
+        context.font = "24px comic sans ms";
+
+        const testing = false;
+
+        //let queue = [];
+
+        class Button {
+            static pointerMap = {};
+
+            pointerId = undefined;
+            calcPosition = undefined;
+            color = undefined;
+            constructor(calcPosition, color, button) {
+                this.calcPosition = calcPosition;
+                this.color = color;
+                this.recalcPosition();
+                if(typeof(button) == "string") {
+                    button = button.toUpperCase().charCodeAt(0);
+                }
+                this.button = button;
+            }
+
+            onPress(event) {
+                this.pointerId = event.pointerId;
+                // this.offsetX = event.clientX - this.x;
+                // this.offsetY = event.clientY - this.y;
+                Button.pointerMap[this.pointerId] = this;
+                if(this.button != undefined) {
+                    socket.send(`${EVENT_KBD_KEY}|${this.button}|`);
+                    //queue.push(`${EVENT_KBD_KEY}|${this.button}|`);
+                }
+            }
+
+            //abstract
+            withinBounds(cX, cY) {};
+
+            draw() {};
+
+            //implements Draggable (if you could do that)
+            //drag() {};
+            //endDrag() {};
+
+            onRelease(event) {
+                delete Button.pointerMap[this.pointerId]
+                this.pointerId = undefined;
+                if(this.button != undefined) {
+                    socket.send(`${EVENT_KBD_KEYUP}|${this.button}|`);
+                    // queue.push(`${EVENT_KBD_KEYUP}|${this.button}|`);
+                }
+            }
+
+            recalcPosition() {
+                const {x, y} = this.calcPosition();
+                this.x = x;
+                this.y = y;
+            }
+        }
+
+        class RectangularButton extends Button {
+            constructor(calcPosition, color, button, width, height, name) {
+                super(calcPosition, color, button, name);
+                this.width = width;
+                this.height = height;
+                this.name = name;
+            }
+
+            withinBounds(cX, cY) {
+                return cX > this.x && cX < this.x+this.width && cY > this.y && cY < this.y+this.height;
+            }
+
+            draw() {
+                context.fillStyle = this.color;
+                context.fillRect(this.x, this.y, this.width, this.height);
+                context.fillStyle = "white";
+                context.fillText(this.name, this.x + this.width/2, this.y + this.height/2);
+            }
+        }
+
+        class CircularButton extends Button {
+            radius = 0;
+            constructor(calcPosition, color, button, radius) {
+                super(calcPosition, color, button);
+                this.radius = radius;
+            }
+
+            withinBounds(cX, cY) {
+                const mag = Math.sqrt((cX - this.x)**2 + (cY - this.y)**2);
+                return mag < this.radius;
+            }
+
+            draw() {
+                context.fillStyle = this.color;
+                context.beginPath();
+                context.arc(this.x, this.y, this.radius, 0, Math.PI*2, false);
+                context.fill();
+                context.stroke();
+            }
+        }
+
+        function dot(ax, ay, bx, by) {
+            return ax*bx + ay*by;
+        }
+
+        const buttons = [
+            new RectangularButton(() => ({x: 0, y: 0}), "grey", 'A', innerWidth/4, innerHeight, "A"),
+            new RectangularButton(() => ({x: (innerWidth/4), y: 0}), "grey", 'S', innerWidth/4, innerHeight, "S"),
+            new RectangularButton(() => ({x: (innerWidth/2), y: 0}), "grey", 'F', innerWidth/4, innerHeight, "F"),
+            new RectangularButton(() => ({x: (innerWidth*3/4), y: 0}), "grey", 'G', innerWidth/4, innerHeight, "G"),
+        ];
+
+        addEventListener("resize", function(event) {
+            canvas.width = innerWidth;
+            canvas.height = innerHeight;
+
+            for(const button of buttons) {
+                button.recalcPosition();
+            }
+        });
+
+        addEventListener("pointerdown", function(event) {
+            console.log(event.clientX, event.clientY);
+
+            for(const button of buttons) {
+                if(button.withinBounds(event.clientX, event.clientY)) {
+                    button.onPress(event);
+                    break;
+                }
+            }
+        });
+
+        addEventListener("pointermove", function(event) {
+            Button.pointerMap[event.pointerId]?.drag?.(event); //INCREDIBLE, just RIDICULOUS
+        });
+
+        addEventListener("pointerup", function(event) {
+            Button.pointerMap[event.pointerId]?.onRelease();
+        });
+
+        let socket;
+
+        function new_socket() {
+            if(document.location.protocol == "file:" || testing) { //lol
+                return {readyState: 0, send: function() {}};
+            }
+            const temp = new WebSocket("/kbdmouse");
+            const time = Date.now();
+            temp.addEventListener("open", function(event) {
+                //console.log("%c"+s,"color: cyan;")
+                console.log("%c[FAST CONNECT]", "color: purple;", "connected in "+(Date.now()-time)+"ms");
+            });
+            temp.addEventListener("message", function(event) {
+                //im probably not gonna be sending any messages back lol (ok wait a second i just remembered that with notifications i can make my shit vibrate so yeah we might be sending a littel something)
+                console.log("Server says: \""+event.data+"\"");
+            });
+            temp.addEventListener("close", function(event) {
+                console.log(`[CONNECTION CLOSED] ${event.reason} (${event.code})`);
+                //document.location.reload(); //lol
+                //console.log(event);
+                socket = new_socket();
+            });
+            return temp;
+        }
+
+        socket = new_socket();
+
+        function draw() {
+            context.clearRect(0, 0, innerWidth, innerHeight);
+            if(socket.readyState != 1) {
+                context.fillStyle = "rgb(64, 0, 0, 0.5)";
+                context.fillRect(0, 0, innerWidth, innerHeight);
+            }
+
+            for(const button of buttons) {
+                button.draw();
+            }
+
+            //if(queue.length) {
+            //    socket.send(queue.join("&")); //yeah baby let's go
+            //}
+
+            //queue = [];
+            requestAnimationFrame(draw);
+        }
+
+        draw();
+    </script>
+</body>
+</html>

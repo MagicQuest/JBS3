@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ViGEm mobile controller</title>
+    <style>
+        html {
+            touch-action: none;
+            user-select: none;
+        }
+        body {
+            margin:0;
+        }
+        canvas {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <!--h1>hello from my <span style="filter: blur(1px); text-shadow: 0 0 8px black; color: yellow;">jbs/c++</span> webserver!</h1-->
+    <canvas id="canvas">
+        it's 2025 bro
+    </canvas>
+    <script>
+        const CONTROLLER_EVENT_THUMB = 1;
+        const CONTROLLER_EVENT_BUTTON = 2;
+        const CONTROLLER_EVENT_NOTIFICATION = 4;
+        const CONTROLLER_EVENT_TRIGGER = 8;
+
+        //we using ds4 so no need
+        const XUSB_GAMEPAD_DPAD_UP = 1;
+        const XUSB_GAMEPAD_DPAD_DOWN = 2;
+        const XUSB_GAMEPAD_DPAD_LEFT = 4;
+        const XUSB_GAMEPAD_DPAD_RIGHT = 8;
+        const XUSB_GAMEPAD_START = 16;
+        const XUSB_GAMEPAD_BACK = 32;
+        const XUSB_GAMEPAD_LEFT_THUMB = 64;
+        const XUSB_GAMEPAD_RIGHT_THUMB = 128;
+        const XUSB_GAMEPAD_LEFT_SHOULDER = 256;
+        const XUSB_GAMEPAD_RIGHT_SHOULDER = 512;
+        const XUSB_GAMEPAD_GUIDE = 1024;
+        const XUSB_GAMEPAD_A = 4096;
+        const XUSB_GAMEPAD_B = 8192;
+        const XUSB_GAMEPAD_X = 16384;
+        const XUSB_GAMEPAD_Y = 32768;
+
+        const XUSB_GAMEPAD_TRIGGER_LEFT = 1 << 16;
+        const XUSB_GAMEPAD_TRIGGER_RIGHT = 1 << 17;
+
+        //const DS4_BUTTON_THUMB_RIGHT = 32768;
+        //const DS4_BUTTON_THUMB_LEFT = 16384;
+        //const DS4_BUTTON_OPTIONS = 8192;
+        //const DS4_BUTTON_SHARE = 4096;
+        //const DS4_BUTTON_TRIGGER_RIGHT = 2048;
+        //const DS4_BUTTON_TRIGGER_LEFT = 1024;
+        //const DS4_BUTTON_SHOULDER_RIGHT = 512;
+        //const DS4_BUTTON_SHOULDER_LEFT = 256;
+        //const DS4_BUTTON_TRIANGLE = 128;
+        //const DS4_BUTTON_CIRCLE = 64;
+        //const DS4_BUTTON_CROSS = 32;
+        //const DS4_BUTTON_SQUARE = 16;
+        //const DS4_SPECIAL_BUTTON_PS = 1;
+        //const DS4_SPECIAL_BUTTON_TOUCHPAD = 2;
+        //const DS4_BUTTON_DPAD_NONE = 8;
+        //const DS4_BUTTON_DPAD_NORTHWEST = 7;
+        //const DS4_BUTTON_DPAD_WEST = 6;
+        //const DS4_BUTTON_DPAD_SOUTHWEST = 5;
+        //const DS4_BUTTON_DPAD_SOUTH = 4;
+        //const DS4_BUTTON_DPAD_SOUTHEAST = 3;
+        //const DS4_BUTTON_DPAD_EAST = 2;
+        //const DS4_BUTTON_DPAD_NORTHEAST = 1;
+        //const DS4_BUTTON_DPAD_NORTH = 0;
+        
+        const canvas = document.getElementById("canvas");
+        const context = canvas.getContext('2d');
+
+        canvas.width = innerWidth;
+        canvas.height = innerHeight;
+
+        //let leftThumbId = undefined;
+        //let rightThumbId = undefined;
+
+        let thumbdistance = 150;
+
+        const testing = false;
+
+        //more like an abstract class than an interface lol
+        //class IHasEvents {
+        //    eventListeners = {}; //aw you can't inherit private properties (normally) in javascript :(
+        //
+        //    constructor() {
+        //
+        //    }
+        //
+        //    addEventListener(event, callback) {
+        //        event = event.toLowerCase();
+        //        if(!this.eventListeners[event]) {
+        //            this.eventListeners[event] = [];
+        //        }
+        //        this.eventListeners[event].push(callback);
+        //    }
+        //
+        //    fireEvent(event, data) {
+        //        event = event.toLowerCase();
+        //        if(!this.eventListeners[event] || this.eventListeners[event].length == 0) {
+        //            return;
+        //        }
+        //        for(const callback of this.eventListeners[event]) {
+        //            callback(data);
+        //        }
+        //    }
+        //}
+
+        //this is basically what the actual DS4_SET_DPAD does
+        //function DS4_SET_DPAD(wButtons, dpad) {
+        //    wButtons &= ~0xF;
+        //    wButtons |= dpad;
+        //    return wButtons;
+        //}
+
+        class Button {
+            static pointerMap = {};
+            //dang it since the dpad is weird and im trying to send all the buttons to the server i need to handle it myself
+            //static dpadMap = {
+            //    0b0000: DS4_BUTTON_DPAD_NONE,
+            //    0b0001: DS4_BUTTON_DPAD_NORTH,
+            //    0b0011: DS4_BUTTON_DPAD_NORTHEAST,
+            //    0b0010: DS4_BUTTON_DPAD_EAST,
+            //    0b0110: DS4_BUTTON_DPAD_SOUTHEAST,
+            //    0b0100: DS4_BUTTON_DPAD_SOUTH,
+            //    0b1100: DS4_BUTTON_DPAD_SOUTHWEST,
+            //    0b1000: DS4_BUTTON_DPAD_WEST,
+            //    0b1001: DS4_BUTTON_DPAD_NORTHWEST,
+            //}
+            static lastControllerButtonsDown = 0;
+            static controllerButtonsDown = 0;
+            static lastTriggers = 0;
+            static triggers = 0;
+            static dpad = 0b0000;
+
+            pointerId = undefined;
+            calcPosition = undefined;
+            color = undefined;
+            constructor(calcPosition, color, button) {
+                this.calcPosition = calcPosition;
+                this.color = color;
+                this.recalcPosition();
+                this.button = button;
+            }
+
+            onPress(event) {
+                this.pointerId = event.pointerId;
+                // this.offsetX = event.clientX - this.x;
+                // this.offsetY = event.clientY - this.y;
+                Button.pointerMap[this.pointerId] = this;
+                if(this.button != undefined) {
+                    //if(this.button <= 0x8) {
+                    //    Button.dpad |= 1 << (button/2);
+                    //    Button.controllerButtonsDown = DS4_SET_DPAD(Button.controllerButtonsDown, Button.dpadMap[Button.dpad]);
+                    //}else {
+                    if(this.button > XUSB_GAMEPAD_Y) {
+                        Button.triggers |= this.button >> 16;
+                    }else {
+                        Button.controllerButtonsDown |= this.button;
+                    }
+                    //}
+                }
+            }
+
+            //abstract
+            withinBounds(cX, cY) {};
+
+            draw() {};
+
+            //implements Draggable (if you could do that)
+            //drag() {};
+            //endDrag() {};
+
+            onRelease(event) {
+                delete Button.pointerMap[this.pointerId]
+                this.pointerId = undefined;
+                if(this.button != undefined) {
+                    //if(this.button <= 0x8) {
+                    //    Button.dpad &= ~(1 << (button/2));
+                    //    Button.controllerButtonsDown = DS4_SET_DPAD(Button.controllerButtonsDown, Button.dpadMap[Button.dpad]);
+                    //}else {
+                    if(this.button > XUSB_GAMEPAD_Y) {
+                        Button.triggers &= ~(this.button >> 16);
+                    }else {
+                        Button.controllerButtonsDown &= ~this.button;
+                    }
+                    //}
+                }
+            }
+
+            recalcPosition() {
+                const {x, y} = this.calcPosition();
+                this.x = x;
+                this.y = y;
+            }
+        }
+
+        class RectangularButton extends Button {
+            constructor(calcPosition, color, button, width, height, name) {
+                super(calcPosition, color, button, name);
+                this.width = width;
+                this.height = height;
+                this.name = name;
+            }
+
+            withinBounds(cX, cY) {
+                return cX > this.x && cX < this.x+this.width && cY > this.y && cY < this.y+this.height;
+            }
+
+            draw() {
+                context.fillStyle = this.color;
+                context.fillRect(this.x, this.y, this.width, this.height);
+                context.fillStyle = "white";
+                context.fillText(this.name, this.x + this.width/2, this.y + this.height/2);
+            }
+        }
+
+        class CircularButton extends Button {
+            radius = 0;
+            constructor(calcPosition, color, button, radius) {
+                super(calcPosition, color, button);
+                this.radius = radius;
+            }
+
+            withinBounds(cX, cY) {
+                const mag = Math.sqrt((cX - this.x)**2 + (cY - this.y)**2);
+                return mag < this.radius;
+            }
+
+            draw() {
+                context.fillStyle = this.color;
+                context.beginPath();
+                context.arc(this.x, this.y, this.radius, 0, Math.PI*2, false);
+                context.fill();
+                context.stroke();
+            }
+        }
+
+        function dot(ax, ay, bx, by) {
+            return ax*bx + ay*by;
+        }
+
+        class Thumb extends CircularButton { //extends IHasEvents {
+            //static pointerMap = {};
+            static radius = 65;
+
+            pointerId = undefined;
+            //#calcPosition = undefined;
+            sX = 0.5;
+            sY = 0.5;
+            lastSX = 0.5;
+            lastSY = 0.5;
+            dirty = 0;
+            // offsetX = 0;
+            // offsetY = 0;
+            constructor(calcPosition) {
+                super(calcPosition, "grey", undefined, Thumb.radius);
+                //this.#calcPosition = calcPosition;
+                //this.recalcPosition();
+            }
+
+            //beginDrag(event) {
+            //    this.pointerId = event.pointerId;
+            //    // this.offsetX = event.clientX - this.x;
+            //    // this.offsetY = event.clientY - this.y;
+            //    Thumb.pointerMap[this.pointerId] = this;
+            //}
+
+            //onPress(event) {
+            //    super.onPress(event, false);
+            //    //this.pointerId = event.pointerId;
+            //    //// this.offsetX = event.clientX - this.x;
+            //    //// this.offsetY = event.clientY - this.y;
+            //    //Button.pointerMap[this.pointerId] = this;
+            //}
+
+            //onDrag(callback) {
+            //    this.addEventListener("drag", callback);
+            //}
+
+            drag(event) {
+                this.x = event.clientX;
+                this.y = event.clientY;
+
+                const {x: ogX, y: ogY} = this.calcPosition();
+                let diffX = (this.x - ogX);
+                let diffY = (this.y - ogY);
+                const mag = Math.sqrt(diffX**2 + diffY**2);
+                if(mag > Thumb.radius) { //subject to change lol
+                    this.x = ogX+(diffX*Thumb.radius/mag);
+                    this.y = ogY+(diffY*Thumb.radius/mag);
+                }
+                diffX = (this.x - ogX);
+                diffY = (this.y - ogY);
+                //this.sX = (diffX/Thumb.radius)/2 + 0.5;
+                //this.sY = (diffY/Thumb.radius)/2 + 0.5;
+                this.sX = Math.round((diffX/Thumb.radius)*32767);
+                this.sY = -Math.round((diffY/Thumb.radius)*32767); //for some reason i gotta flip the y (idk why lol)
+                if(this.lastSX != this.sX || this.lastSX != this.sY) {
+                    //this.fireEvent("drag", this);
+                    this.dirty |= CONTROLLER_EVENT_THUMB;
+                    //socket.send(`${CONTROLLER_EVENT_THUMB}|${+(this == leftThumb)}|${this.sX}|${this.sY}|`); //oh shit i fixed it i don't even need the queue anymore!
+                }
+                this.lastSX = this.sX;
+                this.lastSY = this.sY;
+                //console.log(this.sX, this.sY);
+            }
+
+            update(queue) {
+                if(!this.dirty) {
+                    return;
+                }else {
+                    if(this.dirty & CONTROLLER_EVENT_THUMB == CONTROLLER_EVENT_THUMB) {
+                        //socket.send(`${CONTROLLER_EVENT_THUMB}|${+(this == leftThumb)}|${this.sX}|${this.sY}|`); //haha if i end it with another pipe the garbage will stop fucking my shit up!
+                        queue.push(`${CONTROLLER_EVENT_THUMB}|${+(this == leftThumb)}|${this.sX}|${this.sY}|`);
+                    }
+                    //if(this.dirty & CONTROLLER_EVENT_BUTTON == CONTROLLER_EVENT_BUTTON) {
+                    //
+                    //}
+                    this.dirty = 0;
+                }
+            }
+
+            onRelease() {
+                super.onRelease();
+                //delete Button.pointerMap[this.pointerId]
+                //this.pointerId = undefined;
+                this.recalcPosition();
+                //this.sX = 0.5;
+                //this.sY = 0.5;
+                this.sX = 0;
+                this.sY = 0;
+                this.dirty = CONTROLLER_EVENT_THUMB;
+            }
+
+            //recalcPosition() {
+            //    const {x, y} = this.#calcPosition();
+            //    this.x = x;
+            //    this.y = y;
+            //}
+        }
+
+        class DpadButton extends CircularButton {
+            constructor(calcPosition) {
+                super(calcPosition, "grey", undefined, Thumb.radius);
+            }
+
+            onPress(event) {
+                super.onPress(event);
+                this.drag(event);
+            }
+
+            drag() { //i forgot to put event here and yet everything somehow was working like normal??? when i checked event in globalThis it wasn't there??? (yeah idk)
+                //debugger;    
+                let diffX = (event.clientX - this.x);
+                let diffY = (event.clientY - this.y);
+                const old = Math.sqrt(diffX ** 2 + diffY ** 2);
+                //let's normalize ts values doe
+                diffX *= 1/old;
+                diffY *= 1/old;
+                //const radsq = 1**2;
+                //const permutations = [[1, 0, DS4_BUTTON_DPAD_EAST], [0, 1, DS4_BUTTON_DPAD_SOUTH], [-1, 0, DS4_BUTTON_DPAD_WEST], [0, -1, DS4_BUTTON_DPAD_NORTH]];
+                const permutations = [[1, 0, XUSB_GAMEPAD_DPAD_RIGHT], [0, 1, XUSB_GAMEPAD_DPAD_DOWN], [-1, 0, XUSB_GAMEPAD_DPAD_LEFT], [0, -1, XUSB_GAMEPAD_DPAD_UP]];
+                //Button.dpad = 0b0000;
+                Button.controllerButtonsDown &= ~(0b1111);
+                //hmm lowkey i probably don't need to use the dot product since i only check on one axis at a time... (but now that i think about it, it's just easier to use the dot product lol)
+                for(const [bx, by, direction] of permutations) {
+                    if(dot(diffX, diffY, bx, by) > 0.5) { //tolerance is 0.5
+                        // Button.dpad |= direction;
+                        //oops forgot i was supposed to or them differently >:|
+                        //Button.dpad |= 1 << (direction/2);
+                        //Button.dpad |= direction;
+                        Button.controllerButtonsDown |= direction;
+                    }
+                }
+                //if(Button.dpad & 1) {
+                //    console.log("NORTH");
+                //}
+                //if(Button.dpad >> 1 & 1) {
+                //    console.log("EAST");
+                //}
+                //if(Button.dpad >> 2 & 1) {
+                //    console.log("SOUTH");
+                //}
+                //if(Button.dpad >> 3 & 1) {
+                //    console.log("WEST");
+                //}
+                //console.log(diffX, diffY, dot(diffX, diffY, 1, 0));
+                //console.log(Button.dpad.toString(2));
+                //Button.controllerButtonsDown = DS4_SET_DPAD(Button.controllerButtonsDown, Button.dpadMap[Button.dpad]);
+            }
+
+            onRelease() {
+                super.onRelease();
+                //Button.dpad = 0b0000;
+                //Button.controllerButtonsDown = DS4_SET_DPAD(Button.controllerButtonsDown, Button.dpadMap[Button.dpad]);
+
+                //xobx
+                Button.controllerButtonsDown &= ~(0b1111);
+                //Button.dpad = 0;
+            }
+        }
+
+        //bruh you can't vibrate on ios ts pmo bruhhhhhh
+        class VibrateButton extends CircularButton {
+            constructor(calcPosition, color, button, radius) {
+                super(calcPosition, color, button, radius);
+            }
+
+            onPress(event) {
+                super.onPress(event);
+                setRumble(true);
+            }
+
+            draw() {
+                super.draw();
+                if(rumbling) {
+                    context.fillRect(0, 0, 100, 100);
+                }
+            }
+
+            onRelease(event) {
+                super.onRelease(event);
+                setRumble(false);
+            }
+        }
+
+        const leftThumb = new Thumb(() => ({x: thumbdistance, y: 150}));
+        const rightThumb = new Thumb(() => ({x: innerWidth-thumbdistance*2, y: innerHeight - 150}));
+
+        const lightbar = new RectangularButton(() => ({x: innerWidth/2 - 100, y: 0}), "black", undefined, 200, 50, "lightbar");
+
+        //maybe i should make an independant array for things yo ucan draw or maybe make an array for only the actual buttons idk it's kinda weird how they work so i'll have some global state that all the buttons change and when that changes i'll check in the animation loop
+
+        const buttons = [
+            leftThumb,
+            rightThumb,
+            //new RectangularButton(() => ({x: 200,y: 200}), "green", DS4_BUTTON_CROSS, 100, 100),
+            new DpadButton(() => ({x: leftThumb.x+Thumb.radius*2, y: leftThumb.y+Thumb.radius*2})),
+            lightbar,
+            new CircularButton(() => ({x: innerWidth - thumbdistance, y: 50}), "orange", /*DS4_BUTTON_TRIANGLE*/ XUSB_GAMEPAD_Y, 30),
+            new CircularButton(() => ({x: innerWidth - thumbdistance + 30*2, y: 50 + 30*2}), "red", /*DS4_BUTTON_CIRCLE*/ XUSB_GAMEPAD_B, 30),
+            new CircularButton(() => ({x: innerWidth - thumbdistance - 30*2, y: 50 + 30*2}), "blue", /*DS4_BUTTON_SQUARE*/ XUSB_GAMEPAD_X, 30),
+            new CircularButton(() => ({x: innerWidth - thumbdistance, y: 50 + 60*2}), "green", /*DS4_BUTTON_CROSS*/ XUSB_GAMEPAD_A, 30),
+            new CircularButton(() => ({x: innerWidth/2 + lightbar.width/2, y: 50}), "white", /*DS4_BUTTON_OPTIONS*/ XUSB_GAMEPAD_START, 15),
+            new CircularButton(() => ({x: innerWidth/2 - lightbar.width/2, y: 50}), "white", /*DS4_BUTTON_SHARE*/ XUSB_GAMEPAD_BACK, 15),
+            new RectangularButton(() => ({x: 5 + (lightbar.x/2 - 5)/4, y: 5}), "grey", /*DS4_BUTTON_TRIGGER_LEFT*/ XUSB_GAMEPAD_TRIGGER_LEFT, (lightbar.x/2 - 5)/2, lightbar.height - 5, "LT"),
+            new RectangularButton(() => ({x: (lightbar.x/2 - 5) + (lightbar.x/2 - 5)/4, y: 5}), "grey", /*DS4_BUTTON_SHOULDER_LEFT*/ XUSB_GAMEPAD_LEFT_SHOULDER, (lightbar.x/2 - 5)/2, lightbar.height - 5, "LB"),
+            new RectangularButton(() => ({x: ((5+lightbar.x+lightbar.width)) + (5 + (lightbar.x/2 - 5)/4), y: 5}), "grey", /*DS4_BUTTON_TRIGGER_RIGHT*/ XUSB_GAMEPAD_TRIGGER_RIGHT, (lightbar.x/2 - 5)/2, lightbar.height - 5, "RT"),
+            new RectangularButton(() => ({x: (5+lightbar.x+lightbar.width) + ((lightbar.x/2 - 5) + (lightbar.x/2 - 5)/4), y: 5}), "grey", /*DS4_BUTTON_SHOULDER_RIGHT*/ XUSB_GAMEPAD_RIGHT_SHOULDER, (lightbar.x/2 - 5)/2, lightbar.height - 5, "RB"),
+            //new VibrateButton(() => ({x: innerWidth/2, y: innerHeight/2}), "cyan", undefined, 30),
+        ];
+
+        addEventListener("resize", function(event) {
+            canvas.width = innerWidth;
+            canvas.height = innerHeight;
+            //leftThumb.recalcPosition();
+            //rightThumb.recalcPosition();
+            for(const button of buttons) {
+                button.recalcPosition();
+            }
+        });
+
+        addEventListener("pointerdown", function(event) {
+            console.log(event.clientX, event.clientY);
+            //if(leftThumb.withinBounds(event.clientX, event.clientY)) {
+            //    leftThumb.beginDrag(event);
+            //}else if(rightThumb.withinBounds(event.clientX, event.clientY)) {
+            //    rightThumb.beginDrag(event);
+            //}else {
+            //    console.log("could be button press :)");
+            //}
+            //debugger;
+            for(const button of buttons) {
+                if(button.withinBounds(event.clientX, event.clientY)) {
+                    button.onPress(event);
+                    break;
+                }
+            }
+        });
+
+        addEventListener("pointermove", function(event) {
+            Button.pointerMap[event.pointerId]?.drag?.(event); //INCREDIBLE, just RIDICULOUS
+        });
+
+        addEventListener("pointerup", function(event) {
+            Button.pointerMap[event.pointerId]?.onRelease();
+        });
+
+        let rumbling = false;
+        let rumbleIntervalId = 0;
+        const rate = 100;
+
+        function setRumble(rumble) {
+            rumbling = rumble;
+            if(rumbling) {
+                console.log("vibrating 1");
+                navigator.vibrate(rate);
+                rumbleIntervalId = setInterval(() => {
+                    console.log("vibrating");
+                    navigator.vibrate(rate);
+                }, rate);
+            }else {
+                navigator.vibrate(0);
+                clearInterval(rumbleIntervalId);
+                rumbleIntervalId = 0;
+            }
+        }
+
+        function toggleRumble() {
+            setRumble(!rumbling);
+        }
+
+        let socket;
+
+        function new_socket() {
+            if(document.location.protocol == "file:" || testing) { //lol
+                return {readyState: 0, send: function() {}};
+            }
+            const temp = new WebSocket("/");
+            const time = Date.now();
+            temp.addEventListener("open", function(event) {
+                //console.log("%c"+s,"color: cyan;")
+                console.log("%c[FAST CONNECT]", "color: purple;", "connected in "+(Date.now()-time)+"ms");
+            });
+            temp.addEventListener("message", function(event) {
+                //im probably not gonna be sending any messages back lol (ok wait a second i just remembered that with notifications i can make my shit vibrate so yeah we might be sending a littel something)
+                console.log("Server says: \""+event.data+"\"");
+                const notification = event.data.split("|");
+                if(notification[0] == CONTROLLER_EVENT_NOTIFICATION) {
+                    const rumble = notification[1];
+                    setRumble(rumble);
+                    const lightbar = notification[2];
+                    if(lightbar) {
+                        //const [r, g, b] = notification[2].split(",");
+                        lightbar.color = `rgb(${notification[2]})`;
+                    }
+                }
+            });
+            temp.addEventListener("close", function(event) {
+                console.log(`[CONNECTION CLOSED] ${event.reason} (${event.code})`);
+                //document.location.reload(); //lol
+                //console.log(event);
+                socket = new_socket();
+            });
+            return temp;
+        }
+
+        socket = new_socket();
+
+        //function onthumbdrag(thumb) { //ok this might actually fire so fast that the socket is sends more information before i can read it and i start reading the packets wrong!
+        //    const left = +(thumb == leftThumb);
+        //    //instead of sending the sockets here, we'll just store them so we can send them in the draw loop instead
+        //    //actually i might have to change the way the events work because of this
+        //
+        //    //socket.send(`${CONTROLLER_EVENT_THUMB}|${left}|${thumb.sX}|${thumb.sY}`); //wait should i send it raw or should i send the binary lol?
+        //    //socket.send("!ping");
+        //    //console.log(`${CONTROLLER_EVENT_THUMB}|${left}|${thumb.sX}|${thumb.sY}`);
+        //}
+
+        //leftThumb.onDrag(onthumbdrag);
+        //rightThumb.onDrag(onthumbdrag);
+
+        function draw() {
+            context.clearRect(0, 0, innerWidth, innerHeight);
+            if(socket.readyState != 1) {
+                context.fillStyle = "rgb(64, 0, 0, 0.5)";
+                context.fillRect(0, 0, innerWidth, innerHeight);
+            }
+
+            //context.fillStyle = "grey";
+
+            for(const button of buttons) {
+                button.draw();
+            }
+
+            //context.beginPath();
+            //context.arc(leftThumb.x, leftThumb.y, Thumb.radius, 0, Math.PI*2, false);
+            //context.fill();
+            //context.stroke();
+            //
+            //context.beginPath();
+            //context.arc(rightThumb.x, rightThumb.y, Thumb.radius, 0, Math.PI*2, false);
+            //context.fill();
+            //context.stroke();
+
+            const queue = [];
+            leftThumb.update(queue);
+            rightThumb.update(queue);
+
+            if(Button.controllerButtonsDown != Button.lastControllerButtonsDown) {
+                queue.push(`${CONTROLLER_EVENT_BUTTON}|${Button.controllerButtonsDown}|`);
+            }
+
+            Button.lastControllerButtonsDown = Button.controllerButtonsDown;
+
+            if(Button.triggers != Button.lastTriggers) {
+                for(let i = 0; i < 2; i++) {
+                    if((Button.triggers >> i) & 1 == 1) {
+                        queue.push(`${CONTROLLER_EVENT_TRIGGER}|${1-i}|255|`); //sending max triggerp osition because fuck all dat
+                    }else {
+                        queue.push(`${CONTROLLER_EVENT_TRIGGER}|${1-i}|0|`);
+                    }
+                }
+            }
+
+            Button.lastTriggers = Button.triggers;
+
+            if(queue.length) {
+                socket.send(queue.join("&")); //yeah baby let's go
+            }
+
+            requestAnimationFrame(draw);
+        }
+
+        draw();
+    </script>
+</body>
+</html>

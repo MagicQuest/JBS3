@@ -173,7 +173,7 @@ function onExtensionChange(hasExtension, previousExtensionId) {
 
 //CODE START
 
-if(!ViGEmBus.init()) {
+if(ViGEmBus.init() != VIGEM_ERROR_NONE) {
     quit;
 }
 
@@ -199,8 +199,8 @@ function x360_notification(Client, Target, LargeMotor, SmallMotor, LedNumber) {
 }
 
 controller = ViGEmBus.addController(CONTROLLER_X360);
-if(!controller) {
-    quit;
+if(!controller.pad) { //if the return value is false or an error code, the "pad" property will be undefined
+    quit; //lol
 }
 
 controller.register_notification(x360_notification);
